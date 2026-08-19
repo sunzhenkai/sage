@@ -19,7 +19,7 @@ export function WorkspaceShell({ view, sessionId, children }: { readonly view: W
   const { locale, setLocale, t } = useLocale();
   return <div className="app-frame">
     <aside className="sidebar">
-      <a className="brand" href={workspaceHref({ view: 'chat', ...(sessionId ? { sessionId } : {}) })} aria-label={t('home')}><span className="brand-mark">S</span><span><strong>Sage</strong><small>{t('brandSubtitle')}</small></span></a>
+      <a className="brand" href={workspaceHref({ view: 'chat', ...(sessionId ? { sessionId } : {}) })} aria-label={`${t('brandName')} ${t('home')}`}><span className="brand-mark">S</span><span><strong>{t('brandName')}</strong><small>{t('brandSubtitle')}</small></span></a>
       <div className="workspace-switcher"><span className="workspace-avatar">SL</span><span><strong>{t('localWorkspace')}</strong><small>tenant-local</small></span><span className="chevron">⌄</span></div>
       <nav className="main-nav" aria-label={t('mainNavigation')}>
         <p className="nav-label">{t('workspace')}</p>

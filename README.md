@@ -1,4 +1,6 @@
-# Sage
+# 思极（Sage）
+
+> 不止于思，极致于行
 
 > 通用 Agent 平台 — Agent-first shared Kernel、可插拔 Engine、AgentPackageRelease → AgentTaskSpec → AgentExecutionEnvelope、Interactive/Durable 双 Host、Capability/MCP、Context/Model、Artifact/Checkpoint、Effect/Consumption Ledger 与单一 authority。
 
