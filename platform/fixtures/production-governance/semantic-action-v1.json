@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "1",
+  "productionEvidence": false,
+  "vectors": [
+    {"name":"ascii","tenantId":"tenant-a","taskId":"task-1","attemptCompatibleActionKey":"charge-once","toolVersion":"7","input":{"amount":12.5,"currency":"USD"},"canonicalInputDigest":"sha256:b08a3124c71655a97813fed0e25d47583e250b045d1433a7de63ec207303cd21","semanticActionId":"sha256:0a6419ef67601df6fb5d3998e3a66049630cc2eb62595ec222c1b7c91afaf2ed"},
+    {"name":"unicode-nfc","tenantId":"租户-a","taskId":"task-é","attemptCompatibleActionKey":"éxecute","toolVersion":"1.0.0","input":{"label":"café","items":[3,2,1]},"canonicalInputDigest":"sha256:a0bbc4e9886c4ccbc075df95adc57d1e0d78370dd79848b71e924b866055445e","semanticActionId":"sha256:20342fc4efdcdc66eb66ebc7ab2d7f363028fb37f59fe40de8cb3f5e30f01e67"}
+  ]
+}

@@ -1,0 +1,33 @@
+groups:
+  - name: sage-p7-production-pilot
+    rules:
+      - alert: SagePilotRoutingFailure
+        expr: sum by (tenant_id, task_id, workflow_id, target_id, attempt, run_id, tool_call_id) (increase(sage_task_route_decisions_total{outcome="failed"}[5m])) > 0
+        labels: { severity: critical, responder_service: sage-pilot-primary-oncall }
+        annotations: { summary: "Trusted routing failed", runbook_url: "docs/p7-incident-runbooks.md#routing-failure" }
+      - alert: SagePilotTargetClusterUnavailable
+        expr: sum by (tenant_id, task_id, workflow_id, target_id, attempt, run_id, tool_call_id) (increase(sage_temporal_target_unavailable_total[1m])) > 0
+        labels: { severity: critical, responder_service: sage-pilot-primary-oncall }
+        annotations: { summary: "Selected Temporal target is unavailable; never create a fallback duplicate", runbook_url: "docs/p7-incident-runbooks.md#target-cluster-unavailable" }
+      - alert: SagePilotTaskQueueBacklog
+        expr: max by (namespace, task_queue, target_id) (temporal_task_queue_schedule_to_start_latency_seconds) > 30
+        for: 10m
+        labels: { severity: warning, responder_service: sage-pilot-primary-oncall }
+        annotations: { summary: "Temporal Task Queue schedule-to-start latency is high", runbook_url: "docs/p7-incident-runbooks.md#queue-backlog" }
+      - alert: SagePilotActivityRetry
+        expr: sum by (tenant_id, task_id, workflow_id, target_id, attempt, run_id, tool_call_id) (increase(sage_task_worker_attempt_total{activity_attempt!="1"}[5m])) > 0
+        labels: { severity: warning, responder_service: sage-pilot-primary-oncall }
+        annotations: { summary: "Activity retry observed", runbook_url: "docs/p7-incident-runbooks.md#activity-retry" }
+      - alert: SagePilotProjectionLag
+        expr: max by (tenant_id, task_id, workflow_id, target_id, attempt, run_id, tool_call_id) (sage_task_projection_lag_ms) > 30000
+        for: 5m
+        labels: { severity: warning, responder_service: sage-pilot-primary-oncall }
+        annotations: { summary: "Task projection is stale", runbook_url: "docs/p7-incident-runbooks.md#projection-lag-or-drift" }
+      - alert: SagePilotEffectUnknown
+        expr: sum by (tenant_id, task_id, workflow_id, target_id, attempt, run_id, tool_call_id) (increase(sage_tool_effect_unknown_total[5m]) or increase(sage_task_effect_unknown_total[5m])) > 0
+        labels: { severity: critical, responder_service: sage-pilot-primary-oncall }
+        annotations: { summary: "A Tool or Task side effect has unknown outcome; automatic retry is prohibited", runbook_url: "docs/p7-incident-runbooks.md#effect_unknown" }
+      - alert: SagePilotProjectionDrift
+        expr: sum by (tenant_id, task_id, workflow_id, target_id, attempt, run_id, tool_call_id) (increase(sage_task_projection_drift_total[5m])) > 0
+        labels: { severity: warning, responder_service: sage-pilot-primary-oncall }
+        annotations: { summary: "Temporal History and Task projection differ", runbook_url: "docs/p7-incident-runbooks.md#projection-lag-or-drift" }

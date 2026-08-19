@@ -1,0 +1,47 @@
+{
+  "schemaVersion": "1",
+  "sourceRevision": "e8ea299dcac4f1859528d2c67e31e35a58d05c9e",
+  "sourceDigest": "sha256:968bfae73d45be1e8fd24d15ab63f024053550dc5ed3269785aa113d9ac9a035",
+  "toolDigest": "sha256:3d6dd2655ddfe4566363423fb31c041e376338385de07874a57dd1038ac59fdf",
+  "generatedAt": "2026-08-17T03:31:18.656Z",
+  "sourceState": {
+    "head": "e8ea299dcac4f1859528d2c67e31e35a58d05c9e",
+    "worktreeDigest": "sha256:c2fe13d173b44c54a13ab7b65099712f26754498e64513792781544dc6844687",
+    "dirtyPathCount": 348
+  },
+  "startedAt": "2026-08-17T03:31:18.636Z",
+  "finishedAt": "2026-08-17T03:31:18.656Z",
+  "seed": "apgv-seed-v1",
+  "executionEvidenceRef": "platform/evidence/agent-platform-final/executed-results.json",
+  "executionEvidenceDigest": "sha256:8c9ab5d23775aab3d68d974038541084636e2b440df0cdddb8b6291fb44a2ea4",
+  "caseId": "apgv/replay/v1/projection-rebuild",
+  "projection": {
+    "cursor": 7,
+    "historyState": "COMPLETED",
+    "receiptRefs": [
+      "receipt://effect",
+      "receipt://usage"
+    ],
+    "artifactRefs": [
+      "artifact://result"
+    ],
+    "checkpointRefs": [
+      "checkpoint://sealed"
+    ],
+    "freshness": "cursor:7"
+  },
+  "reconciliation": {
+    "changed": true,
+    "before": {
+      "cursor": 1,
+      "historyState": "RUNNING",
+      "receiptRefs": [],
+      "artifactRefs": [],
+      "checkpointRefs": [],
+      "freshness": "cursor:1"
+    },
+    "commandsEmitted": 0
+  },
+  "status": "PASS",
+  "contentDigest": "sha256:20ac7c83b139790cfc390f3bd9802d4f5573658c2f5f58c0e1dedd224c84978f"
+}

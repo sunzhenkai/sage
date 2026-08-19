@@ -1,0 +1,13 @@
+{
+  "name": "@sage/node-host",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "clean": "rm -rf dist", "typecheck": "tsc -p tsconfig.json --noEmit", "build": "tsc -p tsconfig.json", "start": "tsx src/index.ts" },
+  "dependencies": {
+    "@sage/agent-client": "workspace:*",
+    "@sage/agent-contracts": "workspace:*",
+    "@sage/harness-pi": "workspace:*",
+    "@sage/local-fakes": "workspace:*"
+  }
+}

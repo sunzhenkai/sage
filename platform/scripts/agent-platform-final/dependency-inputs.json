@@ -1,0 +1,81 @@
+{
+  "schemaVersion": "1",
+  "canonicalContractMajor": 1,
+  "sourceRevision": "e8ea299",
+  "compatibilityWindow": {
+    "runtimeMajor": 1,
+    "coordinatorBuilds": [
+      "build://legacy-temporal/v1",
+      "build://coordinator-v2/v1"
+    ]
+  },
+  "productionFreshnessHours": 24,
+  "dependencies": [
+    {
+      "change": "agent-platform-contract-authority-foundation",
+      "owner": "Agent Core",
+      "evidence": "evidence/agent-platform-contract-authority-foundation/phase-0-conformance.md",
+      "progress": {
+        "total": 45,
+        "complete": 45,
+        "remaining": 0,
+        "canonicalTasksDigest": "sha256:95416e32a39b99afd200bac05efbdbfda42373583cd010893be53d36bcb43c98"
+      }
+    },
+    {
+      "change": "agent-runtime-kernel-broker-integration",
+      "owner": "Agent Core",
+      "evidence": "evidence/agent-runtime-kernel-broker-integration/phase-1-runtime-kernel-ports.md",
+      "progress": {
+        "total": 51,
+        "complete": 51,
+        "remaining": 0,
+        "canonicalTasksDigest": "sha256:f196e9a07299a4b76f2a32c10cde6b3fc119f6124bc0a4039897ae3feb26b725"
+      }
+    },
+    {
+      "change": "durable-agent-coordinator-adapter",
+      "owner": "Task Runtime",
+      "evidence": "evidence/durable-agent-coordinator-adapter/phase-2-dependency-gate.md",
+      "progress": {
+        "total": 56,
+        "complete": 56,
+        "remaining": 0,
+        "canonicalTasksDigest": "sha256:d1f16d6aa7e82db2b4570846c4d276695b3fffa70d31383d88869f0b2822bf65"
+      }
+    },
+    {
+      "change": "agent-package-release-admission",
+      "owner": "Package Platform",
+      "evidence": "evidence/agent-package-release-admission/phase-3-dependency-gate.md",
+      "progress": {
+        "total": 65,
+        "complete": 65,
+        "remaining": 0,
+        "canonicalTasksDigest": "sha256:ece5300e2cfeddc32e5670160b3593a8b9e94f612b79b773293c78b567b4e1cd"
+      }
+    },
+    {
+      "change": "agent-platform-production-governance",
+      "owner": "Platform Security/SRE",
+      "evidence": "evidence/production-governance/readiness-manifest.json",
+      "progress": {
+        "total": 67,
+        "complete": 58,
+        "remaining": 9,
+        "canonicalTasksDigest": "sha256:df313de4a041f2458dba70a8414ee19e40ed5b6ace9c5023dc6512734bf69b25"
+      }
+    }
+  ],
+  "externalDeferredTaskIds": [
+    "9.1",
+    "9.2",
+    "9.3",
+    "10.5",
+    "11.2",
+    "11.3",
+    "12.2",
+    "12.3",
+    "12.5"
+  ]
+}

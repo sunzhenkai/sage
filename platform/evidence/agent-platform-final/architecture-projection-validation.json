@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "1",
+  "sourceRevision": "e8ea299dcac4f1859528d2c67e31e35a58d05c9e",
+  "sourceDigest": "sha256:c2fe13d173b44c54a13ab7b65099712f26754498e64513792781544dc6844687",
+  "toolDigest": "sha256:615a886b8b64d8fa078866d1e5da007c31c9088effdb9684eb873b16162bebde",
+  "generatedAt": "2026-08-17T03:31:33.042Z",
+  "caseId": "apgv/architecture/v1/runtime-projection",
+  "modelDigest": "sha256:830d4046e44bcef1a1aad015eaaa6d7b5e0e0131569b4e1ec11c9459b485445a",
+  "dslDigest": "sha256:6ec4daedc6517523a77591d7ea0f6479af86665273d6fc1b3bdf33b0ffd94009",
+  "renderDigest": "sha256:e4edb8f01f473c1827a023f5dbb433d03b578821c560879a11878f905a705d8c",
+  "viewCount": 3,
+  "nodeCount": 26,
+  "edgeCount": 33,
+  "missingNodes": [],
+  "missingEdges": [],
+  "deterministicDigest": "sha256:6ec4daedc6517523a77591d7ea0f6479af86665273d6fc1b3bdf33b0ffd94009",
+  "status": "PASS",
+  "contentDigest": "sha256:faf8b867256344c3a147c45052dbb2c66dbc3c75c0b356608dceabb30fb19681"
+}

@@ -1,0 +1,11 @@
+{
+  "metric_name": "sage_task_worker_attempt_total",
+  "metric_value": 1,
+  "tenant_id": "fixture-tenant",
+  "task_id": "fixture-task",
+  "workflow_id": "fixture-workflow",
+  "target_id": "fixture-target",
+  "attempt": 1,
+  "run_id": "fixture-run",
+  "tool_call_id": "fixture-tool-call"
+}

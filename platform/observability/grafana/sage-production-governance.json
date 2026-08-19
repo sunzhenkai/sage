@@ -1,0 +1,12 @@
+{
+  "title":"Sage Production Governance (NO-GO until external approval)",
+  "schemaVersion":39,
+  "tags":["production-governance","non-authoritative-template"],
+  "panels":[
+    {"title":"Admission outcomes","type":"timeseries","targets":[{"expr":"sum by (component,outcome,reason,severity,scope_kind) (rate(sage_governance_admission_total[5m]))"}]},
+    {"title":"Queue and fairness","type":"timeseries","targets":[{"expr":"max by (component,outcome,reason,severity,scope_kind) (sage_governance_queue_depth)"}]},
+    {"title":"Effect and Usage authority","type":"timeseries","targets":[{"expr":"sum by (component,outcome,reason,severity,scope_kind) (rate(sage_governance_ledger_total[5m]))"}]},
+    {"title":"Reconciliation age","type":"timeseries","targets":[{"expr":"max by (component,outcome,reason,severity,scope_kind) (sage_governance_reconcile_age_seconds)"}]},
+    {"title":"Dependency health","type":"stat","targets":[{"expr":"min by (component,outcome,reason,severity,scope_kind) (sage_governance_dependency_healthy)"}]}
+  ]
+}

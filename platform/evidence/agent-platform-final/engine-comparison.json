@@ -1,0 +1,118 @@
+{
+  "schemaVersion": "1",
+  "sourceRevision": "e8ea299dcac4f1859528d2c67e31e35a58d05c9e",
+  "sourceDigest": "sha256:968bfae73d45be1e8fd24d15ab63f024053550dc5ed3269785aa113d9ac9a035",
+  "toolDigest": "sha256:3d6dd2655ddfe4566363423fb31c041e376338385de07874a57dd1038ac59fdf",
+  "generatedAt": "2026-08-17T03:31:18.656Z",
+  "sourceState": {
+    "head": "e8ea299dcac4f1859528d2c67e31e35a58d05c9e",
+    "worktreeDigest": "sha256:c2fe13d173b44c54a13ab7b65099712f26754498e64513792781544dc6844687",
+    "dirtyPathCount": 348
+  },
+  "startedAt": "2026-08-17T03:31:18.636Z",
+  "finishedAt": "2026-08-17T03:31:18.656Z",
+  "seed": "apgv-seed-v1",
+  "executionEvidenceRef": "platform/evidence/agent-platform-final/executed-results.json",
+  "executionEvidenceDigest": "sha256:8c9ab5d23775aab3d68d974038541084636e2b440df0cdddb8b6291fb44a2ea4",
+  "pairCount": 19,
+  "referenceBuild": "sha256:2a1b753ef3661bc0c19974be5d6a1f47329e60c2a3e4f8976cca5847f474c687",
+  "piBuild": "sha256:60f92482872104bff1ad86aabf6c4055e21a3ab33492e32ec2766c1b49a37040",
+  "allowedNonExact": [
+    "text",
+    "reasoning",
+    "internal-turn"
+  ],
+  "forbiddenCanonical": [
+    "outcome",
+    "error",
+    "authority",
+    "receipt",
+    "artifact",
+    "checkpoint",
+    "budget"
+  ],
+  "canonicalDifferences": [],
+  "nonExactReasons": [
+    "engine-private-text-omitted"
+  ],
+  "cases": [
+    {
+      "caseId": "apgv/engine/v1/preflight-capability",
+      "status": "PASS"
+    },
+    {
+      "caseId": "apgv/engine/v1/canonical-events-and-outcome",
+      "status": "PASS"
+    },
+    {
+      "caseId": "apgv/engine/v1/bound-model-calls",
+      "status": "PASS"
+    },
+    {
+      "caseId": "apgv/engine/v1/bound-tool-calls",
+      "status": "PASS"
+    },
+    {
+      "caseId": "apgv/engine/v1/bound-artifact-bytes",
+      "status": "PASS"
+    },
+    {
+      "caseId": "apgv/engine/v1/bound-checkpoint-candidates",
+      "status": "PASS"
+    },
+    {
+      "caseId": "apgv/engine/v1/cancellation",
+      "status": "PASS"
+    },
+    {
+      "caseId": "apgv/engine/v1/stable-errors",
+      "status": "PASS"
+    },
+    {
+      "caseId": "apgv/engine/v1/candidate-only-checkpoint",
+      "status": "PASS"
+    },
+    {
+      "caseId": "apgv/engine/v1/codec-incompatibility",
+      "status": "PASS"
+    },
+    {
+      "caseId": "apgv/engine/v1/runtime-incompatibility",
+      "status": "PASS"
+    },
+    {
+      "caseId": "apgv/engine/v1/duration-bound",
+      "status": "PASS"
+    },
+    {
+      "caseId": "apgv/engine/v1/turn-bound",
+      "status": "PASS"
+    },
+    {
+      "caseId": "apgv/engine/v1/token-bound",
+      "status": "PASS"
+    },
+    {
+      "caseId": "apgv/engine/v1/context-bound",
+      "status": "PASS"
+    },
+    {
+      "caseId": "apgv/engine/v1/cost-bound",
+      "status": "PASS"
+    },
+    {
+      "caseId": "apgv/engine/v1/concurrency-bound",
+      "status": "PASS"
+    },
+    {
+      "caseId": "apgv/engine/v1/principal-tenant-grant",
+      "status": "PASS"
+    },
+    {
+      "caseId": "apgv/engine/v1/duplicate-invocation",
+      "status": "PASS"
+    }
+  ],
+  "status": "PASS",
+  "contentDigest": "sha256:d38a4d3e125a4633edd9b0e4ef1c8f2204142431979a9d0d2ce196cb37c6b8f9"
+}

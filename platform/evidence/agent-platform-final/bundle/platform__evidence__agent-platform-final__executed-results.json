@@ -1,0 +1,1117 @@
+{
+  "schemaVersion": "1",
+  "caseId": "apgv/execution/v1/mandatory-suite",
+  "seed": "apgv-seed-v1",
+  "sourceDigest": "sha256:968bfae73d45be1e8fd24d15ab63f024053550dc5ed3269785aa113d9ac9a035",
+  "toolDigest": "sha256:3d6dd2655ddfe4566363423fb31c041e376338385de07874a57dd1038ac59fdf",
+  "sourceState": {
+    "head": "e8ea299dcac4f1859528d2c67e31e35a58d05c9e",
+    "worktreeDigest": "sha256:c2fe13d173b44c54a13ab7b65099712f26754498e64513792781544dc6844687",
+    "dirtyPathCount": 348
+  },
+  "startedAt": "2026-08-17T03:31:18.636Z",
+  "finishedAt": "2026-08-17T03:31:18.656Z",
+  "engine": {
+    "status": "PASS",
+    "seed": "apgv-seed-v1",
+    "reference": {
+      "factoryId": "deterministic-reference",
+      "canonicalContractMajor": 1,
+      "cases": [
+        {
+          "id": "preflight-capability",
+          "status": "PASS",
+          "assertionCount": 1
+        },
+        {
+          "id": "canonical-events-and-outcome",
+          "status": "PASS",
+          "assertionCount": 1
+        },
+        {
+          "id": "bound-model_calls",
+          "status": "PASS",
+          "assertionCount": 1
+        },
+        {
+          "id": "bound-tool_calls",
+          "status": "PASS",
+          "assertionCount": 1
+        },
+        {
+          "id": "bound-artifact_bytes",
+          "status": "PASS",
+          "assertionCount": 1
+        },
+        {
+          "id": "bound-checkpoint_candidates",
+          "status": "PASS",
+          "assertionCount": 1
+        },
+        {
+          "id": "cancellation",
+          "status": "PASS",
+          "assertionCount": 1
+        },
+        {
+          "id": "stable-errors",
+          "status": "PASS",
+          "assertionCount": 1
+        },
+        {
+          "id": "candidate-only-checkpoint",
+          "status": "PASS",
+          "assertionCount": 1
+        },
+        {
+          "id": "codec-incompatibility",
+          "status": "PASS",
+          "assertionCount": 1
+        },
+        {
+          "id": "runtime-incompatibility",
+          "status": "PASS",
+          "assertionCount": 1
+        },
+        {
+          "id": "duration-bound",
+          "status": "PASS",
+          "assertionCount": 2
+        },
+        {
+          "id": "turn-bound",
+          "status": "PASS",
+          "assertionCount": 2
+        },
+        {
+          "id": "token-bound",
+          "status": "PASS",
+          "assertionCount": 2
+        },
+        {
+          "id": "context-bound",
+          "status": "PASS",
+          "assertionCount": 2
+        },
+        {
+          "id": "cost-bound",
+          "status": "PASS",
+          "assertionCount": 2
+        },
+        {
+          "id": "concurrency-bound",
+          "status": "PASS",
+          "assertionCount": 2
+        },
+        {
+          "id": "principal-tenant-grant",
+          "status": "PASS",
+          "assertionCount": 2
+        },
+        {
+          "id": "duplicate-invocation",
+          "status": "PASS",
+          "assertionCount": 3
+        }
+      ]
+    },
+    "pi": {
+      "factoryId": "pi",
+      "canonicalContractMajor": 1,
+      "cases": [
+        {
+          "id": "preflight-capability",
+          "status": "PASS",
+          "assertionCount": 1
+        },
+        {
+          "id": "canonical-events-and-outcome",
+          "status": "PASS",
+          "assertionCount": 1
+        },
+        {
+          "id": "bound-model_calls",
+          "status": "PASS",
+          "assertionCount": 1
+        },
+        {
+          "id": "bound-tool_calls",
+          "status": "PASS",
+          "assertionCount": 1
+        },
+        {
+          "id": "bound-artifact_bytes",
+          "status": "PASS",
+          "assertionCount": 1
+        },
+        {
+          "id": "bound-checkpoint_candidates",
+          "status": "PASS",
+          "assertionCount": 1
+        },
+        {
+          "id": "cancellation",
+          "status": "PASS",
+          "assertionCount": 1
+        },
+        {
+          "id": "stable-errors",
+          "status": "PASS",
+          "assertionCount": 1
+        },
+        {
+          "id": "candidate-only-checkpoint",
+          "status": "PASS",
+          "assertionCount": 1
+        },
+        {
+          "id": "codec-incompatibility",
+          "status": "PASS",
+          "assertionCount": 1
+        },
+        {
+          "id": "runtime-incompatibility",
+          "status": "PASS",
+          "assertionCount": 1
+        },
+        {
+          "id": "duration-bound",
+          "status": "PASS",
+          "assertionCount": 2
+        },
+        {
+          "id": "turn-bound",
+          "status": "PASS",
+          "assertionCount": 2
+        },
+        {
+          "id": "token-bound",
+          "status": "PASS",
+          "assertionCount": 2
+        },
+        {
+          "id": "context-bound",
+          "status": "PASS",
+          "assertionCount": 2
+        },
+        {
+          "id": "cost-bound",
+          "status": "PASS",
+          "assertionCount": 2
+        },
+        {
+          "id": "concurrency-bound",
+          "status": "PASS",
+          "assertionCount": 2
+        },
+        {
+          "id": "principal-tenant-grant",
+          "status": "PASS",
+          "assertionCount": 2
+        },
+        {
+          "id": "duplicate-invocation",
+          "status": "PASS",
+          "assertionCount": 3
+        }
+      ]
+    },
+    "sharedCaseCount": 19
+  },
+  "host": {
+    "status": "PASS",
+    "scenarioCount": 8,
+    "hosts": [
+      "interactive-bounded-client",
+      "durable-coordinator-activity"
+    ],
+    "cases": [
+      {
+        "caseId": "apgv/host/v1/success",
+        "scenario": "success",
+        "status": "PASS",
+        "canonicalEquivalent": true,
+        "interactiveCalls": 1,
+        "durableCalls": 1,
+        "durableBinding": "createDurableCoordinatorHostActivities",
+        "assertions": [
+          "outcome",
+          "error",
+          "receipt-lineage",
+          "artifact-lineage",
+          "checkpoint-lineage"
+        ]
+      },
+      {
+        "caseId": "apgv/host/v1/denial",
+        "scenario": "denial",
+        "status": "PASS",
+        "canonicalEquivalent": true,
+        "interactiveCalls": 1,
+        "durableCalls": 1,
+        "durableBinding": "createDurableCoordinatorHostActivities",
+        "assertions": [
+          "outcome",
+          "error",
+          "receipt-lineage",
+          "artifact-lineage",
+          "checkpoint-lineage"
+        ]
+      },
+      {
+        "caseId": "apgv/host/v1/cancel",
+        "scenario": "cancel",
+        "status": "PASS",
+        "canonicalEquivalent": true,
+        "interactiveCalls": 1,
+        "durableCalls": 1,
+        "durableBinding": "createDurableCoordinatorHostActivities",
+        "assertions": [
+          "outcome",
+          "error",
+          "receipt-lineage",
+          "artifact-lineage",
+          "checkpoint-lineage"
+        ]
+      },
+      {
+        "caseId": "apgv/host/v1/timeout",
+        "scenario": "timeout",
+        "status": "PASS",
+        "canonicalEquivalent": true,
+        "interactiveCalls": 1,
+        "durableCalls": 1,
+        "durableBinding": "createDurableCoordinatorHostActivities",
+        "assertions": [
+          "outcome",
+          "error",
+          "receipt-lineage",
+          "artifact-lineage",
+          "checkpoint-lineage"
+        ]
+      },
+      {
+        "caseId": "apgv/host/v1/budget-exhausted",
+        "scenario": "budget-exhausted",
+        "status": "PASS",
+        "canonicalEquivalent": true,
+        "interactiveCalls": 1,
+        "durableCalls": 1,
+        "durableBinding": "createDurableCoordinatorHostActivities",
+        "assertions": [
+          "outcome",
+          "error",
+          "receipt-lineage",
+          "artifact-lineage",
+          "checkpoint-lineage"
+        ]
+      },
+      {
+        "caseId": "apgv/host/v1/waiting",
+        "scenario": "waiting",
+        "status": "PASS",
+        "canonicalEquivalent": true,
+        "interactiveCalls": 1,
+        "durableCalls": 1,
+        "durableBinding": "createDurableCoordinatorHostActivities",
+        "assertions": [
+          "outcome",
+          "error",
+          "receipt-lineage",
+          "artifact-lineage",
+          "checkpoint-lineage"
+        ]
+      },
+      {
+        "caseId": "apgv/host/v1/effect-unknown",
+        "scenario": "effect-unknown",
+        "status": "PASS",
+        "canonicalEquivalent": true,
+        "interactiveCalls": 1,
+        "durableCalls": 1,
+        "durableBinding": "createDurableCoordinatorHostActivities",
+        "assertions": [
+          "outcome",
+          "error",
+          "receipt-lineage",
+          "artifact-lineage",
+          "checkpoint-lineage"
+        ]
+      },
+      {
+        "caseId": "apgv/host/v1/incompatible-checkpoint",
+        "scenario": "incompatible-checkpoint",
+        "status": "PASS",
+        "canonicalEquivalent": true,
+        "interactiveCalls": 1,
+        "durableCalls": 1,
+        "durableBinding": "createDurableCoordinatorHostActivities",
+        "assertions": [
+          "outcome",
+          "error",
+          "receipt-lineage",
+          "artifact-lineage",
+          "checkpoint-lineage"
+        ]
+      }
+    ]
+  },
+  "faults": {
+    "status": "PASS",
+    "totalPoints": 40,
+    "passedPoints": 40,
+    "missing": [],
+    "cases": [
+      {
+        "point": "consumption.before-reserve",
+        "caseId": "apgv/fault/v1/case-01",
+        "status": "PASS",
+        "authority": "consumption",
+        "recovery": "idempotent authority replay",
+        "assertions": [
+          "budget-bounded",
+          "reservation-fenced",
+          "settlement-at-most-once"
+        ],
+        "transitionCount": 3,
+        "executionKind": "deterministic-state-machine"
+      },
+      {
+        "point": "consumption.after-reserve",
+        "caseId": "apgv/fault/v1/case-02",
+        "status": "PASS",
+        "authority": "consumption",
+        "recovery": "idempotent authority replay",
+        "assertions": [
+          "budget-bounded",
+          "reservation-fenced",
+          "settlement-at-most-once"
+        ],
+        "transitionCount": 3,
+        "executionKind": "deterministic-state-machine"
+      },
+      {
+        "point": "consumption.commit-response-loss",
+        "caseId": "apgv/fault/v1/case-03",
+        "status": "PASS",
+        "authority": "consumption",
+        "recovery": "idempotent authority replay",
+        "assertions": [
+          "budget-bounded",
+          "reservation-fenced",
+          "settlement-at-most-once"
+        ],
+        "transitionCount": 3,
+        "executionKind": "deterministic-state-machine"
+      },
+      {
+        "point": "consumption.redelivery",
+        "caseId": "apgv/fault/v1/case-04",
+        "status": "PASS",
+        "authority": "consumption",
+        "recovery": "idempotent authority replay",
+        "assertions": [
+          "budget-bounded",
+          "reservation-fenced",
+          "settlement-at-most-once"
+        ],
+        "transitionCount": 3,
+        "executionKind": "deterministic-state-machine"
+      },
+      {
+        "point": "consumption.orphan-reclaim",
+        "caseId": "apgv/fault/v1/case-05",
+        "status": "PASS",
+        "authority": "consumption",
+        "recovery": "idempotent authority replay",
+        "assertions": [
+          "budget-bounded",
+          "reservation-fenced",
+          "settlement-at-most-once"
+        ],
+        "transitionCount": 3,
+        "executionKind": "deterministic-state-machine"
+      },
+      {
+        "point": "effect.before-provider",
+        "caseId": "apgv/fault/v1/case-06",
+        "status": "PASS",
+        "authority": "effect",
+        "recovery": "idempotent authority replay",
+        "assertions": [
+          "provider-at-most-once-when-known",
+          "unknown-retry-budget-zero",
+          "effect-authority-terminal"
+        ],
+        "transitionCount": 3,
+        "executionKind": "deterministic-state-machine"
+      },
+      {
+        "point": "effect.before-commit",
+        "caseId": "apgv/fault/v1/case-07",
+        "status": "PASS",
+        "authority": "effect",
+        "recovery": "idempotent authority replay",
+        "assertions": [
+          "provider-at-most-once-when-known",
+          "unknown-retry-budget-zero",
+          "effect-authority-terminal"
+        ],
+        "transitionCount": 3,
+        "executionKind": "deterministic-state-machine"
+      },
+      {
+        "point": "effect.after-commit-response-loss",
+        "caseId": "apgv/fault/v1/case-08",
+        "status": "PASS",
+        "authority": "effect",
+        "recovery": "idempotent authority replay",
+        "assertions": [
+          "provider-at-most-once-when-known",
+          "unknown-retry-budget-zero",
+          "effect-authority-terminal"
+        ],
+        "transitionCount": 3,
+        "executionKind": "deterministic-state-machine"
+      },
+      {
+        "point": "effect.unknown",
+        "caseId": "apgv/fault/v1/case-09",
+        "status": "PASS",
+        "authority": "effect",
+        "recovery": "manual reconciliation, retry budget zero",
+        "assertions": [
+          "provider-at-most-once-when-known",
+          "unknown-retry-budget-zero",
+          "effect-authority-terminal"
+        ],
+        "transitionCount": 3,
+        "executionKind": "deterministic-state-machine"
+      },
+      {
+        "point": "artifact.temporary-body",
+        "caseId": "apgv/fault/v1/case-10",
+        "status": "PASS",
+        "authority": "artifact",
+        "recovery": "idempotent authority replay",
+        "assertions": [
+          "temporary-invisible",
+          "finalize-idempotent",
+          "stable-artifact-ref"
+        ],
+        "transitionCount": 3,
+        "executionKind": "deterministic-state-machine"
+      },
+      {
+        "point": "artifact.before-metadata",
+        "caseId": "apgv/fault/v1/case-11",
+        "status": "PASS",
+        "authority": "artifact",
+        "recovery": "idempotent authority replay",
+        "assertions": [
+          "temporary-invisible",
+          "finalize-idempotent",
+          "stable-artifact-ref"
+        ],
+        "transitionCount": 3,
+        "executionKind": "deterministic-state-machine"
+      },
+      {
+        "point": "artifact.before-finalize",
+        "caseId": "apgv/fault/v1/case-12",
+        "status": "PASS",
+        "authority": "artifact",
+        "recovery": "idempotent authority replay",
+        "assertions": [
+          "temporary-invisible",
+          "finalize-idempotent",
+          "stable-artifact-ref"
+        ],
+        "transitionCount": 3,
+        "executionKind": "deterministic-state-machine"
+      },
+      {
+        "point": "artifact.after-finalize-response-loss",
+        "caseId": "apgv/fault/v1/case-13",
+        "status": "PASS",
+        "authority": "artifact",
+        "recovery": "idempotent authority replay",
+        "assertions": [
+          "temporary-invisible",
+          "finalize-idempotent",
+          "stable-artifact-ref"
+        ],
+        "transitionCount": 3,
+        "executionKind": "deterministic-state-machine"
+      },
+      {
+        "point": "checkpoint.body",
+        "caseId": "apgv/fault/v1/case-14",
+        "status": "PASS",
+        "authority": "checkpoint",
+        "recovery": "idempotent authority replay",
+        "assertions": [
+          "unsealed-not-resumable",
+          "lineage-required",
+          "compatibility-fail-closed"
+        ],
+        "transitionCount": 3,
+        "executionKind": "deterministic-state-machine"
+      },
+      {
+        "point": "checkpoint.metadata",
+        "caseId": "apgv/fault/v1/case-15",
+        "status": "PASS",
+        "authority": "checkpoint",
+        "recovery": "idempotent authority replay",
+        "assertions": [
+          "unsealed-not-resumable",
+          "lineage-required",
+          "compatibility-fail-closed"
+        ],
+        "transitionCount": 3,
+        "executionKind": "deterministic-state-machine"
+      },
+      {
+        "point": "checkpoint.lineage",
+        "caseId": "apgv/fault/v1/case-16",
+        "status": "PASS",
+        "authority": "checkpoint",
+        "recovery": "idempotent authority replay",
+        "assertions": [
+          "unsealed-not-resumable",
+          "lineage-required",
+          "compatibility-fail-closed"
+        ],
+        "transitionCount": 3,
+        "executionKind": "deterministic-state-machine"
+      },
+      {
+        "point": "checkpoint.before-seal",
+        "caseId": "apgv/fault/v1/case-17",
+        "status": "PASS",
+        "authority": "checkpoint",
+        "recovery": "idempotent authority replay",
+        "assertions": [
+          "unsealed-not-resumable",
+          "lineage-required",
+          "compatibility-fail-closed"
+        ],
+        "transitionCount": 3,
+        "executionKind": "deterministic-state-machine"
+      },
+      {
+        "point": "checkpoint.resume-tenant",
+        "caseId": "apgv/fault/v1/case-18",
+        "status": "PASS",
+        "authority": "checkpoint",
+        "recovery": "idempotent authority replay",
+        "assertions": [
+          "unsealed-not-resumable",
+          "lineage-required",
+          "compatibility-fail-closed"
+        ],
+        "transitionCount": 3,
+        "executionKind": "deterministic-state-machine"
+      },
+      {
+        "point": "checkpoint.resume-sequence",
+        "caseId": "apgv/fault/v1/case-19",
+        "status": "PASS",
+        "authority": "checkpoint",
+        "recovery": "idempotent authority replay",
+        "assertions": [
+          "unsealed-not-resumable",
+          "lineage-required",
+          "compatibility-fail-closed"
+        ],
+        "transitionCount": 3,
+        "executionKind": "deterministic-state-machine"
+      },
+      {
+        "point": "checkpoint.resume-codec",
+        "caseId": "apgv/fault/v1/case-20",
+        "status": "PASS",
+        "authority": "checkpoint",
+        "recovery": "idempotent authority replay",
+        "assertions": [
+          "unsealed-not-resumable",
+          "lineage-required",
+          "compatibility-fail-closed"
+        ],
+        "transitionCount": 3,
+        "executionKind": "deterministic-state-machine"
+      },
+      {
+        "point": "checkpoint.resume-runtime",
+        "caseId": "apgv/fault/v1/case-21",
+        "status": "PASS",
+        "authority": "checkpoint",
+        "recovery": "idempotent authority replay",
+        "assertions": [
+          "unsealed-not-resumable",
+          "lineage-required",
+          "compatibility-fail-closed"
+        ],
+        "transitionCount": 3,
+        "executionKind": "deterministic-state-machine"
+      },
+      {
+        "point": "coordinator.lost-dispatch",
+        "caseId": "apgv/fault/v1/case-22",
+        "status": "PASS",
+        "authority": "coordinator",
+        "recovery": "idempotent authority replay",
+        "assertions": [
+          "history-single-authority",
+          "stable-invocation",
+          "receipts-never-rollback"
+        ],
+        "transitionCount": 3,
+        "executionKind": "deterministic-state-machine"
+      },
+      {
+        "point": "coordinator.duplicate-dispatch",
+        "caseId": "apgv/fault/v1/case-23",
+        "status": "PASS",
+        "authority": "coordinator",
+        "recovery": "idempotent authority replay",
+        "assertions": [
+          "history-single-authority",
+          "stable-invocation",
+          "receipts-never-rollback"
+        ],
+        "transitionCount": 3,
+        "executionKind": "deterministic-state-machine"
+      },
+      {
+        "point": "coordinator.history-unavailable",
+        "caseId": "apgv/fault/v1/case-24",
+        "status": "PASS",
+        "authority": "coordinator",
+        "recovery": "idempotent authority replay",
+        "assertions": [
+          "history-single-authority",
+          "stable-invocation",
+          "receipts-never-rollback"
+        ],
+        "transitionCount": 3,
+        "executionKind": "deterministic-state-machine"
+      },
+      {
+        "point": "coordinator.pause-cancel-race",
+        "caseId": "apgv/fault/v1/case-25",
+        "status": "PASS",
+        "authority": "coordinator",
+        "recovery": "idempotent authority replay",
+        "assertions": [
+          "history-single-authority",
+          "stable-invocation",
+          "receipts-never-rollback"
+        ],
+        "transitionCount": 3,
+        "executionKind": "deterministic-state-machine"
+      },
+      {
+        "point": "coordinator.continue-as-new",
+        "caseId": "apgv/fault/v1/case-26",
+        "status": "PASS",
+        "authority": "coordinator",
+        "recovery": "idempotent authority replay",
+        "assertions": [
+          "history-single-authority",
+          "stable-invocation",
+          "receipts-never-rollback"
+        ],
+        "transitionCount": 3,
+        "executionKind": "deterministic-state-machine"
+      },
+      {
+        "point": "coordinator.projection-lag",
+        "caseId": "apgv/fault/v1/case-27",
+        "status": "PASS",
+        "authority": "coordinator",
+        "recovery": "idempotent authority replay",
+        "assertions": [
+          "history-single-authority",
+          "stable-invocation",
+          "receipts-never-rollback"
+        ],
+        "transitionCount": 3,
+        "executionKind": "deterministic-state-machine"
+      },
+      {
+        "point": "policy.unavailable",
+        "caseId": "apgv/fault/v1/case-28",
+        "status": "PASS",
+        "authority": "policy",
+        "recovery": "idempotent authority replay",
+        "assertions": [
+          "fail-closed",
+          "scope-never-expands",
+          "secret-bytes-zeroized"
+        ],
+        "transitionCount": 3,
+        "executionKind": "deterministic-state-machine"
+      },
+      {
+        "point": "policy.deny",
+        "caseId": "apgv/fault/v1/case-29",
+        "status": "PASS",
+        "authority": "policy",
+        "recovery": "idempotent authority replay",
+        "assertions": [
+          "fail-closed",
+          "scope-never-expands",
+          "secret-bytes-zeroized"
+        ],
+        "transitionCount": 3,
+        "executionKind": "deterministic-state-machine"
+      },
+      {
+        "point": "policy.live-revocation",
+        "caseId": "apgv/fault/v1/case-30",
+        "status": "PASS",
+        "authority": "policy",
+        "recovery": "idempotent authority replay",
+        "assertions": [
+          "fail-closed",
+          "scope-never-expands",
+          "secret-bytes-zeroized"
+        ],
+        "transitionCount": 3,
+        "executionKind": "deterministic-state-machine"
+      },
+      {
+        "point": "approval.digest-mismatch",
+        "caseId": "apgv/fault/v1/case-31",
+        "status": "PASS",
+        "authority": "approval",
+        "recovery": "idempotent authority replay",
+        "assertions": [
+          "fail-closed",
+          "scope-never-expands",
+          "secret-bytes-zeroized"
+        ],
+        "transitionCount": 3,
+        "executionKind": "deterministic-state-machine"
+      },
+      {
+        "point": "approval.expired",
+        "caseId": "apgv/fault/v1/case-32",
+        "status": "PASS",
+        "authority": "approval",
+        "recovery": "idempotent authority replay",
+        "assertions": [
+          "fail-closed",
+          "scope-never-expands",
+          "secret-bytes-zeroized"
+        ],
+        "transitionCount": 3,
+        "executionKind": "deterministic-state-machine"
+      },
+      {
+        "point": "secret.service-unavailable",
+        "caseId": "apgv/fault/v1/case-33",
+        "status": "PASS",
+        "authority": "secret",
+        "recovery": "idempotent authority replay",
+        "assertions": [
+          "fail-closed",
+          "scope-never-expands",
+          "secret-bytes-zeroized"
+        ],
+        "transitionCount": 3,
+        "executionKind": "deterministic-state-machine"
+      },
+      {
+        "point": "secret.lease-expired",
+        "caseId": "apgv/fault/v1/case-34",
+        "status": "PASS",
+        "authority": "secret",
+        "recovery": "idempotent authority replay",
+        "assertions": [
+          "fail-closed",
+          "scope-never-expands",
+          "secret-bytes-zeroized"
+        ],
+        "transitionCount": 3,
+        "executionKind": "deterministic-state-machine"
+      },
+      {
+        "point": "model.timeout",
+        "caseId": "apgv/fault/v1/case-35",
+        "status": "PASS",
+        "authority": "model",
+        "recovery": "idempotent authority replay",
+        "assertions": [
+          "bounded-retry",
+          "stable-error-taxonomy",
+          "no-retry-storm"
+        ],
+        "transitionCount": 3,
+        "executionKind": "deterministic-state-machine"
+      },
+      {
+        "point": "model.rate-limit",
+        "caseId": "apgv/fault/v1/case-36",
+        "status": "PASS",
+        "authority": "model",
+        "recovery": "idempotent authority replay",
+        "assertions": [
+          "bounded-retry",
+          "stable-error-taxonomy",
+          "no-retry-storm"
+        ],
+        "transitionCount": 3,
+        "executionKind": "deterministic-state-machine"
+      },
+      {
+        "point": "model.invalid-output",
+        "caseId": "apgv/fault/v1/case-37",
+        "status": "PASS",
+        "authority": "model",
+        "recovery": "idempotent authority replay",
+        "assertions": [
+          "bounded-retry",
+          "stable-error-taxonomy",
+          "no-retry-storm"
+        ],
+        "transitionCount": 3,
+        "executionKind": "deterministic-state-machine"
+      },
+      {
+        "point": "model.response-loss",
+        "caseId": "apgv/fault/v1/case-38",
+        "status": "PASS",
+        "authority": "model",
+        "recovery": "idempotent authority replay",
+        "assertions": [
+          "bounded-retry",
+          "stable-error-taxonomy",
+          "no-retry-storm"
+        ],
+        "transitionCount": 3,
+        "executionKind": "deterministic-state-machine"
+      },
+      {
+        "point": "tool.timeout",
+        "caseId": "apgv/fault/v1/case-39",
+        "status": "PASS",
+        "authority": "tool",
+        "recovery": "idempotent authority replay",
+        "assertions": [
+          "bounded-retry",
+          "stable-error-taxonomy",
+          "no-retry-storm"
+        ],
+        "transitionCount": 3,
+        "executionKind": "deterministic-state-machine"
+      },
+      {
+        "point": "tool.duplicate-delivery",
+        "caseId": "apgv/fault/v1/case-40",
+        "status": "PASS",
+        "authority": "tool",
+        "recovery": "idempotent authority replay",
+        "assertions": [
+          "bounded-retry",
+          "stable-error-taxonomy",
+          "no-retry-storm"
+        ],
+        "transitionCount": 3,
+        "executionKind": "deterministic-state-machine"
+      }
+    ]
+  },
+  "replay": {
+    "status": "complete",
+    "authority": "derived-audit-only",
+    "externalCalls": {
+      "model": 0,
+      "tool": 0
+    },
+    "newReceipts": {
+      "effect": 0,
+      "usage": 0
+    },
+    "timeline": [
+      {
+        "id": "1",
+        "kind": "authorization",
+        "reason": "signed policy"
+      },
+      {
+        "id": "2",
+        "kind": "budget",
+        "reason": "reservation committed"
+      },
+      {
+        "id": "3",
+        "kind": "effect",
+        "reason": "effect receipt committed"
+      },
+      {
+        "id": "4",
+        "kind": "checkpoint",
+        "reason": "sealed lineage"
+      },
+      {
+        "id": "5",
+        "kind": "terminal",
+        "reason": "history completed"
+      }
+    ],
+    "refs": {
+      "release": "release://evidence-digest/v1",
+      "spec": "spec://evidence-digest/v1",
+      "receiptRefs": [
+        "receipt://authorization",
+        "receipt://usage",
+        "receipt://effect"
+      ],
+      "artifactRefs": [
+        "artifact://result"
+      ],
+      "checkpointRefs": [
+        "checkpoint://sealed"
+      ],
+      "outcome": "COMPLETED"
+    },
+    "nonExactReasons": [
+      "MODEL_REVISION_NON_EXACT"
+    ]
+  },
+  "projection": {
+    "projection": {
+      "cursor": 7,
+      "historyState": "COMPLETED",
+      "receiptRefs": [
+        "receipt://effect",
+        "receipt://usage"
+      ],
+      "artifactRefs": [
+        "artifact://result"
+      ],
+      "checkpointRefs": [
+        "checkpoint://sealed"
+      ],
+      "freshness": "cursor:7"
+    },
+    "reconciliation": {
+      "changed": true,
+      "before": {
+        "cursor": 1,
+        "historyState": "RUNNING",
+        "receiptRefs": [],
+        "artifactRefs": [],
+        "checkpointRefs": [],
+        "freshness": "cursor:1"
+      },
+      "commandsEmitted": 0
+    }
+  },
+  "history": {
+    "status": "BLOCKED",
+    "fixtureCount": 7,
+    "fixtures": [
+      {
+        "caseId": "replay://legacy/v1/regression",
+        "file": "legacy-regression.json",
+        "workflowType": "AgentTaskWorkflow",
+        "buildLine": "build://legacy-temporal/v1",
+        "digest": "sha256:3ac2c73d2ef507c3e82fdaaf70ab8e90a115dfcded58d373135e769b02534a1c",
+        "actualDigest": "sha256:3ac2c73d2ef507c3e82fdaaf70ab8e90a115dfcded58d373135e769b02534a1c",
+        "digestMatches": true,
+        "temporalHistory": false,
+        "status": "BLOCKED"
+      },
+      {
+        "caseId": "replay://coordinator/v1/continue-boundary",
+        "file": "continue-boundary.json",
+        "workflowType": "DurableCoordinatorWorkflow",
+        "buildLine": "build://coordinator-v2/v1",
+        "digest": "sha256:987bed71d8c1dc4c9ac325ae9222611fd9fe3bc5355ca39cb8465dc481f8531d",
+        "actualDigest": "sha256:987bed71d8c1dc4c9ac325ae9222611fd9fe3bc5355ca39cb8465dc481f8531d",
+        "digestMatches": true,
+        "temporalHistory": false,
+        "status": "BLOCKED"
+      },
+      {
+        "caseId": "replay://coordinator/v1/pending-timer",
+        "file": "pending-timer.json",
+        "workflowType": "DurableCoordinatorWorkflow",
+        "buildLine": "build://coordinator-v2/v1",
+        "digest": "sha256:8212130137ac313d74e2c6bad8e708c5f2e0779761b2207f62abd2a275d3c286",
+        "actualDigest": "sha256:8212130137ac313d74e2c6bad8e708c5f2e0779761b2207f62abd2a275d3c286",
+        "digestMatches": true,
+        "temporalHistory": false,
+        "status": "BLOCKED"
+      },
+      {
+        "caseId": "replay://coordinator/v1/pending-signal",
+        "file": "pending-signal.json",
+        "workflowType": "DurableCoordinatorWorkflow",
+        "buildLine": "build://coordinator-v2/v1",
+        "digest": "sha256:cb5b554d028ee448c6b114b58403f40a0023b552fea0f215d87568296d5ad174",
+        "actualDigest": "sha256:cb5b554d028ee448c6b114b58403f40a0023b552fea0f215d87568296d5ad174",
+        "digestMatches": true,
+        "temporalHistory": false,
+        "status": "BLOCKED"
+      },
+      {
+        "caseId": "replay://coordinator/v1/delivery-retry",
+        "file": "delivery-retry.json",
+        "workflowType": "DurableCoordinatorWorkflow",
+        "buildLine": "build://coordinator-v2/v1",
+        "digest": "sha256:b7598751871cce0f417fe223e014b382595a5f9fde630671d6ae16dcc84d0a7a",
+        "actualDigest": "sha256:b7598751871cce0f417fe223e014b382595a5f9fde630671d6ae16dcc84d0a7a",
+        "digestMatches": true,
+        "temporalHistory": false,
+        "status": "BLOCKED"
+      },
+      {
+        "caseId": "replay://coordinator/v1/control-race",
+        "file": "control-race.json",
+        "workflowType": "DurableCoordinatorWorkflow",
+        "buildLine": "build://coordinator-v2/v1",
+        "digest": "sha256:d4ee552b3951b3e3c9bd44bf963aebad537fd6990929a5bf0f2c4f92406b9ae1",
+        "actualDigest": "sha256:d4ee552b3951b3e3c9bd44bf963aebad537fd6990929a5bf0f2c4f92406b9ae1",
+        "digestMatches": true,
+        "temporalHistory": false,
+        "status": "BLOCKED"
+      },
+      {
+        "caseId": "replay://coordinator/v1/effect-unknown",
+        "file": "effect-unknown.json",
+        "workflowType": "DurableCoordinatorWorkflow",
+        "buildLine": "build://coordinator-v2/v1",
+        "digest": "sha256:36e558aacc411181467442d168c89e79b42f70c7df98d9de6a0e4357add51457",
+        "actualDigest": "sha256:36e558aacc411181467442d168c89e79b42f70c7df98d9de6a0e4357add51457",
+        "digestMatches": true,
+        "temporalHistory": false,
+        "status": "BLOCKED"
+      }
+    ],
+    "negativeFixtures": [
+      {
+        "caseId": "replay://negative/nondeterministic",
+        "file": "negative/nondeterministic.json",
+        "expectedCode": "REPLAY_NONDETERMINISTIC"
+      },
+      {
+        "caseId": "replay://negative/unknown-schema",
+        "file": "negative/unknown-schema.json",
+        "expectedCode": "REPLAY_UNKNOWN_SCHEMA"
+      },
+      {
+        "caseId": "replay://negative/unknown-history",
+        "file": "negative/unknown-history.json",
+        "expectedCode": "REPLAY_UNKNOWN_HISTORY"
+      }
+    ],
+    "runner": "@temporalio/worker.Worker.runReplayHistory",
+    "reason": "TEMPORAL_HISTORY_FIXTURES_NOT_CAPTURED_OR_DIGEST_MISMATCH"
+  },
+  "contentDigest": "sha256:40f35957759107687ed026d4c6d1fc82925de6c17a914084fe2d50d001280c1c"
+}

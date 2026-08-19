@@ -1,0 +1,51 @@
+groups:
+  - name: sage-production-governance
+    rules:
+      - alert: SageProductionAdmissionBlocked
+        expr: sum by (component,outcome,reason,severity,scope_kind) (increase(sage_governance_admission_total{outcome="denied"}[5m])) > 0
+        labels: { severity: critical, owner: platform-security }
+        annotations: { summary: "Production admission is fail-closed", runbook_url: "docs/agent-platform-production-governance-runbooks.md#admission-blocked" }
+      - alert: SageIdentityOrSecretFailure
+        expr: min by (component,outcome,reason,severity,scope_kind) (sage_governance_dependency_healthy{component=~"identity|workload_identity|secret_manager|kms"}) < 1
+        labels: { severity: critical, owner: platform-security }
+        annotations: { summary: "Identity, Secret Manager, or KMS unavailable", runbook_url: "docs/agent-platform-production-governance-runbooks.md#identity-secret-kms" }
+      - alert: SageGrantApprovalRevocationFailure
+        expr: sum by (component,outcome,reason,severity,scope_kind) (increase(sage_governance_authorization_total{outcome="denied",reason=~"grant|approval|revocation.*"}[5m])) > 0
+        labels: { severity: critical, owner: platform-security }
+        annotations: { summary: "Grant, Approval, or revocation denied", runbook_url: "docs/agent-platform-production-governance-runbooks.md#authorization-denial" }
+      - alert: SageEffectUnknown
+        expr: sum by (component,outcome,reason,severity,scope_kind) (increase(sage_governance_effect_total{outcome="unknown"}[5m])) > 0
+        labels: { severity: critical, owner: runtime }
+        annotations: { summary: "Unknown write effect; do not retry", runbook_url: "docs/agent-platform-production-governance-runbooks.md#effect-unknown" }
+      - alert: SageLedgerConflictOrOrphan
+        expr: sum by (component,outcome,reason,severity,scope_kind) (increase(sage_governance_ledger_total{outcome=~"conflict|orphan"}[5m])) > 0
+        labels: { severity: critical, owner: data }
+        annotations: { summary: "Ledger conflict or orphan", runbook_url: "docs/agent-platform-production-governance-runbooks.md#ledger-conflict-or-orphan" }
+      - alert: SageQueueFairnessBackpressure
+        expr: max by (component,outcome,reason,severity,scope_kind) (sage_governance_queue_age_seconds) > 30 or sum by (component,outcome,reason,severity,scope_kind) (increase(sage_governance_backpressure_total[5m])) > 0
+        labels: { severity: warning, owner: operations-sre }
+        annotations: { summary: "Queue fairness or backpressure threshold crossed", runbook_url: "docs/agent-platform-production-governance-runbooks.md#queue-fairness-backpressure" }
+      - alert: SageRetryStorm
+        expr: sum by (component,outcome,reason,severity,scope_kind) (rate(sage_governance_retry_total[5m])) > 10
+        labels: { severity: critical, owner: operations-sre }
+        annotations: { summary: "Retry budget or storm threshold crossed", runbook_url: "docs/agent-platform-production-governance-runbooks.md#retry-storm" }
+      - alert: SageArtifactCheckpointPending
+        expr: max by (component,outcome,reason,severity,scope_kind) (sage_governance_reconcile_age_seconds{component=~"artifact|checkpoint"}) > 300
+        labels: { severity: warning, owner: data }
+        annotations: { summary: "Artifact or Checkpoint pending reconciliation", runbook_url: "docs/agent-platform-production-governance-runbooks.md#artifact-checkpoint-pending" }
+      - alert: SageProjectionLag
+        expr: max by (component,outcome,reason,severity,scope_kind) (sage_governance_projection_lag_seconds) > 30
+        labels: { severity: warning, owner: runtime }
+        annotations: { summary: "Task projection lag exceeds threshold", runbook_url: "docs/agent-platform-production-governance-runbooks.md#projection-lag" }
+      - alert: SageProviderOrSupplyChainUnhealthy
+        expr: min by (component,outcome,reason,severity,scope_kind) (sage_governance_dependency_healthy{component=~"provider|supply_chain"}) < 1
+        labels: { severity: critical, owner: release }
+        annotations: { summary: "Provider or supply chain unavailable or revoked", runbook_url: "docs/agent-platform-production-governance-runbooks.md#provider-or-supply-chain" }
+      - alert: SageSloBurn
+        expr: max by (component,outcome,reason,severity,scope_kind) (sage_governance_error_budget_burn_ratio) > 2
+        labels: { severity: critical, owner: operations-sre }
+        annotations: { summary: "Production governance SLO burn", runbook_url: "docs/agent-platform-production-governance-runbooks.md#slo-burn" }
+      - alert: SageKillSwitchActive
+        expr: sum by (component,outcome,reason,severity,scope_kind) (sage_governance_kill_switch_active) > 0
+        labels: { severity: critical, owner: operations-sre }
+        annotations: { summary: "Governance kill switch active", runbook_url: "docs/agent-platform-production-governance-runbooks.md#kill-switch" }

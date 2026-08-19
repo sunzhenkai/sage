@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "composite": true,
+    "baseUrl": ".",
+    "paths": {
+      "@sage/app-contracts": ["../app-contracts/src/index.ts"],
+      "@sage/postgres-migrations": ["../postgres-migrations/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*.ts"],
+  "references": [{ "path": "../app-contracts" }, { "path": "../postgres-migrations" }]
+}

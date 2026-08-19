@@ -1,0 +1,16 @@
+{
+  "kind": "malformed-reference",
+  "event": {
+    "data": {
+      "secret_ref": "plain-text-credential"
+    }
+  },
+  "checkpoint": {
+    "artifact_ref": "https://example.invalid/not-an-artifact-ref"
+  },
+  "trace": {
+    "attributes": {
+      "runRef": "run-1"
+    }
+  }
+}

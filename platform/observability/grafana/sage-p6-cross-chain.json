@@ -1,0 +1,15 @@
+{
+  "uid": "sage-p6-cross-chain",
+  "title": "Sage P6 Chat to Task Cross-chain",
+  "schemaVersion": 39,
+  "tags": ["sage", "p6"],
+  "panels": [
+    {"title":"Chat promotions","type":"timeseries","targets":[{"expr":"sum by (tenant_id,message_id,session_id,run_id,task_id,workflow_id,target_id,attempt) (rate(sage_chat_task_promotions_total[5m]))"}]},
+    {"title":"Trusted routes","type":"timeseries","targets":[{"expr":"sum by (tenant_id,message_id,session_id,run_id,task_id,workflow_id,target_id,attempt) (rate(sage_task_route_decisions_total[5m]))"}]},
+    {"title":"Worker attempts","type":"timeseries","targets":[{"expr":"sum by (tenant_id,message_id,session_id,run_id,task_id,workflow_id,target_id,attempt) (rate(sage_task_worker_attempt_total[5m]))"}]},
+    {"title":"Projection lag","type":"timeseries","targets":[{"expr":"max by (tenant_id,message_id,session_id,run_id,task_id,workflow_id,target_id,attempt) (sage_task_projection_lag_ms)"}]},
+    {"title":"Retryable reconcile failures","type":"timeseries","targets":[{"expr":"sum by (tenant_id,message_id,session_id,run_id,task_id,workflow_id,target_id,attempt) (increase(sage_task_reconcile_retryable_failure_total[5m]))"}]},
+    {"title":"Artifact outages","type":"timeseries","targets":[{"expr":"sum by (tenant_id,message_id,session_id,run_id,task_id,workflow_id,target_id,attempt) (increase(sage_artifact_store_unavailable_total[5m]))"}]},
+    {"title":"Temporal target unavailable","type":"timeseries","targets":[{"expr":"sum by (tenant_id,message_id,session_id,run_id,task_id,workflow_id,target_id,attempt) (increase(sage_temporal_target_unavailable_total[5m]))"}]}
+  ]
+}

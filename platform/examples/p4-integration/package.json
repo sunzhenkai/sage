@@ -1,0 +1,21 @@
+{
+  "name": "@sage/p4-integration",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@sage/agent-api": "workspace:*",
+    "@sage/agent-client": "workspace:*",
+    "@sage/agent-contracts": "workspace:*",
+    "@sage/agent-worker": "workspace:*",
+    "@sage/task-domain": "workspace:*",
+    "@sage/task-store-postgres": "workspace:*",
+    "@sage/temporal-routing": "workspace:*",
+    "@temporalio/client": "1.22.0",
+    "@temporalio/worker": "1.22.0",
+    "@temporalio/workflow": "1.22.0",
+    "fastify": "5.11.3",
+    "pg": "8.23.0"
+  },
+  "devDependencies": { "@types/pg": "8.21.0" }
+}

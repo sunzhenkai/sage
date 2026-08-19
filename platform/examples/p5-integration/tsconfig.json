@@ -1,0 +1,23 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src", "outDir": "dist", "composite": true, "baseUrl": ".",
+    "paths": {
+      "@sage/agent-client": ["../../packages/agent-client/src/index.ts"],
+      "@sage/agent-contracts": ["../../packages/agent-contracts/src/index.ts"],
+      "@sage/agent-worker": ["../../apps/agent-worker/src/index.ts"],
+      "@sage/platform-ports": ["../../packages/platform-ports/src/index.ts"],
+      "@sage/task-domain": ["../../packages/task-domain/src/index.ts"],
+      "@sage/task-store-postgres": ["../../packages/task-store-postgres/src/index.ts"],
+      "@sage/temporal-registry": ["../../packages/temporal-registry/src/index.ts"],
+      "@sage/temporal-routing": ["../../packages/temporal-routing/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*.ts"],
+  "references": [
+    { "path": "../../packages/agent-contracts" }, { "path": "../../packages/agent-client" },
+    { "path": "../../packages/platform-ports" }, { "path": "../../packages/task-domain" },
+    { "path": "../../packages/task-store-postgres" }, { "path": "../../packages/temporal-registry" },
+    { "path": "../../packages/temporal-routing" }, { "path": "../../apps/agent-worker" }
+  ]
+}

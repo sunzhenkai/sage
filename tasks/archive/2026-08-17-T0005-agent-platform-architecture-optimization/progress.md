@@ -1,0 +1,471 @@
+# T0005 实施进度
+
+- 更新：2026-08-17
+- 阶段：`implementing`
+- 当前 change：`agent-platform-generalization-validation`
+- 当前任务：12.4 发布最终人读验收报告和机器 evidence bundle；报告必须明确 `GO` 或 `NO-GO`，不得在任一强制 Gate 未通过时宣称 validated baseline
+
+## OpenSpec 进度
+
+| 顺序 | change | 完成 | 总数 | 剩余 | planning root |
+|------|--------|------|------|------|---------------|
+| 0 | `agent-platform-contract-authority-foundation` | 45 | 45 | 0 | `<worktree>/openspec` |
+| 1 | `agent-runtime-kernel-broker-integration` | 51 | 51 | 0 | `<worktree>/openspec` |
+| 2 | `durable-agent-coordinator-adapter` | 56 | 56 | 0 | `<worktree>/openspec` |
+| 3 | `agent-package-release-admission` | 65 | 65 | 0 | `<worktree>/openspec` |
+| 4 | `agent-platform-production-governance` | 58 | 67 | 9 | `<worktree>/openspec` |
+| 5 | `agent-platform-generalization-validation` | 56 | 61 | 5 | `<worktree>/openspec` |
+| — | **合计** | 331 | 345 | 14 | |
+
+## 本轮完成
+
+- 3.7 PostgreSQL authority integration tests
+- 4.1 canonical runner authority validation
+- 4.2 canonical Event/Receipt runner authority
+- 4.3 canonical bounds outcome/error taxonomy
+- 4.4 canonical checkpoint candidate seal barrier
+- 4.5 finalized run audit builder and rejections
+- 5.1 agent runtime conformance package
+- 5.2 deterministic reference Engine: @sage/agent-runtime-conformance typecheck/build passed; targeted vitest 5/5 passed; OpenSpec strict validation and git diff --check passed
+- 5.3 Coordinator fake: typecheck/build passed; targeted conformance vitest 7/7 passed; duplicate dispatch, retry/wait, pause/resume, cancel, timeout, terminal and key/revision conflicts verified; git diff --check passed
+- 5.4 authority conformance: canonical fixture deep-frozen; exact trusted Spec assertion fails closed on unavailable/digest/cache drift; non-minimal Envelope and Snapshot/Manifest rejected; typecheck/build and 9/9 targeted tests passed; git diff --check passed
+- 5.5 crash/idempotency conformance: Event single-writer fence, response-loss committed Receipt/Checkpoint replay, duplicate invocation one execution, conflicting digest rejection; typecheck/build and 11/11 tests passed; git diff --check passed
+- 5.6 compatibility replay: canonical v1, legacy Chat/Task v1 and additive wrapper accepted; unknown major, damaged digest, codec/runtime mismatch return stable errors; typecheck/build and 13/13 tests passed; git diff --check passed
+- 5.7 dependency/boundary gate: canonical agent-contracts and agent-runtime-conformance forbid Pi, Temporal, provider SDK, HTTP framework, DB driver/ORM and MCP imports plus framework-shaped serialized keys; 13 positive/negative scanner tests and 13 conformance tests passed; core dependency scanner passed; package typecheck/build and git diff --check passed. Composite check:deps progressed through core/chat/P4/P5 then hit pre-existing P6 Task UI incomplete gate.
+- 6.1 LegacyAgentRunSpecV1Adapter implemented in agent-client: trusted server identity/grant/runtime/defaults produce deterministic canonical Spec digest, create-only Spec Store write and minimal Envelope; authority overrides and unsealed checkpoint fail closed; legacy source, adapter build and deprecation telemetry recorded without affecting semantics. agent-client typecheck/build, core dependency scanner and git diff --check passed; workspace links refreshed offline with zero downloads.
+- 6.2 Legacy adapter tests: valid trusted v1 mapping/persist-before-envelope, client tenant/engine authority override rejection, unsealed checkpoint rejection, ambiguous skill/missing default stable failure, and identical-input byte-stable outputs all verified; 5/5 tests passed. agent-client typecheck/build, dependency scanner and git diff --check passed.
+- 6.3 agent-client exposes LocalCanonicalAgentClient.runCanonical in isolated canonical.ts using only Envelope/canonical runner types; canonical module imports no AgentRunSpec/AgentRunExecution. Existing synchronous v1 LocalAgentClient is explicitly documented as old-runner façade, while canonical compatibility is available only via LegacyAgentRunSpecV1Adapter. 6/6 tests, typecheck/build, dependency scanner and git diff --check passed.
+- 6.4 agent-api Chat composition root now has default-off canonicalCompatibility flag: disabled path emits observable flag_disabled telemetry and calls explicit legacy client; enabled path obtains trusted context, persists via one-way adapter, then executes only mapped Spec/Envelope; mapping rejection fails closed without fallback. 3/3 tests passed; agent-api dependency-topology build, typecheck/build, dependency scanner and git diff --check passed.
+- 6.5 agent-worker Task activity now has a default-off canonicalCompatibility gate: disabled routes observably to explicit legacy runner; enabled derives stable Attempt ID, Spec ref and invocation ID from task/attempt/slice, verifies trusted context, persists via one-way adapter before canonical execution, and fails closed on rejection. Delivery retry identity/persist-before-execute/fallback tests 3/3 passed; worker typecheck/build, dependency scanner and git diff --check passed.
+- 6.6 added cross-Host compatibility integration replay: Chat and Task canonical adapter paths preserve the allowed legacy event/outcome surface; disabling both flags routes only to explicit legacy runners and performs zero canonical reads/writes, with create-only Spec records byte-identical before/after rollback. Combined compatibility suite 7/7 passed; agent-api/worker typecheck and build, dependency scanner and git diff --check passed.
+- 7.1 agent-lib now exports framework-neutral EngineAdapter, KernelEngineCallbacks and typed Model/Tool/Artifact/cancellation/checkpoint-candidate proposal/observation contracts, plus fail-closed identity/capability preflight. No framework/store/provider authority type is exposed and candidate submission cannot issue checkpoint refs. agent-lib tests 17/17, typecheck/build, dependency scanner and git diff --check passed.
+- 7.2 harness-pi now exports PiEngineAdapter: it preflights fixed Engine/callback capabilities, delegates Model/Tool/Artifact/cancellation/candidate operations exclusively through Kernel callbacks, rejects undeclared skills, owns no Spec/Grant/budget/Receipt writer, and returns a CheckpointCandidate without creating checkpoint:// refs. The old PiHarness can no longer be entered implicitly and requires explicit-old-runner mode. Pi tests 4/4, typecheck/build, dependency scanner and git diff --check passed.
+- 7.3 retained HarnessPort only as an explicit compatibility façade: PiHarness requires the explicit-old-runner marker, createExplicitLegacyPiHarness is the sole convenience factory, compatibilityPath is observable, and all local-runtime/node-host callers use that named factory; no default new PiHarness() remains. Harness tests 5/5; harness/local-runtime/node-host typecheck/build, dependency scanner and git diff --check passed.
+- 7.4 added framework-neutral EngineAdapterConformanceFactory/runEngineAdapterConformance and DeterministicReferenceEngineAdapter. The exact same 11 mandatory cases now execute for reference and Pi: preflight capability, canonical event order/outcome, model/tool/artifact-byte/candidate bounds, cancellation, stable identity/candidate errors, candidate-only checkpoint, and codec/runtime incompatibility before callbacks. Pi now rejects incompatible checkpoint Spec/codec/runtime before execution. Shared targeted tests passed 20/20; both packages typecheck/build and changed-file lint passed; dependency scanner and git diff --check passed. Full aggregate check:deps reached the independent existing P6 gate and reported Task UI incomplete after dependency/chat/P4/P5 gates passed.
+- 7.5 updated Node Host to expose and run two auditable examples. The canonical path persists a create-only AgentTaskSpec, reloads it by spec_ref+digest, dispatches only the minimal Envelope, runs Pi through callbacks, stages a candidate with no checkpointRef, and obtains a platform-sealed checkpoint from InMemoryCheckpointStore. The legacy path is explicitly labeled executionPath=explicit-old-runner and no longer asserts or emits a fabricated checkpoint. Node Host tests passed 8/8; typecheck/build, changed-file lint, dependency scanner, live example smoke, and git diff --check passed. Smoke output showed canonical-spec-envelope with candidateDigest and distinct checkpoint://sealed ref, plus explicit-old-runner legacy output.
+- 8.1 ran all eight requested targeted suites against the current delivery tree, including real PostgreSQL authority-store integration via the healthy compose postgres service. agent-contracts 11, platform-ports 5, local-fakes 23, agent-state-postgres integration 11, agent-lib 17, agent-client 6, harness-pi 6, and agent-runtime-conformance 14 all passed: 8 files and 93/93 tests, with no skipped PostgreSQL suite.
+- 8.2 workspace validation passed: corepack pnpm typecheck, corepack pnpm lint, corepack pnpm build, node scripts/check-dependencies.mjs, and git diff --check all passed. The full check:deps aggregate passed Dependency, Chat, P4 and P5 gates, then was independently blocked by the pre-existing P6 gate with Task UI incomplete; no new boundary failure was reported. Fixed two full-workspace consistent-type-imports lint violations in local-fakes without changing behavior; package ownership and public exports built successfully.
+- 8.3 Phase 0 conformance passed: 11 Vitest files and 103 tests passed with 0 skipped, covering deterministic reference Engine, shared Pi EngineAdapter factory, Coordinator fake lifecycle, canonical/legacy Chat and Task replay, authority/digest/codec/runtime rejection, Event fencing, Receipt and Checkpoint response-loss idempotency, local-fakes failure matrix, Tool EFFECT_UNKNOWN, and stable error taxonomy. Saved matrix and failure taxonomy evidence at platform/evidence/agent-platform-contract-authority-foundation/phase-0-conformance.md; git diff --check passed.
+- 8.4 Authority audit passed: agent-contracts, agent-lib, runtime-conformance and harness-pi suites passed 48/48 with 0 skipped; canonical schemas rejected embedded second authorities; runtime preflight rejected invalid/mismatched Spec, Envelope, audit input and incompatible checkpoint before Engine/Model/Tool calls; candidate refs were exposed only after seal; FinalizedRunAuditRecord accepted only terminal receipts; public-package leakage and direct dependency scanner passed (Dependency boundaries: OK); git diff --check passed. Evidence saved under platform/evidence/agent-platform-contract-authority-foundation/phase-0-authority-audit.md.
+- 8.5 Compatibility enablement evidence saved at platform/evidence/agent-platform-contract-authority-foundation/phase-0-compatibility-rollback.md. Chat/Task composition tests passed 4 files and 13 tests with 0 skipped: disabled flags use legacy fallback with telemetry, enabled flags persist then execute canonical, mapping rejection fails closed without fallback, stable delivery identity is reused, and rollback preserves canonical records. Legacy adapter telemetry/rejection taxonomy and explicit removal conditions are recorded. Existing P6 aggregate gate remains NO-GO, so legacy default remains available. git diff --check passed.
+- 1.1 完成并 strict validate agent-platform-contract-authority-foundation，记录稳定 schema major；openspec validate agent-platform-contract-authority-foundation --strict 通过（Change valid）
+- 1.2 Phase 1 dependency gate passed: node scripts/check-phase1-dependencies.mjs；consumed AgentTaskSpec.v1/AgentExecutionEnvelope.v1/AgentEvent.v2/BoundedRunReceipt.v1/CheckpointCandidate.v1/SealedCheckpointRef.v1，duplicate authority false
+- 1.3 migration inventory saved at platform/docs/p1-runtime-kernel-migration.md; explicit legacy AgentRunner/Harness façade, canonical Kernel ownership, ToolPipeline, state/artifact/checkpoint impacts and rollback boundaries recorded
+- 2.1 canonical EngineAdapter callbacks now expose public KernelClient/AgentRuntimeKernel and CanonicalBoundedOutcomePort; platform boundary scan and agent-lib typecheck passed without Pi/MCP/Temporal/provider/database/Ledger-driver imports; targeted Kernel conformance passed 3/3
+- 2.2 platform-ports now defines ModelBrokerPort, ContextResolverPort, CapabilityBrokerPort, ConsumptionLedgerPort, ArtifactFinalizePort and runtime identity/usage/checkpoint boundary types; Kernel callback tests and contracts/ports/agent-lib typecheck passed
+- 2.3 additive migration 003_runtime_kernel_broker.sql adds tenant-scoped usage reservation/receipt, artifact finalize/outbox and sealed checkpoint metadata with unique/state/fence constraints; explicit down migration and static 2-test gate passed; agent-state adapter loads 001→002→003
+- 2.4 deterministic reference Engine plus State/Checkpoint/idempotency fakes and new Model/Context/Capability/Artifact/Ledger fakes support call records, failNext, timeoutNext, loseResponseNext and cancelNext; local-fakes typecheck passed and 2 files/5 tests passed
+- 3.1 AgentRuntimeKernel.runBounded 已校验 tenant-scoped Spec 与 Envelope ref/digest、Engine identity，并绑定 immutable principal/tenant/task/run/attempt/invocation/specDigest；Model identity 与 duplicate-delivery targeted tests passed，evidence 已归档
+- 3.2 Kernel 已实现 duration/maxDuration、trusted deadline、Engine turn、Model/Tool call、token、context/artifact bytes、cost、concurrency bounds；effective deadline 与 remaining Model timeout 为 invocation-local，7 个 Kernel tests passed
+- 3.3 Kernel callbacks 已对 Model/Capability/Context/Artifact/Checkpoint candidate 执行 identity、effective deadline/cancel、bounds 与 authority guards；固定 route/plan/grant drift negative test、agent-lib typecheck 和 7-test Kernel suite passed
+- 3.4 CanonicalInvocationRunner 维护 fenced 标准事件顺序；Kernel 在 commit 前执行 bounded receipt/artifact refs 与 outcome payload 校验，外部取消稳定映射 KERNEL_CANCELLED 且取消不回滚 authority；9 个 Kernel tests passed
+- 3.5 CanonicalInvocationRunner 作为唯一 fenced commit barrier，先处理 checkpoint candidate/event 与关联 receipt/artifact refs，再提交 bounded Run Receipt；index+kernel targeted suite 2 files/26 tests passed
+- 3.6 Kernel fault matrix 完成：maxTurns/maxModelCalls/maxToolCalls/maxTokens/maxContextBytes/maxArtifactBytes/maxCost/maxConcurrentCallbacks、deadline/duration、identity/authority drift、callback bypass、cancel race、commit barrier、duplicate invocation、model/context/capability/artifact downstream unavailable；targeted 2 files/29 tests passed，agent-lib typecheck passed，evidence 已归档
+- 4.1 InMemoryConsumptionLedger 实现权威 tenant/account balance 查询与 upper-bound reservation；不足余额、跨 tenant/account、重复 invocation 语义漂移和非法 bounds 均 fail closed，重复相同 reservation 幂等；local-fakes typecheck PASS，runtime targeted 1 file/3 tests PASS，evidence 已归档
+- 4.2 ConsumptionLedger commit 绑定 immutable invocation/reservation，拒绝负数、非有限、超 upper bound 和错误 identity 的 UsageReceipt；同 digest 幂等 existing、不同 digest conflict，unused release 一次性恢复余额；local-fakes typecheck PASS，runtime targeted 1 file/4 tests PASS，evidence 已归档
+- 4.3 Reservation owner tenant、per-invocation fencing lock、expiry fail-closed、bounded reconciler 与 audit 完成；并发 reserve 只扣一次，commit/release race 无负余额/双释放；local-fakes typecheck PASS，runtime targeted 1 file/5 tests PASS，evidence 已归档
+- 4.4 完成 reserve timeout、commit response-loss、同 receipt retry/replay、权威余额重读及 Checkpoint 不保存 remainingBudget 验证；2 files/17 tests PASS，contracts/ports/local-fakes typecheck PASS，evidence 已归档
+- 5.1 新增 SpecBoundModelBroker 与 HTTPS FetchModelProviderClient：固定 Spec route snapshot 的 primary/ordered fallback、provider/model/adapter identity、参数、timeout、region/data policy；先 Ledger reserve，按 allowlist fallback，生成带 request/model/adapter/参数/策略审计字段的 Usage Receipt，unknown response 不 fallback；model-broker 1 file/4 tests passed，typecheck/build passed，evidence 已归档
+- 5.2 Model Broker 完成 full-bound Ledger reservation、immutable Usage Receipt、幂等 commit/release、cancel、rate limit、circuit breaker；unknown response/timeout/commit outcome 停止 fallback，revision 缺失标记 non-exact；model-broker 1 file/6 tests passed，typecheck/build/lint passed，evidence 已归档
+- 5.3 新增 SpecBoundContextResolver：冻结 plan/source allowlist、tenant/principal/resource ACL、revision/sensitivity/provenance 校验，确定性去重排序、byte/token clipping、required fail-closed 和显式 optional degraded；context-resolver 1 file/4 tests passed，typecheck/build/lint passed，evidence 已归档
+- 5.4 生成有界 Context view 与 Context Receipt：超过 plan inlineSnapshotBytes 的 source 必须有 finalized ArtifactRef，view 仅返回 snapshotRef、不内联大内容，receipt 记录 artifactRefs lineage；内容不能影响 Spec/identity/grant/route/target/policy；context-resolver 1 file/5 tests passed，upstream build、typecheck、build、lint、workspace typecheck、dependency checks 和跨包 5 files/46 tests passed，evidence 已归档
+- 5.5 增加 Model route drift、未授权 fallback、预算不足/非法预算、取消和 Context 跨租户/超限/注入/来源降级测试；Model Broker 9 tests、Context Resolver 6 tests，跨包 suite 5 files/50 passed，typecheck/build/lint passed，evidence 已归档
+- 6.1 新增 CapabilityAuthorityPort 与 IntersectionCapabilityAuthority，在 Capability Broker 调用前计算 Spec grant descriptor、live deny/revocation、principal/tenant/resource scope、approval、Ledger budget 的单调交集，缺失依赖 fail closed；Kernel 14 tests、workspace typecheck、agent-lib build/lint、跨包 5 files/52 tests 和非 P6 boundary gates passed，evidence 已归档；aggregate check:deps 仍受既有 P6 script readFile binding 问题阻断
+- 6.2
+- 6.3
+- 6.4
+- 7.1
+- 7.2
+- 7.3
+- 7.4
+- 7.5
+- 7.6
+- 8.1
+- 8.2
+- 8.3
+- 8.4
+- 9.1
+- 9.2
+- 9.3
+- 9.4
+- 10.1
+- 10.2
+- 10.3
+- 10.4
+- 10.5
+- 11.1
+- 11.2
+- 11.3
+- 11.4
+- 11.5
+- 11.6
+- 1.1
+- 1.2
+- 1.3
+- 1.4
+- 1.5
+- 1.6
+- 1.7
+- 2.1
+- 2.2
+- 2.3
+- 2.4
+- 2.5
+- 2.6
+- 3.1
+- 3.2
+- 3.3
+- 3.4
+- 3.5
+- 3.6
+- 4.1
+- 4.2
+- 4.3
+- 4.4
+- 4.5
+- 4.6
+- 4.7
+- 4.8
+- 5.1
+- 5.2
+- 5.3
+- 5.4
+- 5.5
+- 5.6
+- 6.1
+- 6.5
+- 8.5
+- 8.6
+- 9.5
+- 9.6
+- 9.7
+- 3.7
+- 3.8
+- 5.7
+- 6.6
+- 6.7
+- 6.8
+- 6.9
+- 6.10
+- 6.11
+- 1.1 建立 apply dependency gate：确认 `agent-platform-contract-authority-foundation`、`agent-runtime-kernel-broker-integration`、`durable-agent-coordinator-adapter` 已完成实现、strict validate 与 conformance，并记录实际 contract/port versions。
+- 1.2 定义并导出运行侧 `AgentPackageRelease.v1` schema，限制其为不可变发布身份、compatibility、provenance/signature refs 和运行依赖 digests，不允许直接执行配置
+- 1.3 定义并导出严格的 `AgentTaskSpec.v1` schema，覆盖身份、provenance、Goal、Engine/Skill、Model、Context、Capability、execution policy、bounds/budget refs 与 governance，并拒绝 Secret、remaining budget、物理 endpoint、完整 Context/Checkpoint body 和动态 alias
+- 1.4 定义并导出最小 `AgentExecutionEnvelope.v1` schema，只允许 Spec ref/digest、稳定 task/run/attempt/invocation IDs、可选 sealed checkpoint ref 和稳定 correlation IDs
+- 1.5 为 Release、Spec 和 Envelope 增加 round-trip、unknown-field、未知 major、identity mismatch、forbidden material 与完整 Snapshot/Manifest 拒绝测试
+- 2.1 在 `agent-contracts` 定义标准 `AgentEvent` major、封闭 event type 集合、有界安全 payload/ref schemas、稳定 event ID 与 Run/Attempt sequence 字段，并保留 `AgentEvent.v1` reader/compatibility exports
+- 2.2 定义 `BoundedRunOutcome`、稳定 error category/code/retry disposition 和 `BoundedRunReceipt.v1` schema，禁止内嵌 Spec、AgentState、Snapshot 或 Manifest
+- 2.3 定义有界 `AgentState.v1` schema，允许认知状态与 receipt/artifact refs，拒绝权威 budget、授权决定、Secret、durable lifecycle 和 oversized inline body
+- 2.4 定义 `CheckpointCandidate.v1`、sealed checkpoint metadata/ref、compatibility binding 与 `FinalizedRunAuditRecord.v1` schemas，并从 execution input unions 中排除 audit record
+- 2.5 用 contract tests 覆盖标准 outcomes、错误 taxonomy、Event payload 边界、Receipt 完整性、AgentState 禁止字段以及 audit 只能由终态 final receipt 构建
+- 3.1 在 `platform-ports` 新增 `AgentTaskSpecStorePort`、`BoundedRunReceiptStorePort`、fenced `AgentEventStorePort` 和 candidate/seal 型 `CheckpointStorePort`，保持 ports 不依赖 Pi、Temporal、HTTP 或数据库类型
+- 3.2 在 `local-fakes` 实现内容寻址的 Spec fake，强制一个 Attempt 只绑定一个 immutable Spec，并覆盖 duplicate write、digest conflict 和不可用故障
+- 3.3 在 `local-fakes` 实现 Event/Receipt fakes，强制单 active writer fence、严格 sequence 以及相同 invocation/digest 幂等和不同 digest conflict
+- 3.4 在 `local-fakes` 实现 Checkpoint candidate→seal 两阶段 fake，校验 ACL、identity、Spec digest、sequence、codec/runtime compatibility、fence 与 Effect/Usage lineage
+- 3.5 为 Checkpoint fake 增加 body/metadata/seal 各阶段 failure injection、响应丢失、重复 seal、冲突 seal、不可见 partial write 和 resume compatibility 测试
+- 3.6 以 expand-only migration 扩展 `agent-state-postgres` 的 Spec/Receipt/Checkpoint metadata 与 seal 存储，保留旧 `putCheckpoint` API 供 legacy path 使用但禁止 canonical runner 调用
+- 3.7 为 PostgreSQL adapters 增加集成测试，验证 immutable Spec、Receipt idempotency、atomic seal、tenant ACL、fencing、digest conflict 和 sealed-only resume
+- 4.1 在 `agent-lib` 增加 canonical runner 入口：按 Envelope 加载 Spec，先校验 digest/IDs/major 与 sealed Checkpoint，再启动 Engine，并证明失败路径为零 Engine/Model/Tool 调用
+- 4.2 实现 Run/Attempt 单 writer fencing、标准 Event 排序和 `BoundedRunReceipt` 组装/提交，确保 duplicate invocation 返回原 Receipt/event range
+- 4.3 将所有 duration/turn/model/tool/token/context/artifact/cost/concurrency 边界映射到标准 outcome/error taxonomy，并让调用方只消费 category 与 retry disposition
+- 4.4 实现 Engine `CheckpointCandidate` 校验与 Store seal 调用，只有 seal 成功后才能向 Event/Receipt/Coordinator 返回 `CheckpointRef`
+- 4.5 实现终态后 `FinalizedRunAuditRecord` builder，汇总 refs/build attestations/non-exact reasons，并测试非终态、缺 final receipt 和把 audit 当执行输入时均被拒绝
+- 5.1 新增 `agent-runtime-conformance` workspace package（或等价独立测试模块），建立 adapter factories、版本化 fixtures 和不依赖框架 SDK 的公共 expectations
+- 5.2 实现 deterministic reference Engine，以 fixture 脚本和 Kernel callbacks 生成 byte-stable proposals、outcomes 与 checkpoint candidate，并测试无时钟/随机/网络/存储 side channel
+- 5.3 实现 Coordinator fake，仅用 Envelope、Receipt refs 和 lifecycle commands 模拟 dispatch、duplicate delivery、retry、wait、pause/resume、cancel、timeout 与 conflict
+- 5.4 增加 authority conformance cases，覆盖 Spec immutability/digest、Envelope 最小化、Spec Store/cache mismatch fail-closed 和禁止完整 Snapshot/Manifest 第二 authority
+- 5.5 增加 crash/idempotency conformance cases，覆盖 Event fence、Receipt commit 响应丢失、Checkpoint seal 响应丢失、duplicate invocation 和 conflicting digest
+- 5.6 增加兼容 replay fixtures，覆盖 canonical v1、legacy Chat/Task v1、允许的 additive reader、未知 major、损坏 digest、codec/runtime 不兼容与稳定错误输出
+- 5.7 在 dependency/boundary check 中禁止 canonical contracts、fixtures 和 expectations 直接依赖或序列化 Pi、Temporal、provider、HTTP framework 与数据库 driver 类型
+- 6.1 实现 `LegacyAgentRunSpecV1Adapter`，用服务端可信身份、Grant、runtime 与 defaults 单向生成持久化 Spec/Envelope，并记录 legacy source、adapter build 和 deprecation telemetry
+- 6.2 为 adapter 增加测试，覆盖合法 v1 映射、客户端 authority 覆盖拒绝、未 sealed checkpoint 拒绝、歧义输入稳定失败和同输入确定性输出
+- 6.3 扩展 `agent-client` 提供显式 canonical run API，同时保留 v1 façade；确保 canonical package 不 import legacy DTO 且 v1 façade 只能调用单向 adapter 或旧 runner
+- 6.4 在 `agent-api` Chat composition root 加入 canonical feature flag 和可观测 fallback，验证 canonical 模式不再现场把 Chat 数据直接当 `AgentRunSpec` authority
+- 6.5 在 `agent-worker` 旧 Task composition root 加入同样的 adapter/feature flag，确保 delivery retry 稳定复用 Attempt、Spec 和 invocation ID
+- 6.6 增加 Chat/Task 兼容集成测试，对比允许的旧 outcome/event surface，验证关闭 flag 可回退且不会删除、修改或反向消费 canonical records
+- 7.1 定义框架中立 Engine Adapter 与 Kernel callback contracts，将 Model、Tool、Artifact、cancellation 和 candidate 提交都限制在 callbacks 内
+- 7.2 重构 `harness-pi` 通过 callbacks 执行，移除直接创建 `checkpoint://`、自带未声明 provider/tool/skill fallback 以及任何 Spec/Grant/budget/Receipt authority
+- 7.3 提供旧 `HarnessPort` compatibility façade 供尚未迁移调用方使用，但确保 façade 最终进入单向 adapter 或明确旧 runner
+- 7.4 让 Pi 与 deterministic reference Engine 运行同一 Engine conformance factory，覆盖 preflight capability、事件/outcome、bounds、cancellation、stable errors、candidate-only checkpoint 和版本不兼容
+- 7.5 更新 Node Host 与相关示例/测试，使 canonical 示例展示 Spec Store + Envelope + sealed Checkpoint，legacy 示例明确标注兼容路径
+- 8.1 运行 `agent-contracts`、`platform-ports`、`local-fakes`、`agent-state-postgres`、`agent-lib`、`agent-client`、`harness-pi` 和 conformance package 的 targeted unit/integration tests 并修复失败
+- 8.2 运行 workspace typecheck、lint、dependency boundary checks 与 build，确认公共导出和 package ownership 配置完整
+- 8.3 运行 reference Engine、Pi、Coordinator fake、legacy Chat/Task replay 与 failure-injection 全套 conformance，保存 Phase 0 兼容矩阵和失败 taxonomy 证据
+- 8.4 执行静态与 runtime authority audit，证明 Envelope/Receipt/Checkpoint/History/Audit/Snapshot/Manifest 均不能成为第二运行配置 authority，且 `FinalizedRunAuditRecord` 仅在终态后生成
+- 8.5 记录 canonical feature flags、rollback 操作、legacy 使用/映射失败 telemetry 和后续移除条件；在未满足 conformance 或回放门时保持旧 Chat/Task 默认路径可回退
+- 1.1 完成并 strict validate `agent-platform-contract-authority-foundation`，记录其 `AgentTaskSpec`、`AgentExecutionEnvelope`、Event、Run/Usage/Effect Receipt 与 Checkpoint seal 的稳定 schema major；前序未 apply-ready 时停止本 change 实施
+- 1.2 对照前序 artifacts 审核本 change 的 proposal/design/specs，消除重复 authority 或字段冲突，并增加 Phase 1 / 序列 2 的依赖追踪测试
+- 1.3 盘点 `AgentRunner`、`HarnessPort`、`LocalAgentClient`、API/Worker composition、`ToolPipeline`、Agent State 与 Artifact/Checkpoint 现状，冻结兼容入口和迁移影响清单
+- 2.1 在 canonical package 中定义框架无关的 `EngineAdapter`、受控 callbacks、`KernelClient` 与 bounded outcome ports，确保不泄漏 Pi、MCP、Temporal、provider、数据库或 Ledger driver 类型
+- 2.2 定义 Model Broker、Context Resolver、Consumption Ledger、Artifact finalize/reconcile 与 Checkpoint candidate/seal ports，并复用前序 change 的可信 identity、Spec digest 和 Receipt 类型
+- 2.3 为 Usage reservation/receipt/commit、Artifact finalize/outbox 和 sealed Checkpoint metadata 增加持久化 schema、唯一约束、fencing 与向前/回滚迁移
+- 2.4 实现 deterministic Engine、Model/Context/Capability/State/Artifact/Checkpoint/Ledger fakes，支持调用记录、故障注入、超时、响应丢失、重复投递和取消
+- 3.1 在 `agent-lib` 实现 `AgentRuntimeKernel.runBounded`，校验 Spec/Envelope 并绑定不可变 principal、tenant、run、attempt、invocation 与 Spec digest
+- 3.2 实现 duration、deadline、Engine turn、Model call、Tool call、token、context bytes、artifact bytes、cost 与 concurrency 的统一上限和 invocation-local fail-fast projection
+- 3.3 实现 Model、Capability、Context、Artifact 与 Checkpoint candidate callbacks，在每次调用前后执行 identity、deadline、cancel、bounds 和 authority guard
+- 3.4 实现标准平台事件排序、payload/ref 上限、稳定错误分类与 cancel 传播，验证取消不回滚已提交 Effect、Usage、Artifact 或 Checkpoint
+- 3.5 实现 Run Receipt 与 Checkpoint commit barrier，确保先关联 Effect/Usage/Artifact receipts，再提交 bounded Receipt 和可选 Checkpoint candidate
+- 3.6 增加 Kernel 单元与故障注入测试，覆盖每个 bound、身份篡改、callback 绕过、取消竞态、commit barrier、重复 invocation 和下游不可用
+- 4.1 实现 Ledger 权威余额查询及 `reserve(invocation_id, upper_bound)`，拒绝不足、越 tenant/account 或重复冲突的 reservation
+- 4.2 实现 immutable Usage Receipt 的幂等 `commit(invocation_id, receipt_digest, actual)` 与 unused reservation release/expiry，保证相同 digest 最多结算一次、不同 digest 冲突
+- 4.3 实现 orphan reservation lease、fencing、reconciler 与审计，验证 commit/release 竞争不产生负余额、双扣或双重释放
+- 4.4 增加 crash/timeout/response-loss/replay 测试，验证 retry/resume 从 Ledger 读取余额且 Checkpoint 不保存 remaining balance
+- 5.1 实现真实 Model Broker adapter，严格消费 Spec 固定 primary/ordered fallback、provider/model identity、参数、timeout、region 与数据策略
+- 5.2 将 Model 调用接入 Ledger reservation、immutable Usage Receipt、幂等 commit/release、cancel、rate limit 与 circuit breaker，并记录 non-exact replay reason
+- 5.3 实现 Context Resolver 的 plan/source allowlist、tenant ACL、revision、sensitivity、provenance、裁剪、摘要、去重和 byte/token 上限
+- 5.4 生成有界 Context view 与 Context Receipt，大快照仅引用 finalized Artifact，并隔离内容对 Spec、身份、grant、route、target 与 policy 的影响
+- 5.5 增加 Model route 漂移/未授权 fallback/预算不足/取消和 Context 跨租户/超限/注入/来源降级测试
+- 6.1 在 Kernel Capability callback 前计算 `Spec grant ∩ live deny/revocation ∩ principal/tenant/resource ∩ approval ∩ ledger budget`，缺失依赖一律 fail closed
+- 6.2 将现有 `ToolPipeline` 接为唯一 Capability 执行路径，保留 schema、credential、idempotency、normalization、Effect Ledger 与 `effect_unknown` 语义
+- 6.3 将 MCP 限制为 discovery/schema/transport adapter，按固定 provider/tool/schema version 过滤 descriptor，禁止 discovery 写回或扩大 grant
+- 6.4 增加权限单调收窄、live revoke、审批 digest/expiry、MCP 新增 Tool、同名版本漂移、Engine/Host 直连和 Effect replay 测试
+- 7.1 实现 Artifact temporary body、digest/size/ACL/lineage 校验和原子 finalize/outbox，只有 finalize 成功才返回 ArtifactRef
+- 7.2 实现 Artifact operation ID 幂等查询、temporary cleanup 和 metadata/body reconciliation，覆盖提交前崩溃、提交后响应丢失与 body 缺失
+- 7.3 扩展 Agent State 持久化 bounded Event、Run Receipt 与引用型大输出，并拒绝 temporary、missing、跨租户或未 seal 的引用
+- 7.4 实现 Checkpoint candidate 的 body/metadata/digest/receipt-lineage/seal 提交，绑定 tenant、run/attempt/sequence、Spec、state schema、Engine codec 与 runtime compatibility
+- 7.5 实现 Resume ACL、digest、sequence、Spec/attempt 与 compatibility 校验；无显式 migration 时对不兼容状态稳定失败
+- 7.6 增加 Artifact/Checkpoint 跨租户、悬空引用、部分提交、response loss、重复 seal、codec 不兼容和取消竞态故障注入测试
+- 8.1 将 `PiHarness` 演进为只实现 canonical `EngineAdapter` 的 Pi adapter，移除内部 provider/model、ToolRuntime/MCP、State、Artifact、Checkpoint 与 Ledger 实现依赖
+- 8.2 将 Pi 的 Model、Tool、Context、大结果与恢复状态操作分别改为 Kernel callbacks 和结构化 proposal/candidate，不接受 Pi 自报的 grant、余额或 commit 状态
+- 8.3 增加 package dependency/import boundary 检查，确保 Pi SDK 仅存在于 Pi adapter 且 Pi 无法直接获得 provider client、MCP connection 或 authority writer
+- 8.4 让 Pi 与 deterministic reference Engine 通过同一 conformance suite，覆盖 callbacks、bounds、cancel、event order、错误、Receipt lineage 与 Checkpoint candidate
+- 9.1 将 `LocalAgentClient` 改为通过 public `KernelClient`/in-process Kernel binding 调用，并保留 `AgentRunSpec.v1` compatibility adapter 与旧 Harness 路径
+- 9.2 在 `agent-api` Interactive Host 接入同一 Kernel composition，传播可信 principal/tenant、deadline、cancel、events、Receipt 和 sealed CheckpointRef
+- 9.3 在 `agent-worker` Durable Host/Activity 接入相同 Kernel contract，保持 Temporal 类型和 lifecycle 推进逻辑在 Kernel 之外
+- 9.4 增加 Interactive/Durable 对同一 fixed Spec 的等价性测试，并验证 Client public API 不泄漏 Engine、Temporal、MCP、provider 或数据库类型
+- 10.1 实现默认 `legacy` 的 `legacy`/`shadow`/`kernel` 配置、环境/tenant/workload allowlist、实际 build identity 与安全审计
+- 10.2 实现独立 namespace 的 Interactive shadow，只使用 deterministic/recorded/read-only adapters；写 Tool、真实计费、Ledger commit、Artifact finalize、Checkpoint seal 和公共事件发布必须被阻止或标记 `shadow_unsupported`
+- 10.3 实现脱敏 shadow 差异指标和观测面，比较事件摘要、bounds、稳定错误和终态，不暴露 reasoning、完整 Context 或大 payload
+- 10.4 实现回退 commit barrier：authority commit 前按策略最多回退一次，commit 后禁止旧路径自动重放并返回可对账 receipt refs
+- 10.5 编写启用、逐步放量、停止新 Kernel admission、切回旧路径、orphan reconcile 和已提交 receipts 对账 runbook
+- 11.1 运行 dependency/schema boundary、typecheck、lint 和受影响 package 单元测试，修复所有新增错误
+- 11.2 运行 Kernel、Pi/reference Engine、Interactive/Durable Host conformance suite，证明 Engine/Host 不能绕过 Broker/Ledger/Checkpoint
+- 11.3 运行真实 Broker/Resolver/State/Artifact/Checkpoint/Ledger 集成测试及 crash、timeout、duplicate、response-loss、cancel race 故障注入
+- 11.4 验证未 grant、跨租户、过期审批、live revoke、MCP discovery 新 Tool、预算不足、Ledger/policy unavailable 与不兼容 Checkpoint 全部 fail closed
+- 11.5 在本地和受控 Interactive allowlist 完成 shadow 观察，按 Owner 冻结的差异率、错误率、延迟和最小窗口阈值形成 GO/NO-GO 证据
+- 11.6 执行 `openspec validate agent-runtime-kernel-broker-integration --strict`，确认全部 artifacts 有效，并记录前序依赖、迁移、回退和剩余开放问题
+- 1.1 执行依赖 Gate：确认 `agent-platform-contract-authority-foundation` 与 `agent-runtime-kernel-broker-integration` 均已完成、strict validate 且 delta specs 已同步；记录两个 change 的版本/digest，任一条件不满足时停止本 change 实现
+- 1.2 用前两个 changes 的 Envelope/receipt fixtures 与现有 P4–P7 样本验证 64 KiB 单 payload、128 refs 上限；将最终上限固定为版本化 contract 常量和边界测试，不得退化为无界
+- 1.3 在 canonical contracts/ports 中实现 SDK-neutral `DurableCoordinatorPort`、lifecycle state、command、observation、logical cursor、owner/target refs 与稳定 error taxonomy（D1）
+- 1.4 实现 `AgentExecutionEnvelope`、command 和 bounded receipt summary 的 runtime schema validation，拒绝超限、body、Secret/Credential 与 Temporal-specific 字段（D2）
+- 1.5 实现纯函数 lifecycle reducer，覆盖 start/dispatch/wait/signal/pause/resume/cancel/retry/timeout/continue、requested/effective control、dispatch epoch 与 terminal precedence（D3–D5）
+- 1.6 扩展依赖/声明/schema 扫描 gate，证明 canonical packages 不导入或泄漏 Temporal SDK、Workflow、History、Signal/Query 或 Build ID 类型（D1）
+- 1.7 在 `local-fakes` 实现 Coordinator fake，并建立 fake/Temporal Adapter 共用的 canonical conformance suite骨架（D1）
+- 2.1 为 Task persistence 增加 additive migration：`lifecycle_path`、owner token/state、start idempotency key、adapter/runtime refs、logical cursor、projection freshness与必要审计字段；legacy rows安全回填为 `LEGACY_TEMPORAL_TASK`（D7、D9）
+- 2.2 实现 Task prepare/start repository 的唯一约束与 CAS，使同一 Task只有一个path/owner能从prepared进入starting/started，并覆盖legacy/V2并发竞争（D7）
+- 2.3 扩展可信 target snapshot 生成与校验，V2 snapshot固定adapter identity、target ref、runtime compatibility、policy/registry versions，拒绝client/model/Package提供raw endpoint、namespace或task queue（D7、D9）
+- 2.4 更新route/start controller，使start响应丢失时只按原path/target/owner/idempotency key查询或重试，禁止跨path/target/Cluster fallback（D7）
+- 2.5 更新query/signal/pause/resume/cancel/retry/timeout与reconciliation client resolution，始终按持久path/snapshot选择legacy client或V2 Adapter，不使用当前默认路由或projection猜测（D7、D9）
+- 2.6 增加repository与controller并发/故障测试，覆盖双实例跨路径start、unknown start outcome、snapshot损坏、registry变化与legacy row兼容（D7、D9）
+- 3.1 在独立V2 workflow type/task queue实现只持有Envelope、refs/digests、有界state/receipts的Coordinator Workflow，不改动legacy `AgentTaskWorkflow`（D2、D9）
+- 3.2 将canonical dispatch映射为Durable Host Activity/Job，将wait/timeout映射为Timer/condition，将control映射为versioned Signal，将observation映射为bounded Query（D1、D9）
+- 3.3 实现Temporal边缘类型与错误归一化，确保Workflow ID/Run ID/History/Build ID/SDK error不穿透canonical port（D1）
+- 3.4 实现continue-as-new阈值与有界carry state，保持task/run/attempt/Spec/owner、未决timer/control、receipt refs和单调logical chain cursor（D4）
+- 3.5 增加Workflow bundle/source/manifest/transitive scan，禁止Model、Tool、Capability、Context、Memory、database、network、Artifact/Checkpoint body、Agent Library、Secret、Credential与LLM SDK依赖（D2）
+- 3.6 增加deterministic unit/replay测试，覆盖Timer、Signal、timeout、continue-as-new、payload边界与故意command drift的负向nondeterminism fixture（D2、D4、D6）
+- 4.1 将V2 dispatch接到Phase 1 Durable Host，使Host加载并校验Spec/Checkpoint、执行bounded Kernel invocation并只返回immutable receipt refs/digests和bounded summary（D2）
+- 4.2 实现delivery retry稳定identity：同Attempt/Spec/invocation/dispatch epoch重投递返回同一committed receipt或in-progress状态，不重复Effect/Usage（D4）
+- 4.3 实现known-safe semantic retry：同Attempt/Spec创建新invocation，携带并核验已提交Effect/Usage/Artifact/Checkpoint receipts（D4）
+- 4.4 实现new Attempt/New Spec gate：model、grant、target、runtime compatibility、context revision policy、输入语义或不兼容Checkpoint变化必须重新admission且不得修改旧Spec（D4）
+- 4.5 将`EFFECT_UNKNOWN`映射为人工处置阻塞终态，拒绝自动delivery/semantic/new-Attempt retry、continue dispatch与path/target fallback，且不得增加新的dispatch History（D4）
+- 4.6 实现pause/resume/cancel幂等command key、单调control sequence、requested/effective状态与cancel优先级；terminal先提交时保留terminal结果（D5）
+- 4.7 为每次dispatch递增fencing epoch，拒绝旧epoch迟到receipt推进lifecycle，同时保留已提交或unknown Effect receipt审计（D5）
+- 4.8 增加fault-injection/state-machine测试，覆盖响应丢失、已提交重投递、semantic retry、new Spec、`EFFECT_UNKNOWN`、pause→cancel、completion→late cancel、stale receipt与timeout（D4、D5）
+- 5.1 扩展Task projection schema/store，保存path、owner、adapter/runtime、logical cursor、authority receipt digests、fresh/stale/unavailable与repair audit，但不允许projection API推进Coordinator lifecycle（D3）
+- 5.2 实现path-aware reconciler：legacy继续使用Temporal H1/H2观察，V2使用canonical `H1 → observation + receipts → H2`并在cursor稳定且digest可验证时幂等修复（D3）
+- 5.3 实现continue-as-new chain traversal与前后refs、logical cursor、state digest校验，把多个physical runs投影成一个logical Task/Attempt（D3、D4）
+- 5.4 实现chain缺失、receipt不可用/冲突、target不可用和History持续推进的stale/retryable行为，禁止猜测terminal状态（D3）
+- 5.5 增加outbox/backfill或等价机制，使Workflow/Host不依赖同步Task Store写入且projection恢复后可追平（D3）
+- 5.6 增加真实存储测试：延迟/停止projection writer、制造矛盾projection、删除全部V2 projection、跨多次continue-as-new后均从History与权威receipts重建（D3）
+- 6.1 为Chat promotion增加additive handoff persistence与outbox：`PREPARING → SOURCE_QUIESCED → TARGET_STARTING → DURABLE_OWNED`、source cursor、owner token、start key与失败审计（D8）
+- 6.2 实现idempotent source quiesce，在durable start前结束或暂停interactive Run到安全边界并取得immutable input/checkpoint refs与digests（D8）
+- 6.3 实现promotion owner CAS与V2 start；quiesce前失败保留interactive owner，quiesce后响应丢失只用同一key确认/补发durable start且不自动恢复source（D8）
+- 6.4 将promotion payload限制为admission后的Envelope与immutable refs/digests，拒绝消息正文、raw target、model配置、Chat Store对象或Temporal DTO进入Coordinator（D2、D8）
+- 6.5 实现handoff reconciler并增加并发/崩溃测试，覆盖promotion与interactive continuation竞争、各状态断点恢复、重复请求和永久无双owner断言（D8）
+- 7.1 建立脱敏、有界replay corpus manifest，覆盖支持窗口每个workflow schema major/build line、legacy回归、continue边界、pending timer/signal、retry、control race与`EFFECT_UNKNOWN`（D6）
+- 7.2 实现CI replay gate，执行canonical conformance、History replay、old-reader/new-writer compatibility、负向nondeterminism与corpus完整性检查（D6）
+- 7.3 实现显式compatible build policy与Worker启动/queue注册gate；未通过build不得poll受影响queue或进入兼容集合（D6）
+- 7.4 将实际Host/Adapter/Worker build attestation写入bounded receipt/audit，并验证active registry或Worker image变化不修改已启动Spec/snapshot（D6）
+- 7.5 编写Worker rollout/drain/rollback runbook，要求填写生产replay支持窗口、History抽样保留期、批准Owner与观察指标；未填写或gate失败时保持生产`NO-GO`（D6）
+- 8.1 增加只影响未prepared新Task的V2 feature/admission policy；V2关闭时新Task可选legacy，active/unknown-start V2 Task保持原owner（D7、D9）
+- 8.2 扩展route/start/control/retry/continue/fallback audit，记录Task/Run/Attempt/Spec、path/owner、adapter/runtime、snapshot versions、command key、logical cursor、actor与接受/拒绝原因（D7）
+- 8.3 为`EFFECT_UNKNOWN`、replay gate rejection、owner conflict、cross-path start attempt、projection lag/repair、continue chain failure与stale receipt增加安全日志、trace与低基数metrics/alerts（D3–D7）
+- 8.4 在API/Task Card projection中暴露可授权的path、requested/effective lifecycle与freshness，不把projection状态用作控制authority（D3、D7）
+- 8.5 执行双路径rollback drill：关闭V2新admission，证明新Task走legacy、active V2原地继续、unknown start不复制、legacy P4–P7 Task行为不变（D7、D9）
+- 8.6 增加目标不可用、start响应丢失、stale projection与回退并发的端到端测试，断言任何Task均无跨path/target/Cluster双执行（D7）
+- 9.1 运行受影响packages的lint、dependency boundary、typecheck、unit tests与build，修复所有回归
+- 9.2 运行Coordinator fake conformance与真实Temporal V2 integration，覆盖Worker restart、Activity redelivery、Timer/Signal、continue-as-new、control race与History replay
+- 9.3 运行PostgreSQL integration/fault tests，覆盖owner CAS、handoff、projection outage、outbox/backfill、全量projection rebuild与receipt digest conflict
+- 9.4 重跑legacy P4–P7 integration/边界/故障测试，证明旧Temporal Task、trusted routing、projection reconciliation、Chat promotion与生产观测语义保持
+- 9.5 扫描History、Event、Trace、projection和fixtures，证明不存在Secret、Credential、完整Context/Memory/Checkpoint/Tool/Model body或超限payload
+- 9.6 更新架构映射、运行/事故/回滚文档和Phase 2 exit evidence，明确History/ledger/store authority、双路径生命周期与未实现的`EFFECT_UNKNOWN` resolution
+- 9.7 执行`openspec validate durable-agent-coordinator-adapter --strict`并记录通过结果；生产replay窗口、Owner或外部依赖未获批准时明确保持`NO-GO`
+- 1.2 对齐前三项 change 的 canonical `AgentTaskSpec`、`AgentExecutionEnvelope`、Spec Store、Consumption Ledger reservation、Broker 和 Coordinator ports；删除本 change 中任何重复 authority 或 Temporal/Provider SDK 类型泄漏。
+- 1.3 为 `agent-package-release`、`agent-release-registry`、`agent-run-admission` 创建 package 骨架、ownership 和依赖边界规则，并接入 workspace typecheck/test。
+- 1.4 添加跨包 dependency-boundary 测试，阻止 Package/Admission canonical 模块依赖具体 Engine、Temporal、Web、数据库 driver、MCP SDK 或 Provider SDK。
+- 2.1 实现显式 major 版本、strict unknown-field、大小/深度/标识符有界的 `AgentPackage.v1` schema 及 canonical serializer。
+- 2.2 实现普通 Package allowlist 字段校验，覆盖 metadata、agent definition、Skills、Capabilities、Context、Model、schemas、Policies、Budgets、eval cases、plan hints 与 View metadata。
+- 2.3 实现静态扫描并拒绝原生代码、WASM/脚本、远程 include、Secret/credential bytes、物理 endpoint/namespace/task queue、数据库/表标识、SQL/MQL、自定义前端代码与基础设施 SDK 配置。
+- 2.4 添加 schema/serializer 单元与性质测试，覆盖未知字段、重复 key、Unicode/canonical ordering、超限输入和 forbidden-content 全矩阵，确保被拒内容从不执行。
+- 3.1 定义 trusted artifact/catalog resolution ports，解析精确 Engine compatibility、Skill、Context、Capability/Tool、Model requirement、Policy、schema 和 Budget identities。
+- 3.2 实现禁止 `latest`、浮动 runtime alias、歧义结果、已撤销或不可信依赖进入 Release 的 resolver 与稳定错误 taxonomy。
+- 3.3 实现 canonical `AgentPackageLock.v1`，绑定 source digest、compiler/resolver build、catalog revisions 和所有精确 artifact versions/digests。
+- 3.4 实现 canonical JSON/content hashing 和可复现构建测试，证明相同 source/build/catalog 输入得到字节等价 lock 与相同 digest，任一输入变化得到新 digest。
+- 3.5 生成并验证 Package dependency SBOM、source/build provenance 和覆盖 content/lock/SBOM/provenance/compiler digests 的 signature。
+- 3.6 实现 trust issuer/key、expiry/revocation、license/vulnerability policy 与 attestation mismatch gate；为 local fake trust root 加显著非生产标记。
+- 3.7 定义 `AgentPackageRelease` create-only schema/builder，绑定 owner、kernel contract、Engine compatibility、全部依赖 digest、attestation refs 和 compiler identity，且排除 identity、Secret、target、live grant 与 remaining budget。
+- 3.8 添加 Release 构建、digest mutation、无效证明、撤销证明和独立 Engine/Provider/Capability artifact 引用测试。
+- 4.1 添加 PostgreSQL migrations：immutable releases、release attestations/refs、channel pointers/revisions 与 append-only registry audit，包含 tenant/namespace constraints 和 create-only 数据保护。
+- 4.2 实现 tenant-bound Release Store 与幂等 submit；相同 identity/different digest 拒绝覆盖，相同 digest 重投返回原 ref。
+- 4.3 实现 publication verifier，强制认证 actor、owner/role、非空 reason、expected revision、signature/provenance/SBOM、compatibility 与 policy gates。
+- 4.4 实现事务内 channel pointer CAS publish 和 append-only audit，审计失败时整体 rollback。
+- 4.5 实现 immutable ref 与 channel 两种 deterministic resolve，返回 release ref/content digest/observed revision，禁止 Host 按 channel 运行时重解析。
+- 4.6 实现受控 rollback 到已验证 predecessor，复用 publish 的认证、CAS、reason 和审计规则，且不复制或修改 Release。
+- 4.7 添加 Registry PostgreSQL 集成测试，覆盖跨租户 ACL、并发 CAS、mutation rejection、审计原子性、publish B/rollback A，以及 rollback 前后新旧 Attempt 隔离。
+- 4.8 提供 strict authenticated Package lint/build、Release submit/verify/publish/rollback/read API 与 bounded safe projections，拒绝未知字段并不泄露私钥、内部 endpoint 或完整构建环境。
+- 5.1 扩展 Provider/Model Catalog port：在 immutable revision 上按 Model requirements 与治理约束解析精确 primary/fallback Model builds、Provider build digests、参数和 data-handling policy digests。
+- 5.2 添加 Catalog resolution 测试，覆盖 alias 固定、歧义/撤销/无 snapshot/projection failure、active revision 变化和 safe audit；证明既有 Spec 不漂移。
+- 5.3 扩展 trusted Temporal Router，使其接受已验证 Release runtime requirements 和 compatibility-mapped TaskType requirements，同时拒绝 Package/Invocation/Model/Tool 提供的物理 target 字段。
+- 5.4 使 Router 返回精确 TargetProfile/runtime build、requirements digest、registry revision、候选过滤与 rationale，并添加 no-legal-target fail-closed 测试。
+- 5.5 在 Workflow Target Snapshot 中记录精确 target/runtime、Release requirements digest、policy/registry revision 和 rationale，并在 Spec commit/Envelope 前完成 create-only 持久化与 digest 绑定。
+- 5.6 修改 query/signal/cancel/resume/delivery retry 只从 Attempt 的 Spec/Target Snapshot 解析 client；semantic target 变化创建新 Attempt/Spec。
+- 5.7 添加 Registry publish/rollback、Worker restart、delivery retry、semantic retry 和 control-operation 集成测试，证明 rollback 仅影响新 Attempt。
+- 6.1 定义 strict `AdmissionRequest.v1` 与稳定响应/错误 contract，只接受 Release selector、immutable input refs、mode 和有界 invocation metadata，身份与 scope 仅来自服务端认证上下文。
+- 6.2 实现 Release integrity/trust/compatibility 和 input ref digest/schema/tenant ACL/data-classification/size/retention 验证阶段。
+- 6.3 接入 Policy/Approval authority，生成本 Attempt 最大 capability grant snapshot，并确保 Package、Engine、Model、Tool metadata 与 Host 无法扩权。
+- 6.4 接入精确 Engine、Model、Skill、Context resolver/revision policy、Capability/Tool、Provider 和 Target 解析，将所有 versions/digests 固化到 Spec。
+- 6.5 使用稳定 `admission_id/attempt_id` 接入 Consumption Ledger 初始硬预算 reservation，确保重投不重复预留且 Spec 不保存 remaining budget。
+- 6.6 实现 canonical Spec builder 和 Spec Store create-only commit/read-back digest verification；语义配置变化必须创建新 Attempt/Spec。
+- 6.7 实现 admission audit/outbox 与 reservation compensator/orphan lease reconciler，覆盖 Spec/audit commit 后故障和释放响应丢失。
+- 6.8 仅在 Spec、必需审计和 digest 回读均成功后签发最小 `AgentExecutionEnvelope`；消费者拒绝额外配置字段与 digest mismatch。
+- 6.9 实现 Admission 幂等状态机/status API：相同 idempotency key 返回同一完成 Spec/Envelope 或继续同一处理中状态，不重复 Router/Ledger 副作用。
+- 6.10 添加逐阶段故障注入矩阵，覆盖 Identity、Release、ACL、Policy、Approval、Catalog、Context、Capability、Provider、Target、Ledger、Spec Store、audit/outbox；每个失败均断言无可执行 Envelope/dispatch。
+- 6.11 添加并发、crash/restart 和 100 次重投测试，证明最多一个 Spec、一个有效 reservation、一个 target snapshot 和一个 dispatch。
+- 7.1 定义版本化 fixed TaskType → package/channel/release runtime requirements 映射和 golden fixtures，映射表不包含物理 target、Secret 或调用方身份。
+- 7.2 实现 Chat、Task 和 `AgentRunSpec.v1` adapters，将 legacy inputs 转为 immutable refs 与 canonical `AdmissionRequest` 后调用同一 Admission Compiler。
+- 7.3 计算排除稳定 ID/时间字段的 Spec semantic digest，并为等价 legacy/new invocation 断言 Grant、Model、Context、Capability、Target 和预算语义一致。
+- 7.4 拒绝或安全忽略 legacy endpoint/namespace/task queue/model-provider 物理 override，添加防绕过与 tenant scope 测试。
+- 7.5 在请求创建前通过 feature flag 选择 legacy 或 canonical lifecycle owner，添加并发请求测试确保同一 Task 不双启。
+- 7.6 验证 delivery retry 复用旧 Attempt/Spec，用户或策略 semantic retry 创建新 Attempt 并重新读取当前 Release/Target Registry。
+- 8.1 创建只读“受控资料摘要”reference AgentPackage、input/output schemas、summary Skill、document Capability requirement、Context plan、Model policy、Budget、eval cases 和 View mapping。
+- 8.2 通过真实 Package build/attestation/Registry publication/Admission 路径接入该 workload，并在 Interactive mode 验证安全 event、budget 和 output schema。
+- 8.3 在 Durable mode 运行同一 Release，验证 Envelope、Target Snapshot、bounded Receipt、retry/resume 与 Interactive 平台语义等价。
+- 8.4 添加 ownership/forbidden-diff Gate，禁止 reference workload 修改 Kernel、Interactive/Durable Host、通用 Run/Spec 表、canonical API 或新增业务 TaskType switch。
+- 8.5 添加 reference workload 失败测试，覆盖 schema invalid、Context denied、Capability denied、Model unavailable、budget不足和 target unavailable，均不绕过 Admission。
+- 9.1 添加独立 feature flags：Package/Registry dark launch、shadow admission、canonical new-workload entry、legacy adapter cutover，并定义 tenant/TaskType allowlist 与 kill switch。
+- 9.2 实现无真实 reservation、无 Envelope、无 dispatch 的 shadow admission/diff pipeline，输出 bounded semantic digest/route/grant 差异指标和审计。
+- 9.3 增加 Release、Admission、reservation、Spec、Target 和 compatibility adapter 的 trace/log/audit correlation；高基数 ID 不进入 metrics label，Secret/完整 input/context/endpoint 不进入 telemetry。
+- 9.4 编写 rollout/runbook：dependency gate、dark launch、shadow 收敛、小流量 reference workload、legacy cutover、观察窗口和 production NO-GO 条件。
+- 9.5 编写无损 rollback runbook：停止新 canonical admission、旧入口在创建前切回 legacy owner、既有 canonical Attempt 继续或按既有 cancel policy 终止，禁止改写/删除 Release、Spec、reservation、snapshot、audit 与 History。
+- 9.6 添加迁移/回退端到端测试，覆盖 shadow→canonical→legacy rollback、应用 binary rollback 的 additive schema compatibility，以及已启动 Spec 在整个过程中不漂移。
+- Phase 3 10.1 completed: 8 affected package typechecks passed; targeted ESLint passed; compose PostgreSQL healthy; 15 Vitest files / 142 tests passed including 12 PostgreSQL authority-store integration tests; git diff --check passed. Fixed invalid non-hex sha256 fixtures, explicit bigint cast, and deterministic Attempt ordering in index.integration.test.ts.
+- Boundary gate unit positives/negatives passed: approved declaration root allowed; Kernel/Host/domain/canonical and unrelated paths rejected; runtime authority imports and TaskType switches rejected. Shared targeted validation: 5 Vitest files / 25 tests passed; agent-run-admission and observability typechecks passed; targeted ESLint and git diff --check passed.
+- Reference workload fail-closed matrix passed all 6 cases with zero Envelope and zero dispatch. Shared targeted validation: 5 Vitest files / 25 tests passed; agent-run-admission and observability typechecks passed; targeted ESLint and git diff --check passed.
+- Independent flags, tenant/task allowlists, default-legacy behavior and kill-switch precedence verified. Shared targeted validation: 5 Vitest files / 25 tests passed; agent-run-admission and observability typechecks passed; targeted ESLint and git diff --check passed.
+- Pure bounded-digest shadow audit verified; reservationCreated=false, envelopeIssued=false and dispatches=0. Shared targeted validation: 5 Vitest files / 25 tests passed; agent-run-admission and observability typechecks passed; targeted ESLint and git diff --check passed.
+- Correlation tests verified six stages, sanitized high-cardinality refs only in log/trace, fixed-cardinality metrics, and endpoint/input/context/secret/payload exclusion. Shared targeted validation: 5 Vitest files / 25 tests passed; agent-run-admission and observability typechecks passed; targeted ESLint and git diff --check passed.
+- Runbook explicitly covers dependency/precondition gates, ordered dark launch, zero-authority shadow, convergence window, allowlisted reference canary, legacy cutover, bounded expansion, stop conditions, evidence and production NO-GO.
+- Lossless rollback runbook preserves persisted owner and all authority data, switches only new requests to legacy, retains active canonical Attempts, reconciles reservations/unknown effects, and forbids destructive schema rollback.
+- Migration/rollback E2E plus additive migration tests passed: shadow remains legacy/no side effects, canonical owns new request, kill-switch returns new requests to legacy, committed Spec/Envelope remain byte-stable, and release schema is additive/create-only. git diff --check passed.
+- Engine, Pi, Kernel, Model/Context Broker, local authority fakes, Coordinator, History replay corpus/gate and Worker compatibility suites passed within the 23-file/219-test run; no authority or determinism regression. git diff --check passed.
+- Specialized suite passed 7 files/81 tests: Package supply-chain, immutable Registry/CAS rollback, Admission fail-closed, Chat/Task legacy-canonical semantic equivalence, reference workload success/failure and boundary negatives. PostgreSQL authority integration also passed in prior 23-file run. git diff --check passed.
+- Added reusable Phase 3 data-boundary scanner and safe fixture covering Package, Release, Spec, Envelope, History, audit, log and trace shapes. Scanner negative probes reject secret bytes, endpoints, SQL/MQL and PII; safe reference fixtures scan 2 documents with 0 findings. Targeted 4-file/64-test suite, ESLint and git diff --check passed.
+- Canonical strict validation passed: Change 'agent-package-release-admission' is valid. Added docs/agent-package-release-admission-phase-3-exit.md recording test counts, additive migration/binary compatibility, lossless rollback, known risks, mandatory external dependencies and explicit production NO-GO.
+- Rollout policy now parses six independent mandatory gates, all default false. canonical/cutover requests with any missing gate return gates_incomplete, disable Package/Registry/canonical admission, and keep lifecycleOwner=legacy; kill switch independently forces legacy. Positive canonical path requires all six gates. Admission typecheck, targeted ESLint, git diff --check, and 3 files/30 tests passed. External production dependencies and human approvals are missing, so Phase 3 exit review records NO-GO and gates remain false.
+- Prerequisite evidence: all four changes are 100% complete and strict-valid; 26 deltas were synchronized into canonical main specs and all 46 main specs strict-validate; representative conformance/replay/admission gate passed 10 files/116 tests. Readiness/owner decision tables explicitly map every unfilled production owner/dependency to NO-GO.
+- Phase 4 aggregate gate passed lint/typecheck/dependency scans; versioned contracts/ports and canonical vectors passed within 19 files/89 tests. PostgreSQL preflight passed 8 additive rerunnable migrations and 5 forced-RLS authorities; 6 DB files/13 tests passed including cross-tenant/RLS and migration safety.
+- OIDC/JWKS/replay, workload exchange, zeroizable Secret/KMS leases and fail-closed dependency health are implemented in framework-neutral production-governance adapters. Unit/fault/scanner gates passed; data-boundary scanner covered 13 fixture/evidence files. Real providers remain NO-GO inputs, not fallback credentials.
+- Monotonic authorization enforces Grant ceilings, canonical Approval/policy binding, live scoped kills, budget and stable AUTHORIZED receipts; MCP cannot grant. Production Tool execution requires canonical authorization, Consumption authority, Effect claim, mandatory sandbox and DNS/connect/redirect egress checks. Hostile bypass tests passed in the 89-test unit gate.
+- Effect Ledger claim/fence/commit/replay/conflict/unknown/resolution and fenced reconciliation are implemented with exact immutable receipt/result replay and mandatory atomic audit. Production writes cannot bypass the Ledger. Effect PostgreSQL suite passed 4 tests including audit rollback, concurrency and late-receipt behavior; fault matrix passed 8/8.
+- Consumption Ledger validates bounded amounts, stable reservation/receipt identity, idempotent commit/conflict, release/expiry/orphan fencing and late settlement; production Tool/Admission require authoritative budget. Consumption PostgreSQL suite passed 4 tests and bounded fairness/backpressure load suite passed 3/3.
+- Encrypted temporary→pending→fenced finalize→committed-only Artifact and Checkpoint protocols, full lineage resume validation, quarantine reconciliation, rotation/legal-hold/tombstone/backup-window lifecycle are implemented. PostgreSQL Artifact/Checkpoint and lifecycle suites passed; aggregate DB gate 6 files/13 tests and fault matrix 8/8 passed.
+- Exact digest/signature/provenance/SBOM/license/vulnerability/revocation checks are enforced at Registry publish, Run Admission and Worker load. Production route is non-bypassable, compensation/orphan behavior and scoped kill/drain preserve frozen Specs. Supply-chain/Registry/Admission/API/Worker tests passed within 19 files/89 tests.
+- Repository resilience controls implement mandatory bounded queues/drain, concurrency caps, circuit breaker, jitter/retry budgets and no EFFECT_UNKNOWN retry. Public Fastify hostile tests prove max concurrency 1, queue overflow 429, drain 503; load 3/3 and fault/rollback 8/8 passed. Production HA/SLO facts remain separately deferred.
+- Full bounded correlation and mandatory append-only atomic security audit are wired; metrics reject high-cardinality labels and 13-file data scanner rejects sensitive payloads. Prometheus/Grafana alert families and runbooks exist. Boundary/cardinality/data scanners all PASS and authority audit-failure rollback is covered in PostgreSQL tests.
+- Deterministic non-production fakes are marked productionEvidence=false; zero-authority shadow/canary state machine, expanded fault/rollback/load suites and aggregate CI are reproducible. check:production-governance:ci passed 89 unit + 8 fault + 3 load + 13 PostgreSQL tests with lint/typecheck/boundaries.
+- Readiness, traceability, data, recovery, release, incident and EFFECT_UNKNOWN documents plus machine manifest are updated. Malformed/incomplete records fail closed; public production route makes zero calls under NO-GO. Manifest remains productionEvidence=false, decision=NO_GO, canEnableProduction=false; strict OpenSpec and aggregate CI pass.
+- Final dependency preflight consumes a versioned canonical progress snapshot: Phase 0–3 are 45/45, 51/51, 56/56, 65/65; Phase 4 is 58/67 with exact nine deferred IDs. Entry manifest is digest-bound and correctly emits BLOCKED/NO-GO without starting promotion.
+- @sage/agent-platform-conformance provides framework-neutral factories/Host/fault/evidence interfaces, causal oracle, stable seed/virtual clock/barriers and digest-bound case writer. Final unit suite passed 19 files/58 tests; generated reports derive from executed-results metadata.
+- Evidence Digest workload is declaration-only with Package/Schemas/Skills/Capabilities/Policies/View, tenant-bound document.fetch, idempotent evidence.publish, supply-chain Release and Interactive/Durable Specs. Boundary/reverse-graph scanners PASS; protected baseline-dependent items are separately deferred.
+- Executed dual-Engine evidence covers 19 shared cases using reference and Pi adapters with the same case IDs/Specs/seed/fault schedule, canonical bounds/authority/receipt/checkpoint comparisons and explicit non-exact reasons. Engine conformance and comparison reports are digest-bound PASS.
+- Paired-Spec builder and actual Interactive/Durable host drivers normalize transport-only events and compare 8 success/failure scenarios; negative host-special-case and duplicate-loop fixtures fail as required. Host equivalence evidence is execution-derived PASS.
+- Forty named deterministic authority-transfer fault points execute across Consumption, Effect, Artifact, Checkpoint, Coordinator, Policy/Approval/Secret, Model and Tool boundaries. Fault evidence reports 40/40 transitions with no missing points and no automatic EFFECT_UNKNOWN retry.
+- Explainable replay makes zero Model/Tool calls and no new Effect/Usage; projection rebuild emits zero commands and reconciles to History/receipts. Unit/Temporal suites passed; real exported Temporal History items are separately exact-deferred.
+- AST/import, resolved package graph, JSON/schema surface, built public .d.ts and reverse dependency scanners all PASS. Seven forbidden dependency fixture families are detected; allowlist requires owner/reason/expiry and forbids final core-leak exceptions.
+- Authoritative draft System Model covers 26 elements, 33 relations, 11 unique authorities, 5 trust boundaries and recovery ownership; structural validation PASS. Generated 3-view DSL/render has 26 nodes/33 edges. Formal Review remains FAIL with open high findings and no evidence-free accepted risk, as required under NO-GO.
+- Traceability maps all 19 canonical requirements and all 61 dotted task IDs to design/model/DSL/code/case/evidence digests; consistency checker reports zero errors. Offline 46-entry bundle verification reports zero mismatches, networkUsed=false and workspaceCacheUsed=false.
+- Canonical 23-item gate accepts only PASS/FAIL/BLOCKED, validates content/source/tool digests, revisions, mandatory sets, freshness, evidence and production approvals. Forged/stale/unsigned/local override tests deny promotion; real command exits 2 PROMOTION_GATE_NOT_GO and baseline/model remain Proposed/draft.
+- Final pipeline passed 19 files/58 tests, Temporal suite 4 files/10 tests, PostgreSQL 6 files/13 tests, typecheck, ESLint, builds, dependency gates and strict OpenSpec. Machine/human bundle and acceptance report explicitly say BLOCKED/NO-GO; mandatory real History job is separately deferred.
+
+## 验证证据
+
+- Checkout Gate: <worktree> on feat-agent-platform-architecture-optimization; six changes seeded and execution-context reports 345 remaining items.
+- 新增 index.ts primitives 与 index.test.ts 覆盖已写入隔离 worktree；验证命令因缺 node_modules 退出 1。
+- 1.1 complete: corepack pnpm --filter @sage/agent-contracts typecheck passed; corepack pnpm vitest run packages/agent-contracts/src/index.test.ts passed 4/4.
+- 1.2 complete: agent-contracts typecheck passed; vitest packages/agent-contracts/src/index.test.ts passed 5/5.
+- 1.3 complete: corepack pnpm --filter @sage/agent-contracts typecheck passed; vitest packages/agent-contracts/src/index.test.ts passed 6/6.
+- 1.4 complete: corepack pnpm --filter @sage/agent-contracts typecheck passed; vitest packages/agent-contracts/src/index.test.ts passed 7/7.
+- Current 1.5 subset: agent-contracts typecheck passed; index.test.ts passed 7/7; Envelope round-trip/unknown-major, strict fields and Envelope/Spec identity mismatch covered.
+- 1.5 complete: agent-contracts typecheck passed; index.test.ts passed 7/7 with Release/Spec/Envelope round-trip, unknown-major, strict unknown-field, forbidden material and identity-match assertions.
+- 2.1 complete: agent-contracts typecheck passed; index.test.ts passed 8/8, including bounded AgentEvent.v2 identity/type/payload tests.
+- 2.2 complete: agent-contracts typecheck passed; index.test.ts passed 9/9 with BoundedRunReceipt outcome/error/reference-only rejection tests.
+- 2.3 complete: agent-contracts typecheck passed; index.test.ts passed 10/10 with AgentState forbidden authority/secret tests.
+- 2.4 partial: agent-contracts typecheck passed; index.test.ts passed 11/11; candidate binding and checkpointRef rejection covered.
+- 2.4 complete: agent-contracts typecheck passed; index.test.ts passed 11/11 with candidate/sealed/audit schema tests and audit executionPolicy rejection.
+- 2.5 complete: agent-contracts typecheck passed; index.test.ts passed 11/11 with terminal-only audit builder gate and contract boundary coverage.
+- 3.1 complete: agent-contracts typecheck passed and index.test.ts 11/11; agent-contracts build passed; platform-ports typecheck passed and index.test.ts 5/5; source boundary scan passed (no Pi/Temporal/HTTP/database imports).
+- 3.2 complete: platform-ports build passed; local-fakes typecheck passed; local-fakes index.test.ts passed 10/10 covering create-only Spec, duplicate replay, digest/attempt conflicts, tenant/digest fail-closed, and injected putSpec unavailability.
+- 3.3 complete: platform-ports build passed; local-fakes typecheck passed; local-fakes index.test.ts passed 15/15 covering one active writer, active epoch reuse, stale fence rejection, strict Event sequence and exact replay, Receipt tenant/invocation/digest idempotency/conflict, and selected failure injection.
+- 3.4 complete: platform-ports build and local-fakes typecheck passed; local-fakes index.test.ts passed 18/18 covering staged-not-resumable, fenced seal, ACL/identity/lineage/sequence failures, duplicate seal, and sealed resume compatibility checks.
+- 3.5 complete: local-fakes typecheck passed; local-fakes index.test.ts passed 23/23; git diff --check passed. Tests cover injected stageBody/stageMetadata/stageCandidate/seal failures, no sealed ref for partial writes, lost-response retry returning existing seal, conflict preservation, duplicate seal, and incompatible resume rejection.
+- 3.6 complete: platform-ports build passed; agent-state-postgres typecheck and build passed; index.integration.test.ts passed 5/5 non-DB tests with 5 DB tests correctly skipped because P2_POSTGRES_URL is missing; migration contract asserts 002 creates only canonical authority tables with no ALTER/DROP/TRUNCATE/DELETE/UPDATE and preserves legacy putCheckpoint.
+- compose postgres:17.6-alpine healthy; P2_POSTGRES_URL=... corepack pnpm vitest run packages/agent-state-postgres/src/index.integration.test.ts: 11 passed; corepack pnpm --filter @sage/agent-state-postgres typecheck: passed; build: passed; git diff --check: passed. Added real DB coverage for immutable Spec, Receipt idempotency/digest conflict, tenant isolation, single writer/stale fence/strict sequence, staged-not-resumable, concurrent atomic seal replay, candidate sequence conflict, and sealed resume spec/codec/runtime compatibility. Fixed JSONB key-order idempotency comparisons using isDeepStrictEqual.
+- 3.7 evidence: compose PostgreSQL healthy; targeted authority integration 11 passed; @sage/agent-state-postgres typecheck/build passed; git diff --check passed. Full P2 gate after corepack pnpm --filter @sage/local-fakes build: corepack pnpm test:p2:integration passed 48 tests across 3 files.
+- Added CanonicalAgentRunner in agent-lib, using only AgentTaskSpecStorePort and CheckpointStorePort. It schema-validates Envelope, loads Spec by ref+digest and trusted tenant, verifies canonical Spec tenant/ref/digest/task/run/attempt identity, validates sealed checkpoint compatibility, and invokes the Engine only after preflight. agent-lib tests: 4 passed, with invalid envelope/missing or mismatched Spec/unsealed checkpoint each asserting zero Engine/Model/Tool calls; success invokes once. agent-contracts/platform-ports/agent-lib builds passed; targeted tests 20 passed; git diff --check passed.
+- Added CanonicalInvocationRunner. It reads an existing Receipt before execution for duplicate invocation replay, validates Spec/checkpoint, acquires one Event writer fence before Engine invocation, appends run.started/engine.started/terminal canonical Events with strict 1..3 sequence and stable digest event IDs, and commits BoundedRunReceipt with canonical sha256 digest. Added BoundedRunOutcome type export from existing schema. agent-lib tests: 6 passed, including held-fence zero Engine call and duplicate invocation returning original Receipt/event range. agent-contracts/platform-ports/agent-lib targeted tests: 22 passed; builds and git diff --check passed.
+- Exported ErrorCategory and RetryDisposition types from existing schemas. Added BoundedExecutionLimit mapping covering duration/turn/model/tool/token/context/artifact/cost/concurrency, all with stable canonical code/category/retry disposition/safe message; concurrency maps to DEPENDENCY_TRANSIENT/DELIVERY_RETRY and remaining bounds to BUDGET/REQUIRES_NEW_ATTEMPT. Invocation runner propagates structured error to BoundedRunReceipt. agent-lib taxonomy tests: 8 passed; agent-contracts and agent-lib builds/typecheck passed; git diff --check passed.
+- CanonicalInvocationEngine now returns only CheckpointCandidate; CanonicalInvocationRunner validates candidate schema, task/run/attempt/spec binding, engine codec and runtime major, then stages and seals it with the acquired Event writer fence. Only successful sealed/existing results produce checkpoint.sealed Event payload and BoundedRunReceipt.checkpointRef. Candidate validation, stage conflict and seal conflict write run.failed without exposing a ref. agent-contracts/platform-ports/agent-lib builds and agent-lib typecheck passed with pnpm 10.33.0; 3 targeted test files passed (28 tests); git diff --check passed.
+- Expanded FinalizedRunAuditRecord with Release refs/digests, bounded build attestation and Coordinator refs, and deduplicated canonical ref aggregation. CanonicalFinalizedAuditBuilder reads only the receipt store, rejects missing receipt, receipt/spec mismatch and non-terminal receipt. Canonical runners reject audit records as execution input. agent-contracts/platform-ports/agent-lib builds passed; 3 targeted test files passed (31 tests); git diff --check passed.
+- Created @sage/agent-runtime-conformance workspace package with canonical-major=1 framework-neutral adapter factory interface, versioned canonical fixture, fixture schema/identity expectation and no-second-configuration-authority guard. Package only depends on @sage/agent-contracts. corepack pnpm@10.33.0 install --offline, package typecheck/build, 3 unit tests, and git diff --check passed.
+- Targeted Vitest: 4 files, 38 tests passed; admission package typecheck passed; boundary lint and executable ownership smoke passed.
+- Observability Vitest: 12 tests passed; observability typecheck and lint passed. Correlation refs are logged/traced while metrics contain only stage/outcome/reason_code.
+- Rollout/rollback docs created; rollout E2E: 2 files, 4 tests passed; admission typecheck and lint passed; immutable Spec and Envelope compatibility remained valid through rollback.
+
+## 暂缓项
+
+- `agent-platform-production-governance`（9）
+  - 9.1 为 Admission、Identity/Secret、Policy/Revocation/Approval、Effect/Consumption Ledger、Coordinator、Artifact/Checkpoint、Provider 和 reconciliation 定义具名 Owner、SLI/SLO、错误预算与告警阈值。（BLOCKER accountable-owner-roster-and-approved-slo-thresholds: named production Owners, approved SLIs/SLOs/error budgets and alert thresholds are unfilled; repository templates default this gate to NO-GO.）
+  - 9.2 部署并验证已批准的多故障域副本、quorum/failover、PITR、备份保留和 dependency readiness；记录配置版本与容量 headroom。（BLOCKER production-multi-fault-domain-topology-and-pitr: no approved production replicas/quorum/failover/PITR/backup topology or capacity headroom evidence exists.）
+  - 9.3 对 PostgreSQL/Coordinator/Ledger/Artifact/Checkpoint 执行生产等价备份恢复与 point-in-time exercise，验证 authority/ref 完整性和已批准 RTO/RPO。（BLOCKER production-equivalent-backup-restore-rto-rpo-exercise: no production-equivalent PostgreSQL/Coordinator/Ledger/Artifact/Checkpoint restore exercise or approved RTO/RPO exists.）
+  - 10.5 为每类告警编写并演练具名 Owner Runbook，包含 fail-closed、禁止重复副作用、safe reconcile、人工 resolution、drain/cancel 和升级路径。（BLOCKER named-alert-owner-roster-and-witnessed-runbook-exercises: runbooks exist but accountable human Owners, escalation roster and witnessed production exercises are unfilled.）
+  - 11.2 部署 shadow decision 模式，仅比较授权/Admission/reconcile 结果而不授予权限、不执行副作用、不结算或签发可恢复 ref，并建立差异阈值。（BLOCKER production-shadow-environment-tenant-and-approved-thresholds: zero-authority shadow implementation/tests pass, but no authorized production shadow deployment, tenant, observation window or threshold exists.）
+  - 11.3 在隔离 tenant 依次 canary Identity/Secret、Consumption、Artifact/Checkpoint、Effect、sandbox/egress 和供应链 Gate；每一步通过后才扩大范围。（BLOCKER isolated-production-canary-tenant-and-real-dependencies: no approved isolated tenant or real Identity/Secret/Ledger/Artifact/Effect/sandbox/supply-chain production dependency set is available.）
+  - 12.2 汇总前四个 change、生产依赖、SLO/RTO/RPO、供应链、租户隔离、安全/故障/容量演练和告警 Runbook 的不可变 evidence digests 与 freshness。（BLOCKER immutable-production-evidence-digests-and-freshness-inputs: repository manifest truthfully lists missing inputs, but production dependency/SLO/RTO/RPO/security/capacity evidence digests and freshness records do not exist.）
+  - 12.3 由具名 Security、Architecture、Operations/SRE、Release 与 Data Owner 逐项签署，记录任何明确、时限化且不绕过 mandatory control 的残余风险接受。（BLOCKER five-distinct-human-owner-signatures: Security, Architecture, Operations/SRE, Release and Data Owner external identities/signatures are UNFILLED.）
+  - 12.5 仅在最终人类 `GO` 后开启有界 production canary，并持续监测 readiness regression；任一 mandatory gate 失效立即触发 scope/global kill、暂停新 Admission 并恢复 `NO-GO`/suspended。（BLOCKER final-human-go-and-production-canary-authorization: external human GO is absent; machine readiness remains productionEvidence=false, decision=NO_GO, canEnableProduction=false.）
+- `agent-platform-generalization-validation`（5）
+  - 3.1 在实现前生成受保护核心路径 tree/diff baseline，覆盖 Kernel、Interactive/Durable Host、通用 Run 表、Coordinator canonical contract 和 canonical API（BLOCKER authentic-pre-reference-workload-protected-snapshot: implementation began before an immutable protected-path baseline was captured; equal late snapshots are explicitly BLOCKED and cannot prove zero core changes.）
+  - 3.7 完成后重新生成 protected-path manifest，证明相对现有 Chat/Task workload family 的第二 workload 仅改动 Release、Skills、Capabilities、Schemas、Policies、Views 和批准的 fixtures；出现核心变化时使 Gate 失败（BLOCKER protected-path-before-anchor: the after manifest exists, but no independently anchored pre-workload tree digest exists, so workload zero-core-diff remains BLOCKED rather than falsely PASS.）
+  - 7.5 从序列 3 compatibility policy 枚举支持窗口内全部旧 Coordinator History fixtures，使用当前 Worker/Adapter 离线 replay 并保存 fixture/build/digest 清单（BLOCKER exported-temporal-history-corpus: seven compatibility fixtures have verified byte digests but are declarative JSON, not exported Temporal Histories replayed with Worker.runReplayHistory.）
+  - 7.6 增加 nondeterministic/unknown schema/history 负向 fixture，证明单个不兼容即可阻断 Worker 发布和总 Gate（BLOCKER real-negative-temporal-history-fixtures: nondeterministic/unknown-schema negatives exist as declarations, but no actual exported History negative corpus is available for current Worker replay.）
+  - 12.2 运行完整双 Engine conformance、双 Host 等价、fault matrix、replay/rebuild/history 和 static boundary CI jobs，确认无 skipped/only/flaky 强制 case（BLOCKER mandatory-history-replay-job: dual Engine/Host, fault, rebuild and static jobs pass with no only/skip/flaky markers, but the mandatory real Temporal History replay job remains BLOCKED by missing exported Histories.）
+
+## 候选项
+
+- （无）
+
+## 阻塞
+
+- 无
+
+## 下一步
+
+- 继续下一个未完成 OpenSpec task
+
+## Git 快照
+
+- `.` checkout=`<worktree>` branch=`feat-agent-platform-architecture-optimization` head=`e8ea299dcac4f1859528d2c67e31e35a58d05c9e` dirty=unchecked
+
+## 最终验证快照
+
+- 状态：`missing`

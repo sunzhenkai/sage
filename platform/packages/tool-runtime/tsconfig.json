@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "composite": true,
+    "baseUrl": ".",
+    "paths": {
+      "@sage/agent-contracts": ["../agent-contracts/src/index.ts"],
+      "@sage/platform-ports": ["../platform-ports/src/index.ts"],
+      "@sage/local-fakes": ["../local-fakes/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*.ts"],
+  "references": [{ "path": "../agent-contracts" }, { "path": "../platform-ports" }, { "path": "../local-fakes" }]
+}

@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "1",
+  "sourceRevision": "e8ea299dcac4f1859528d2c67e31e35a58d05c9e",
+  "sourceDigest": "sha256:c2fe13d173b44c54a13ab7b65099712f26754498e64513792781544dc6844687",
+  "toolDigest": "sha256:615a886b8b64d8fa078866d1e5da007c31c9088effdb9684eb873b16162bebde",
+  "generatedAt": "2026-08-17T03:31:33.601Z",
+  "caseId": "apgv/traceability/v1/consistency",
+  "rowCount": 19,
+  "mappedTaskCount": 61,
+  "canonicalTaskCount": 61,
+  "requirementCount": 19,
+  "errors": [],
+  "status": "PASS",
+  "contentDigest": "sha256:c49ad6a0652853928be6b8c1e91368c0ccc66cbf357864c61c8b46c7c30f327e"
+}

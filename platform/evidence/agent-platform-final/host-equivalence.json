@@ -1,0 +1,164 @@
+{
+  "schemaVersion": "1",
+  "sourceRevision": "e8ea299dcac4f1859528d2c67e31e35a58d05c9e",
+  "sourceDigest": "sha256:968bfae73d45be1e8fd24d15ab63f024053550dc5ed3269785aa113d9ac9a035",
+  "toolDigest": "sha256:3d6dd2655ddfe4566363423fb31c041e376338385de07874a57dd1038ac59fdf",
+  "generatedAt": "2026-08-17T03:31:18.656Z",
+  "sourceState": {
+    "head": "e8ea299dcac4f1859528d2c67e31e35a58d05c9e",
+    "worktreeDigest": "sha256:c2fe13d173b44c54a13ab7b65099712f26754498e64513792781544dc6844687",
+    "dirtyPathCount": 348
+  },
+  "startedAt": "2026-08-17T03:31:18.636Z",
+  "finishedAt": "2026-08-17T03:31:18.656Z",
+  "seed": "apgv-seed-v1",
+  "executionEvidenceRef": "platform/evidence/agent-platform-final/executed-results.json",
+  "executionEvidenceDigest": "sha256:8c9ab5d23775aab3d68d974038541084636e2b440df0cdddb8b6291fb44a2ea4",
+  "status": "PASS",
+  "scenarioCount": 8,
+  "hosts": [
+    "interactive-bounded-client",
+    "durable-coordinator-activity"
+  ],
+  "cases": [
+    {
+      "caseId": "apgv/host/v1/success",
+      "scenario": "success",
+      "status": "PASS",
+      "canonicalEquivalent": true,
+      "interactiveCalls": 1,
+      "durableCalls": 1,
+      "durableBinding": "createDurableCoordinatorHostActivities",
+      "assertions": [
+        "outcome",
+        "error",
+        "receipt-lineage",
+        "artifact-lineage",
+        "checkpoint-lineage"
+      ]
+    },
+    {
+      "caseId": "apgv/host/v1/denial",
+      "scenario": "denial",
+      "status": "PASS",
+      "canonicalEquivalent": true,
+      "interactiveCalls": 1,
+      "durableCalls": 1,
+      "durableBinding": "createDurableCoordinatorHostActivities",
+      "assertions": [
+        "outcome",
+        "error",
+        "receipt-lineage",
+        "artifact-lineage",
+        "checkpoint-lineage"
+      ]
+    },
+    {
+      "caseId": "apgv/host/v1/cancel",
+      "scenario": "cancel",
+      "status": "PASS",
+      "canonicalEquivalent": true,
+      "interactiveCalls": 1,
+      "durableCalls": 1,
+      "durableBinding": "createDurableCoordinatorHostActivities",
+      "assertions": [
+        "outcome",
+        "error",
+        "receipt-lineage",
+        "artifact-lineage",
+        "checkpoint-lineage"
+      ]
+    },
+    {
+      "caseId": "apgv/host/v1/timeout",
+      "scenario": "timeout",
+      "status": "PASS",
+      "canonicalEquivalent": true,
+      "interactiveCalls": 1,
+      "durableCalls": 1,
+      "durableBinding": "createDurableCoordinatorHostActivities",
+      "assertions": [
+        "outcome",
+        "error",
+        "receipt-lineage",
+        "artifact-lineage",
+        "checkpoint-lineage"
+      ]
+    },
+    {
+      "caseId": "apgv/host/v1/budget-exhausted",
+      "scenario": "budget-exhausted",
+      "status": "PASS",
+      "canonicalEquivalent": true,
+      "interactiveCalls": 1,
+      "durableCalls": 1,
+      "durableBinding": "createDurableCoordinatorHostActivities",
+      "assertions": [
+        "outcome",
+        "error",
+        "receipt-lineage",
+        "artifact-lineage",
+        "checkpoint-lineage"
+      ]
+    },
+    {
+      "caseId": "apgv/host/v1/waiting",
+      "scenario": "waiting",
+      "status": "PASS",
+      "canonicalEquivalent": true,
+      "interactiveCalls": 1,
+      "durableCalls": 1,
+      "durableBinding": "createDurableCoordinatorHostActivities",
+      "assertions": [
+        "outcome",
+        "error",
+        "receipt-lineage",
+        "artifact-lineage",
+        "checkpoint-lineage"
+      ]
+    },
+    {
+      "caseId": "apgv/host/v1/effect-unknown",
+      "scenario": "effect-unknown",
+      "status": "PASS",
+      "canonicalEquivalent": true,
+      "interactiveCalls": 1,
+      "durableCalls": 1,
+      "durableBinding": "createDurableCoordinatorHostActivities",
+      "assertions": [
+        "outcome",
+        "error",
+        "receipt-lineage",
+        "artifact-lineage",
+        "checkpoint-lineage"
+      ]
+    },
+    {
+      "caseId": "apgv/host/v1/incompatible-checkpoint",
+      "scenario": "incompatible-checkpoint",
+      "status": "PASS",
+      "canonicalEquivalent": true,
+      "interactiveCalls": 1,
+      "durableCalls": 1,
+      "durableBinding": "createDurableCoordinatorHostActivities",
+      "assertions": [
+        "outcome",
+        "error",
+        "receipt-lineage",
+        "artifact-lineage",
+        "checkpoint-lineage"
+      ]
+    }
+  ],
+  "negativeFixtures": [
+    {
+      "id": "host-special-case",
+      "failureCode": "HOST_WORKLOAD_SPECIAL_CASE"
+    },
+    {
+      "id": "duplicate-loop-host",
+      "failureCode": "HOST_DUPLICATE_AGENT_LOOP"
+    }
+  ],
+  "contentDigest": "sha256:ebd8cecdeaa4eff3fb2df03460d46ec43d7b5f609a9069cb26a43420492a0ffe"
+}

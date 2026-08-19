@@ -1,0 +1,363 @@
+version: "1.1"
+sourceModel: "./first-version-system.architecture.json#1.1"
+status: validated
+diagramType: runtime
+renderer: mermaid
+direction: left-to-right
+layers:
+  - Actors
+  - Manager
+  - Gateway
+  - Runtime
+  - Platform
+  - Infrastructure
+nodes:
+  - id: end-user
+    label: "Agent Application User"
+    type: actor
+    layer: Actors
+    group: User
+    positionHint: far-left
+  - id: host-application
+    label: "Host Application"
+    type: actor
+    layer: Actors
+    group: Host Integration
+    positionHint: far-left
+  - id: agent-web-ui
+    label: "Agent Web UI\nChat + Tasks"
+    type: manager
+    layer: Manager
+    group: Agent Application
+    positionHint: left
+  - id: temporal-target-registry
+    label: "Temporal Target Registry\ntask type / env / namespace / queue"
+    type: manager
+    layer: Manager
+    group: Task Routing
+    positionHint: center
+  - id: application-api
+    label: "Application API\nFastify + HTTP/SSE"
+    type: gateway
+    layer: Gateway
+    group: Agent Application
+    positionHint: left
+  - id: agent-library-api
+    label: "Agent Library API\nLocalAgentClient"
+    type: gateway
+    layer: Gateway
+    group: Agent Library
+    positionHint: center
+  - id: chat-service
+    label: "Chat Service\nsession / message / streaming"
+    type: service
+    layer: Runtime
+    group: Chat
+    positionHint: center
+  - id: task-service
+    label: "Task Service\ncreate / query / signal / cancel"
+    type: service
+    layer: Runtime
+    group: Task Management
+    positionHint: center
+  - id: task-router
+    label: "Task Router\nresolve and pin WorkflowTarget"
+    type: service
+    layer: Runtime
+    group: Task Routing
+    positionHint: center
+  - id: environment-task-workers
+    label: "Environment Task Workers\nTemporal Workflow / Activity"
+    type: service
+    layer: Runtime
+    group: Task Execution
+    positionHint: right
+  - id: agent-runner
+    label: "Agent Runner\nbounded run / event / budget / cancel"
+    type: service
+    layer: Runtime
+    group: Agent Library
+    positionHint: center
+  - id: temporal-client-adapter
+    label: "Temporal Client Adapter\nmulti-target client factory"
+    type: platform
+    layer: Platform
+    group: Task Routing
+    positionHint: right
+  - id: temporal-clusters
+    label: "Temporal Clusters\ndev / prod / isolated / region"
+    type: external
+    layer: Platform
+    group: Workflow Runtime
+    positionHint: far-right
+  - id: pi-harness
+    label: "Pi Harness Adapter\nHarnessPort"
+    type: platform
+    layer: Platform
+    group: Agent Library
+    positionHint: right
+  - id: skill-tool-runtime
+    label: "Skill and Tool Runtime\nregistry / authorize / execute"
+    type: platform
+    layer: Platform
+    group: Agent Library
+    positionHint: right
+  - id: credential-provider
+    label: "Credential Provider\nconnection_ref / secret_ref"
+    type: platform
+    layer: Platform
+    group: Credential
+    positionHint: right
+  - id: model-provider
+    label: "LLM Provider"
+    type: external
+    layer: Platform
+    group: External Capabilities
+    positionHint: far-right
+  - id: business-tools
+    label: "Business Tools\nand MCP Servers"
+    type: external
+    layer: Platform
+    group: External Capabilities
+    positionHint: far-right
+  - id: identity-provider
+    label: "Identity Provider"
+    type: external
+    layer: Platform
+    group: Identity
+    positionHint: far-right
+  - id: observability-backend
+    label: "Observability Backend\nlogs / metrics / traces"
+    type: external
+    layer: Platform
+    group: Operations
+    positionHint: far-right
+  - id: chat-store
+    label: "PostgreSQL Chat Store\nsession / message / summary"
+    type: database
+    layer: Infrastructure
+    group: Chat State
+    positionHint: bottom
+  - id: task-store
+    label: "PostgreSQL Task Store\nproduct state / routing snapshot"
+    type: database
+    layer: Infrastructure
+    group: Task State
+    positionHint: bottom
+  - id: agent-state-store
+    label: "PostgreSQL Agent State\nsession / checkpoint"
+    type: database
+    layer: Infrastructure
+    group: Agent State
+    positionHint: bottom
+  - id: artifact-store
+    label: "Artifact Store\nS3-compatible"
+    type: object-storage
+    layer: Infrastructure
+    group: Artifact
+    positionHint: bottom
+  - id: secret-manager
+    label: "Secret Manager\nservice and user credentials"
+    type: external
+    layer: Infrastructure
+    group: Credential
+    positionHint: bottom
+edges:
+  - id: user-operates-web-ui
+    from: end-user
+    to: agent-web-ui
+    protocol: HTTPS
+    sync: sync
+    label: "HTTPS · chat and task operations"
+  - id: web-ui-calls-application-api
+    from: agent-web-ui
+    to: application-api
+    protocol: HTTP/JSON and SSE
+    sync: sync
+    label: "HTTP/SSE · commands and streams"
+  - id: application-api-validates-identity
+    from: application-api
+    to: identity-provider
+    protocol: HTTPS/OIDC
+    sync: sync
+    label: "OIDC · authenticate and scope"
+  - id: application-api-emits-telemetry
+    from: application-api
+    to: observability-backend
+    protocol: OTLP
+    sync: async
+    label: "OTLP · API telemetry"
+  - id: application-api-calls-chat-service
+    from: application-api
+    to: chat-service
+    protocol: in-process
+    sync: sync
+    label: "in-process · chat commands"
+  - id: application-api-calls-task-service
+    from: application-api
+    to: task-service
+    protocol: in-process
+    sync: sync
+    label: "in-process · task commands"
+  - id: chat-service-reads-writes-chat-store
+    from: chat-service
+    to: chat-store
+    protocol: SQL
+    sync: sync
+    label: "SQL · session and messages"
+  - id: chat-service-runs-agent-library
+    from: chat-service
+    to: agent-library-api
+    protocol: in-process LocalAgentClient
+    sync: sync
+    label: "in-process · short chat run"
+  - id: chat-service-promotes-task
+    from: chat-service
+    to: task-service
+    protocol: in-process
+    sync: sync
+    label: "in-process · promote long request"
+  - id: chat-service-reads-writes-artifacts
+    from: chat-service
+    to: artifact-store
+    protocol: S3 API
+    sync: sync
+    label: "S3 · chat attachments"
+  - id: task-service-reads-writes-task-store
+    from: task-service
+    to: task-store
+    protocol: SQL
+    sync: sync
+    label: "SQL · task product state"
+  - id: task-service-reads-artifacts
+    from: task-service
+    to: artifact-store
+    protocol: S3 API
+    sync: sync
+    label: "S3 · task artifact read"
+  - id: task-service-routes-task
+    from: task-service
+    to: task-router
+    protocol: in-process
+    sync: sync
+    label: "in-process · route trusted task type"
+  - id: task-router-reads-target-registry
+    from: task-router
+    to: temporal-target-registry
+    protocol: in-process configuration API
+    sync: sync
+    label: "config · target policy"
+  - id: task-router-writes-routing-snapshot
+    from: task-router
+    to: task-store
+    protocol: SQL
+    sync: sync
+    label: "SQL · pin target snapshot"
+  - id: task-router-calls-temporal-adapter
+    from: task-router
+    to: temporal-client-adapter
+    protocol: in-process
+    sync: sync
+    label: "in-process · Temporal operations"
+  - id: temporal-adapter-resolves-credentials
+    from: temporal-client-adapter
+    to: credential-provider
+    protocol: CredentialProvider in-process
+    sync: sync
+    label: "CredentialPort · target auth"
+  - id: temporal-adapter-calls-selected-cluster
+    from: temporal-client-adapter
+    to: temporal-clusters
+    protocol: Temporal gRPC/mTLS
+    sync: sync
+    label: "gRPC/mTLS · selected cluster"
+  - id: temporal-clusters-dispatch-workers
+    from: temporal-clusters
+    to: environment-task-workers
+    protocol: Temporal Task Queue
+    sync: async
+    label: "Task Queue · workflow/activity task"
+  - id: workers-project-task-state
+    from: environment-task-workers
+    to: task-store
+    protocol: SQL
+    sync: sync
+    label: "SQL · task projection"
+  - id: workers-read-write-agent-state
+    from: environment-task-workers
+    to: agent-state-store
+    protocol: SQL
+    sync: sync
+    label: "SQL · session and checkpoint"
+  - id: workers-write-artifacts
+    from: environment-task-workers
+    to: artifact-store
+    protocol: S3 API
+    sync: sync
+    label: "S3 · results and reports"
+  - id: workers-call-agent-library
+    from: environment-task-workers
+    to: agent-library-api
+    protocol: in-process LocalAgentClient
+    sync: sync
+    label: "in-process · agent activity"
+  - id: workers-emit-telemetry
+    from: environment-task-workers
+    to: observability-backend
+    protocol: OTLP
+    sync: async
+    label: "OTLP · workflow and agent telemetry"
+  - id: host-application-calls-agent-library
+    from: host-application
+    to: agent-library-api
+    protocol: in-process library API
+    sync: sync
+    label: "in-process · embedded agent"
+  - id: agent-library-api-calls-runner
+    from: agent-library-api
+    to: agent-runner
+    protocol: in-process
+    sync: sync
+    label: "in-process · validate and run"
+  - id: agent-runner-calls-pi-harness
+    from: agent-runner
+    to: pi-harness
+    protocol: HarnessPort in-process
+    sync: sync
+    label: "HarnessPort · agent loop"
+  - id: agent-runner-calls-skill-tool-runtime
+    from: agent-runner
+    to: skill-tool-runtime
+    protocol: Provider ports in-process
+    sync: sync
+    label: "Provider Port · skill and tool"
+  - id: agent-runner-emits-telemetry
+    from: agent-runner
+    to: observability-backend
+    protocol: OTLP
+    sync: async
+    label: "OTLP · agent telemetry"
+  - id: pi-harness-calls-model-provider
+    from: pi-harness
+    to: model-provider
+    protocol: HTTPS
+    sync: sync
+    label: "HTTPS · model inference"
+  - id: skill-tool-runtime-calls-business-tools
+    from: skill-tool-runtime
+    to: business-tools
+    protocol: HTTPS/MCP
+    sync: sync
+    label: "HTTPS/MCP · authorized tool call"
+  - id: skill-tool-runtime-resolves-credentials
+    from: skill-tool-runtime
+    to: credential-provider
+    protocol: CredentialProvider in-process
+    sync: sync
+    label: "CredentialPort · tool credentials"
+  - id: credential-provider-reads-secret-manager
+    from: credential-provider
+    to: secret-manager
+    protocol: Secret Manager API
+    sync: sync
+    label: "Secret API · resolve and rotate"

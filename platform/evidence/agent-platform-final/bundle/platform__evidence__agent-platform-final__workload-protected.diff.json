@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "1",
+  "caseId": "apgv/workload/v1/protected-diff",
+  "status": "BLOCKED",
+  "changed": [],
+  "renames": [],
+  "beforeDigest": "sha256:96688a50ca6815bdd655dfe9d2ed510478e7adcbb869005dc5ee240295ab03c8",
+  "afterDigest": "sha256:96688a50ca6815bdd655dfe9d2ed510478e7adcbb869005dc5ee240295ab03c8",
+  "protectedFileCount": 19,
+  "observedAt": "2026-08-17T03:31:31.408Z",
+  "sourceDigest": "sha256:9ea9953292a576baf8d62926acfa987058dafe2b207ba25267c7c1d3f1703d4e",
+  "toolDigest": "sha256:fc2601cd6de5869959c2e57ecbb31c1e2d4ab39335b740b7be5a66449735d252",
+  "reason": "PRE_WORKLOAD_SNAPSHOT_NOT_AVAILABLE_AFTER_IMPLEMENTATION",
+  "contentDigest": "sha256:2c17685451c84e6e7bc4aca7989c54200e5e90242c2daaf2abe349ca1c22f144"
+}

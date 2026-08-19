@@ -1,0 +1,142 @@
+{
+  "schemaVersion": "1",
+  "kind": "protected-path-manifest",
+  "phase": "after",
+  "head": "e8ea299dcac4f1859528d2c67e31e35a58d05c9e",
+  "capturedAt": "2026-08-17T03:31:31.407Z",
+  "dirtyState": true,
+  "worktreeStatusDigest": "sha256:df2cad87ea5cdbe0e234fc478678ab7bc63c00dfe4fd6413371a3ec6acbdacca",
+  "roots": [
+    "packages/agent-contracts/src",
+    "packages/platform-ports/src",
+    "packages/agent-lib/src/kernel.ts",
+    "packages/local-runtime/src",
+    "apps/agent-api/src/runtime.ts",
+    "apps/agent-worker/src/activities.ts",
+    "packages/task-domain/migrations",
+    "packages/temporal-workflows/src/coordinator-workflow.ts"
+  ],
+  "files": [
+    {
+      "path": "apps/agent-api/src/runtime.ts",
+      "mode": "644",
+      "bytes": 12221,
+      "digest": "sha256:2cc9f636e3bfe4f14c5b7e999e874456dc5e34dd8ffb045400f9ec08c681ce09"
+    },
+    {
+      "path": "apps/agent-worker/src/activities.ts",
+      "mode": "644",
+      "bytes": 17738,
+      "digest": "sha256:ba869d406b16a7ec7cc098deb14a9bd9379ea7843ceaf1abb05fb0a2f69f19b5"
+    },
+    {
+      "path": "packages/agent-contracts/src/index.test.ts",
+      "mode": "644",
+      "bytes": 13749,
+      "digest": "sha256:83349f0216d7aa533eda2c46f6d0b8528da168c7f0452b08412b5dce1cd6d594"
+    },
+    {
+      "path": "packages/agent-contracts/src/index.ts",
+      "mode": "644",
+      "bytes": 22885,
+      "digest": "sha256:90ce9c97f1e62c6bcfa11cd39279ec8a8c500e30b353dd92391f96793f765868"
+    },
+    {
+      "path": "packages/agent-contracts/src/production-governance.test.ts",
+      "mode": "644",
+      "bytes": 1449,
+      "digest": "sha256:6da464bb98fea0baa024c671295737b5b93a5ae6a0479975f75502305a2a3895"
+    },
+    {
+      "path": "packages/agent-contracts/src/production-governance.ts",
+      "mode": "644",
+      "bytes": 11087,
+      "digest": "sha256:bf645ed55e0305dff094f6d1497c314d8701060aaff0e5fd1d4950e8028cf9e1"
+    },
+    {
+      "path": "packages/agent-lib/src/kernel.ts",
+      "mode": "644",
+      "bytes": 21461,
+      "digest": "sha256:fa924735abbf01f82e9dd98d3e52c377eaf244cb05e39696727b26a10c15272d"
+    },
+    {
+      "path": "packages/local-runtime/src/index.ts",
+      "mode": "644",
+      "bytes": 291,
+      "digest": "sha256:9dd0973004bdbba863def49cecb8fc424cae2112ff4311c39e50fe29199abffd"
+    },
+    {
+      "path": "packages/local-runtime/src/kernel.test.ts",
+      "mode": "644",
+      "bytes": 3075,
+      "digest": "sha256:9491c3b4acdb8866370c97e18caa2dccfe161d70607c715a7c802dd3724e520e"
+    },
+    {
+      "path": "packages/local-runtime/src/kernel.ts",
+      "mode": "644",
+      "bytes": 6404,
+      "digest": "sha256:bf7e18374e0da1eea954022d69dcaa7dcf0e31f303910b382bbee554e91ecdd0"
+    },
+    {
+      "path": "packages/platform-ports/src/coordinator-conformance.ts",
+      "mode": "644",
+      "bytes": 5160,
+      "digest": "sha256:94415a816f47c635cda145f7aa27ef4e4e5b8e24102354df2389d5383ff32622"
+    },
+    {
+      "path": "packages/platform-ports/src/index.test.ts",
+      "mode": "644",
+      "bytes": 35436,
+      "digest": "sha256:fa7c50f2279118948eaed31b9a722fdbeff309196a85b2f182b31b99227c7d5d"
+    },
+    {
+      "path": "packages/platform-ports/src/index.ts",
+      "mode": "644",
+      "bytes": 56194,
+      "digest": "sha256:e790db84188c6fb0cf35859560276f41b600103a115f9a93b52e57313affc810"
+    },
+    {
+      "path": "packages/platform-ports/src/production-governance.test.ts",
+      "mode": "644",
+      "bytes": 597,
+      "digest": "sha256:36e9d69da030ca5d9adc4b0e9f99a3c0f454adc82abfbfca414ff27dfcf4bc7e"
+    },
+    {
+      "path": "packages/platform-ports/src/production-governance.ts",
+      "mode": "644",
+      "bytes": 11708,
+      "digest": "sha256:4f59bdb458c4cac8632405425a8507ae682f5cb04f4e0dec13e40799de3c1522"
+    },
+    {
+      "path": "packages/platform-ports/src/runtime.ts",
+      "mode": "644",
+      "bytes": 9470,
+      "digest": "sha256:d2254673a9e363e3ac9ce0a8db239a60e040782a5ec06836a068c5daa1cea36a"
+    },
+    {
+      "path": "packages/task-domain/migrations/001_task_store.sql",
+      "mode": "644",
+      "bytes": 10346,
+      "digest": "sha256:31f7cdb2bbce1c0f3c8a3a979cb95de07dd458411bada73606bb836b4a884929"
+    },
+    {
+      "path": "packages/task-domain/migrations/002_durable_coordinator_task_persistence.sql",
+      "mode": "644",
+      "bytes": 9314,
+      "digest": "sha256:99b6c7dba9e6ba1fa1ae86cae906c4a6e2c23b37e52f7dd6bf36978a37be5d8d"
+    },
+    {
+      "path": "packages/temporal-workflows/src/coordinator-workflow.ts",
+      "mode": "644",
+      "bytes": 18042,
+      "digest": "sha256:3216d74e404a5915a0b1e4ef200981ba2fcf93a31a1f833bd156aab7066afe43"
+    }
+  ],
+  "treeDigest": "sha256:96688a50ca6815bdd655dfe9d2ed510478e7adcbb869005dc5ee240295ab03c8",
+  "provenance": {
+    "immutable": false,
+    "historicalAnchorAvailable": false,
+    "status": "CURRENT",
+    "reason": "POST_WORKLOAD_SNAPSHOT"
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "name":"@sage/production-governance-integration","version":"0.1.0","private":true,"type":"module",
+  "scripts":{"typecheck":"tsc -p tsconfig.json --noEmit","build":"tsc -p tsconfig.json"},
+  "dependencies":{"@sage/production-governance":"workspace:*","@sage/tool-runtime":"workspace:*"}
+}

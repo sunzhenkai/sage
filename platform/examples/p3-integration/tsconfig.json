@@ -1,0 +1,26 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "composite": true,
+    "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM"],
+    "baseUrl": ".",
+    "paths": {
+      "@sage/agent-api": ["../../apps/agent-api/src/index.ts"],
+      "@sage/agent-web/chat": ["../../apps/agent-web/src/chat.tsx"],
+      "@sage/app-contracts": ["../../packages/app-contracts/src/index.ts"],
+      "@sage/chat-domain": ["../../packages/chat-domain/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "references": [
+    { "path": "../../packages/agent-contracts" },
+    { "path": "../../packages/agent-client" },
+    { "path": "../../packages/app-contracts" },
+    { "path": "../../packages/chat-domain" },
+    { "path": "../../apps/agent-api" },
+    { "path": "../../apps/agent-web" }
+  ]
+}

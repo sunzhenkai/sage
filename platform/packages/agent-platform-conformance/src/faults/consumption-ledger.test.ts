@@ -1,0 +1,1 @@
+import{expect,it}from'vitest';import{byDomain}from'./fault-fixtures.js';it('covers reserve before/after, response loss, redelivery and orphan reclaim',()=>expect(byDomain('consumption').map(x=>x.point)).toEqual(['consumption.before-reserve','consumption.after-reserve','consumption.commit-response-loss','consumption.redelivery','consumption.orphan-reclaim']));

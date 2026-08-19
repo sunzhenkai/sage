@@ -1,0 +1,17 @@
+{
+  "name": "@sage/harness-pi",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
+  "scripts": { "clean": "rm -rf dist", "typecheck": "tsc -p tsconfig.json --noEmit", "build": "tsc -p tsconfig.json" },
+  "dependencies": {
+    "@sage/agent-contracts": "workspace:*",
+    "@sage/agent-lib": "workspace:*",
+    "@mariozechner/pi-agent-core": "0.73.1",
+    "@mariozechner/pi-ai": "0.73.1"
+  },
+  "devDependencies": {
+    "@sage/agent-runtime-conformance": "workspace:*"
+  }
+}

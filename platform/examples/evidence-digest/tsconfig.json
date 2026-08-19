@@ -1,0 +1,3 @@
+{
+  "extends":"../../tsconfig.base.json","compilerOptions":{"rootDir":"src","outDir":"dist","composite":true,"baseUrl":".","paths":{"@sage/agent-platform-conformance":["../../packages/agent-platform-conformance/src/index.ts"],"@sage/agent-package-release":["../../packages/agent-package-release/src/index.ts"],"@sage/agent-runtime-conformance":["../../packages/agent-runtime-conformance/src/index.ts"],"@sage/harness-pi":["../../packages/harness-pi/src/index.ts"]}},"include":["src/**/*.ts"],"references":[{"path":"../../packages/agent-platform-conformance"},{"path":"../../packages/agent-package-release"},{"path":"../../packages/agent-runtime-conformance"},{"path":"../../packages/harness-pi"}]
+}

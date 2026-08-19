@@ -1,0 +1,119 @@
+name: sage-mvp
+services:
+  postgres:
+    image: postgres:17.6-alpine
+    environment:
+      POSTGRES_USER: sage
+      POSTGRES_PASSWORD: sage-local-only
+      POSTGRES_DB: sage
+    ports: ["${SAGE_POSTGRES_PORT:-15432}:5432"]
+    volumes: ["postgres-data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sage -d sage"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  temporal:
+    image: temporalio/auto-setup:1.29.1
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB: postgres12
+      DB_PORT: 5432
+      POSTGRES_USER: sage
+      POSTGRES_PWD: sage-local-only
+      POSTGRES_SEEDS: postgres
+      DEFAULT_NAMESPACE: sage-dev
+    ports: ["${SAGE_TEMPORAL_PORT:-17233}:7233"]
+    healthcheck:
+      test: ["CMD-SHELL", "temporal operator cluster health --address $$(hostname -i):7233"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+
+  artifact-store:
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+    command: server /data --console-address :9001
+    environment:
+      MINIO_ROOT_USER: sage-local
+      MINIO_ROOT_PASSWORD: sage-local-password
+    ports:
+      - "${SAGE_ARTIFACT_PORT:-19000}:9000"
+      - "${SAGE_ARTIFACT_CONSOLE_PORT:-19001}:9001"
+    volumes: ["artifact-data:/data"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:9000/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  agent-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: agent-api
+    environment:
+      SAGE_DEPLOYMENT_MODE: local
+      SAGE_TENANT_ID: tenant-local
+      SAGE_POSTGRES_URL: postgres://sage:sage-local-only@postgres:5432/sage
+      SAGE_TEMPORAL_ADDRESS: temporal:7233
+      SAGE_HTTP_HOST: 0.0.0.0
+      SAGE_HTTP_PORT: 3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      temporal:
+        condition: service_healthy
+    ports: ["${SAGE_API_HOST_PORT:-13000}:3000"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/readyz').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  agent-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: agent-worker
+    environment:
+      SAGE_DEPLOYMENT_MODE: local
+      SAGE_TENANT_ID: tenant-local
+      SAGE_POSTGRES_URL: postgres://sage:sage-local-only@postgres:5432/sage
+      SAGE_TEMPORAL_ADDRESS: temporal:7233
+      SAGE_HEALTH_HOST: 0.0.0.0
+      SAGE_HEALTH_PORT: 3001
+    depends_on:
+      postgres:
+        condition: service_healthy
+      temporal:
+        condition: service_healthy
+    ports: ["${SAGE_WORKER_HEALTH_HOST_PORT:-13001}:3001"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/readyz').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  agent-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: agent-web
+    environment:
+      SAGE_API_PROXY_TARGET: http://agent-api:3000
+    depends_on:
+      agent-api:
+        condition: service_healthy
+    ports: ["${SAGE_WEB_HOST_PORT:-14173}:4173"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4173/').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  postgres-data:
+  artifact-data:

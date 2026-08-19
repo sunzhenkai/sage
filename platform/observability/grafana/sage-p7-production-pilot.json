@@ -1,0 +1,16 @@
+{
+  "uid": "sage-p7-production-pilot",
+  "title": "Sage P7 Production Pilot Readiness",
+  "schemaVersion": 39,
+  "tags": ["sage", "p7", "production-pilot"],
+  "description": "Responder service is a routing identity only. A real human roster remains an external Go/No-Go field.",
+  "panels": [
+    {"title":"Routing failures","type":"timeseries","targets":[{"expr":"sum by (tenant_id,task_id,workflow_id,target_id,attempt,run_id,tool_call_id) (increase(sage_task_route_decisions_total{outcome=\"failed\"}[5m]))"}]},
+    {"title":"Target unavailable","type":"timeseries","targets":[{"expr":"sum by (tenant_id,task_id,workflow_id,target_id,attempt,run_id,tool_call_id) (increase(sage_temporal_target_unavailable_total[5m]))"}]},
+    {"title":"Queue schedule-to-start","type":"timeseries","targets":[{"expr":"max by (namespace,task_queue,target_id) (temporal_task_queue_schedule_to_start_latency_seconds)"}]},
+    {"title":"Activity retries","type":"timeseries","targets":[{"expr":"sum by (tenant_id,task_id,workflow_id,target_id,attempt,run_id,tool_call_id) (increase(sage_task_worker_attempt_total{activity_attempt!=\"1\"}[5m]))"}]},
+    {"title":"Projection lag","type":"timeseries","targets":[{"expr":"max by (tenant_id,task_id,workflow_id,target_id,attempt,run_id,tool_call_id) (sage_task_projection_lag_ms)"}]},
+    {"title":"Effect unknown","type":"timeseries","targets":[{"expr":"sum by (tenant_id,task_id,workflow_id,target_id,attempt,run_id,tool_call_id) (increase(sage_tool_effect_unknown_total[5m]) or increase(sage_task_effect_unknown_total[5m]))"}]},
+    {"title":"Projection drift","type":"timeseries","targets":[{"expr":"sum by (tenant_id,task_id,workflow_id,target_id,attempt,run_id,tool_call_id) (increase(sage_task_projection_drift_total[5m]))"}]}
+  ]
+}

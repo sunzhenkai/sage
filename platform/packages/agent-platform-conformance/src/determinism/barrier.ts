@@ -1,0 +1,1 @@
+export class Barrier { private count=0; constructor(readonly target:number){if(!Number.isInteger(target)||target<1)throw new TypeError('BARRIER_TARGET_INVALID');} arrive():boolean{this.count+=1;if(this.count>this.target)throw new Error('BARRIER_OVERFLOW');return this.count===this.target;} get reached():boolean{return this.count===this.target;} }

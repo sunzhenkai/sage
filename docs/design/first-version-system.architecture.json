@@ -1,0 +1,535 @@
+{
+  "version": "1.1",
+  "status": "validated",
+  "layerProfile": "generic-six-layer-v1",
+  "nodes": [
+    {
+      "id": "end-user",
+      "name": "Agent Application User",
+      "kind": "actor",
+      "type": "actor",
+      "layer": "Actors",
+      "boundedContext": "User",
+      "boundary": "external"
+    },
+    {
+      "id": "host-application",
+      "name": "Host Application",
+      "kind": "actor",
+      "type": "actor",
+      "layer": "Actors",
+      "boundedContext": "Host Integration",
+      "boundary": "external"
+    },
+    {
+      "id": "agent-web-ui",
+      "name": "Agent Web UI",
+      "kind": "container",
+      "type": "manager",
+      "layer": "Manager",
+      "boundedContext": "Agent Application",
+      "boundary": "internal",
+      "deployment": "agent-web",
+      "replicas": 1
+    },
+    {
+      "id": "temporal-target-registry",
+      "name": "Temporal Target Registry",
+      "kind": "component",
+      "type": "manager",
+      "layer": "Manager",
+      "boundedContext": "Task Routing",
+      "boundary": "internal",
+      "deployment": "agent-api",
+      "replicas": 1
+    },
+    {
+      "id": "application-api",
+      "name": "Application API",
+      "kind": "container",
+      "type": "gateway",
+      "layer": "Gateway",
+      "boundedContext": "Agent Application",
+      "boundary": "internal",
+      "deployment": "agent-api",
+      "replicas": 1
+    },
+    {
+      "id": "agent-library-api",
+      "name": "Agent Library API",
+      "kind": "component",
+      "type": "gateway",
+      "layer": "Gateway",
+      "boundedContext": "Agent Capability",
+      "boundary": "internal",
+      "deployment": "agent-lib-package"
+    },
+    {
+      "id": "chat-service",
+      "name": "Chat Service",
+      "kind": "component",
+      "type": "service",
+      "layer": "Runtime",
+      "boundedContext": "Chat",
+      "boundary": "internal",
+      "deployment": "agent-api",
+      "replicas": 1
+    },
+    {
+      "id": "task-service",
+      "name": "Task Service",
+      "kind": "component",
+      "type": "service",
+      "layer": "Runtime",
+      "boundedContext": "Task Management",
+      "boundary": "internal",
+      "deployment": "agent-api",
+      "replicas": 1
+    },
+    {
+      "id": "task-router",
+      "name": "Task Router",
+      "kind": "component",
+      "type": "service",
+      "layer": "Runtime",
+      "boundedContext": "Task Routing",
+      "boundary": "internal",
+      "deployment": "agent-api",
+      "replicas": 1
+    },
+    {
+      "id": "environment-task-workers",
+      "name": "Environment Task Workers",
+      "kind": "container",
+      "type": "service",
+      "layer": "Runtime",
+      "boundedContext": "Task Execution",
+      "boundary": "internal",
+      "deployment": "temporal-workers-per-target-environment",
+      "replicas": 2
+    },
+    {
+      "id": "agent-runner",
+      "name": "Agent Runner",
+      "kind": "component",
+      "type": "service",
+      "layer": "Runtime",
+      "boundedContext": "Agent Capability",
+      "boundary": "internal",
+      "deployment": "agent-lib-package"
+    },
+    {
+      "id": "temporal-client-adapter",
+      "name": "Temporal Client Adapter",
+      "kind": "component",
+      "type": "platform",
+      "layer": "Platform",
+      "boundedContext": "Task Routing",
+      "boundary": "internal",
+      "deployment": "agent-api"
+    },
+    {
+      "id": "temporal-clusters",
+      "name": "Multi-environment Temporal Clusters",
+      "kind": "system",
+      "type": "external",
+      "layer": "Platform",
+      "boundedContext": "Workflow Runtime",
+      "boundary": "external",
+      "deployment": "temporal-clusters-by-environment"
+    },
+    {
+      "id": "pi-harness",
+      "name": "Pi Harness Adapter",
+      "kind": "component",
+      "type": "platform",
+      "layer": "Platform",
+      "boundedContext": "Agent Capability",
+      "boundary": "internal",
+      "deployment": "harness-pi-package"
+    },
+    {
+      "id": "skill-tool-runtime",
+      "name": "Skill and Tool Runtime",
+      "kind": "component",
+      "type": "platform",
+      "layer": "Platform",
+      "boundedContext": "Agent Capability",
+      "boundary": "internal",
+      "deployment": "agent-lib-package"
+    },
+    {
+      "id": "credential-provider",
+      "name": "Credential Provider",
+      "kind": "component",
+      "type": "platform",
+      "layer": "Platform",
+      "boundedContext": "Credential",
+      "boundary": "internal",
+      "deployment": "credential-provider-package"
+    },
+    {
+      "id": "model-provider",
+      "name": "LLM Provider",
+      "kind": "system",
+      "type": "external",
+      "layer": "Platform",
+      "boundedContext": "External Capabilities",
+      "boundary": "external"
+    },
+    {
+      "id": "business-tools",
+      "name": "Business Tools and MCP Servers",
+      "kind": "system",
+      "type": "external",
+      "layer": "Platform",
+      "boundedContext": "External Capabilities",
+      "boundary": "external"
+    },
+    {
+      "id": "identity-provider",
+      "name": "Identity Provider",
+      "kind": "system",
+      "type": "external",
+      "layer": "Platform",
+      "boundedContext": "Identity",
+      "boundary": "external"
+    },
+    {
+      "id": "observability-backend",
+      "name": "Observability Backend",
+      "kind": "system",
+      "type": "external",
+      "layer": "Platform",
+      "boundedContext": "Operations",
+      "boundary": "external"
+    },
+    {
+      "id": "chat-store",
+      "name": "PostgreSQL Chat Store",
+      "kind": "container",
+      "type": "database",
+      "layer": "Infrastructure",
+      "boundedContext": "Chat State",
+      "boundary": "internal",
+      "deployment": "postgresql",
+      "replicas": 1
+    },
+    {
+      "id": "task-store",
+      "name": "PostgreSQL Task Store",
+      "kind": "container",
+      "type": "database",
+      "layer": "Infrastructure",
+      "boundedContext": "Task State",
+      "boundary": "internal",
+      "deployment": "postgresql",
+      "replicas": 1
+    },
+    {
+      "id": "agent-state-store",
+      "name": "PostgreSQL Agent State Store",
+      "kind": "container",
+      "type": "database",
+      "layer": "Infrastructure",
+      "boundedContext": "Agent State",
+      "boundary": "internal",
+      "deployment": "postgresql",
+      "replicas": 1
+    },
+    {
+      "id": "artifact-store",
+      "name": "Artifact Store",
+      "kind": "container",
+      "type": "object-storage",
+      "layer": "Infrastructure",
+      "boundedContext": "Artifact",
+      "boundary": "internal",
+      "deployment": "s3-compatible-storage",
+      "replicas": 1
+    },
+    {
+      "id": "secret-manager",
+      "name": "Secret Manager",
+      "kind": "system",
+      "type": "external",
+      "layer": "Infrastructure",
+      "boundedContext": "Credential",
+      "boundary": "external"
+    }
+  ],
+  "relations": [
+    {
+      "id": "user-operates-web-ui",
+      "from": "end-user",
+      "to": "agent-web-ui",
+      "protocol": "HTTPS",
+      "sync": "sync",
+      "description": "进行 Chat 并创建、查看、取消、重试和恢复 Task"
+    },
+    {
+      "id": "web-ui-calls-application-api",
+      "from": "agent-web-ui",
+      "to": "application-api",
+      "protocol": "HTTP/JSON and SSE",
+      "sync": "sync",
+      "description": "Chat、Task 命令查询与断点续传事件流"
+    },
+    {
+      "id": "application-api-validates-identity",
+      "from": "application-api",
+      "to": "identity-provider",
+      "protocol": "HTTPS/OIDC",
+      "sync": "sync",
+      "description": "验证用户身份并建立最小 Scope"
+    },
+    {
+      "id": "application-api-emits-telemetry",
+      "from": "application-api",
+      "to": "observability-backend",
+      "protocol": "OTLP",
+      "sync": "async",
+      "description": "发送 API、Chat 和 Task 遥测"
+    },
+    {
+      "id": "application-api-calls-chat-service",
+      "from": "application-api",
+      "to": "chat-service",
+      "protocol": "in-process",
+      "sync": "sync",
+      "description": "创建 Session、提交消息、流式运行与查询历史"
+    },
+    {
+      "id": "application-api-calls-task-service",
+      "from": "application-api",
+      "to": "task-service",
+      "protocol": "in-process",
+      "sync": "sync",
+      "description": "创建、查询、Signal、取消和重试 Task"
+    },
+    {
+      "id": "chat-service-reads-writes-chat-store",
+      "from": "chat-service",
+      "to": "chat-store",
+      "protocol": "SQL",
+      "sync": "sync",
+      "description": "持久化 Session、Message、MessagePart 和 Summary"
+    },
+    {
+      "id": "chat-service-runs-agent-library",
+      "from": "chat-service",
+      "to": "agent-library-api",
+      "protocol": "in-process LocalAgentClient",
+      "sync": "sync",
+      "description": "执行短时交互式 Agent Run"
+    },
+    {
+      "id": "chat-service-promotes-task",
+      "from": "chat-service",
+      "to": "task-service",
+      "protocol": "in-process",
+      "sync": "sync",
+      "description": "将长耗时 Chat 请求提升为可恢复 Task"
+    },
+    {
+      "id": "chat-service-reads-writes-artifacts",
+      "from": "chat-service",
+      "to": "artifact-store",
+      "protocol": "S3 API",
+      "sync": "sync",
+      "description": "保存附件并读取 Chat Artifact"
+    },
+    {
+      "id": "task-service-reads-writes-task-store",
+      "from": "task-service",
+      "to": "task-store",
+      "protocol": "SQL",
+      "sync": "sync",
+      "description": "持久化 Task 产品状态、路由快照和 Workflow 关联"
+    },
+    {
+      "id": "task-service-reads-artifacts",
+      "from": "task-service",
+      "to": "artifact-store",
+      "protocol": "S3 API",
+      "sync": "sync",
+      "description": "经授权读取 Task 结果和 Artifact"
+    },
+    {
+      "id": "task-service-routes-task",
+      "from": "task-service",
+      "to": "task-router",
+      "protocol": "in-process",
+      "sync": "sync",
+      "description": "按可信 TaskType 请求解析 WorkflowTarget"
+    },
+    {
+      "id": "task-router-reads-target-registry",
+      "from": "task-router",
+      "to": "temporal-target-registry",
+      "protocol": "in-process configuration API",
+      "sync": "sync",
+      "description": "读取环境、Cluster、Namespace、Task Queue 与 capability 策略"
+    },
+    {
+      "id": "task-router-writes-routing-snapshot",
+      "from": "task-router",
+      "to": "task-store",
+      "protocol": "SQL",
+      "sync": "sync",
+      "description": "固化不可由模型修改的 WorkflowTarget 快照"
+    },
+    {
+      "id": "task-router-calls-temporal-adapter",
+      "from": "task-router",
+      "to": "temporal-client-adapter",
+      "protocol": "in-process",
+      "sync": "sync",
+      "description": "对选中目标执行 start/query/signal/cancel"
+    },
+    {
+      "id": "temporal-adapter-resolves-credentials",
+      "from": "temporal-client-adapter",
+      "to": "credential-provider",
+      "protocol": "CredentialProvider in-process",
+      "sync": "sync",
+      "description": "按 target credential_ref 获取短期 mTLS 或认证信息"
+    },
+    {
+      "id": "temporal-adapter-calls-selected-cluster",
+      "from": "temporal-client-adapter",
+      "to": "temporal-clusters",
+      "protocol": "Temporal gRPC/mTLS",
+      "sync": "sync",
+      "description": "连接选中的 Cluster/Namespace 并操作 Workflow"
+    },
+    {
+      "id": "temporal-clusters-dispatch-workers",
+      "from": "temporal-clusters",
+      "to": "environment-task-workers",
+      "protocol": "Temporal Task Queue",
+      "sync": "async",
+      "description": "按目标环境 Task Queue 分发 Workflow/Activity Task"
+    },
+    {
+      "id": "workers-project-task-state",
+      "from": "environment-task-workers",
+      "to": "task-store",
+      "protocol": "SQL",
+      "sync": "sync",
+      "description": "投影 Workflow、Attempt、AgentEvent 与结果状态"
+    },
+    {
+      "id": "workers-read-write-agent-state",
+      "from": "environment-task-workers",
+      "to": "agent-state-store",
+      "protocol": "SQL",
+      "sync": "sync",
+      "description": "读取和保存 Session、Checkpoint 与恢复元数据"
+    },
+    {
+      "id": "workers-write-artifacts",
+      "from": "environment-task-workers",
+      "to": "artifact-store",
+      "protocol": "S3 API",
+      "sync": "sync",
+      "description": "保存大结果、文件和报告并返回 ArtifactRef"
+    },
+    {
+      "id": "workers-call-agent-library",
+      "from": "environment-task-workers",
+      "to": "agent-library-api",
+      "protocol": "in-process LocalAgentClient",
+      "sync": "sync",
+      "description": "Activity 内执行有界 Agent Run"
+    },
+    {
+      "id": "workers-emit-telemetry",
+      "from": "environment-task-workers",
+      "to": "observability-backend",
+      "protocol": "OTLP",
+      "sync": "async",
+      "description": "发送 Workflow、Activity、Run 和 Tool 遥测"
+    },
+    {
+      "id": "host-application-calls-agent-library",
+      "from": "host-application",
+      "to": "agent-library-api",
+      "protocol": "in-process library API",
+      "sync": "sync",
+      "description": "其他应用直接嵌入 Agent 能力"
+    },
+    {
+      "id": "agent-library-api-calls-runner",
+      "from": "agent-library-api",
+      "to": "agent-runner",
+      "protocol": "in-process",
+      "sync": "sync",
+      "description": "校验 AgentRunSpec 并执行有界 Run"
+    },
+    {
+      "id": "agent-runner-calls-pi-harness",
+      "from": "agent-runner",
+      "to": "pi-harness",
+      "protocol": "HarnessPort in-process",
+      "sync": "sync",
+      "description": "驱动 Pi Agent Loop 并归一化事件和结果"
+    },
+    {
+      "id": "agent-runner-calls-skill-tool-runtime",
+      "from": "agent-runner",
+      "to": "skill-tool-runtime",
+      "protocol": "Provider ports in-process",
+      "sync": "sync",
+      "description": "解析 Skill、校验 Tool、授权和执行能力"
+    },
+    {
+      "id": "agent-runner-emits-telemetry",
+      "from": "agent-runner",
+      "to": "observability-backend",
+      "protocol": "OTLP",
+      "sync": "async",
+      "description": "发送 Agent Run、模型和 Tool 指标与 Trace"
+    },
+    {
+      "id": "pi-harness-calls-model-provider",
+      "from": "pi-harness",
+      "to": "model-provider",
+      "protocol": "HTTPS",
+      "sync": "sync",
+      "description": "模型推理和流式响应"
+    },
+    {
+      "id": "skill-tool-runtime-calls-business-tools",
+      "from": "skill-tool-runtime",
+      "to": "business-tools",
+      "protocol": "HTTPS/MCP",
+      "sync": "sync",
+      "description": "调用经授权的业务 Tool 和 MCP Server"
+    },
+    {
+      "id": "skill-tool-runtime-resolves-credentials",
+      "from": "skill-tool-runtime",
+      "to": "credential-provider",
+      "protocol": "CredentialProvider in-process",
+      "sync": "sync",
+      "description": "按 connection_ref 与 Scope 解析 Tool 短期凭据"
+    },
+    {
+      "id": "credential-provider-reads-secret-manager",
+      "from": "credential-provider",
+      "to": "secret-manager",
+      "protocol": "Secret Manager API",
+      "sync": "sync",
+      "description": "读取、轮换和撤销密钥，调用方只持有 secret_ref"
+    }
+  ],
+  "openQuestions": [
+    "TaskType 到 WorkflowTarget 的配置 Owner、发布和回滚流程尚未确定；模型和普通用户不得直接指定 Temporal endpoint、Namespace 或 Task Queue。",
+    "不同环境应使用独立 Temporal Cluster 还是共享 Cluster 的独立 Namespace，需根据网络、数据驻留、故障域和成本决定。",
+    "Workflow 启动后默认固定 Cluster；跨 Cluster 故障切换需要外部 Checkpoint、新 Workflow 与幂等迁移协议，首版不做静默迁移。",
+    "Chat Message 保留期、摘要阈值、分支对话和长请求自动提升为 Task 的判定策略尚未量化。",
+    "实现前需锁定 Pi 和 Temporal TypeScript SDK 的准确 package、版本和许可。",
+    "MVP 的 agent-web、agent-api、PostgreSQL 与 Artifact Store 允许单副本，是已知 SPOF；生产试运行前需确定副本、备份和 RTO/RPO。"
+  ]
+}

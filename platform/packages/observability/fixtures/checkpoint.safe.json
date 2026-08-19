@@ -1,0 +1,11 @@
+{
+  "kind": "checkpoint",
+  "checkpoint_ref": "checkpoint://tenant-a/run-1/1",
+  "state": {
+    "connection_ref": "connection://tenant-a/crm/read",
+    "secret_ref": "secret://tenant-a/crm/access",
+    "data": {
+      "cursor": "page-2"
+    }
+  }
+}

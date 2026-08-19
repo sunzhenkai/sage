@@ -1,0 +1,81 @@
+{
+  "schemaVersion": "1",
+  "packageId": "controlled-summary-reference",
+  "version": "1.0.0",
+  "metadata": {
+    "name": "Controlled资料摘要 reference workload",
+    "title": "Controlled Summary",
+    "labels": { "workload": "reference", "dataHandling": "internal" }
+  },
+  "agent": {
+    "name": "controlled-summary",
+    "instructions": "Use only the admitted document context and return the bounded output schema.",
+    "inputSchemaRef": "schema://controlled-summary/input@1",
+    "outputSchemaRef": "schema://controlled-summary/output@1"
+  },
+  "skills": [
+    {
+      "skillId": "summary",
+      "version": "1.0.0",
+      "ref": "skill://controlled-summary/summary@1",
+      "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "required": true,
+      "config": { "style": "bounded" }
+    }
+  ],
+  "capabilities": [
+    {
+      "capabilityId": "document.fetch",
+      "version": "1.0.0",
+      "ref": "capability://document.fetch@1",
+      "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "required": true,
+      "readOnly": true,
+      "config": { "maxDocuments": 4, "maxBytes": 16384 }
+    }
+  ],
+  "context": {
+    "sourceRefs": ["artifact://controlled-summary/source-catalog@1"],
+    "plan": "context://controlled-summary/plan@1",
+    "instructions": "Resolve only tenant-scoped admitted document references.",
+    "maxBytes": 16384,
+    "maxDocuments": 4,
+    "retention": "bounded"
+  },
+  "model": {
+    "requirements": ["summary-quality-v1"],
+    "primary": "model://reference/summary@1",
+    "fallbacks": [],
+    "parameters": { "temperature": 0, "maxOutputTokens": 256 },
+    "providerPolicy": "approved-reference-only"
+  },
+  "schemas": {
+    "input": "schema://controlled-summary/input@1",
+    "output": "schema://controlled-summary/output@1",
+    "refs": ["artifact://controlled-summary/schemas@1"]
+  },
+  "policies": {
+    "access": "tenant-scoped-read-only",
+    "retention": "bounded",
+    "dataHandling": "internal",
+    "approval": "reference-fixture-approved",
+    "limits": { "maxDocuments": 4, "maxOutputBytes": 8192 }
+  },
+  "budgets": {
+    "maxTokens": 512,
+    "maxDurationMs": 30000,
+    "maxToolCalls": 4,
+    "maxBytes": 16384,
+    "maxCost": 1
+  },
+  "evalCases": [
+    { "id": "summary-empty", "input": "artifact://controlled-summary/eval-empty@1", "expected": "empty-bounded-summary" },
+    { "id": "summary-two-documents", "input": "artifact://controlled-summary/eval-two-documents@1", "expected": "bounded-summary-with-citations" }
+  ],
+  "planHints": { "strategy": "read-context-then-summarize", "maxSteps": 3, "parallelism": 1 },
+  "viewMetadata": {
+    "title": "Controlled Summary",
+    "fields": ["summary", "sourceCount", "artifactRef", "receiptRef"],
+    "layout": "summary-with-receipts"
+  }
+}

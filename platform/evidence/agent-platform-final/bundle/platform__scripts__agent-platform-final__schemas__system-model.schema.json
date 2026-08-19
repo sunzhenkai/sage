@@ -1,0 +1,20 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"sage://agent-platform-final/system-model/v1",
+  "type":"object",
+  "additionalProperties":false,
+  "required":["schemaVersion","modelId","version","status","title","sourceDocument","generatorPolicy","elements","ports","authorities","trustBoundaries","relations","recovery","allowedDependencies","openQuestions"],
+  "properties":{
+    "schemaVersion":{"const":"1"},
+    "status":{"const":"draft"},
+    "title":{"const":"Proposed final architecture baseline"},
+    "elements":{"type":"array","minItems":20,"items":{"type":"object","additionalProperties":false,"required":["id","kind","owner","deployment","dataClasses"],"properties":{"id":{"type":"string","pattern":"^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$"},"dataClasses":{"type":"array","minItems":1}}}},
+    "ports":{"type":"array","minItems":5,"items":{"required":["id","owner","protocol"]}},
+    "authorities":{"type":"array","minItems":9,"items":{"required":["fact","element"]}},
+    "trustBoundaries":{"type":"array","minItems":3,"items":{"required":["id","status","members"],"properties":{"status":{"enum":["defined","uncertain"]}}}},
+    "relations":{"type":"array","minItems":20,"items":{"required":["id","from","to","kind"]}},
+    "recovery":{"type":"array","minItems":3,"items":{"required":["id","owner","source","action"]}},
+    "allowedDependencies":{"type":"array","minItems":1},
+    "openQuestions":{"type":"array","minItems":9}
+  }
+}

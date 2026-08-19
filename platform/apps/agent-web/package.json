@@ -1,0 +1,30 @@
+{
+  "name": "@sage/agent-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./chat": { "types": "./dist-types/chat.d.ts", "default": "./dist-types/chat.js" },
+    "./tasks": { "types": "./dist-types/tasks.d.ts", "default": "./dist-types/tasks.js" }
+  },
+  "scripts": {
+    "clean": "rm -rf dist dist-types",
+    "dev": "vite",
+    "preview": "vite preview",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@sage/app-contracts": "workspace:*",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.4",
+    "@types/react-test-renderer": "19.1.0",
+    "@vitejs/plugin-react": "6.0.5",
+    "react-test-renderer": "19.2.8",
+    "vite": "8.2.1"
+  }
+}

@@ -1,0 +1,20 @@
+groups:
+  - name: sage-p6
+    rules:
+      - alert: SageTaskProjectionLag
+        expr: max by (tenant_id, message_id, session_id, run_id, task_id, workflow_id, target_id, attempt) (sage_task_projection_lag_ms) > 30000
+        for: 5m
+        labels: { severity: warning }
+        annotations: { summary: "Sage Task projection is stale" }
+      - alert: SageTaskReconcileFailure
+        expr: sum by (tenant_id, message_id, session_id, run_id, task_id, workflow_id, target_id, attempt) (increase(sage_task_reconcile_retryable_failure_total[5m])) > 0
+        labels: { severity: critical }
+        annotations: { summary: "Sage Task reconciliation failed" }
+      - alert: SageArtifactStoreUnavailable
+        expr: sum by (tenant_id, message_id, session_id, run_id, task_id, workflow_id, target_id, attempt) (increase(sage_artifact_store_unavailable_total[5m])) > 0
+        labels: { severity: warning }
+        annotations: { summary: "Sage Artifact Store unavailable" }
+      - alert: SageTemporalTargetUnavailable
+        expr: sum by (tenant_id, message_id, session_id, run_id, task_id, workflow_id, target_id, attempt) (increase(sage_temporal_target_unavailable_total[1m])) > 0
+        labels: { severity: critical }
+        annotations: { summary: "Selected Sage Temporal target unavailable; no fallback" }

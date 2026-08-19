@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1",
+  "sourceRevision": "e8ea299dcac4f1859528d2c67e31e35a58d05c9e",
+  "sourceDigest": "sha256:c2fe13d173b44c54a13ab7b65099712f26754498e64513792781544dc6844687",
+  "toolDigest": "sha256:615a886b8b64d8fa078866d1e5da007c31c9088effdb9684eb873b16162bebde",
+  "generatedAt": "2026-08-17T03:31:32.420Z",
+  "caseId": "apgv/boundary/v1/public-surfaces",
+  "layers": [
+    "TypeScript-AST",
+    "resolved-package-graph",
+    "schema-json",
+    "built-public-d.ts"
+  ],
+  "scannedRoots": [
+    "packages/agent-contracts/src",
+    "packages/platform-ports/src",
+    "packages/agent-platform-conformance/src",
+    "packages/agent-contracts/dist",
+    "packages/platform-ports/dist",
+    "packages/agent-platform-conformance/dist"
+  ],
+  "violations": [],
+  "status": "PASS",
+  "contentDigest": "sha256:4a6202c3646bd5448ee1ef1ce11b78d7dcddec86eb47c0bced328b8ffe6b83c8"
+}

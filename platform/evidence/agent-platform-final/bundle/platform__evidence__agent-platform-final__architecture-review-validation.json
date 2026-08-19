@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "1",
+  "sourceRevision": "e8ea299dcac4f1859528d2c67e31e35a58d05c9e",
+  "sourceDigest": "sha256:c2fe13d173b44c54a13ab7b65099712f26754498e64513792781544dc6844687",
+  "toolDigest": "sha256:615a886b8b64d8fa078866d1e5da007c31c9088effdb9684eb873b16162bebde",
+  "generatedAt": "2026-08-17T03:31:31.595Z",
+  "caseId": "apgv/architecture/v1/formal-review",
+  "reviewDigest": "sha256:7ccae9946b970e87b520144176cd469d8f59e86848f106b680f67514a5b42f3b",
+  "status": "FAIL",
+  "findingCount": 9,
+  "highOpen": 9,
+  "acceptedRiskWithoutEvidence": 0,
+  "checkSummary": {
+    "Layer": "pass",
+    "DDD": "pass",
+    "Dependency": "pass",
+    "Authority": "pass",
+    "Recovery": "pass",
+    "Data flow": "pass",
+    "SDK leakage": "pass",
+    "Dual Host equivalence": "pass",
+    "Engine replaceability": "pass",
+    "Scale": "insufficient-evidence",
+    "HA": "insufficient-evidence",
+    "Security": "insufficient-evidence",
+    "Operation": "insufficient-evidence",
+    "Production readiness": "insufficient-evidence"
+  },
+  "contentDigest": "sha256:5d3d94ff7fe01bcb7894cfe6759533b43e421a538a598d3e8b8cb25cce20c0d0"
+}

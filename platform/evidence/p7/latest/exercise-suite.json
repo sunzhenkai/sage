@@ -1,0 +1,99 @@
+{
+  "schema_version": "1",
+  "suite": "sage-p7-controlled-exercises",
+  "environment": "isolated-local-compose-and-filesystem",
+  "production_evidence": false,
+  "started_at": "2026-08-16T02:14:08.538Z",
+  "completed_at": "2026-08-16T02:14:38.828Z",
+  "outcome": "passed",
+  "results": [
+    {
+      "exercise_id": "compose-prerequisites",
+      "command": "docker compose up -d --wait postgres temporal",
+      "started_at": "2026-08-16T02:14:08.538Z",
+      "completed_at": "2026-08-16T02:14:09.594Z",
+      "exit_code": 0,
+      "outcome": "passed",
+      "stdout": "",
+      "stderr": " Container sage-mvp-postgres-1 Running \n Container sage-mvp-temporal-1 Running \n Container sage-mvp-postgres-1 Waiting \n Container sage-mvp-postgres-1 Healthy \n Container sage-mvp-postgres-1 Waiting \n Container sage-mvp-temporal-1 Waiting \n Container sage-mvp-postgres-1 Healthy \n Container sage-mvp-temporal-1 Healthy \n",
+      "production_evidence": false
+    },
+    {
+      "exercise_id": "postgres-backup-restore",
+      "command": "<node-binary> scripts/p7/postgres-exercise.mjs",
+      "started_at": "2026-08-16T02:14:09.594Z",
+      "completed_at": "2026-08-16T02:14:13.911Z",
+      "exit_code": 0,
+      "outcome": "passed",
+      "stdout": "P7 isolated PostgreSQL formal backup/restore/tenant-deletion exercise: PASS\n",
+      "stderr": "",
+      "production_evidence": false
+    },
+    {
+      "exercise_id": "artifact-backup-restore",
+      "command": "<node-binary> scripts/p7/artifact-exercise.mjs",
+      "started_at": "2026-08-16T02:14:13.911Z",
+      "completed_at": "2026-08-16T02:14:14.015Z",
+      "exit_code": 0,
+      "outcome": "passed",
+      "stdout": "P7 isolated Artifact backup/restore/retention exercise: PASS\n",
+      "stderr": "",
+      "production_evidence": false
+    },
+    {
+      "exercise_id": "admission-and-secret-controls",
+      "command": "corepack pnpm vitest run apps/agent-api/src/pilot-admission.p7.test.ts scripts/p7/fixture-scanner.p7.test.ts",
+      "started_at": "2026-08-16T02:14:14.015Z",
+      "completed_at": "2026-08-16T02:14:15.002Z",
+      "exit_code": 0,
+      "outcome": "passed",
+      "stdout": "\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.10 \u001b[39m\u001b[90m<worktree>/platform\u001b[39m\n\n \u001b[32m✓\u001b[39m scripts/p7/fixture-scanner.p7.test.ts \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 8\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m apps/agent-api/src/pilot-admission.p7.test.ts \u001b[2m(\u001b[22m\u001b[2m4 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 107\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m2 passed\u001b[39m\u001b[22m\u001b[90m (2)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m6 passed\u001b[39m\u001b[22m\u001b[90m (6)\u001b[39m\n\u001b[2m   Start at \u001b[22m 10:14:14\n\u001b[2m   Duration \u001b[22m 550ms\u001b[2m (transform 103ms, setup 0ms, import 385ms, tests 115ms, environment 0ms)\u001b[22m\n\n",
+      "stderr": "",
+      "production_evidence": false
+    },
+    {
+      "exercise_id": "tenant-isolation-deletion-audit",
+      "command": "corepack pnpm vitest run examples/p6-integration/src/p7-data-controls.integration.test.ts",
+      "started_at": "2026-08-16T02:14:15.002Z",
+      "completed_at": "2026-08-16T02:14:15.831Z",
+      "exit_code": 0,
+      "outcome": "passed",
+      "stdout": "\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.10 \u001b[39m\u001b[90m<worktree>/platform\u001b[39m\n\n \u001b[32m✓\u001b[39m examples/p6-integration/src/p7-data-controls.integration.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 109\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m   Start at \u001b[22m 10:14:15\n\u001b[2m   Duration \u001b[22m 408ms\u001b[2m (transform 72ms, setup 0ms, import 216ms, tests 109ms, environment 0ms)\u001b[22m\n\n",
+      "stderr": "",
+      "production_evidence": false
+    },
+    {
+      "exercise_id": "worker-compatible-rollout-rollback",
+      "command": "corepack pnpm vitest run examples/p4-integration/src/p4.integration.test.ts -t P7 rolls a long Workflow",
+      "started_at": "2026-08-16T02:14:15.831Z",
+      "completed_at": "2026-08-16T02:14:22.821Z",
+      "exit_code": 0,
+      "outcome": "passed",
+      "stdout": "\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.10 \u001b[39m\u001b[90m<worktree>/platform\u001b[39m\n\n \u001b[32m✓\u001b[39m examples/p4-integration/src/p4.integration.test.ts \u001b[2m(\u001b[22m\u001b[2m7 tests\u001b[22m\u001b[2m | \u001b[22m\u001b[33m6 skipped\u001b[39m\u001b[2m)\u001b[22m\u001b[33m 5858\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[33m\u001b[2m✓\u001b[22m\u001b[39m P7 rolls a long Workflow through real Worker Deployment v1 to v2 and back to v1 without duplicate effects or invalid replay \u001b[33m 5233\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[33m6 skipped\u001b[39m\u001b[90m (7)\u001b[39m\n\u001b[2m   Start at \u001b[22m 10:14:16\n\u001b[2m   Duration \u001b[22m 6.54s\u001b[2m (transform 179ms, setup 0ms, import 601ms, tests 5.86s, environment 0ms)\u001b[22m\n\n",
+      "stderr": "2026-08-16T02:14:17.448Z [INFO] asset workflow-bundle-4eb983ca56f0fa5ff3cc.js 1.51 MiB [emitted] [immutable] (name: main)\nruntime modules 1.34 KiB 4 modules\nmodules by path ./node_modules/.pnpm/ 438 KiB\n  modules by path ./node_modules/.pnpm/@temporalio+common@1.22.0/node_modules/@temporal...(truncated) 161 KiB 35 modules\n  modules by path ./node_modules/.pnpm/@temporalio+workflow@1.22.0/node_modules/@tempor...(truncated) 202 KiB\n    ./node_modules/.pnpm/@temporalio+workflow@1.22.0/node_modules/@temporalio/workfl...(truncated) 12.9 KiB [built] [code generated]\n    + 25 modules\n  modules by path ./node_modules/.pnpm/nexus-rpc@0.0.2/node_modules/nexus-rpc/lib/ 22.3 KiB 13 modules\n  ./node_modules/.pnpm/long@5.3.2/node_modules/long/umd/index.js 49.8 KiB [built] [code generated]\n  ./node_modules/.pnpm/ms@3.0.0-canary.1/node_modules/ms/dist/index.cjs 3.41 KiB [built] [code generated]\nmodules by path ./packages/temporal-workflows/src/ 8.39 KiB\n  ./packages/temporal-workflows/src/workflows-autogenerated-entrypoint.cjs 535 bytes [built] [code generated]\n  ./packages/temporal-workflows/src/workflows.ts 7.87 KiB [built] [code generated]\noptional modules 30 bytes [optional]\n  __temporal_custom_payload_converter (ignored) 15 bytes [optional] [built] [code generated]\n  __temporal_custom_failure_converter (ignored) 15 bytes [optional] [built] [code generated]\nwebpack 5.109.2 compiled successfully in 354 ms\n2026-08-16T02:14:17.451Z [INFO] Workflow bundle created { size: '1.51MB' }\n2026-08-16T02:14:17.818Z [INFO] Worker state changed {\n  sdkComponent: 'worker',\n  taskQueue: 'sage-agent-task-v1',\n  state: 'RUNNING'\n}\n2026-08-16T02:14:17.820Z [INFO] No Nexus services registered, not polling for Nexus tasks { sdkComponent: 'worker', taskQueue: 'sage-agent-task-v1' }\n2026-08-16T02:14:17.821Z [INFO] Worker state changed {\n  sdkComponent: 'worker',\n  taskQueue: 'sage-agent-task-v1',\n  state: 'RUNNING'\n}\n2026-08-16T02:14:17.821Z [INFO] No Nexus services registered, not polling for Nexus tasks { sdkComponent: 'worker', taskQueue: 'sage-agent-task-v1' }\n2026-08-16T02:14:22.222Z [INFO] Worker state changed {\n  sdkComponent: 'worker',\n  taskQueue: 'fake_replay_queue-0',\n  state: 'RUNNING'\n}\n2026-08-16T02:14:22.240Z [INFO] Worker state changed {\n  sdkComponent: 'worker',\n  taskQueue: 'fake_replay_queue-0',\n  state: 'STOPPING'\n}\n2026-08-16T02:14:22.241Z [INFO] Worker state changed {\n  sdkComponent: 'worker',\n  taskQueue: 'fake_replay_queue-0',\n  state: 'DRAINING'\n}\n2026-08-16T02:14:22.241Z [INFO] Worker state changed {\n  sdkComponent: 'worker',\n  taskQueue: 'fake_replay_queue-0',\n  state: 'DRAINED'\n}\n2026-08-16T02:14:22.241Z [INFO] Worker state changed {\n  sdkComponent: 'worker',\n  taskQueue: 'fake_replay_queue-0',\n  state: 'STOPPED'\n}\n2026-08-16T02:14:22.749Z [INFO] Worker state changed {\n  sdkComponent: 'worker',\n  taskQueue: 'sage-agent-task-v1',\n  state: 'STOPPING'\n}\n2026-08-16T02:14:22.750Z [INFO] Worker state changed {\n  sdkComponent: 'worker',\n  taskQueue: 'sage-agent-task-v1',\n  state: 'DRAINING'\n}\n2026-08-16T02:14:22.750Z [INFO] Worker state changed {\n  sdkComponent: 'worker',\n  taskQueue: 'sage-agent-task-v1',\n  state: 'STOPPING'\n}\n2026-08-16T02:14:22.750Z [INFO] Worker state changed {\n  sdkComponent: 'worker',\n  taskQueue: 'sage-agent-task-v1',\n  state: 'DRAINING'\n}\n2026-08-16T02:14:22.750Z [INFO] Worker state changed {\n  sdkComponent: 'worker',\n  taskQueue: 'sage-agent-task-v1',\n  state: 'DRAINED'\n}\n2026-08-16T02:14:22.751Z [INFO] Worker state changed {\n  sdkComponent: 'worker',\n  taskQueue: 'sage-agent-task-v1',\n  state: 'STOPPED'\n}\n2026-08-16T02:14:22.752Z [INFO] Worker state changed {\n  sdkComponent: 'worker',\n  taskQueue: 'sage-agent-task-v1',\n  state: 'DRAINED'\n}\n2026-08-16T02:14:22.752Z [INFO] Worker state changed {\n  sdkComponent: 'worker',\n  taskQueue: 'sage-agent-task-v1',\n  state: 'STOPPED'\n}\n",
+      "production_evidence": false
+    },
+    {
+      "exercise_id": "control-plane-failure",
+      "command": "corepack pnpm vitest run examples/p4-integration/src/p4.integration.test.ts -t keeps Temporal query/control/completion available",
+      "started_at": "2026-08-16T02:14:22.821Z",
+      "completed_at": "2026-08-16T02:14:27.010Z",
+      "exit_code": 0,
+      "outcome": "passed",
+      "stdout": "\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.10 \u001b[39m\u001b[90m<worktree>/platform\u001b[39m\n\n \u001b[32m✓\u001b[39m examples/p4-integration/src/p4.integration.test.ts \u001b[2m(\u001b[22m\u001b[2m7 tests\u001b[22m\u001b[2m | \u001b[22m\u001b[33m6 skipped\u001b[39m\u001b[2m)\u001b[22m\u001b[33m 3045\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[33m\u001b[2m✓\u001b[22m\u001b[39m keeps Temporal query/control/completion available during a real isolated projection-PG connection outage, then backfills freshness \u001b[33m 2429\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[33m6 skipped\u001b[39m\u001b[90m (7)\u001b[39m\n\u001b[2m   Start at \u001b[22m 10:14:23\n\u001b[2m   Duration \u001b[22m 3.72s\u001b[2m (transform 169ms, setup 0ms, import 593ms, tests 3.05s, environment 0ms)\u001b[22m\n\n",
+      "stderr": "2026-08-16T02:14:24.452Z [INFO] asset workflow-bundle-4eb983ca56f0fa5ff3cc.js 1.51 MiB [emitted] [immutable] (name: main)\nruntime modules 1.34 KiB 4 modules\nmodules by path ./node_modules/.pnpm/ 438 KiB\n  modules by path ./node_modules/.pnpm/@temporalio+common@1.22.0/node_modules/@temporal...(truncated) 161 KiB 35 modules\n  modules by path ./node_modules/.pnpm/@temporalio+workflow@1.22.0/node_modules/@tempor...(truncated) 202 KiB\n    ./node_modules/.pnpm/@temporalio+workflow@1.22.0/node_modules/@temporalio/workfl...(truncated) 12.9 KiB [built] [code generated]\n    + 25 modules\n  modules by path ./node_modules/.pnpm/nexus-rpc@0.0.2/node_modules/nexus-rpc/lib/ 22.3 KiB 13 modules\n  ./node_modules/.pnpm/long@5.3.2/node_modules/long/umd/index.js 49.8 KiB [built] [code generated]\n  ./node_modules/.pnpm/ms@3.0.0-canary.1/node_modules/ms/dist/index.cjs 3.41 KiB [built] [code generated]\nmodules by path ./packages/temporal-workflows/src/ 8.39 KiB\n  ./packages/temporal-workflows/src/workflows-autogenerated-entrypoint.cjs 535 bytes [built] [code generated]\n  ./packages/temporal-workflows/src/workflows.ts 7.87 KiB [built] [code generated]\noptional modules 30 bytes [optional]\n  __temporal_custom_payload_converter (ignored) 15 bytes [optional] [built] [code generated]\n  __temporal_custom_failure_converter (ignored) 15 bytes [optional] [built] [code generated]\nwebpack 5.109.2 compiled successfully in 347 ms\n2026-08-16T02:14:24.455Z [INFO] Workflow bundle created { size: '1.51MB' }\n2026-08-16T02:14:24.695Z [INFO] Worker state changed {\n  sdkComponent: 'worker',\n  taskQueue: 'sage-agent-task-v1',\n  state: 'RUNNING'\n}\n2026-08-16T02:14:24.696Z [INFO] No Nexus services registered, not polling for Nexus tasks { sdkComponent: 'worker', taskQueue: 'sage-agent-task-v1' }\n2026-08-16T02:14:26.948Z [INFO] Worker state changed {\n  sdkComponent: 'worker',\n  taskQueue: 'sage-agent-task-v1',\n  state: 'STOPPING'\n}\n2026-08-16T02:14:26.948Z [INFO] Worker state changed {\n  sdkComponent: 'worker',\n  taskQueue: 'sage-agent-task-v1',\n  state: 'DRAINING'\n}\n2026-08-16T02:14:26.949Z [INFO] Worker state changed {\n  sdkComponent: 'worker',\n  taskQueue: 'sage-agent-task-v1',\n  state: 'DRAINED'\n}\n2026-08-16T02:14:26.949Z [INFO] Worker state changed {\n  sdkComponent: 'worker',\n  taskQueue: 'sage-agent-task-v1',\n  state: 'STOPPED'\n}\n",
+      "production_evidence": false
+    },
+    {
+      "exercise_id": "target-cluster-unavailable-no-duplicate",
+      "command": "corepack pnpm vitest run examples/p6-integration/src/p6.e2e.test.tsx packages/temporal-routing/src/p5-controller.test.ts -t binds an unreachable selected target|serializes concurrent create/reconcile",
+      "started_at": "2026-08-16T02:14:27.010Z",
+      "completed_at": "2026-08-16T02:14:38.828Z",
+      "exit_code": 0,
+      "outcome": "passed",
+      "stdout": "\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.10 \u001b[39m\u001b[90m<worktree>/platform\u001b[39m\n\n \u001b[32m✓\u001b[39m packages/temporal-routing/src/p5-controller.test.ts \u001b[2m(\u001b[22m\u001b[2m9 tests\u001b[22m\u001b[2m | \u001b[22m\u001b[33m8 skipped\u001b[39m\u001b[2m)\u001b[22m\u001b[32m 14\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m examples/p6-integration/src/p6.e2e.test.tsx \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m | \u001b[22m\u001b[33m1 skipped\u001b[39m\u001b[2m)\u001b[22m\u001b[33m 10686\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[33m\u001b[2m✓\u001b[22m\u001b[39m binds an unreachable selected target with no fallback and emits target-unavailable correlation \u001b[33m 10071\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m2 passed\u001b[39m\u001b[22m\u001b[90m (2)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m2 passed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[33m9 skipped\u001b[39m\u001b[90m (11)\u001b[39m\n\u001b[2m   Start at \u001b[22m 10:14:27\n\u001b[2m   Duration \u001b[22m 11.37s\u001b[2m (transform 253ms, setup 0ms, import 922ms, tests 10.70s, environment 0ms)\u001b[22m\n\n",
+      "stderr": "2026-08-16T02:14:28.644Z [INFO] asset workflow-bundle-4eb983ca56f0fa5ff3cc.js 1.51 MiB [emitted] [immutable] (name: main)\nruntime modules 1.34 KiB 4 modules\nmodules by path ./node_modules/.pnpm/ 438 KiB\n  modules by path ./node_modules/.pnpm/@temporalio+common@1.22.0/node_modules/@temporal...(truncated) 161 KiB 35 modules\n  modules by path ./node_modules/.pnpm/@temporalio+workflow@1.22.0/node_modules/@tempor...(truncated) 202 KiB\n    ./node_modules/.pnpm/@temporalio+workflow@1.22.0/node_modules/@temporalio/workfl...(truncated) 12.9 KiB [built] [code generated]\n    + 25 modules\n  modules by path ./node_modules/.pnpm/nexus-rpc@0.0.2/node_modules/nexus-rpc/lib/ 22.3 KiB 13 modules\n  ./node_modules/.pnpm/long@5.3.2/node_modules/long/umd/index.js 49.8 KiB [built] [code generated]\n  ./node_modules/.pnpm/ms@3.0.0-canary.1/node_modules/ms/dist/index.cjs 3.41 KiB [built] [code generated]\nmodules by path ./packages/temporal-workflows/src/ 8.39 KiB\n  ./packages/temporal-workflows/src/workflows-autogenerated-entrypoint.cjs 535 bytes [built] [code generated]\n  ./packages/temporal-workflows/src/workflows.ts 7.87 KiB [built] [code generated]\noptional modules 30 bytes [optional]\n  __temporal_custom_payload_converter (ignored) 15 bytes [optional] [built] [code generated]\n  __temporal_custom_failure_converter (ignored) 15 bytes [optional] [built] [code generated]\nwebpack 5.109.2 compiled successfully in 354 ms\n2026-08-16T02:14:28.647Z [INFO] Workflow bundle created { size: '1.51MB' }\n",
+      "production_evidence": false
+    }
+  ]
+}

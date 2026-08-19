@@ -1,0 +1,33 @@
+{
+  "name": "@sage/agent-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
+  "scripts": {
+    "clean": "rm -rf dist",
+    "dev": "tsx src/runtime.ts",
+    "start": "node dist/runtime.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@sage/agent-client": "workspace:*",
+    "@sage/agent-contracts": "workspace:*",
+    "@sage/agent-lib": "workspace:*",
+    "@sage/chat-domain": "workspace:*",
+    "@sage/local-runtime": "workspace:*",
+    "@sage/observability": "workspace:*",
+    "@sage/platform-ports": "workspace:*",
+    "@sage/production-governance": "workspace:*",
+    "@sage/task-domain": "workspace:*",
+    "@sage/task-store-postgres": "workspace:*",
+    "@sage/temporal-workflows": "workspace:*",
+    "@temporalio/activity": "1.22.0",
+    "@temporalio/worker": "1.22.0",
+    "pg": "8.23.0"
+  },
+  "devDependencies": {
+    "@types/pg": "8.21.0"
+  }
+}

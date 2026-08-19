@@ -1,0 +1,197 @@
+{
+  "schemaVersion": "1",
+  "sourceRevision": "e8ea299dcac4f1859528d2c67e31e35a58d05c9e",
+  "sourceDigest": "sha256:968bfae73d45be1e8fd24d15ab63f024053550dc5ed3269785aa113d9ac9a035",
+  "toolDigest": "sha256:3d6dd2655ddfe4566363423fb31c041e376338385de07874a57dd1038ac59fdf",
+  "generatedAt": "2026-08-17T03:31:18.656Z",
+  "sourceState": {
+    "head": "e8ea299dcac4f1859528d2c67e31e35a58d05c9e",
+    "worktreeDigest": "sha256:c2fe13d173b44c54a13ab7b65099712f26754498e64513792781544dc6844687",
+    "dirtyPathCount": 348
+  },
+  "startedAt": "2026-08-17T03:31:18.636Z",
+  "finishedAt": "2026-08-17T03:31:18.656Z",
+  "seed": "apgv-seed-v1",
+  "executionEvidenceRef": "platform/evidence/agent-platform-final/executed-results.json",
+  "executionEvidenceDigest": "sha256:8c9ab5d23775aab3d68d974038541084636e2b440df0cdddb8b6291fb44a2ea4",
+  "caseCount": 19,
+  "engines": [
+    "deterministic-reference",
+    "pi"
+  ],
+  "cases": [
+    {
+      "caseId": "apgv/engine/v1/preflight-capability",
+      "id": "preflight-capability",
+      "status": "PASS",
+      "referenceAssertions": 1,
+      "piAssertions": 1,
+      "specDigest": "sha256:4095811f075186456ae3f22bcf435c43f715d61257ecaef5f518cf94b53f552d",
+      "faultDigest": "sha256:30a16940a0c92e67a2c308d2a969103cabfcd5c024104d1a2464d9bb7a1f78ba"
+    },
+    {
+      "caseId": "apgv/engine/v1/canonical-events-and-outcome",
+      "id": "canonical-events-and-outcome",
+      "status": "PASS",
+      "referenceAssertions": 1,
+      "piAssertions": 1,
+      "specDigest": "sha256:4095811f075186456ae3f22bcf435c43f715d61257ecaef5f518cf94b53f552d",
+      "faultDigest": "sha256:bbb78ab1b67ab17751bbc8a89c6a620eaf6de1a46a8d5fd1b11c52929f4a63b1"
+    },
+    {
+      "caseId": "apgv/engine/v1/bound-model-calls",
+      "id": "bound-model_calls",
+      "status": "PASS",
+      "referenceAssertions": 1,
+      "piAssertions": 1,
+      "specDigest": "sha256:4095811f075186456ae3f22bcf435c43f715d61257ecaef5f518cf94b53f552d",
+      "faultDigest": "sha256:9c4643cf40d9a6ac65762d2b473f0cb7558ada973de8df43524f599770e9b987"
+    },
+    {
+      "caseId": "apgv/engine/v1/bound-tool-calls",
+      "id": "bound-tool_calls",
+      "status": "PASS",
+      "referenceAssertions": 1,
+      "piAssertions": 1,
+      "specDigest": "sha256:4095811f075186456ae3f22bcf435c43f715d61257ecaef5f518cf94b53f552d",
+      "faultDigest": "sha256:2bd6e5c1b3f0440a3857a0f278ef1d96ae082d608fec388d3172c88066cc4c86"
+    },
+    {
+      "caseId": "apgv/engine/v1/bound-artifact-bytes",
+      "id": "bound-artifact_bytes",
+      "status": "PASS",
+      "referenceAssertions": 1,
+      "piAssertions": 1,
+      "specDigest": "sha256:4095811f075186456ae3f22bcf435c43f715d61257ecaef5f518cf94b53f552d",
+      "faultDigest": "sha256:64032f7f031ded10aae29ea8666e64eb9e99f8f815758dc6596ec4f7d5630665"
+    },
+    {
+      "caseId": "apgv/engine/v1/bound-checkpoint-candidates",
+      "id": "bound-checkpoint_candidates",
+      "status": "PASS",
+      "referenceAssertions": 1,
+      "piAssertions": 1,
+      "specDigest": "sha256:4095811f075186456ae3f22bcf435c43f715d61257ecaef5f518cf94b53f552d",
+      "faultDigest": "sha256:f9e8cee3c9134284a752729d006abd472956ac70e2e306b7d0181b0759f1bd99"
+    },
+    {
+      "caseId": "apgv/engine/v1/cancellation",
+      "id": "cancellation",
+      "status": "PASS",
+      "referenceAssertions": 1,
+      "piAssertions": 1,
+      "specDigest": "sha256:4095811f075186456ae3f22bcf435c43f715d61257ecaef5f518cf94b53f552d",
+      "faultDigest": "sha256:80812d7992dd498c03bbb6b797f4ac179be160f921c462b0b8a4a9bd1ca3b4be"
+    },
+    {
+      "caseId": "apgv/engine/v1/stable-errors",
+      "id": "stable-errors",
+      "status": "PASS",
+      "referenceAssertions": 1,
+      "piAssertions": 1,
+      "specDigest": "sha256:4095811f075186456ae3f22bcf435c43f715d61257ecaef5f518cf94b53f552d",
+      "faultDigest": "sha256:08bf7197662eab5fb5d159c064b4f9677ad85bcf5004df39f29c43da6304f73b"
+    },
+    {
+      "caseId": "apgv/engine/v1/candidate-only-checkpoint",
+      "id": "candidate-only-checkpoint",
+      "status": "PASS",
+      "referenceAssertions": 1,
+      "piAssertions": 1,
+      "specDigest": "sha256:4095811f075186456ae3f22bcf435c43f715d61257ecaef5f518cf94b53f552d",
+      "faultDigest": "sha256:b5d05d6d752d3cb340290843c94cb8fc70d240277d271f40797e769f967541e6"
+    },
+    {
+      "caseId": "apgv/engine/v1/codec-incompatibility",
+      "id": "codec-incompatibility",
+      "status": "PASS",
+      "referenceAssertions": 1,
+      "piAssertions": 1,
+      "specDigest": "sha256:4095811f075186456ae3f22bcf435c43f715d61257ecaef5f518cf94b53f552d",
+      "faultDigest": "sha256:80dc0e84625f16515984f59e74115b0886c5e64dc84cf7e938b0afb170ccdbaf"
+    },
+    {
+      "caseId": "apgv/engine/v1/runtime-incompatibility",
+      "id": "runtime-incompatibility",
+      "status": "PASS",
+      "referenceAssertions": 1,
+      "piAssertions": 1,
+      "specDigest": "sha256:4095811f075186456ae3f22bcf435c43f715d61257ecaef5f518cf94b53f552d",
+      "faultDigest": "sha256:3c554c666f38dafd1857e44558482c2152948d151e2684ab171ef4c45275fa22"
+    },
+    {
+      "caseId": "apgv/engine/v1/duration-bound",
+      "id": "duration-bound",
+      "status": "PASS",
+      "referenceAssertions": 2,
+      "piAssertions": 2,
+      "specDigest": "sha256:4095811f075186456ae3f22bcf435c43f715d61257ecaef5f518cf94b53f552d",
+      "faultDigest": "sha256:d28c002faaa73679972d6c822ce912bb17a42ecd5c2c100f5b21c15201edd8c5"
+    },
+    {
+      "caseId": "apgv/engine/v1/turn-bound",
+      "id": "turn-bound",
+      "status": "PASS",
+      "referenceAssertions": 2,
+      "piAssertions": 2,
+      "specDigest": "sha256:4095811f075186456ae3f22bcf435c43f715d61257ecaef5f518cf94b53f552d",
+      "faultDigest": "sha256:c30e40aecf291bd362b9081b3e0683e877dd96a92ba19ccd39840d0fc1444fcc"
+    },
+    {
+      "caseId": "apgv/engine/v1/token-bound",
+      "id": "token-bound",
+      "status": "PASS",
+      "referenceAssertions": 2,
+      "piAssertions": 2,
+      "specDigest": "sha256:4095811f075186456ae3f22bcf435c43f715d61257ecaef5f518cf94b53f552d",
+      "faultDigest": "sha256:b21a34b423542406c9fc64a44831baca3eb1b148fb69728d0747dfd4884dd93d"
+    },
+    {
+      "caseId": "apgv/engine/v1/context-bound",
+      "id": "context-bound",
+      "status": "PASS",
+      "referenceAssertions": 2,
+      "piAssertions": 2,
+      "specDigest": "sha256:4095811f075186456ae3f22bcf435c43f715d61257ecaef5f518cf94b53f552d",
+      "faultDigest": "sha256:ff2a4956629211756775a289730f2270ffaf6bf40bb97087276b616844db8f80"
+    },
+    {
+      "caseId": "apgv/engine/v1/cost-bound",
+      "id": "cost-bound",
+      "status": "PASS",
+      "referenceAssertions": 2,
+      "piAssertions": 2,
+      "specDigest": "sha256:4095811f075186456ae3f22bcf435c43f715d61257ecaef5f518cf94b53f552d",
+      "faultDigest": "sha256:2129de5964ff6985b98fc951ee0ec6a4e69116195a435547bd0cf243f91598a3"
+    },
+    {
+      "caseId": "apgv/engine/v1/concurrency-bound",
+      "id": "concurrency-bound",
+      "status": "PASS",
+      "referenceAssertions": 2,
+      "piAssertions": 2,
+      "specDigest": "sha256:4095811f075186456ae3f22bcf435c43f715d61257ecaef5f518cf94b53f552d",
+      "faultDigest": "sha256:91770e519b2db7633e158d64f7ec999e125acc18b1af3c9c07e6a8b11669d4ab"
+    },
+    {
+      "caseId": "apgv/engine/v1/principal-tenant-grant",
+      "id": "principal-tenant-grant",
+      "status": "PASS",
+      "referenceAssertions": 2,
+      "piAssertions": 2,
+      "specDigest": "sha256:4095811f075186456ae3f22bcf435c43f715d61257ecaef5f518cf94b53f552d",
+      "faultDigest": "sha256:93df3b5aa5ea3b7c24c4d1f3513c8095aeb172b6aa33e10df314282f0fc0ac15"
+    },
+    {
+      "caseId": "apgv/engine/v1/duplicate-invocation",
+      "id": "duplicate-invocation",
+      "status": "PASS",
+      "referenceAssertions": 3,
+      "piAssertions": 3,
+      "specDigest": "sha256:4095811f075186456ae3f22bcf435c43f715d61257ecaef5f518cf94b53f552d",
+      "faultDigest": "sha256:af3869c48cc4561eca67de215cec30d1679824396fd7e2349761f1d5f46d912c"
+    }
+  ],
+  "status": "PASS",
+  "contentDigest": "sha256:9e19b837dd3b10dc8f39cd1798fa30476bcc561488375d8520f4d4fff48d88eb"
+}

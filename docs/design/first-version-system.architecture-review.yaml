@@ -1,0 +1,108 @@
+status: pass
+score: 87
+model: ./first-version-system.architecture.json#1.1
+dsl: ./first-version-system.runtime.dsl.yaml
+renderedDocument: ./first-version-system.runtime.md
+rules:
+  version: 1
+  confidence: low
+reviewConfidence: medium
+dimensions:
+  layer:
+    score: 15
+    max: 15
+    evidence: 25 个节点属于唯一固定 Layer；Storage/Secret 位于 Infrastructure；Actor 不属于部署集群。
+  ddd:
+    score: 15
+    max: 15
+    evidence: Chat、Task Management、Task Routing、Workflow Runtime、Task Execution、Agent Capability、Credential 和各状态 Owner 明确分离。
+  dependency:
+    score: 18
+    max: 20
+    evidence: 33 条关系均声明 protocol/sync；Runtime 无环；Application 只通过 Agent Library API 复用 Agent 能力；多目标 Temporal 经 Adapter 隔离。
+  scale:
+    score: 8
+    max: 10
+    evidence: Target Registry、Task Queue 和环境 Worker 支持按类型与环境扩展；容量和 backlog 路由阈值尚未量化。
+  ha:
+    score: 10
+    max: 15
+    evidence: Temporal 提供 Workflow/Activity 恢复并支持多故障域目标；控制面、PostgreSQL、Artifact 和跨 Cluster 迁移仍有单点或未决策略。
+  security:
+    score: 9
+    max: 10
+    evidence: OIDC Scope、可信 Target Registry、CredentialProvider、Secret Manager 和环境 Worker 权限边界已显式建模。
+  operation:
+    score: 12
+    max: 15
+    evidence: Chat/Task/Workflow/Run 统一 OTLP 关联，Task Store 与 Temporal Owner 明确；对账、Build ID 和迁移 Runbook 尚未冻结。
+findings:
+  - rule_id: routing.health-fallback-policy-open
+    severity: medium
+    element_ids:
+      - task-router
+      - temporal-target-registry
+      - temporal-clusters
+    message: Target health、容量信号与 allowFallback 规则尚未量化，错误配置可能选择不可用或不合规环境。
+    action:
+      target: model
+      operation: update-attribute
+      detail: 实现前冻结 health source、priority、allowFallback、数据驻留和无目标错误语义。
+  - rule_id: temporal.cross-cluster-migration-explicit
+    severity: medium
+    element_ids:
+      - temporal-client-adapter
+      - temporal-clusters
+      - task-store
+      - agent-state-store
+    message: Workflow 启动后 History 固定在原 Cluster，不能通过普通 retry 静默迁移。
+    action:
+      target: model
+      operation: update-attribute
+      detail: 首版明确不自动迁移；后续迁移必须使用外部 Checkpoint、新 workflow_id、新 TargetSnapshot 和审计。
+  - rule_id: state.temporal-projection-reconciliation
+    severity: medium
+    element_ids:
+      - temporal-clusters
+      - environment-task-workers
+      - task-store
+    message: Task Store 是产品投影，可能暂时落后于 Temporal History，需要明确对账和 stale 状态表达。
+    action:
+      target: model
+      operation: update-attribute
+      detail: API 返回 projection_updated_at；Worker 或对账器按固化 Target 查询 Temporal 修复投影。
+  - rule_id: chat.short-run-recovery-boundary
+    severity: low
+    element_ids:
+      - chat-service
+      - agent-library-api
+      - chat-store
+    message: 短 Chat Run 在 API 崩溃时不会由 Temporal 恢复。
+    action:
+      target: model
+      operation: update-attribute
+      detail: 先持久化用户消息；失败后允许 Retry；需要可靠恢复的请求必须提升为 Task。
+  - rule_id: ha.control-plane-single-replica
+    severity: low
+    element_ids:
+      - agent-web-ui
+      - application-api
+      - chat-store
+      - task-store
+      - artifact-store
+    message: MVP 控制面和存储仍允许单副本部署。
+    action:
+      target: model
+      operation: update-attribute
+      detail: 生产前确定副本、备份、RTO/RPO 和连接故障降级策略。
+  - rule_id: dependency.sdk-version-open
+    severity: low
+    element_ids:
+      - pi-harness
+      - temporal-client-adapter
+      - environment-task-workers
+    message: Pi 与 Temporal TypeScript SDK 的精确 package、版本和兼容范围尚未锁定。
+    action:
+      target: model
+      operation: update-attribute
+      detail: 依赖 Spike 后使用精确版本，并验证 Worker bundle、mTLS、取消、Skill、Session 与 Build ID 行为。

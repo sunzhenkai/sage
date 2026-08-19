@@ -1,0 +1,8 @@
+{
+  "tenant_id": "fixture-tenant",
+  "artifact_ref": "artifact://fixture-tenant/task/report",
+  "media_type": "application/json",
+  "size": 42,
+  "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "created_at": "2026-08-13T00:00:00.000Z"
+}

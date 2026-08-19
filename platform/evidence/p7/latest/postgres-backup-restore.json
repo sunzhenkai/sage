@@ -1,0 +1,22 @@
+{
+  "exercise_id": "postgres-backup-restore",
+  "environment": "isolated-local-compose-disposable-databases",
+  "production_evidence": false,
+  "started_at": "2026-08-16T02:14:09.615Z",
+  "completed_at": "2026-08-16T02:14:12.433Z",
+  "source_database": "sage_p7_source_3906727_1786846449614",
+  "restored_database": "sage_p7_restored_3906727_1786846449614",
+  "formal_backup_script_executed": true,
+  "formal_restore_script_executed": true,
+  "backup_role_superuser": false,
+  "restore_role_scoped_to_isolated_database": true,
+  "restored_safe_reference_rows": 1,
+  "tenant_deletion_script_executed": true,
+  "deletion_role_cannot_alter_triggers": true,
+  "target_rows_remaining": 0,
+  "cross_tenant_rows_retained": 1,
+  "deletion_audit_rows": 1,
+  "deletion_audit_append_only": true,
+  "backup_sha256": "51a3e310fbec995d29f76108762ba1a7a3f29b4765f2c266407c8e45646a64d0",
+  "outcome": "passed"
+}

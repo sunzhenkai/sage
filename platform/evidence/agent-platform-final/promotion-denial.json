@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "1",
+  "sourceRevision": "e8ea299dcac4f1859528d2c67e31e35a58d05c9e",
+  "sourceDigest": "sha256:c2fe13d173b44c54a13ab7b65099712f26754498e64513792781544dc6844687",
+  "toolDigest": "sha256:615a886b8b64d8fa078866d1e5da007c31c9088effdb9684eb873b16162bebde",
+  "generatedAt": "2026-08-17T03:31:52.046Z",
+  "caseId": "apgv/promotion/v1/denied",
+  "decision": "DENIED",
+  "code": "PROMOTION_GATE_NOT_GO",
+  "gateDigest": "sha256:1dabbce9a0eb5eeedc16ad02d606e5bd2992bcc87be1c384bc2afc81c9da0a86",
+  "targetStatus": "Proposed final architecture baseline",
+  "modelStatus": "draft",
+  "blockedItems": 7,
+  "status": "BLOCKED",
+  "contentDigest": "sha256:00dc70521c16f7369c4044b2589a1999392a47f44fa62dc642a0aff86cef547c"
+}

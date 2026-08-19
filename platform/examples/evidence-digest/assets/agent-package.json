@@ -1,0 +1,13 @@
+{
+  "schemaVersion":"1","packageId":"evidence-digest","version":"1.0.0",
+  "metadata":{"name":"Evidence Digest","description":"Tenant-bound evidence digest reference workload","labels":{"classification":"internal"}},
+  "agent":{"name":"evidence-digest","description":"Produces cited structured digests","instructions":"Use declared capabilities only","inputSchemaRef":"schema://evidence-digest/input/v1","outputSchemaRef":"schema://evidence-digest/output/v1"},
+  "skills":[{"id":"evidence-digest","version":"1","ref":"skill://evidence-digest/v1","digest":"sha256:1111111111111111111111111111111111111111111111111111111111111111","required":true}],
+  "capabilities":[{"id":"document.fetch","version":"1","ref":"capability://document.fetch/v1","digest":"sha256:2222222222222222222222222222222222222222222222222222222222222222","required":true,"readOnly":true},{"id":"evidence.publish","version":"1","ref":"capability://evidence.publish/v1","digest":"sha256:3333333333333333333333333333333333333333333333333333333333333333","required":true,"readOnly":false}],
+  "context":{"sourceRefs":[],"maxBytes":1048576,"maxDocuments":16,"retention":"P30D"},
+  "model":{"requirements":{"structuredOutput":true},"providerPolicy":"approved-only"},
+  "schemas":{"input":"schema://evidence-digest/input/v1","output":"schema://evidence-digest/output/v1"},
+  "policies":{"access":{"tenantBound":true},"retention":"P30D","dataHandling":"artifact-refs-only","limits":{"maxDocuments":16,"maxBytes":1048576}},
+  "budgets":{"maxTokens":8192,"maxDurationMs":30000,"maxToolCalls":18,"maxBytes":1048576,"maxCost":1},
+  "viewMetadata":{"title":"Evidence Digest","description":"Artifact-derived view","fields":["status","resultArtifactRef","receiptRefs","provenance"],"layout":"generic-result"}
+}

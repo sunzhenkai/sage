@@ -1,0 +1,1 @@
+{"schemaVersion":"1","viewId":"generic-artifact-result","source":{"resultArtifactRef":"$.artifactRefs[0]","receiptRefs":"$.receiptRefs","provenance":"$.provenance"},"fields":["status","resultArtifactRef","downloadRef","receiptRefs","provenance"],"customRoute":false,"customComponent":false}

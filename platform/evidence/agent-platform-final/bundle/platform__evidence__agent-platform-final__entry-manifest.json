@@ -1,0 +1,69 @@
+{
+  "schemaVersion": "1",
+  "caseId": "apgv/entry/v1/dependency-manifest",
+  "status": "BLOCKED",
+  "decision": "NO-GO",
+  "canonicalContractMajor": 1,
+  "sourceRevision": "e8ea299dcac4f1859528d2c67e31e35a58d05c9e",
+  "sourceDigest": "sha256:2b48b5ec5cdf170ee7b0150547fa363f7f9f7c909f2407b3aea5ec93aed9395a",
+  "toolDigest": "sha256:cb1d9a30bc4ab8a397f39b7d786bb82aca0b816077eefc35d7c822017d75f6a5",
+  "compatibilityWindow": {
+    "runtimeMajor": 1,
+    "coordinatorBuilds": [
+      "build://legacy-temporal/v1",
+      "build://coordinator-v2/v1"
+    ]
+  },
+  "productionFreshnessHours": 24,
+  "dependencies": [
+    {
+      "change": "agent-platform-contract-authority-foundation",
+      "owner": "Agent Core",
+      "status": "PASS",
+      "evidenceRef": "evidence/agent-platform-contract-authority-foundation/phase-0-conformance.md",
+      "evidenceDigest": "sha256:47380ae9698d8086c53ee2c14c0b9acf55e654e4ac54516bd49281690066ac5c"
+    },
+    {
+      "change": "agent-runtime-kernel-broker-integration",
+      "owner": "Agent Core",
+      "status": "PASS",
+      "evidenceRef": "evidence/agent-runtime-kernel-broker-integration/phase-1-runtime-kernel-ports.md",
+      "evidenceDigest": "sha256:76959f867349567fc07be557d2a249fd703705b748bbf58aa177a47f48a3bfcf"
+    },
+    {
+      "change": "durable-agent-coordinator-adapter",
+      "owner": "Task Runtime",
+      "status": "PASS",
+      "evidenceRef": "evidence/durable-agent-coordinator-adapter/phase-2-dependency-gate.md",
+      "evidenceDigest": "sha256:b4505a808982c1b0be9ceceb736cc268e7c18110735bfaef1c6b244da615d04b"
+    },
+    {
+      "change": "agent-package-release-admission",
+      "owner": "Package Platform",
+      "status": "PASS",
+      "evidenceRef": "evidence/agent-package-release-admission/phase-3-dependency-gate.md",
+      "evidenceDigest": "sha256:a2e9d2e43bb7f73168e669d8ab01215a226c365b455a2e8bd0a1d88f95e07530"
+    },
+    {
+      "change": "agent-platform-production-governance",
+      "owner": "Platform Security/SRE",
+      "status": "BLOCKED",
+      "evidenceRef": "evidence/production-governance/readiness-manifest.json",
+      "evidenceDigest": "sha256:e8ccc9ffa44f882750dbe7637126c81d260a082b6bf4f70784c991d56eb60674"
+    }
+  ],
+  "externalDeferredTaskIds": [
+    "9.1",
+    "9.2",
+    "9.3",
+    "10.5",
+    "11.2",
+    "11.3",
+    "12.2",
+    "12.3",
+    "12.5"
+  ],
+  "promotionToken": null,
+  "generatedAt": "2026-08-17T03:31:31.390Z",
+  "contentDigest": "sha256:9fab410f5d3646c7193ebf99863d66266a97c35923c5256a7f0448f2e64bc8ff"
+}

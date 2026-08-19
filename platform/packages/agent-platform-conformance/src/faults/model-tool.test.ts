@@ -1,0 +1,1 @@
+import{expect,it}from'vitest';import{byDomain}from'./fault-fixtures.js';it('covers model/tool timeout, limits, invalid output, loss and duplicate delivery',()=>expect([...byDomain('model'),...byDomain('tool')]).toHaveLength(6));

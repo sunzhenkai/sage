@@ -1,0 +1,119 @@
+{
+  "schemaVersion": "1",
+  "sourceRevision": "e8ea299dcac4f1859528d2c67e31e35a58d05c9e",
+  "sourceDigest": "sha256:968bfae73d45be1e8fd24d15ab63f024053550dc5ed3269785aa113d9ac9a035",
+  "toolDigest": "sha256:3d6dd2655ddfe4566363423fb31c041e376338385de07874a57dd1038ac59fdf",
+  "generatedAt": "2026-08-17T03:31:18.656Z",
+  "sourceState": {
+    "head": "e8ea299dcac4f1859528d2c67e31e35a58d05c9e",
+    "worktreeDigest": "sha256:c2fe13d173b44c54a13ab7b65099712f26754498e64513792781544dc6844687",
+    "dirtyPathCount": 348
+  },
+  "startedAt": "2026-08-17T03:31:18.636Z",
+  "finishedAt": "2026-08-17T03:31:18.656Z",
+  "seed": "apgv-seed-v1",
+  "executionEvidenceRef": "platform/evidence/agent-platform-final/executed-results.json",
+  "executionEvidenceDigest": "sha256:8c9ab5d23775aab3d68d974038541084636e2b440df0cdddb8b6291fb44a2ea4",
+  "caseId": "apgv/replay/v1/history-compatibility",
+  "status": "BLOCKED",
+  "fixtureCount": 7,
+  "fixtures": [
+    {
+      "caseId": "replay://legacy/v1/regression",
+      "file": "legacy-regression.json",
+      "workflowType": "AgentTaskWorkflow",
+      "buildLine": "build://legacy-temporal/v1",
+      "digest": "sha256:3ac2c73d2ef507c3e82fdaaf70ab8e90a115dfcded58d373135e769b02534a1c",
+      "actualDigest": "sha256:3ac2c73d2ef507c3e82fdaaf70ab8e90a115dfcded58d373135e769b02534a1c",
+      "digestMatches": true,
+      "temporalHistory": false,
+      "status": "BLOCKED"
+    },
+    {
+      "caseId": "replay://coordinator/v1/continue-boundary",
+      "file": "continue-boundary.json",
+      "workflowType": "DurableCoordinatorWorkflow",
+      "buildLine": "build://coordinator-v2/v1",
+      "digest": "sha256:987bed71d8c1dc4c9ac325ae9222611fd9fe3bc5355ca39cb8465dc481f8531d",
+      "actualDigest": "sha256:987bed71d8c1dc4c9ac325ae9222611fd9fe3bc5355ca39cb8465dc481f8531d",
+      "digestMatches": true,
+      "temporalHistory": false,
+      "status": "BLOCKED"
+    },
+    {
+      "caseId": "replay://coordinator/v1/pending-timer",
+      "file": "pending-timer.json",
+      "workflowType": "DurableCoordinatorWorkflow",
+      "buildLine": "build://coordinator-v2/v1",
+      "digest": "sha256:8212130137ac313d74e2c6bad8e708c5f2e0779761b2207f62abd2a275d3c286",
+      "actualDigest": "sha256:8212130137ac313d74e2c6bad8e708c5f2e0779761b2207f62abd2a275d3c286",
+      "digestMatches": true,
+      "temporalHistory": false,
+      "status": "BLOCKED"
+    },
+    {
+      "caseId": "replay://coordinator/v1/pending-signal",
+      "file": "pending-signal.json",
+      "workflowType": "DurableCoordinatorWorkflow",
+      "buildLine": "build://coordinator-v2/v1",
+      "digest": "sha256:cb5b554d028ee448c6b114b58403f40a0023b552fea0f215d87568296d5ad174",
+      "actualDigest": "sha256:cb5b554d028ee448c6b114b58403f40a0023b552fea0f215d87568296d5ad174",
+      "digestMatches": true,
+      "temporalHistory": false,
+      "status": "BLOCKED"
+    },
+    {
+      "caseId": "replay://coordinator/v1/delivery-retry",
+      "file": "delivery-retry.json",
+      "workflowType": "DurableCoordinatorWorkflow",
+      "buildLine": "build://coordinator-v2/v1",
+      "digest": "sha256:b7598751871cce0f417fe223e014b382595a5f9fde630671d6ae16dcc84d0a7a",
+      "actualDigest": "sha256:b7598751871cce0f417fe223e014b382595a5f9fde630671d6ae16dcc84d0a7a",
+      "digestMatches": true,
+      "temporalHistory": false,
+      "status": "BLOCKED"
+    },
+    {
+      "caseId": "replay://coordinator/v1/control-race",
+      "file": "control-race.json",
+      "workflowType": "DurableCoordinatorWorkflow",
+      "buildLine": "build://coordinator-v2/v1",
+      "digest": "sha256:d4ee552b3951b3e3c9bd44bf963aebad537fd6990929a5bf0f2c4f92406b9ae1",
+      "actualDigest": "sha256:d4ee552b3951b3e3c9bd44bf963aebad537fd6990929a5bf0f2c4f92406b9ae1",
+      "digestMatches": true,
+      "temporalHistory": false,
+      "status": "BLOCKED"
+    },
+    {
+      "caseId": "replay://coordinator/v1/effect-unknown",
+      "file": "effect-unknown.json",
+      "workflowType": "DurableCoordinatorWorkflow",
+      "buildLine": "build://coordinator-v2/v1",
+      "digest": "sha256:36e558aacc411181467442d168c89e79b42f70c7df98d9de6a0e4357add51457",
+      "actualDigest": "sha256:36e558aacc411181467442d168c89e79b42f70c7df98d9de6a0e4357add51457",
+      "digestMatches": true,
+      "temporalHistory": false,
+      "status": "BLOCKED"
+    }
+  ],
+  "negativeFixtures": [
+    {
+      "caseId": "replay://negative/nondeterministic",
+      "file": "negative/nondeterministic.json",
+      "expectedCode": "REPLAY_NONDETERMINISTIC"
+    },
+    {
+      "caseId": "replay://negative/unknown-schema",
+      "file": "negative/unknown-schema.json",
+      "expectedCode": "REPLAY_UNKNOWN_SCHEMA"
+    },
+    {
+      "caseId": "replay://negative/unknown-history",
+      "file": "negative/unknown-history.json",
+      "expectedCode": "REPLAY_UNKNOWN_HISTORY"
+    }
+  ],
+  "runner": "@temporalio/worker.Worker.runReplayHistory",
+  "reason": "TEMPORAL_HISTORY_FIXTURES_NOT_CAPTURED_OR_DIGEST_MISMATCH",
+  "contentDigest": "sha256:5b662fd332c1019cfc5a800a0a7294f7e04c740d036ef32c7f7d93ca2424acf6"
+}

@@ -1,0 +1,89 @@
+{
+  "version": 1,
+  "deferred": [
+    {
+      "change": "agent-platform-production-governance",
+      "task": "9.1 为 Admission、Identity/Secret、Policy/Revocation/Approval、Effect/Consumption Ledger、Coordinator、Artifact/Checkpoint、Provider 和 reconciliation 定义具名 Owner、SLI/SLO、错误预算与告警阈值。",
+      "reason": "BLOCKER accountable-owner-roster-and-approved-slo-thresholds: named production Owners, approved SLIs/SLOs/error budgets and alert thresholds are unfilled; repository templates default this gate to NO-GO.",
+      "updated": "2026-08-17"
+    },
+    {
+      "change": "agent-platform-production-governance",
+      "task": "9.2 部署并验证已批准的多故障域副本、quorum/failover、PITR、备份保留和 dependency readiness；记录配置版本与容量 headroom。",
+      "reason": "BLOCKER production-multi-fault-domain-topology-and-pitr: no approved production replicas/quorum/failover/PITR/backup topology or capacity headroom evidence exists.",
+      "updated": "2026-08-17"
+    },
+    {
+      "change": "agent-platform-production-governance",
+      "task": "9.3 对 PostgreSQL/Coordinator/Ledger/Artifact/Checkpoint 执行生产等价备份恢复与 point-in-time exercise，验证 authority/ref 完整性和已批准 RTO/RPO。",
+      "reason": "BLOCKER production-equivalent-backup-restore-rto-rpo-exercise: no production-equivalent PostgreSQL/Coordinator/Ledger/Artifact/Checkpoint restore exercise or approved RTO/RPO exists.",
+      "updated": "2026-08-17"
+    },
+    {
+      "change": "agent-platform-production-governance",
+      "task": "10.5 为每类告警编写并演练具名 Owner Runbook，包含 fail-closed、禁止重复副作用、safe reconcile、人工 resolution、drain/cancel 和升级路径。",
+      "reason": "BLOCKER named-alert-owner-roster-and-witnessed-runbook-exercises: runbooks exist but accountable human Owners, escalation roster and witnessed production exercises are unfilled.",
+      "updated": "2026-08-17"
+    },
+    {
+      "change": "agent-platform-production-governance",
+      "task": "11.2 部署 shadow decision 模式，仅比较授权/Admission/reconcile 结果而不授予权限、不执行副作用、不结算或签发可恢复 ref，并建立差异阈值。",
+      "reason": "BLOCKER production-shadow-environment-tenant-and-approved-thresholds: zero-authority shadow implementation/tests pass, but no authorized production shadow deployment, tenant, observation window or threshold exists.",
+      "updated": "2026-08-17"
+    },
+    {
+      "change": "agent-platform-production-governance",
+      "task": "11.3 在隔离 tenant 依次 canary Identity/Secret、Consumption、Artifact/Checkpoint、Effect、sandbox/egress 和供应链 Gate；每一步通过后才扩大范围。",
+      "reason": "BLOCKER isolated-production-canary-tenant-and-real-dependencies: no approved isolated tenant or real Identity/Secret/Ledger/Artifact/Effect/sandbox/supply-chain production dependency set is available.",
+      "updated": "2026-08-17"
+    },
+    {
+      "change": "agent-platform-production-governance",
+      "task": "12.2 汇总前四个 change、生产依赖、SLO/RTO/RPO、供应链、租户隔离、安全/故障/容量演练和告警 Runbook 的不可变 evidence digests 与 freshness。",
+      "reason": "BLOCKER immutable-production-evidence-digests-and-freshness-inputs: repository manifest truthfully lists missing inputs, but production dependency/SLO/RTO/RPO/security/capacity evidence digests and freshness records do not exist.",
+      "updated": "2026-08-17"
+    },
+    {
+      "change": "agent-platform-production-governance",
+      "task": "12.3 由具名 Security、Architecture、Operations/SRE、Release 与 Data Owner 逐项签署，记录任何明确、时限化且不绕过 mandatory control 的残余风险接受。",
+      "reason": "BLOCKER five-distinct-human-owner-signatures: Security, Architecture, Operations/SRE, Release and Data Owner external identities/signatures are UNFILLED.",
+      "updated": "2026-08-17"
+    },
+    {
+      "change": "agent-platform-production-governance",
+      "task": "12.5 仅在最终人类 `GO` 后开启有界 production canary，并持续监测 readiness regression；任一 mandatory gate 失效立即触发 scope/global kill、暂停新 Admission 并恢复 `NO-GO`/suspended。",
+      "reason": "BLOCKER final-human-go-and-production-canary-authorization: external human GO is absent; machine readiness remains productionEvidence=false, decision=NO_GO, canEnableProduction=false.",
+      "updated": "2026-08-17"
+    },
+    {
+      "change": "agent-platform-generalization-validation",
+      "task": "3.1 在实现前生成受保护核心路径 tree/diff baseline，覆盖 Kernel、Interactive/Durable Host、通用 Run 表、Coordinator canonical contract 和 canonical API",
+      "reason": "BLOCKER authentic-pre-reference-workload-protected-snapshot: implementation began before an immutable protected-path baseline was captured; equal late snapshots are explicitly BLOCKED and cannot prove zero core changes.",
+      "updated": "2026-08-17"
+    },
+    {
+      "change": "agent-platform-generalization-validation",
+      "task": "3.7 完成后重新生成 protected-path manifest，证明相对现有 Chat/Task workload family 的第二 workload 仅改动 Release、Skills、Capabilities、Schemas、Policies、Views 和批准的 fixtures；出现核心变化时使 Gate 失败",
+      "reason": "BLOCKER protected-path-before-anchor: the after manifest exists, but no independently anchored pre-workload tree digest exists, so workload zero-core-diff remains BLOCKED rather than falsely PASS.",
+      "updated": "2026-08-17"
+    },
+    {
+      "change": "agent-platform-generalization-validation",
+      "task": "7.5 从序列 3 compatibility policy 枚举支持窗口内全部旧 Coordinator History fixtures，使用当前 Worker/Adapter 离线 replay 并保存 fixture/build/digest 清单",
+      "reason": "BLOCKER exported-temporal-history-corpus: seven compatibility fixtures have verified byte digests but are declarative JSON, not exported Temporal Histories replayed with Worker.runReplayHistory.",
+      "updated": "2026-08-17"
+    },
+    {
+      "change": "agent-platform-generalization-validation",
+      "task": "7.6 增加 nondeterministic/unknown schema/history 负向 fixture，证明单个不兼容即可阻断 Worker 发布和总 Gate",
+      "reason": "BLOCKER real-negative-temporal-history-fixtures: nondeterministic/unknown-schema negatives exist as declarations, but no actual exported History negative corpus is available for current Worker replay.",
+      "updated": "2026-08-17"
+    },
+    {
+      "change": "agent-platform-generalization-validation",
+      "task": "12.2 运行完整双 Engine conformance、双 Host 等价、fault matrix、replay/rebuild/history 和 static boundary CI jobs，确认无 skipped/only/flaky 强制 case",
+      "reason": "BLOCKER mandatory-history-replay-job: dual Engine/Host, fault, rebuild and static jobs pass with no only/skip/flaky markers, but the mandatory real Temporal History replay job remains BLOCKED by missing exported Histories.",
+      "updated": "2026-08-17"
+    }
+  ]
+}

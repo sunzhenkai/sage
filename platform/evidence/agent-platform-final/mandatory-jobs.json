@@ -1,0 +1,94 @@
+{
+  "schemaVersion": "1",
+  "sourceRevision": "e8ea299dcac4f1859528d2c67e31e35a58d05c9e",
+  "sourceDigest": "sha256:968bfae73d45be1e8fd24d15ab63f024053550dc5ed3269785aa113d9ac9a035",
+  "toolDigest": "sha256:3d6dd2655ddfe4566363423fb31c041e376338385de07874a57dd1038ac59fdf",
+  "generatedAt": "2026-08-17T03:31:52.027Z",
+  "caseId": "apgv/jobs/v1/mandatory",
+  "runnerPolicy": {
+    "only": 0,
+    "skip": 0,
+    "flakyRetry": 0
+  },
+  "jobs": [
+    {
+      "name": "dual-engine",
+      "status": "PASS",
+      "evidenceRef": "platform/evidence/agent-platform-final/engine-conformance.json",
+      "evidenceDigest": "sha256:9829c53da0cdb54098a33a4c6835c8c6594eed5af6ca1ad8b90546371a4dd16f"
+    },
+    {
+      "name": "dual-host",
+      "status": "PASS",
+      "evidenceRef": "platform/evidence/agent-platform-final/host-equivalence.json",
+      "evidenceDigest": "sha256:1d5f952b673630a8653ebb26569bb7a7512406d5ed3aabdf47c7e2d257d59f6d"
+    },
+    {
+      "name": "fault-matrix",
+      "status": "PASS",
+      "evidenceRef": "platform/evidence/agent-platform-final/fault-matrix.json",
+      "evidenceDigest": "sha256:5bd2e8dd70b0185f988fe532cb1ae9f93eb7ef1539670f69fcf4f676cd1f2253"
+    },
+    {
+      "name": "explainable-replay",
+      "status": "PASS",
+      "evidenceRef": "platform/evidence/agent-platform-final/explainable-replay.json",
+      "evidenceDigest": "sha256:dd02724dbc0fc0587e20110893179692f069a5e39c288dc01bad9001689cf526"
+    },
+    {
+      "name": "projection-rebuild",
+      "status": "PASS",
+      "evidenceRef": "platform/evidence/agent-platform-final/projection-rebuild.json",
+      "evidenceDigest": "sha256:45d110d57b32624104a567c5b3d37ceae5169a2e3bcce6e8a5341acc92468bf1"
+    },
+    {
+      "name": "history-replay",
+      "status": "BLOCKED",
+      "evidenceRef": "platform/evidence/agent-platform-final/history-replay.json",
+      "evidenceDigest": "sha256:395d5f7aecec1aae485040cb4c4183c603c4f8770d0a6ec2df0f45cf813c54f7"
+    },
+    {
+      "name": "boundary-canonical",
+      "status": "PASS",
+      "evidenceRef": "platform/evidence/agent-platform-final/boundary-canonical.json",
+      "evidenceDigest": "sha256:bbddea8c2389616829fddb0a0b0714c28389c19d9515c3692c1276167b11e2aa"
+    },
+    {
+      "name": "boundary-public",
+      "status": "PASS",
+      "evidenceRef": "platform/evidence/agent-platform-final/boundary-public-surfaces.json",
+      "evidenceDigest": "sha256:6e45d273498b91eac41a6c8a5b5c8633d95057f2dd38c00cbb78136add9820ab"
+    },
+    {
+      "name": "boundary-workload",
+      "status": "PASS",
+      "evidenceRef": "platform/evidence/agent-platform-final/boundary-evidence-digest.json",
+      "evidenceDigest": "sha256:d96b581b9822c75c21030cd31df3d789afdc422f3d5bf694d9f453f6bc8dcb48"
+    },
+    {
+      "name": "production-topology",
+      "status": "BLOCKED",
+      "reason": "EXTERNAL_EVIDENCE_REQUIRED"
+    },
+    {
+      "name": "human-security-approval",
+      "status": "BLOCKED",
+      "reason": "EXTERNAL_EVIDENCE_REQUIRED"
+    },
+    {
+      "name": "human-architecture-approval",
+      "status": "BLOCKED",
+      "reason": "EXTERNAL_EVIDENCE_REQUIRED"
+    },
+    {
+      "name": "human-operations-approval",
+      "status": "BLOCKED",
+      "reason": "EXTERNAL_EVIDENCE_REQUIRED"
+    }
+  ],
+  "localPassCount": 8,
+  "blockedLocalCount": 1,
+  "blockedExternalCount": 4,
+  "status": "BLOCKED",
+  "contentDigest": "sha256:f351a09361e89eb4a00f01c9e32821f6874c6e76da50c215b97dc372be0bc446"
+}

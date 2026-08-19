@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src", "outDir": "dist", "composite": true, "baseUrl": ".",
+    "paths": { "@sage/task-domain": ["../task-domain/src/index.ts"] }
+  },
+  "include": ["src/**/*.ts"],
+  "references": [{ "path": "../task-domain" }]
+}

@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "1",
+  "sourceRevision": "e8ea299dcac4f1859528d2c67e31e35a58d05c9e",
+  "sourceDigest": "sha256:968bfae73d45be1e8fd24d15ab63f024053550dc5ed3269785aa113d9ac9a035",
+  "toolDigest": "sha256:3d6dd2655ddfe4566363423fb31c041e376338385de07874a57dd1038ac59fdf",
+  "generatedAt": "2026-08-17T03:31:52.013Z",
+  "caseId": "apgv/quality/v1/workspace",
+  "node": "v24.14.0",
+  "pnpm": "10.33.0",
+  "typescript": "5.9.3",
+  "vitest": "4.1.10",
+  "commands": [
+    {
+      "command": "pnpm test:agent-platform-final:unit",
+      "status": "PASS"
+    },
+    {
+      "command": "pnpm test:agent-platform-final:temporal",
+      "status": "PASS"
+    },
+    {
+      "command": "pnpm scan:agent-platform-final",
+      "status": "PASS"
+    },
+    {
+      "command": "pnpm typecheck",
+      "status": "PASS"
+    },
+    {
+      "command": "pnpm lint",
+      "status": "PASS"
+    },
+    {
+      "command": "pnpm build",
+      "status": "PASS"
+    },
+    {
+      "command": "pnpm check:deps",
+      "status": "PASS"
+    },
+    {
+      "command": "openspec validate agent-platform-generalization-validation --strict",
+      "status": "PASS"
+    }
+  ],
+  "status": "PASS",
+  "contentDigest": "sha256:bfed25af8a3197d3510acb7efc1638d584df10aa3d55d6140e3049e8eeae7722"
+}

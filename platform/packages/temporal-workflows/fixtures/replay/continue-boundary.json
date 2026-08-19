@@ -1,0 +1,1 @@
+{"schemaVersion":"1","scenario":"continue-boundary","commands":["START","CONTINUE_AS_NEW"],"expected":"COMPATIBLE"}

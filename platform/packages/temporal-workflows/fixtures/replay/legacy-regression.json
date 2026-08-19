@@ -1,0 +1,1 @@
+{"schemaVersion":"1","scenario":"legacy-regression","commands":["START","COMPLETE"],"expected":"COMPATIBLE"}

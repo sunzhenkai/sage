@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "1",
+  "caseId": "apgv/architecture/v1/system-model",
+  "status": "PASS",
+  "structuralValidation": "PASS",
+  "baselineAdmission": "BLOCKED",
+  "modelStatus": "draft",
+  "elementCount": 26,
+  "relationCount": 33,
+  "authorityCount": 11,
+  "trustBoundaryCount": 5,
+  "errors": [],
+  "modelDigest": "sha256:830d4046e44bcef1a1aad015eaaa6d7b5e0e0131569b4e1ec11c9459b485445a",
+  "schemaDigest": "sha256:ec23fe3f0a9f5fbb7024341ab693097183f95a5b3948a2f6690b335398671fd9",
+  "sourceDigest": "sha256:830d4046e44bcef1a1aad015eaaa6d7b5e0e0131569b4e1ec11c9459b485445a",
+  "toolDigest": "sha256:615a886b8b64d8fa078866d1e5da007c31c9088effdb9684eb873b16162bebde",
+  "validatedAt": "2026-08-17T03:31:32.853Z",
+  "contentDigest": "sha256:2c136d826bec340c7c872c4ac3c8cb4500c2ffaf70c37c38fbb54c4b617935a1"
+}

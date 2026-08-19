@@ -1,0 +1,46 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "composite": true,
+    "baseUrl": ".",
+    "paths": {
+      "@sage/agent-client": ["../../packages/agent-client/src/index.ts"],
+      "@sage/agent-contracts": ["../../packages/agent-contracts/src/index.ts"],
+      "@sage/agent-run-admission": ["../../packages/agent-run-admission/src/index.ts"],
+      "@sage/agent-lib": ["../../packages/agent-lib/src/index.ts"],
+      "@sage/app-contracts": ["../../packages/app-contracts/src/index.ts"],
+      "@sage/chat-domain": ["../../packages/chat-domain/src/index.ts"],
+      "@sage/local-fakes": ["../../packages/local-fakes/src/index.ts"],
+      "@sage/local-runtime": ["../../packages/local-runtime/src/index.ts"],
+      "@sage/observability": ["../../packages/observability/src/index.ts"],
+      "@sage/platform-ports": ["../../packages/platform-ports/src/index.ts"],
+      "@sage/production-governance": ["../../packages/production-governance/src/index.ts"],
+      "@sage/provider-catalog": ["../../packages/provider-catalog/src/index.ts"],
+      "@sage/task-domain": ["../../packages/task-domain/src/index.ts"],
+      "@sage/task-store-postgres": ["../../packages/task-store-postgres/src/index.ts"],
+      "@sage/temporal-registry": ["../../packages/temporal-registry/src/index.ts"],
+      "@sage/temporal-routing": ["../../packages/temporal-routing/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*.ts"],
+  "references": [
+    { "path": "../../packages/agent-contracts" },
+    { "path": "../../packages/agent-run-admission" },
+    { "path": "../../packages/agent-client" },
+    { "path": "../../packages/agent-lib" },
+    { "path": "../../packages/app-contracts" },
+    { "path": "../../packages/chat-domain" },
+    { "path": "../../packages/local-fakes" },
+    { "path": "../../packages/local-runtime" },
+    { "path": "../../packages/observability" },
+    { "path": "../../packages/platform-ports" },
+    { "path": "../../packages/production-governance" },
+    { "path": "../../packages/provider-catalog" },
+    { "path": "../../packages/task-domain" },
+    { "path": "../../packages/task-store-postgres" },
+    { "path": "../../packages/temporal-registry" },
+    { "path": "../../packages/temporal-routing" }
+  ]
+}

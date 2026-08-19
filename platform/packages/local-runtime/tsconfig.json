@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": { "rootDir": "src", "outDir": "dist", "composite": true, "baseUrl": ".", "paths": {
+    "@sage/agent-client": ["../agent-client/src/index.ts"],
+    "@sage/agent-contracts": ["../agent-contracts/src/index.ts"],
+    "@sage/agent-lib": ["../agent-lib/src/index.ts"],
+    "@sage/harness-pi": ["../harness-pi/src/index.ts"],
+    "@sage/local-fakes": ["../local-fakes/src/index.ts"],
+    "@sage/platform-ports": ["../platform-ports/src/index.ts"]
+  } },
+  "include": ["src/**/*.ts"],
+  "references": [{ "path": "../agent-client" }, { "path": "../agent-contracts" }, { "path": "../agent-lib" }, { "path": "../harness-pi" }, { "path": "../local-fakes" }, { "path": "../platform-ports" }]
+}

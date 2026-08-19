@@ -1,0 +1,33 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src", "outDir": "dist", "composite": true, "baseUrl": ".",
+    "paths": {
+      "@sage/agent-client": ["../../packages/agent-client/src/index.ts"],
+      "@sage/agent-contracts": ["../../packages/agent-contracts/src/index.ts"],
+      "@sage/agent-lib": ["../../packages/agent-lib/src/index.ts"],
+      "@sage/chat-domain": ["../../packages/chat-domain/src/index.ts"],
+      "@sage/local-runtime": ["../../packages/local-runtime/src/index.ts"],
+      "@sage/observability": ["../../packages/observability/src/index.ts"],
+      "@sage/platform-ports": ["../../packages/platform-ports/src/index.ts"],
+      "@sage/production-governance": ["../../packages/production-governance/src/index.ts"],
+      "@sage/task-domain": ["../../packages/task-domain/src/index.ts"],
+      "@sage/task-store-postgres": ["../../packages/task-store-postgres/src/index.ts"],
+      "@sage/temporal-workflows": ["../../packages/temporal-workflows/src/workflows.ts"]
+    }
+  },
+  "include": ["src/**/*.ts"],
+  "references": [
+    { "path": "../../packages/agent-contracts" },
+    { "path": "../../packages/agent-client" },
+    { "path": "../../packages/agent-lib" },
+    { "path": "../../packages/chat-domain" },
+    { "path": "../../packages/local-runtime" },
+    { "path": "../../packages/observability" },
+    { "path": "../../packages/platform-ports" },
+    { "path": "../../packages/production-governance" },
+    { "path": "../../packages/task-domain" },
+    { "path": "../../packages/task-store-postgres" },
+    { "path": "../../packages/temporal-workflows" }
+  ]
+}

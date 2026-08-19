@@ -1,0 +1,8 @@
+{
+  "kind": "prompt",
+  "content": "Summarize the referenced document without resolving credentials.",
+  "references": {
+    "artifact_ref": "artifact://tenant-a/prompts/document-1",
+    "context_ref": "context://tenant-a/context-1"
+  }
+}

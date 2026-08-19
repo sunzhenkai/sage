@@ -1,0 +1,34 @@
+{
+  "exercise_id": "artifact-backup-restore",
+  "environment": "isolated-local-filesystem",
+  "production_evidence": false,
+  "started_at": "2026-08-16T02:14:13.931Z",
+  "completed_at": "2026-08-16T02:14:14.009Z",
+  "tenant_id": "tenant-exercise",
+  "restored_sha256": "0bd153710ac0d76a876c6974b9133e4e7cb7719c4492da3b07f3f6aa14c627be",
+  "cross_tenant_restore_count": 0,
+  "retention_dry_run_preserved": true,
+  "approved_apply_deleted": true,
+  "deletion_audit_sha256": "cd49fc1528436a08fc121062912a5c347b50761ec12128cdd61bdcd9fdbd933e",
+  "audit_records": [
+    {
+      "kind": "artifact-retention-delete",
+      "tenant_id": "tenant-exercise",
+      "cutoff": "2021-01-01T00:00:00.000Z",
+      "mode": "dry-run",
+      "candidate_count": 1,
+      "occurred_at": "2026-08-16T02:14:13Z"
+    },
+    {
+      "kind": "artifact-retention-delete",
+      "tenant_id": "tenant-exercise",
+      "cutoff": "2021-01-01T00:00:00.000Z",
+      "mode": "--apply",
+      "candidate_count": 1,
+      "occurred_at": "2026-08-16T02:14:13Z"
+    }
+  ],
+  "unsafe_symlink_backup_rejected": true,
+  "unsafe_symlink_restore_rejected": true,
+  "outcome": "passed"
+}

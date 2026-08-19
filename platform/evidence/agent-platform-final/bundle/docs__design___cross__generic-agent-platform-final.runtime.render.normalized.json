@@ -1,0 +1,420 @@
+{
+  "schemaVersion": "1",
+  "sourceDslDigest": "sha256:6ec4daedc6517523a77591d7ea0f6479af86665273d6fc1b3bdf33b0ffd94009",
+  "status": "draft",
+  "admission": "blocked",
+  "nodes": [
+    {
+      "id": "actor.caller",
+      "kind": "actor",
+      "owner": "Application"
+    },
+    {
+      "id": "broker.capability",
+      "kind": "broker",
+      "owner": "Agent Core"
+    },
+    {
+      "id": "broker.context",
+      "kind": "broker",
+      "owner": "Platform"
+    },
+    {
+      "id": "broker.model",
+      "kind": "broker",
+      "owner": "Platform"
+    },
+    {
+      "id": "control.admission",
+      "kind": "control",
+      "owner": "Package Platform"
+    },
+    {
+      "id": "control.release",
+      "kind": "control",
+      "owner": "Package Platform"
+    },
+    {
+      "id": "coordinator.lifecycle",
+      "kind": "coordinator",
+      "owner": "Task Runtime"
+    },
+    {
+      "id": "engine.pi",
+      "kind": "adapter",
+      "owner": "Agent Core"
+    },
+    {
+      "id": "engine.reference",
+      "kind": "adapter",
+      "owner": "Quality"
+    },
+    {
+      "id": "host.durable",
+      "kind": "host",
+      "owner": "Task Runtime"
+    },
+    {
+      "id": "host.interactive",
+      "kind": "host",
+      "owner": "Agent Core"
+    },
+    {
+      "id": "projection.product",
+      "kind": "projection",
+      "owner": "Application"
+    },
+    {
+      "id": "provider.external",
+      "kind": "external",
+      "owner": "External Provider"
+    },
+    {
+      "id": "reconciler.authority",
+      "kind": "reconciler",
+      "owner": "SRE"
+    },
+    {
+      "id": "runtime.kernel",
+      "kind": "component",
+      "owner": "Agent Core"
+    },
+    {
+      "id": "service.approval",
+      "kind": "authority",
+      "owner": "Platform Security"
+    },
+    {
+      "id": "service.identity",
+      "kind": "authority",
+      "owner": "Platform Security"
+    },
+    {
+      "id": "service.kms",
+      "kind": "service",
+      "owner": "Platform Security"
+    },
+    {
+      "id": "service.observability",
+      "kind": "component",
+      "owner": "SRE"
+    },
+    {
+      "id": "service.policy",
+      "kind": "authority",
+      "owner": "Platform Security"
+    },
+    {
+      "id": "service.secret",
+      "kind": "authority",
+      "owner": "Platform Security"
+    },
+    {
+      "id": "store.artifact",
+      "kind": "authority",
+      "owner": "Platform"
+    },
+    {
+      "id": "store.checkpoint",
+      "kind": "authority",
+      "owner": "Platform"
+    },
+    {
+      "id": "store.consumption",
+      "kind": "authority",
+      "owner": "Platform"
+    },
+    {
+      "id": "store.effect",
+      "kind": "authority",
+      "owner": "Platform"
+    },
+    {
+      "id": "store.history",
+      "kind": "authority",
+      "owner": "Task Runtime"
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge.admission-durable",
+      "from": "control.admission",
+      "to": "coordinator.lifecycle",
+      "kind": "spec"
+    },
+    {
+      "id": "edge.admission-identity",
+      "from": "control.admission",
+      "to": "service.identity",
+      "kind": "authenticate"
+    },
+    {
+      "id": "edge.admission-interactive",
+      "from": "control.admission",
+      "to": "host.interactive",
+      "kind": "spec"
+    },
+    {
+      "id": "edge.artifact-projection",
+      "from": "store.artifact",
+      "to": "projection.product",
+      "kind": "derive"
+    },
+    {
+      "id": "edge.caller-admission",
+      "from": "actor.caller",
+      "to": "control.admission",
+      "kind": "request"
+    },
+    {
+      "id": "edge.capability-provider",
+      "from": "broker.capability",
+      "to": "provider.external",
+      "kind": "egress"
+    },
+    {
+      "id": "edge.capability-secret",
+      "from": "broker.capability",
+      "to": "service.secret",
+      "kind": "lease-ref"
+    },
+    {
+      "id": "edge.checkpoint-projection",
+      "from": "store.checkpoint",
+      "to": "projection.product",
+      "kind": "derive"
+    },
+    {
+      "id": "edge.coordinator-history",
+      "from": "coordinator.lifecycle",
+      "to": "store.history",
+      "kind": "authority-write"
+    },
+    {
+      "id": "edge.coordinator-host",
+      "from": "coordinator.lifecycle",
+      "to": "host.durable",
+      "kind": "dispatch"
+    },
+    {
+      "id": "edge.coordinator-observe",
+      "from": "coordinator.lifecycle",
+      "to": "service.observability",
+      "kind": "bounded-telemetry"
+    },
+    {
+      "id": "edge.durable-kernel",
+      "from": "host.durable",
+      "to": "runtime.kernel",
+      "kind": "invoke"
+    },
+    {
+      "id": "edge.effect-projection",
+      "from": "store.effect",
+      "to": "projection.product",
+      "kind": "derive"
+    },
+    {
+      "id": "edge.history-projection",
+      "from": "store.history",
+      "to": "projection.product",
+      "kind": "derive"
+    },
+    {
+      "id": "edge.interactive-kernel",
+      "from": "host.interactive",
+      "to": "runtime.kernel",
+      "kind": "invoke"
+    },
+    {
+      "id": "edge.kernel-artifact",
+      "from": "runtime.kernel",
+      "to": "store.artifact",
+      "kind": "authority-port"
+    },
+    {
+      "id": "edge.kernel-checkpoint",
+      "from": "runtime.kernel",
+      "to": "store.checkpoint",
+      "kind": "candidate"
+    },
+    {
+      "id": "edge.kernel-consumption",
+      "from": "runtime.kernel",
+      "to": "store.consumption",
+      "kind": "reserve-commit"
+    },
+    {
+      "id": "edge.kernel-effect",
+      "from": "runtime.kernel",
+      "to": "store.effect",
+      "kind": "claim-commit"
+    },
+    {
+      "id": "edge.kernel-pi",
+      "from": "runtime.kernel",
+      "to": "engine.pi",
+      "kind": "adapter"
+    },
+    {
+      "id": "edge.kernel-policy",
+      "from": "runtime.kernel",
+      "to": "service.policy",
+      "kind": "authorize"
+    },
+    {
+      "id": "edge.kernel-reference",
+      "from": "runtime.kernel",
+      "to": "engine.reference",
+      "kind": "test-adapter"
+    },
+    {
+      "id": "edge.model-provider",
+      "from": "broker.model",
+      "to": "provider.external",
+      "kind": "egress"
+    },
+    {
+      "id": "edge.pi-capability",
+      "from": "engine.pi",
+      "to": "broker.capability",
+      "kind": "callback"
+    },
+    {
+      "id": "edge.pi-context",
+      "from": "engine.pi",
+      "to": "broker.context",
+      "kind": "callback"
+    },
+    {
+      "id": "edge.pi-model",
+      "from": "engine.pi",
+      "to": "broker.model",
+      "kind": "callback"
+    },
+    {
+      "id": "edge.policy-approval",
+      "from": "service.policy",
+      "to": "service.approval",
+      "kind": "verify"
+    },
+    {
+      "id": "edge.reconciler-history",
+      "from": "reconciler.authority",
+      "to": "store.history",
+      "kind": "read"
+    },
+    {
+      "id": "edge.reconciler-projection",
+      "from": "reconciler.authority",
+      "to": "projection.product",
+      "kind": "repair"
+    },
+    {
+      "id": "edge.release-admission",
+      "from": "control.release",
+      "to": "control.admission",
+      "kind": "immutable-ref"
+    },
+    {
+      "id": "edge.runtime-observe",
+      "from": "runtime.kernel",
+      "to": "service.observability",
+      "kind": "bounded-telemetry"
+    },
+    {
+      "id": "edge.secret-kms",
+      "from": "service.secret",
+      "to": "service.kms",
+      "kind": "key-ref"
+    },
+    {
+      "id": "edge.usage-projection",
+      "from": "store.consumption",
+      "to": "projection.product",
+      "kind": "derive"
+    }
+  ],
+  "trustBoundaries": [
+    {
+      "id": "trust.external",
+      "status": "uncertain",
+      "members": [
+        "actor.caller",
+        "provider.external"
+      ]
+    },
+    {
+      "id": "trust.control",
+      "status": "defined",
+      "members": [
+        "control.release",
+        "control.admission"
+      ]
+    },
+    {
+      "id": "trust.runtime",
+      "status": "defined",
+      "members": [
+        "host.interactive",
+        "host.durable",
+        "runtime.kernel",
+        "engine.pi",
+        "broker.model",
+        "broker.capability",
+        "broker.context",
+        "coordinator.lifecycle"
+      ]
+    },
+    {
+      "id": "trust.security",
+      "status": "uncertain",
+      "members": [
+        "service.identity",
+        "service.policy",
+        "service.approval",
+        "service.secret",
+        "service.kms"
+      ]
+    },
+    {
+      "id": "trust.data",
+      "status": "uncertain",
+      "members": [
+        "store.history",
+        "store.effect",
+        "store.consumption",
+        "store.artifact",
+        "store.checkpoint",
+        "projection.product"
+      ]
+    }
+  ],
+  "recovery": [
+    {
+      "id": "recovery.effect-unknown",
+      "owner": "Platform",
+      "source": "store.effect",
+      "action": "manual-reconcile-no-auto-retry"
+    },
+    {
+      "id": "recovery.projection",
+      "owner": "SRE",
+      "source": "store.history",
+      "action": "authority-only-rebuild"
+    },
+    {
+      "id": "recovery.checkpoint",
+      "owner": "Task Runtime",
+      "source": "store.checkpoint",
+      "action": "sealed-compatible-resume"
+    },
+    {
+      "id": "recovery.history",
+      "owner": "Task Runtime",
+      "source": "store.history",
+      "action": "offline-worker-replay"
+    }
+  ],
+  "contentDigest": "sha256:e4edb8f01f473c1827a023f5dbb433d03b578821c560879a11878f905a705d8c"
+}

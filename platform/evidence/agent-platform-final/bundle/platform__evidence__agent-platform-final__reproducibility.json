@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "1",
+  "sourceRevision": "e8ea299dcac4f1859528d2c67e31e35a58d05c9e",
+  "sourceDigest": "sha256:c2fe13d173b44c54a13ab7b65099712f26754498e64513792781544dc6844687",
+  "toolDigest": "sha256:615a886b8b64d8fa078866d1e5da007c31c9088effdb9684eb873b16162bebde",
+  "generatedAt": "2026-08-17T03:31:31.694Z",
+  "caseId": "apgv/archive/v1/offline-verification",
+  "bundleDigest": "sha256:0e6282811280c87f37b822794f189f375d511b0eb6fe8c96ba0c0ec2e51d7e64",
+  "entryCount": 46,
+  "mismatches": [],
+  "networkUsed": false,
+  "workspaceCacheUsed": false,
+  "isolatedVerifier": "bundle/offline-verify.mjs",
+  "status": "PASS",
+  "contentDigest": "sha256:21957e50d00afd1b354277803a83fb53335914fa9ae65d85ef2d17db96f80742"
+}

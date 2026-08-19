@@ -1,0 +1,19 @@
+{
+  "name": "@sage/p3-integration",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@sage/agent-api": "workspace:*",
+    "@sage/agent-client": "workspace:*",
+    "@sage/agent-contracts": "workspace:*",
+    "@sage/agent-web": "workspace:*",
+    "@sage/app-contracts": "workspace:*",
+    "@sage/chat-domain": "workspace:*",
+    "fastify": "5.11.3",
+    "pg": "8.23.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": { "@types/pg": "8.21.0", "@types/react": "19.2.18", "@types/react-dom": "19.2.4" }
+}

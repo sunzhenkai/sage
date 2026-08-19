@@ -1,0 +1,35 @@
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Build artefacts
+node_modules/
+**/node_modules/
+**/dist/
+**/dist-types/
+**/*.tsbuildinfo
+
+# Test / coverage artefacts
+coverage/
+**/coverage/
+
+# Logs
+*.log
+
+# Local runner artefacts (host-specific paths / env leakage)
+.service-manager.md
+platform/.service-manager.md
+platform/.evidence/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.keystore

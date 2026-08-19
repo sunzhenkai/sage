@@ -1,0 +1,584 @@
+{
+  "schemaVersion": "1",
+  "sourceRevision": "e8ea299dcac4f1859528d2c67e31e35a58d05c9e",
+  "sourceDigest": "sha256:968bfae73d45be1e8fd24d15ab63f024053550dc5ed3269785aa113d9ac9a035",
+  "toolDigest": "sha256:3d6dd2655ddfe4566363423fb31c041e376338385de07874a57dd1038ac59fdf",
+  "generatedAt": "2026-08-17T03:31:18.656Z",
+  "sourceState": {
+    "head": "e8ea299dcac4f1859528d2c67e31e35a58d05c9e",
+    "worktreeDigest": "sha256:c2fe13d173b44c54a13ab7b65099712f26754498e64513792781544dc6844687",
+    "dirtyPathCount": 348
+  },
+  "startedAt": "2026-08-17T03:31:18.636Z",
+  "finishedAt": "2026-08-17T03:31:18.656Z",
+  "seed": "apgv-seed-v1",
+  "executionEvidenceRef": "platform/evidence/agent-platform-final/executed-results.json",
+  "executionEvidenceDigest": "sha256:8c9ab5d23775aab3d68d974038541084636e2b440df0cdddb8b6291fb44a2ea4",
+  "status": "PASS",
+  "totalPoints": 40,
+  "passedPoints": 40,
+  "missing": [],
+  "cases": [
+    {
+      "point": "consumption.before-reserve",
+      "caseId": "apgv/fault/v1/case-01",
+      "status": "PASS",
+      "authority": "consumption",
+      "recovery": "idempotent authority replay",
+      "assertions": [
+        "budget-bounded",
+        "reservation-fenced",
+        "settlement-at-most-once"
+      ],
+      "transitionCount": 3,
+      "executionKind": "deterministic-state-machine"
+    },
+    {
+      "point": "consumption.after-reserve",
+      "caseId": "apgv/fault/v1/case-02",
+      "status": "PASS",
+      "authority": "consumption",
+      "recovery": "idempotent authority replay",
+      "assertions": [
+        "budget-bounded",
+        "reservation-fenced",
+        "settlement-at-most-once"
+      ],
+      "transitionCount": 3,
+      "executionKind": "deterministic-state-machine"
+    },
+    {
+      "point": "consumption.commit-response-loss",
+      "caseId": "apgv/fault/v1/case-03",
+      "status": "PASS",
+      "authority": "consumption",
+      "recovery": "idempotent authority replay",
+      "assertions": [
+        "budget-bounded",
+        "reservation-fenced",
+        "settlement-at-most-once"
+      ],
+      "transitionCount": 3,
+      "executionKind": "deterministic-state-machine"
+    },
+    {
+      "point": "consumption.redelivery",
+      "caseId": "apgv/fault/v1/case-04",
+      "status": "PASS",
+      "authority": "consumption",
+      "recovery": "idempotent authority replay",
+      "assertions": [
+        "budget-bounded",
+        "reservation-fenced",
+        "settlement-at-most-once"
+      ],
+      "transitionCount": 3,
+      "executionKind": "deterministic-state-machine"
+    },
+    {
+      "point": "consumption.orphan-reclaim",
+      "caseId": "apgv/fault/v1/case-05",
+      "status": "PASS",
+      "authority": "consumption",
+      "recovery": "idempotent authority replay",
+      "assertions": [
+        "budget-bounded",
+        "reservation-fenced",
+        "settlement-at-most-once"
+      ],
+      "transitionCount": 3,
+      "executionKind": "deterministic-state-machine"
+    },
+    {
+      "point": "effect.before-provider",
+      "caseId": "apgv/fault/v1/case-06",
+      "status": "PASS",
+      "authority": "effect",
+      "recovery": "idempotent authority replay",
+      "assertions": [
+        "provider-at-most-once-when-known",
+        "unknown-retry-budget-zero",
+        "effect-authority-terminal"
+      ],
+      "transitionCount": 3,
+      "executionKind": "deterministic-state-machine"
+    },
+    {
+      "point": "effect.before-commit",
+      "caseId": "apgv/fault/v1/case-07",
+      "status": "PASS",
+      "authority": "effect",
+      "recovery": "idempotent authority replay",
+      "assertions": [
+        "provider-at-most-once-when-known",
+        "unknown-retry-budget-zero",
+        "effect-authority-terminal"
+      ],
+      "transitionCount": 3,
+      "executionKind": "deterministic-state-machine"
+    },
+    {
+      "point": "effect.after-commit-response-loss",
+      "caseId": "apgv/fault/v1/case-08",
+      "status": "PASS",
+      "authority": "effect",
+      "recovery": "idempotent authority replay",
+      "assertions": [
+        "provider-at-most-once-when-known",
+        "unknown-retry-budget-zero",
+        "effect-authority-terminal"
+      ],
+      "transitionCount": 3,
+      "executionKind": "deterministic-state-machine"
+    },
+    {
+      "point": "effect.unknown",
+      "caseId": "apgv/fault/v1/case-09",
+      "status": "PASS",
+      "authority": "effect",
+      "recovery": "manual reconciliation, retry budget zero",
+      "assertions": [
+        "provider-at-most-once-when-known",
+        "unknown-retry-budget-zero",
+        "effect-authority-terminal"
+      ],
+      "transitionCount": 3,
+      "executionKind": "deterministic-state-machine"
+    },
+    {
+      "point": "artifact.temporary-body",
+      "caseId": "apgv/fault/v1/case-10",
+      "status": "PASS",
+      "authority": "artifact",
+      "recovery": "idempotent authority replay",
+      "assertions": [
+        "temporary-invisible",
+        "finalize-idempotent",
+        "stable-artifact-ref"
+      ],
+      "transitionCount": 3,
+      "executionKind": "deterministic-state-machine"
+    },
+    {
+      "point": "artifact.before-metadata",
+      "caseId": "apgv/fault/v1/case-11",
+      "status": "PASS",
+      "authority": "artifact",
+      "recovery": "idempotent authority replay",
+      "assertions": [
+        "temporary-invisible",
+        "finalize-idempotent",
+        "stable-artifact-ref"
+      ],
+      "transitionCount": 3,
+      "executionKind": "deterministic-state-machine"
+    },
+    {
+      "point": "artifact.before-finalize",
+      "caseId": "apgv/fault/v1/case-12",
+      "status": "PASS",
+      "authority": "artifact",
+      "recovery": "idempotent authority replay",
+      "assertions": [
+        "temporary-invisible",
+        "finalize-idempotent",
+        "stable-artifact-ref"
+      ],
+      "transitionCount": 3,
+      "executionKind": "deterministic-state-machine"
+    },
+    {
+      "point": "artifact.after-finalize-response-loss",
+      "caseId": "apgv/fault/v1/case-13",
+      "status": "PASS",
+      "authority": "artifact",
+      "recovery": "idempotent authority replay",
+      "assertions": [
+        "temporary-invisible",
+        "finalize-idempotent",
+        "stable-artifact-ref"
+      ],
+      "transitionCount": 3,
+      "executionKind": "deterministic-state-machine"
+    },
+    {
+      "point": "checkpoint.body",
+      "caseId": "apgv/fault/v1/case-14",
+      "status": "PASS",
+      "authority": "checkpoint",
+      "recovery": "idempotent authority replay",
+      "assertions": [
+        "unsealed-not-resumable",
+        "lineage-required",
+        "compatibility-fail-closed"
+      ],
+      "transitionCount": 3,
+      "executionKind": "deterministic-state-machine"
+    },
+    {
+      "point": "checkpoint.metadata",
+      "caseId": "apgv/fault/v1/case-15",
+      "status": "PASS",
+      "authority": "checkpoint",
+      "recovery": "idempotent authority replay",
+      "assertions": [
+        "unsealed-not-resumable",
+        "lineage-required",
+        "compatibility-fail-closed"
+      ],
+      "transitionCount": 3,
+      "executionKind": "deterministic-state-machine"
+    },
+    {
+      "point": "checkpoint.lineage",
+      "caseId": "apgv/fault/v1/case-16",
+      "status": "PASS",
+      "authority": "checkpoint",
+      "recovery": "idempotent authority replay",
+      "assertions": [
+        "unsealed-not-resumable",
+        "lineage-required",
+        "compatibility-fail-closed"
+      ],
+      "transitionCount": 3,
+      "executionKind": "deterministic-state-machine"
+    },
+    {
+      "point": "checkpoint.before-seal",
+      "caseId": "apgv/fault/v1/case-17",
+      "status": "PASS",
+      "authority": "checkpoint",
+      "recovery": "idempotent authority replay",
+      "assertions": [
+        "unsealed-not-resumable",
+        "lineage-required",
+        "compatibility-fail-closed"
+      ],
+      "transitionCount": 3,
+      "executionKind": "deterministic-state-machine"
+    },
+    {
+      "point": "checkpoint.resume-tenant",
+      "caseId": "apgv/fault/v1/case-18",
+      "status": "PASS",
+      "authority": "checkpoint",
+      "recovery": "idempotent authority replay",
+      "assertions": [
+        "unsealed-not-resumable",
+        "lineage-required",
+        "compatibility-fail-closed"
+      ],
+      "transitionCount": 3,
+      "executionKind": "deterministic-state-machine"
+    },
+    {
+      "point": "checkpoint.resume-sequence",
+      "caseId": "apgv/fault/v1/case-19",
+      "status": "PASS",
+      "authority": "checkpoint",
+      "recovery": "idempotent authority replay",
+      "assertions": [
+        "unsealed-not-resumable",
+        "lineage-required",
+        "compatibility-fail-closed"
+      ],
+      "transitionCount": 3,
+      "executionKind": "deterministic-state-machine"
+    },
+    {
+      "point": "checkpoint.resume-codec",
+      "caseId": "apgv/fault/v1/case-20",
+      "status": "PASS",
+      "authority": "checkpoint",
+      "recovery": "idempotent authority replay",
+      "assertions": [
+        "unsealed-not-resumable",
+        "lineage-required",
+        "compatibility-fail-closed"
+      ],
+      "transitionCount": 3,
+      "executionKind": "deterministic-state-machine"
+    },
+    {
+      "point": "checkpoint.resume-runtime",
+      "caseId": "apgv/fault/v1/case-21",
+      "status": "PASS",
+      "authority": "checkpoint",
+      "recovery": "idempotent authority replay",
+      "assertions": [
+        "unsealed-not-resumable",
+        "lineage-required",
+        "compatibility-fail-closed"
+      ],
+      "transitionCount": 3,
+      "executionKind": "deterministic-state-machine"
+    },
+    {
+      "point": "coordinator.lost-dispatch",
+      "caseId": "apgv/fault/v1/case-22",
+      "status": "PASS",
+      "authority": "coordinator",
+      "recovery": "idempotent authority replay",
+      "assertions": [
+        "history-single-authority",
+        "stable-invocation",
+        "receipts-never-rollback"
+      ],
+      "transitionCount": 3,
+      "executionKind": "deterministic-state-machine"
+    },
+    {
+      "point": "coordinator.duplicate-dispatch",
+      "caseId": "apgv/fault/v1/case-23",
+      "status": "PASS",
+      "authority": "coordinator",
+      "recovery": "idempotent authority replay",
+      "assertions": [
+        "history-single-authority",
+        "stable-invocation",
+        "receipts-never-rollback"
+      ],
+      "transitionCount": 3,
+      "executionKind": "deterministic-state-machine"
+    },
+    {
+      "point": "coordinator.history-unavailable",
+      "caseId": "apgv/fault/v1/case-24",
+      "status": "PASS",
+      "authority": "coordinator",
+      "recovery": "idempotent authority replay",
+      "assertions": [
+        "history-single-authority",
+        "stable-invocation",
+        "receipts-never-rollback"
+      ],
+      "transitionCount": 3,
+      "executionKind": "deterministic-state-machine"
+    },
+    {
+      "point": "coordinator.pause-cancel-race",
+      "caseId": "apgv/fault/v1/case-25",
+      "status": "PASS",
+      "authority": "coordinator",
+      "recovery": "idempotent authority replay",
+      "assertions": [
+        "history-single-authority",
+        "stable-invocation",
+        "receipts-never-rollback"
+      ],
+      "transitionCount": 3,
+      "executionKind": "deterministic-state-machine"
+    },
+    {
+      "point": "coordinator.continue-as-new",
+      "caseId": "apgv/fault/v1/case-26",
+      "status": "PASS",
+      "authority": "coordinator",
+      "recovery": "idempotent authority replay",
+      "assertions": [
+        "history-single-authority",
+        "stable-invocation",
+        "receipts-never-rollback"
+      ],
+      "transitionCount": 3,
+      "executionKind": "deterministic-state-machine"
+    },
+    {
+      "point": "coordinator.projection-lag",
+      "caseId": "apgv/fault/v1/case-27",
+      "status": "PASS",
+      "authority": "coordinator",
+      "recovery": "idempotent authority replay",
+      "assertions": [
+        "history-single-authority",
+        "stable-invocation",
+        "receipts-never-rollback"
+      ],
+      "transitionCount": 3,
+      "executionKind": "deterministic-state-machine"
+    },
+    {
+      "point": "policy.unavailable",
+      "caseId": "apgv/fault/v1/case-28",
+      "status": "PASS",
+      "authority": "policy",
+      "recovery": "idempotent authority replay",
+      "assertions": [
+        "fail-closed",
+        "scope-never-expands",
+        "secret-bytes-zeroized"
+      ],
+      "transitionCount": 3,
+      "executionKind": "deterministic-state-machine"
+    },
+    {
+      "point": "policy.deny",
+      "caseId": "apgv/fault/v1/case-29",
+      "status": "PASS",
+      "authority": "policy",
+      "recovery": "idempotent authority replay",
+      "assertions": [
+        "fail-closed",
+        "scope-never-expands",
+        "secret-bytes-zeroized"
+      ],
+      "transitionCount": 3,
+      "executionKind": "deterministic-state-machine"
+    },
+    {
+      "point": "policy.live-revocation",
+      "caseId": "apgv/fault/v1/case-30",
+      "status": "PASS",
+      "authority": "policy",
+      "recovery": "idempotent authority replay",
+      "assertions": [
+        "fail-closed",
+        "scope-never-expands",
+        "secret-bytes-zeroized"
+      ],
+      "transitionCount": 3,
+      "executionKind": "deterministic-state-machine"
+    },
+    {
+      "point": "approval.digest-mismatch",
+      "caseId": "apgv/fault/v1/case-31",
+      "status": "PASS",
+      "authority": "approval",
+      "recovery": "idempotent authority replay",
+      "assertions": [
+        "fail-closed",
+        "scope-never-expands",
+        "secret-bytes-zeroized"
+      ],
+      "transitionCount": 3,
+      "executionKind": "deterministic-state-machine"
+    },
+    {
+      "point": "approval.expired",
+      "caseId": "apgv/fault/v1/case-32",
+      "status": "PASS",
+      "authority": "approval",
+      "recovery": "idempotent authority replay",
+      "assertions": [
+        "fail-closed",
+        "scope-never-expands",
+        "secret-bytes-zeroized"
+      ],
+      "transitionCount": 3,
+      "executionKind": "deterministic-state-machine"
+    },
+    {
+      "point": "secret.service-unavailable",
+      "caseId": "apgv/fault/v1/case-33",
+      "status": "PASS",
+      "authority": "secret",
+      "recovery": "idempotent authority replay",
+      "assertions": [
+        "fail-closed",
+        "scope-never-expands",
+        "secret-bytes-zeroized"
+      ],
+      "transitionCount": 3,
+      "executionKind": "deterministic-state-machine"
+    },
+    {
+      "point": "secret.lease-expired",
+      "caseId": "apgv/fault/v1/case-34",
+      "status": "PASS",
+      "authority": "secret",
+      "recovery": "idempotent authority replay",
+      "assertions": [
+        "fail-closed",
+        "scope-never-expands",
+        "secret-bytes-zeroized"
+      ],
+      "transitionCount": 3,
+      "executionKind": "deterministic-state-machine"
+    },
+    {
+      "point": "model.timeout",
+      "caseId": "apgv/fault/v1/case-35",
+      "status": "PASS",
+      "authority": "model",
+      "recovery": "idempotent authority replay",
+      "assertions": [
+        "bounded-retry",
+        "stable-error-taxonomy",
+        "no-retry-storm"
+      ],
+      "transitionCount": 3,
+      "executionKind": "deterministic-state-machine"
+    },
+    {
+      "point": "model.rate-limit",
+      "caseId": "apgv/fault/v1/case-36",
+      "status": "PASS",
+      "authority": "model",
+      "recovery": "idempotent authority replay",
+      "assertions": [
+        "bounded-retry",
+        "stable-error-taxonomy",
+        "no-retry-storm"
+      ],
+      "transitionCount": 3,
+      "executionKind": "deterministic-state-machine"
+    },
+    {
+      "point": "model.invalid-output",
+      "caseId": "apgv/fault/v1/case-37",
+      "status": "PASS",
+      "authority": "model",
+      "recovery": "idempotent authority replay",
+      "assertions": [
+        "bounded-retry",
+        "stable-error-taxonomy",
+        "no-retry-storm"
+      ],
+      "transitionCount": 3,
+      "executionKind": "deterministic-state-machine"
+    },
+    {
+      "point": "model.response-loss",
+      "caseId": "apgv/fault/v1/case-38",
+      "status": "PASS",
+      "authority": "model",
+      "recovery": "idempotent authority replay",
+      "assertions": [
+        "bounded-retry",
+        "stable-error-taxonomy",
+        "no-retry-storm"
+      ],
+      "transitionCount": 3,
+      "executionKind": "deterministic-state-machine"
+    },
+    {
+      "point": "tool.timeout",
+      "caseId": "apgv/fault/v1/case-39",
+      "status": "PASS",
+      "authority": "tool",
+      "recovery": "idempotent authority replay",
+      "assertions": [
+        "bounded-retry",
+        "stable-error-taxonomy",
+        "no-retry-storm"
+      ],
+      "transitionCount": 3,
+      "executionKind": "deterministic-state-machine"
+    },
+    {
+      "point": "tool.duplicate-delivery",
+      "caseId": "apgv/fault/v1/case-40",
+      "status": "PASS",
+      "authority": "tool",
+      "recovery": "idempotent authority replay",
+      "assertions": [
+        "bounded-retry",
+        "stable-error-taxonomy",
+        "no-retry-storm"
+      ],
+      "transitionCount": 3,
+      "executionKind": "deterministic-state-machine"
+    }
+  ],
+  "contentDigest": "sha256:81b395c026ca231b730f0ceb09dbefc44abee005c1741cc43c9e66997a8b0cc8"
+}

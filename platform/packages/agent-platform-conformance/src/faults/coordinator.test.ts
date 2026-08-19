@@ -1,0 +1,1 @@
+import{expect,it}from'vitest';import{byDomain}from'./fault-fixtures.js';it('covers coordinator History single-authority windows',()=>{const cases=byDomain('coordinator');expect(cases).toHaveLength(6);expect(cases.every(x=>x.authority==='coordinator')).toBe(true);});

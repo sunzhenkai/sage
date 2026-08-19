@@ -1,0 +1,277 @@
+{
+  "schemaVersion": "1",
+  "status": "BLOCKED",
+  "decision": "NO-GO",
+  "sourceRevision": "e8ea299dcac4f1859528d2c67e31e35a58d05c9e",
+  "sourceDigest": "sha256:968bfae73d45be1e8fd24d15ab63f024053550dc5ed3269785aa113d9ac9a035",
+  "toolDigest": "sha256:3d6dd2655ddfe4566363423fb31c041e376338385de07874a57dd1038ac59fdf",
+  "targetBaseline": "Proposed final architecture baseline",
+  "targetRevision": "sha256:4606629f41952a7a7ff224d21238c51fbd4639fd01fcee331010e7a389d54277",
+  "generatedAt": "2026-08-17T03:31:52.037Z",
+  "items": [
+    {
+      "key": "dependency.agent-platform-contract-authority-foundation",
+      "status": "PASS",
+      "owner": "Agent Core",
+      "observedAt": "2026-08-17T03:31:31.389Z",
+      "evidenceRef": "platform/evidence/agent-platform-contract-authority-foundation/phase-0-conformance.md",
+      "evidenceDigest": "sha256:47380ae9698d8086c53ee2c14c0b9acf55e654e4ac54516bd49281690066ac5c",
+      "freshness": "CURRENT",
+      "remediation": "REPOSITORY_BASELINE_CONSUMABLE"
+    },
+    {
+      "key": "dependency.agent-runtime-kernel-broker-integration",
+      "status": "PASS",
+      "owner": "Agent Core",
+      "observedAt": "2026-08-17T03:31:31.389Z",
+      "evidenceRef": "platform/evidence/agent-runtime-kernel-broker-integration/phase-1-runtime-kernel-ports.md",
+      "evidenceDigest": "sha256:76959f867349567fc07be557d2a249fd703705b748bbf58aa177a47f48a3bfcf",
+      "freshness": "CURRENT",
+      "remediation": "REPOSITORY_BASELINE_CONSUMABLE"
+    },
+    {
+      "key": "dependency.durable-agent-coordinator-adapter",
+      "status": "PASS",
+      "owner": "Task Runtime",
+      "observedAt": "2026-08-17T03:31:31.389Z",
+      "evidenceRef": "platform/evidence/durable-agent-coordinator-adapter/phase-2-dependency-gate.md",
+      "evidenceDigest": "sha256:b4505a808982c1b0be9ceceb736cc268e7c18110735bfaef1c6b244da615d04b",
+      "freshness": "CURRENT",
+      "remediation": "REPOSITORY_BASELINE_CONSUMABLE"
+    },
+    {
+      "key": "dependency.agent-package-release-admission",
+      "status": "PASS",
+      "owner": "Package Platform",
+      "observedAt": "2026-08-17T03:31:31.389Z",
+      "evidenceRef": "platform/evidence/agent-package-release-admission/phase-3-dependency-gate.md",
+      "evidenceDigest": "sha256:a2e9d2e43bb7f73168e669d8ab01215a226c365b455a2e8bd0a1d88f95e07530",
+      "freshness": "CURRENT",
+      "remediation": "REPOSITORY_BASELINE_CONSUMABLE"
+    },
+    {
+      "key": "dependency.agent-platform-production-governance",
+      "status": "BLOCKED",
+      "owner": "Platform Security/SRE",
+      "observedAt": "2026-08-17T03:31:31.389Z",
+      "evidenceRef": "platform/evidence/production-governance/readiness-manifest.json",
+      "evidenceDigest": "sha256:e8ccc9ffa44f882750dbe7637126c81d260a082b6bf4f70784c991d56eb60674",
+      "freshness": "EXTERNAL_REQUIRED",
+      "remediation": "EXTERNAL_PRODUCTION_EVIDENCE_AND_APPROVALS_REQUIRED"
+    },
+    {
+      "key": "workload.zero-core-diff",
+      "status": "BLOCKED",
+      "owner": "Quality",
+      "observedAt": "2026-08-17T03:31:31.408Z",
+      "evidenceRef": "platform/evidence/agent-platform-final/workload-protected.diff.json",
+      "evidenceDigest": "sha256:7da41ecd9418ebe4d2ee81579561f54e48f9afcea4119dfccab363fa7f28e88b",
+      "freshness": "CURRENT"
+    },
+    {
+      "key": "engine.dual",
+      "status": "PASS",
+      "owner": "Quality",
+      "observedAt": "2026-08-17T03:31:18.656Z",
+      "evidenceRef": "platform/evidence/agent-platform-final/engine-conformance.json",
+      "evidenceDigest": "sha256:9829c53da0cdb54098a33a4c6835c8c6594eed5af6ca1ad8b90546371a4dd16f",
+      "freshness": "CURRENT"
+    },
+    {
+      "key": "host.dual",
+      "status": "PASS",
+      "owner": "Quality",
+      "observedAt": "2026-08-17T03:31:18.656Z",
+      "evidenceRef": "platform/evidence/agent-platform-final/host-equivalence.json",
+      "evidenceDigest": "sha256:1d5f952b673630a8653ebb26569bb7a7512406d5ed3aabdf47c7e2d257d59f6d",
+      "freshness": "CURRENT"
+    },
+    {
+      "key": "fault.matrix",
+      "status": "PASS",
+      "owner": "Quality",
+      "observedAt": "2026-08-17T03:31:18.656Z",
+      "evidenceRef": "platform/evidence/agent-platform-final/fault-matrix.json",
+      "evidenceDigest": "sha256:5bd2e8dd70b0185f988fe532cb1ae9f93eb7ef1539670f69fcf4f676cd1f2253",
+      "freshness": "CURRENT"
+    },
+    {
+      "key": "replay.explainable",
+      "status": "PASS",
+      "owner": "Quality",
+      "observedAt": "2026-08-17T03:31:18.656Z",
+      "evidenceRef": "platform/evidence/agent-platform-final/explainable-replay.json",
+      "evidenceDigest": "sha256:dd02724dbc0fc0587e20110893179692f069a5e39c288dc01bad9001689cf526",
+      "freshness": "CURRENT"
+    },
+    {
+      "key": "replay.projection-rebuild",
+      "status": "PASS",
+      "owner": "Quality",
+      "observedAt": "2026-08-17T03:31:18.656Z",
+      "evidenceRef": "platform/evidence/agent-platform-final/projection-rebuild.json",
+      "evidenceDigest": "sha256:45d110d57b32624104a567c5b3d37ceae5169a2e3bcce6e8a5341acc92468bf1",
+      "freshness": "CURRENT"
+    },
+    {
+      "key": "replay.history",
+      "status": "BLOCKED",
+      "owner": "Quality",
+      "observedAt": "2026-08-17T03:31:18.656Z",
+      "evidenceRef": "platform/evidence/agent-platform-final/history-replay.json",
+      "evidenceDigest": "sha256:395d5f7aecec1aae485040cb4c4183c603c4f8770d0a6ec2df0f45cf813c54f7",
+      "freshness": "CURRENT"
+    },
+    {
+      "key": "boundary.canonical",
+      "status": "PASS",
+      "owner": "Quality",
+      "observedAt": "2026-08-17T03:31:32.146Z",
+      "evidenceRef": "platform/evidence/agent-platform-final/boundary-canonical.json",
+      "evidenceDigest": "sha256:bbddea8c2389616829fddb0a0b0714c28389c19d9515c3692c1276167b11e2aa",
+      "freshness": "CURRENT"
+    },
+    {
+      "key": "boundary.public-surfaces",
+      "status": "PASS",
+      "owner": "Quality",
+      "observedAt": "2026-08-17T03:31:32.420Z",
+      "evidenceRef": "platform/evidence/agent-platform-final/boundary-public-surfaces.json",
+      "evidenceDigest": "sha256:6e45d273498b91eac41a6c8a5b5c8633d95057f2dd38c00cbb78136add9820ab",
+      "freshness": "CURRENT"
+    },
+    {
+      "key": "boundary.workload",
+      "status": "PASS",
+      "owner": "Quality",
+      "observedAt": "2026-08-17T03:31:32.663Z",
+      "evidenceRef": "platform/evidence/agent-platform-final/boundary-evidence-digest.json",
+      "evidenceDigest": "sha256:d96b581b9822c75c21030cd31df3d789afdc422f3d5bf694d9f453f6bc8dcb48",
+      "freshness": "CURRENT"
+    },
+    {
+      "key": "architecture.model-structure",
+      "status": "PASS",
+      "owner": "Architecture",
+      "observedAt": "2026-08-17T03:31:32.853Z",
+      "evidenceRef": "platform/evidence/agent-platform-final/architecture-model-validation.json",
+      "evidenceDigest": "sha256:1e2ddba98d9017dcb37bd544deef9b29a2936575871a5f443ed87140eea02df8",
+      "freshness": "CURRENT"
+    },
+    {
+      "key": "architecture.dsl-render",
+      "status": "PASS",
+      "owner": "Architecture",
+      "observedAt": "2026-08-17T03:31:33.042Z",
+      "evidenceRef": "platform/evidence/agent-platform-final/architecture-projection-validation.json",
+      "evidenceDigest": "sha256:884ae9868ae03165604d99e7584e48e738c0019106ec21f491403f818bbddc47",
+      "freshness": "CURRENT"
+    },
+    {
+      "key": "traceability.consistency",
+      "status": "PASS",
+      "owner": "Quality",
+      "observedAt": "2026-08-17T03:31:33.601Z",
+      "evidenceRef": "platform/evidence/agent-platform-final/traceability-validation.json",
+      "evidenceDigest": "sha256:bee60f6625eff7eb81f92a53a3bd6dad0cbee8fec7ae7c1037f8cb12fc2d15a0",
+      "freshness": "CURRENT"
+    },
+    {
+      "key": "quality.workspace",
+      "status": "PASS",
+      "owner": "Quality",
+      "observedAt": "2026-08-17T03:31:52.013Z",
+      "evidenceRef": "platform/evidence/agent-platform-final/quality.json",
+      "evidenceDigest": "sha256:7069dd00dab131927d905539120f92e4603db5efa51a43cec78d488e05eb6f7e",
+      "freshness": "CURRENT"
+    },
+    {
+      "key": "jobs.mandatory-external",
+      "status": "BLOCKED",
+      "owner": "Quality",
+      "observedAt": "2026-08-17T03:31:52.027Z",
+      "evidenceRef": "platform/evidence/agent-platform-final/mandatory-jobs.json",
+      "evidenceDigest": "sha256:67abdabadd9b5c3af15ce8dce9a0fc723194e977658e927f5101b5108baa3a41",
+      "freshness": "CURRENT"
+    },
+    {
+      "key": "architecture.formal-review",
+      "status": "FAIL",
+      "owner": "Architecture",
+      "observedAt": "2026-08-17T03:31:31.595Z",
+      "evidenceRef": "platform/evidence/agent-platform-final/architecture-review-validation.json",
+      "evidenceDigest": "sha256:00d4278b6cfccc340574e27c71aa57507d29e1afb082edf170ecb0fd53162455",
+      "freshness": "CURRENT"
+    },
+    {
+      "key": "production.readiness",
+      "status": "BLOCKED",
+      "owner": "Platform Security/SRE",
+      "observedAt": "2026-08-17T03:31:52.036Z",
+      "evidenceRef": "platform/evidence/production-governance/readiness-manifest.json",
+      "evidenceDigest": "sha256:e8ccc9ffa44f882750dbe7637126c81d260a082b6bf4f70784c991d56eb60674",
+      "freshness": "EXTERNAL_REQUIRED",
+      "remediation": "provide fresh production evidence and named signed approvals"
+    },
+    {
+      "key": "evidence.freshness",
+      "status": "BLOCKED",
+      "owner": "Platform Security/SRE",
+      "observedAt": "2026-08-17T03:31:52.036Z",
+      "evidenceRef": "platform/evidence/production-governance/readiness-manifest.json",
+      "evidenceDigest": "sha256:e8ccc9ffa44f882750dbe7637126c81d260a082b6bf4f70784c991d56eb60674",
+      "freshness": "EXTERNAL_REQUIRED",
+      "remediation": "provide fresh production evidence and named signed approvals"
+    }
+  ],
+  "blockers": [
+    {
+      "key": "dependency.agent-platform-production-governance",
+      "status": "BLOCKED",
+      "owner": "Platform Security/SRE",
+      "evidenceRef": "platform/evidence/production-governance/readiness-manifest.json",
+      "remediation": "EXTERNAL_PRODUCTION_EVIDENCE_AND_APPROVALS_REQUIRED"
+    },
+    {
+      "key": "workload.zero-core-diff",
+      "status": "BLOCKED",
+      "owner": "Quality",
+      "evidenceRef": "platform/evidence/agent-platform-final/workload-protected.diff.json"
+    },
+    {
+      "key": "replay.history",
+      "status": "BLOCKED",
+      "owner": "Quality",
+      "evidenceRef": "platform/evidence/agent-platform-final/history-replay.json"
+    },
+    {
+      "key": "jobs.mandatory-external",
+      "status": "BLOCKED",
+      "owner": "Quality",
+      "evidenceRef": "platform/evidence/agent-platform-final/mandatory-jobs.json"
+    },
+    {
+      "key": "architecture.formal-review",
+      "status": "FAIL",
+      "owner": "Architecture",
+      "evidenceRef": "platform/evidence/agent-platform-final/architecture-review-validation.json"
+    },
+    {
+      "key": "production.readiness",
+      "status": "BLOCKED",
+      "owner": "Platform Security/SRE",
+      "evidenceRef": "platform/evidence/production-governance/readiness-manifest.json",
+      "remediation": "provide fresh production evidence and named signed approvals"
+    },
+    {
+      "key": "evidence.freshness",
+      "status": "BLOCKED",
+      "owner": "Platform Security/SRE",
+      "evidenceRef": "platform/evidence/production-governance/readiness-manifest.json",
+      "remediation": "provide fresh production evidence and named signed approvals"
+    }
+  ],
+  "overrideAttempts": [],
+  "productionEvidenceVerified": false,
+  "contentDigest": "sha256:1dabbce9a0eb5eeedc16ad02d606e5bd2992bcc87be1c384bc2afc81c9da0a86"
+}

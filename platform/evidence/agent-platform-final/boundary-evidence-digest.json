@@ -1,0 +1,221 @@
+{
+  "schemaVersion": "1",
+  "sourceRevision": "e8ea299dcac4f1859528d2c67e31e35a58d05c9e",
+  "sourceDigest": "sha256:c2fe13d173b44c54a13ab7b65099712f26754498e64513792781544dc6844687",
+  "toolDigest": "sha256:615a886b8b64d8fa078866d1e5da007c31c9088effdb9684eb873b16162bebde",
+  "generatedAt": "2026-08-17T03:31:32.663Z",
+  "caseId": "apgv/boundary/v1/evidence-digest",
+  "allowedRoots": [
+    "Release",
+    "Skill",
+    "Capability",
+    "Schema",
+    "Policy",
+    "View",
+    "approved-test-adapter"
+  ],
+  "sourceFiles": 14,
+  "assetFiles": 11,
+  "reverseDependencyGraph": [
+    {
+      "name": "@sage/agent-contracts",
+      "path": "packages/agent-contracts",
+      "dependencies": [
+        "typebox"
+      ],
+      "devDependencies": [],
+      "resolved": [
+        {
+          "name": "typebox",
+          "kind": "production",
+          "resolvedPath": null
+        }
+      ]
+    },
+    {
+      "name": "@sage/agent-lib",
+      "path": "packages/agent-lib",
+      "dependencies": [
+        "@sage/agent-contracts",
+        "@sage/platform-ports"
+      ],
+      "devDependencies": [],
+      "resolved": [
+        {
+          "name": "@sage/agent-contracts",
+          "kind": "production",
+          "resolvedPath": "packages/agent-contracts"
+        },
+        {
+          "name": "@sage/platform-ports",
+          "kind": "production",
+          "resolvedPath": "packages/platform-ports"
+        }
+      ]
+    },
+    {
+      "name": "@sage/agent-package-release",
+      "path": "packages/agent-package-release",
+      "dependencies": [
+        "@sage/agent-contracts",
+        "@sage/platform-ports"
+      ],
+      "devDependencies": [],
+      "resolved": [
+        {
+          "name": "@sage/agent-contracts",
+          "kind": "production",
+          "resolvedPath": "packages/agent-contracts"
+        },
+        {
+          "name": "@sage/platform-ports",
+          "kind": "production",
+          "resolvedPath": "packages/platform-ports"
+        }
+      ]
+    },
+    {
+      "name": "@sage/agent-platform-conformance",
+      "path": "packages/agent-platform-conformance",
+      "dependencies": [
+        "@sage/agent-runtime-conformance"
+      ],
+      "devDependencies": [],
+      "resolved": [
+        {
+          "name": "@sage/agent-runtime-conformance",
+          "kind": "production",
+          "resolvedPath": "packages/agent-runtime-conformance"
+        }
+      ]
+    },
+    {
+      "name": "@sage/agent-runtime-conformance",
+      "path": "packages/agent-runtime-conformance",
+      "dependencies": [
+        "@sage/agent-contracts",
+        "@sage/agent-lib"
+      ],
+      "devDependencies": [],
+      "resolved": [
+        {
+          "name": "@sage/agent-contracts",
+          "kind": "production",
+          "resolvedPath": "packages/agent-contracts"
+        },
+        {
+          "name": "@sage/agent-lib",
+          "kind": "production",
+          "resolvedPath": "packages/agent-lib"
+        }
+      ]
+    },
+    {
+      "name": "@sage/evidence-digest-example",
+      "path": "examples/evidence-digest",
+      "dependencies": [
+        "@sage/agent-package-release",
+        "@sage/agent-platform-conformance"
+      ],
+      "devDependencies": [
+        "@sage/agent-runtime-conformance",
+        "@sage/harness-pi"
+      ],
+      "resolved": [
+        {
+          "name": "@sage/agent-package-release",
+          "kind": "production",
+          "resolvedPath": "packages/agent-package-release"
+        },
+        {
+          "name": "@sage/agent-platform-conformance",
+          "kind": "production",
+          "resolvedPath": "packages/agent-platform-conformance"
+        },
+        {
+          "name": "@sage/agent-runtime-conformance",
+          "kind": "development",
+          "resolvedPath": "packages/agent-runtime-conformance"
+        },
+        {
+          "name": "@sage/harness-pi",
+          "kind": "development",
+          "resolvedPath": "packages/harness-pi"
+        }
+      ]
+    },
+    {
+      "name": "@sage/harness-pi",
+      "path": "packages/harness-pi",
+      "dependencies": [
+        "@mariozechner/pi-agent-core",
+        "@mariozechner/pi-ai",
+        "@sage/agent-contracts",
+        "@sage/agent-lib"
+      ],
+      "devDependencies": [
+        "@sage/agent-runtime-conformance"
+      ],
+      "resolved": [
+        {
+          "name": "@mariozechner/pi-agent-core",
+          "kind": "production",
+          "resolvedPath": null
+        },
+        {
+          "name": "@mariozechner/pi-ai",
+          "kind": "production",
+          "resolvedPath": null
+        },
+        {
+          "name": "@sage/agent-contracts",
+          "kind": "production",
+          "resolvedPath": "packages/agent-contracts"
+        },
+        {
+          "name": "@sage/agent-lib",
+          "kind": "production",
+          "resolvedPath": "packages/agent-lib"
+        },
+        {
+          "name": "@sage/agent-runtime-conformance",
+          "kind": "development",
+          "resolvedPath": "packages/agent-runtime-conformance"
+        }
+      ]
+    },
+    {
+      "name": "@sage/platform-ports",
+      "path": "packages/platform-ports",
+      "dependencies": [
+        "@sage/agent-contracts",
+        "typebox"
+      ],
+      "devDependencies": [],
+      "resolved": [
+        {
+          "name": "@sage/agent-contracts",
+          "kind": "production",
+          "resolvedPath": "packages/agent-contracts"
+        },
+        {
+          "name": "typebox",
+          "kind": "production",
+          "resolvedPath": null
+        }
+      ]
+    }
+  ],
+  "productionEdges": [
+    "@sage/agent-package-release",
+    "@sage/agent-platform-conformance"
+  ],
+  "testOnlyEdges": [
+    "@sage/agent-runtime-conformance",
+    "@sage/harness-pi"
+  ],
+  "violations": [],
+  "shortestViolationChain": null,
+  "status": "PASS",
+  "contentDigest": "sha256:556568132523e5fd208508d2730f8b8e4e147e3857b49c35930a252574479f75"
+}

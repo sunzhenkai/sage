@@ -1,0 +1,131 @@
+import { describe, expect, it } from 'vitest';
+import { Value } from 'typebox/value';
+import {
+  ArtifactReferenceSchema,
+  CatalogErrorSchema,
+  CatalogStatusSchema,
+  ProviderConnectionCheckRequestSchema,
+  ProviderConnectionCheckResponseSchema,
+  CatalogSyncAttemptSchema,
+  ChatErrorSchema,
+  CreateSessionRequestSchema,
+  ListModelsQuerySchema,
+  ListProvidersQuerySchema,
+  ListSessionsQuerySchema,
+  ListSessionsResponseSchema,
+  MessagePartSchema,
+  ModelCatalogPageSchema,
+  PromoteChatMessageRequestSchema,
+  ProviderCatalogPageSchema,
+  SessionHistoryItemSchema,
+  SubmitMessageRequestSchema,
+  TimelineEventSchema
+} from './index.js';
+
+describe('P3 app contracts', () => {
+  it('accepts text and reference-only artifact parts and rejects inline bytes', () => {
+    expect(Value.Check(MessagePartSchema, { kind: 'text', text: 'hello' })).toBe(true);
+    expect(Value.Check(MessagePartSchema, { kind: 'artifact', artifact: { artifactRef: 'artifact://chat/a', name: 'a.txt', mediaType: 'text/plain', sizeBytes: 12 } })).toBe(true);
+    expect(Value.Check(MessagePartSchema, { kind: 'artifact', artifact: { artifactRef: 'artifact://chat/a', name: 'a.txt', mediaType: 'text/plain', sizeBytes: 12, content: 'forbidden' } })).toBe(false);
+    expect(Value.Check(ArtifactReferenceSchema, { artifactRef: 'https://inline.example/a', name: 'a', mediaType: 'text/plain', sizeBytes: 1 })).toBe(false);
+  });
+
+  it('keeps stable errors and public timeline provider-neutral', () => {
+    expect(Value.Check(ChatErrorSchema, { code: 'CHAT_API_RESTARTED', message: 'API restarted', retryable: true })).toBe(true);
+    expect(Value.Check(TimelineEventSchema, { schemaVersion: '1', sessionId: 'session-1', runId: 'run-1', sequence: 1, occurredAt: new Date().toISOString(), payload: { kind: 'tool', toolName: 'search', status: 'completed' } })).toBe(true);
+    expect(Value.Check(ChatErrorSchema, { code: 'PI_PROVIDER_ERROR', message: 'leak', retryable: true })).toBe(false);
+  });
+});
+
+
+describe('Session history contracts', () => {
+  const item = {
+    schemaVersion: '1', sessionId: 'session-1', status: 'open', title: 'Hello', preview: 'Latest text',
+    lastMessageRole: 'user', lastMessageAt: '2026-08-14T01:02:03.123Z',
+    createdAt: '2026-08-14T01:00:00.000Z', updatedAt: '2026-08-14T01:02:03.123Z',
+    retentionEligibleAt: '2026-09-13T01:02:03.123Z'
+  };
+
+  it('accepts the bounded enriched item and response without transcript data', () => {
+    expect(Value.Check(SessionHistoryItemSchema, item)).toBe(true);
+    expect(Value.Check(ListSessionsResponseSchema, { schemaVersion: '1', items: [item], nextCursor: 'eyJ2IjoxfQ' })).toBe(true);
+    expect(Value.Check(SessionHistoryItemSchema, { ...item, messages: [] })).toBe(false);
+    expect(Value.Check(ListSessionsResponseSchema, { schemaVersion: '1', items: [item], summaries: [] })).toBe(false);
+  });
+
+  it('strictly validates status, title query, limit, cursor, and extra properties', () => {
+    expect(Value.Check(ListSessionsQuerySchema, {})).toBe(true);
+    expect(Value.Check(ListSessionsQuerySchema, { limit: '100', status: 'closed', q: 'literal title', cursor: 'abc_DEF-123' })).toBe(true);
+    expect(Value.Check(ListSessionsQuerySchema, { limit: '0' })).toBe(false);
+    expect(Value.Check(ListSessionsQuerySchema, { limit: '101' })).toBe(false);
+    expect(Value.Check(ListSessionsQuerySchema, { status: 'active' })).toBe(false);
+    expect(Value.Check(ListSessionsQuerySchema, { q: 'x'.repeat(101) })).toBe(false);
+    expect(Value.Check(ListSessionsQuerySchema, { cursor: 'not opaque!' })).toBe(false);
+    expect(Value.Check(ListSessionsQuerySchema, { provider: 'forbidden' })).toBe(false);
+  });
+});
+
+
+describe('Provider Catalog public contracts', () => {
+  const pageBase = { schemaVersion: '1', snapshotId: 'snapshot-1', activeSince: '2026-08-14T01:00:00.000Z', stale: false };
+
+  it('accepts only bounded provider/model whitelist pages and strict queries', () => {
+    expect(Value.Check(ProviderCatalogPageSchema, { ...pageBase, items: [{ providerId: 'openai', name: 'OpenAI', api: 'https://api.openai.com/v1' }] })).toBe(true);
+    expect(Value.Check(ModelCatalogPageSchema, { ...pageBase, items: [{ modelId: 'gpt-5', providerId: 'openai', name: 'GPT-5', status: 'active', capabilities: ['text'], effectiveBaseUrl: 'https://api.openai.com/v1' }] })).toBe(true);
+    expect(Value.Check(ProviderCatalogPageSchema, { ...pageBase, items: [], rawPayload: {} })).toBe(false);
+    expect(Value.Check(ListProvidersQuerySchema, { limit: '30', q: 'open', cursor: 'opaque_1' })).toBe(true);
+    expect(Value.Check(ListModelsQuerySchema, { providerId: 'openai', status: 'deprecated', capability: 'text' })).toBe(true);
+    expect(Value.Check(ListModelsQuerySchema, { status: 'unknown' })).toBe(false);
+    expect(Value.Check(ListModelsQuerySchema, { tenantId: 'forbidden' })).toBe(false);
+  });
+
+  it('exposes a bounded attempt projection and rejects internal identity or audit fields', () => {
+    const attempt = { attemptId: 'attempt-1', trigger: 'manual', status: 'running', queuedAt: '2026-08-14T01:00:00.000Z', startedAt: '2026-08-14T01:00:01.000Z' };
+    expect(Value.Check(CatalogSyncAttemptSchema, attempt)).toBe(true);
+    for (const forbidden of ['principalId', 'authenticationId', 'ownerId', 'audit', 'responseBody', 'stack']) {
+      expect(Value.Check(CatalogSyncAttemptSchema, { ...attempt, [forbidden]: 'leak' })).toBe(false);
+    }
+    expect(Value.Check(CatalogErrorSchema, { code: 'CATALOG_SYNC_ATTEMPT_NOT_FOUND', message: 'Attempt not found', retryable: false })).toBe(true);
+  });
+
+  it('keeps status safe and scoped', () => {
+    expect(Value.Check(CatalogStatusSchema, {
+      schemaVersion: '1', source: 'models-dev', availability: 'unavailable', providerCount: 0, modelCount: 0,
+      nextSyncAt: '2026-08-14T02:00:00.000Z', projection: 'unavailable', errorCode: 'SOURCE_TIMEOUT'
+    })).toBe(true);
+    expect(Value.Check(CatalogStatusSchema, {
+      schemaVersion: '1', source: 'models-dev', availability: 'unavailable', providerCount: 0, modelCount: 0,
+      nextSyncAt: '2026-08-14T02:00:00.000Z', projection: 'unavailable', stack: 'secret'
+    })).toBe(false);
+  });
+});
+
+describe('workspace payload boundaries and promotion eligibility', () => {
+  it('adds optional eligibility while legacy text remains valid and extra fields remain forbidden', () => {
+    const base = { schemaVersion: '1', sessionId: 'session-1', runId: 'run-1', sequence: 1, occurredAt: '2026-08-14T01:00:00.000Z' };
+    expect(Value.Check(TimelineEventSchema, { ...base, payload: { kind: 'text', text: 'user text', messageId: 'message-1', promotionEligibility: 'explicit' } })).toBe(true);
+    expect(Value.Check(TimelineEventSchema, { ...base, payload: { kind: 'text', text: 'legacy', messageId: 'message-1' } })).toBe(true);
+    expect(Value.Check(TimelineEventSchema, { ...base, payload: { kind: 'text', text: 'bad', promotionEligibility: 'always' } })).toBe(false);
+  });
+
+  it('rejects provider/runtime override fields from existing Chat and promotion bodies', () => {
+    const forbidden = ['provider', 'model', 'profile', 'baseUrl', 'apiKey', 'target', 'endpoint', 'namespace', 'actor', 'roles'];
+    for (const field of forbidden) {
+      expect(Value.Check(CreateSessionRequestSchema, { [field]: 'forbidden' })).toBe(false);
+      expect(Value.Check(SubmitMessageRequestSchema, { parts: [{ kind: 'text', text: 'hello' }], [field]: 'forbidden' })).toBe(false);
+      expect(Value.Check(PromoteChatMessageRequestSchema, { mode: 'explicit', [field]: 'forbidden' })).toBe(false);
+    }
+  });
+});
+
+
+describe('Provider connection check contracts', () => {
+  const request = { adapterKind: 'openai-compatible', baseUrl: 'https://api.example.test/v1', modelId: 'model-1', apiKey: 'tab-secret' };
+  it('accepts bounded requests/responses and rejects secret or routing extensions', () => {
+    expect(Value.Check(ProviderConnectionCheckRequestSchema, request)).toBe(true);
+    expect(Value.Check(ProviderConnectionCheckResponseSchema, { status: 'connected', checkedAt: '2026-08-15T01:00:00.000Z', message: 'Connected' })).toBe(true);
+    expect(Value.Check(ProviderConnectionCheckRequestSchema, { ...request, apiKey: 'x'.repeat(4097) })).toBe(false);
+    expect(Value.Check(ProviderConnectionCheckRequestSchema, { ...request, ownerId: 'leak' })).toBe(false);
+    expect(Value.Check(ProviderConnectionCheckResponseSchema, { status: 'connected', checkedAt: '2026-08-15T01:00:00.000Z', message: 'ok', apiKey: 'leak' })).toBe(false);
+  });
+});

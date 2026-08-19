@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1",
+  "productionEvidence": false,
+  "records": {
+    "spec": {"specRef":"spec://safe","secret_ref":"secret://tenant-a/provider"},
+    "history": {"event":"tool.denied","reason":"SECRET_MANAGER_UNAVAILABLE"},
+    "event": {"type":"effect_unknown","receipt_ref":"effect-receipt://safe"},
+    "checkpoint": {"checkpoint_ref":"checkpoint://safe","receipt_refs":["usage-receipt://safe"]},
+    "projection": {"status":"blocked","reason_code":"NO_GO"},
+    "log": {"component":"agent-api","outcome":"denied"},
+    "trace": {"span":"production.admission","outcome":"NO_GO"},
+    "audit": {"category":"identity","authority_digest":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+  }
+}

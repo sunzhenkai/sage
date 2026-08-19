@@ -1,0 +1,11 @@
+{
+  "name":"@sage/p6-integration","version":"0.1.0","private":true,"type":"module",
+  "scripts":{"clean":"rm -rf dist","typecheck":"tsc -p tsconfig.json --noEmit","build":"tsc -p tsconfig.json"},
+  "dependencies":{
+    "@sage/agent-api":"workspace:*","@sage/agent-client":"workspace:*","@sage/agent-contracts":"workspace:*","@sage/agent-web":"workspace:*","@sage/agent-worker":"workspace:*",
+    "@sage/app-contracts":"workspace:*","@sage/chat-domain":"workspace:*","@sage/observability":"workspace:*","@sage/platform-ports":"workspace:*","@sage/task-domain":"workspace:*",
+    "@sage/task-store-postgres":"workspace:*","@sage/temporal-registry":"workspace:*","@sage/temporal-routing":"workspace:*",
+    "@temporalio/client":"1.22.0","@temporalio/worker":"1.22.0","pg":"8.23.0","react":"19.2.8","react-dom":"19.2.8"
+  },
+  "devDependencies":{"@types/pg":"8.21.0","@types/react":"19.2.18","@types/react-dom":"19.2.4"}
+}

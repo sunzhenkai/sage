@@ -1,0 +1,2 @@
+import type { AdapterResult } from '../contracts.js';import { evaluateOracle } from '../oracle.js';
+export function compareEngines(reference:AdapterResult,pi:AdapterResult){const oracle=evaluateOracle(reference,pi);return {allowedNonExact:['text','reasoning','internal-turn'],forbiddenCanonical:['outcome','errorCode','authority','causal-edge','receipt','artifact','checkpoint','budget'],...oracle};}

@@ -1,0 +1,244 @@
+{
+  "schemaVersion": "1",
+  "sourceRevision": "e8ea299dcac4f1859528d2c67e31e35a58d05c9e",
+  "sourceDigest": "sha256:968bfae73d45be1e8fd24d15ab63f024053550dc5ed3269785aa113d9ac9a035",
+  "toolDigest": "sha256:109efbf9ccf4ddf5315b04d87a6fbeba2041de1019eb5464d0ede313b3e3d8fd",
+  "generatedAt": "2026-08-17T03:31:52.064Z",
+  "entryCount": 46,
+  "entries": [
+    {
+      "path": "docs__design___cross__generic-agent-platform-final.md",
+      "digest": "sha256:4606629f41952a7a7ff224d21238c51fbd4639fd01fcee331010e7a389d54277",
+      "source": "docs/design/_cross/generic-agent-platform-final.md"
+    },
+    {
+      "path": "docs__design___cross__generic-agent-platform-final.system-model.json",
+      "digest": "sha256:71e3bc100876b8c3ef527cc7f20ed8a275ca668aed8880198ab138220bab1ac9",
+      "source": "docs/design/_cross/generic-agent-platform-final.system-model.json"
+    },
+    {
+      "path": "docs__design___cross__generic-agent-platform-final.runtime.dsl.yaml",
+      "digest": "sha256:7053469d81c19f829ad3a0e69d3e8eb5d464c99a9625e708293ebfc0289e5b3d",
+      "source": "docs/design/_cross/generic-agent-platform-final.runtime.dsl.yaml"
+    },
+    {
+      "path": "docs__design___cross__generic-agent-platform-final.runtime.md",
+      "digest": "sha256:732805f15f0716d65051cea25ab63259999fef269ad02dd07bf4d7d4f230a5f1",
+      "source": "docs/design/_cross/generic-agent-platform-final.runtime.md"
+    },
+    {
+      "path": "docs__design___cross__generic-agent-platform-final.runtime.render.normalized.json",
+      "digest": "sha256:76e8940e3fa2963bfb19f77e7b2d868eb433dc470b39d96d7fdaff12b8a3ae1c",
+      "source": "docs/design/_cross/generic-agent-platform-final.runtime.render.normalized.json"
+    },
+    {
+      "path": "docs__design___cross__generic-agent-platform-final.architecture-review.yaml",
+      "digest": "sha256:db7cccac989fe5f1d4587a4450d3e5444d97bec4b85ec5d91ae4a6cdbc7c220d",
+      "source": "docs/design/_cross/generic-agent-platform-final.architecture-review.yaml"
+    },
+    {
+      "path": "platform__scripts__agent-platform-final__lib.mjs",
+      "digest": "sha256:109efbf9ccf4ddf5315b04d87a6fbeba2041de1019eb5464d0ede313b3e3d8fd",
+      "source": "platform/scripts/agent-platform-final/lib.mjs"
+    },
+    {
+      "path": "platform__package.json",
+      "digest": "sha256:baa50e8a73e89b64ac23afd7f885bc0ec24999f35db27a91bf79a7a9431de5a1",
+      "source": "platform/package.json"
+    },
+    {
+      "path": "platform__pnpm-lock.yaml",
+      "digest": "sha256:cedb5e2507c23c8ea3d77666eb1cc8fddcd286a5ec4ddcb6c2df1251c88c683a",
+      "source": "platform/pnpm-lock.yaml"
+    },
+    {
+      "path": "platform__scripts__agent-platform-final__schemas__architecture-review.schema.json",
+      "digest": "sha256:a3f5c1c914bd7900971f8dabe1d4fb0b66f5f1ecf5b496e7420759186284ddec",
+      "source": "platform/scripts/agent-platform-final/schemas/architecture-review.schema.json"
+    },
+    {
+      "path": "platform__scripts__agent-platform-final__schemas__case-result.schema.json",
+      "digest": "sha256:75e7f9eaa1375220260e645ecc4705eb9122bfefbb5f308d39af4bd00660c571",
+      "source": "platform/scripts/agent-platform-final/schemas/case-result.schema.json"
+    },
+    {
+      "path": "platform__scripts__agent-platform-final__schemas__entry-manifest.schema.json",
+      "digest": "sha256:6f4292b148385e488862a1cc32aefa7924d9d3d55806c6f23787d67d7f0a8992",
+      "source": "platform/scripts/agent-platform-final/schemas/entry-manifest.schema.json"
+    },
+    {
+      "path": "platform__scripts__agent-platform-final__schemas__evidence-envelope.schema.json",
+      "digest": "sha256:c3ab74d7da3e9ddfb536fbbe2e100f0b7d3bc931630b1da38d68b6896a05cbe2",
+      "source": "platform/scripts/agent-platform-final/schemas/evidence-envelope.schema.json"
+    },
+    {
+      "path": "platform__scripts__agent-platform-final__schemas__gate-manifest.schema.json",
+      "digest": "sha256:d957c7fa046c0e731119ef068e4f6ef981dcb0bd06f17399b8c23a7c521a94d5",
+      "source": "platform/scripts/agent-platform-final/schemas/gate-manifest.schema.json"
+    },
+    {
+      "path": "platform__scripts__agent-platform-final__schemas__runtime-dsl.schema.json",
+      "digest": "sha256:cad2cc5eeca892e20ca50a2d5e4377027ebcd5b00d27d8dce661b3fb84f10013",
+      "source": "platform/scripts/agent-platform-final/schemas/runtime-dsl.schema.json"
+    },
+    {
+      "path": "platform__scripts__agent-platform-final__schemas__system-model.schema.json",
+      "digest": "sha256:ec23fe3f0a9f5fbb7024341ab693097183f95a5b3948a2f6690b335398671fd9",
+      "source": "platform/scripts/agent-platform-final/schemas/system-model.schema.json"
+    },
+    {
+      "path": "platform__scripts__agent-platform-final__schemas__traceability.schema.json",
+      "digest": "sha256:230270948fc9cd7fc51ae5af24f5d3462b0a167e140d41ea263a9ac0bf0938fa",
+      "source": "platform/scripts/agent-platform-final/schemas/traceability.schema.json"
+    },
+    {
+      "path": "platform__evidence__agent-platform-final__acceptance-report.md",
+      "digest": "sha256:79e0d70b7f7f86fb6b409e3d065e7b2418d5df117369fe347145b37cac5f1a49",
+      "source": "platform/evidence/agent-platform-final/acceptance-report.md"
+    },
+    {
+      "path": "platform__evidence__agent-platform-final__architecture-model-validation.json",
+      "digest": "sha256:1e2ddba98d9017dcb37bd544deef9b29a2936575871a5f443ed87140eea02df8",
+      "source": "platform/evidence/agent-platform-final/architecture-model-validation.json"
+    },
+    {
+      "path": "platform__evidence__agent-platform-final__architecture-projection-validation.json",
+      "digest": "sha256:884ae9868ae03165604d99e7584e48e738c0019106ec21f491403f818bbddc47",
+      "source": "platform/evidence/agent-platform-final/architecture-projection-validation.json"
+    },
+    {
+      "path": "platform__evidence__agent-platform-final__architecture-review-validation.json",
+      "digest": "sha256:00d4278b6cfccc340574e27c71aa57507d29e1afb082edf170ecb0fd53162455",
+      "source": "platform/evidence/agent-platform-final/architecture-review-validation.json"
+    },
+    {
+      "path": "platform__evidence__agent-platform-final__boundary-canonical.json",
+      "digest": "sha256:bbddea8c2389616829fddb0a0b0714c28389c19d9515c3692c1276167b11e2aa",
+      "source": "platform/evidence/agent-platform-final/boundary-canonical.json"
+    },
+    {
+      "path": "platform__evidence__agent-platform-final__boundary-evidence-digest.json",
+      "digest": "sha256:d96b581b9822c75c21030cd31df3d789afdc422f3d5bf694d9f453f6bc8dcb48",
+      "source": "platform/evidence/agent-platform-final/boundary-evidence-digest.json"
+    },
+    {
+      "path": "platform__evidence__agent-platform-final__boundary-public-surfaces.json",
+      "digest": "sha256:6e45d273498b91eac41a6c8a5b5c8633d95057f2dd38c00cbb78136add9820ab",
+      "source": "platform/evidence/agent-platform-final/boundary-public-surfaces.json"
+    },
+    {
+      "path": "platform__evidence__agent-platform-final__engine-comparison.json",
+      "digest": "sha256:67161d3e7d754cf782fa5edb1ebbba9df7f95c61dc3d35a1c70469813eca8814",
+      "source": "platform/evidence/agent-platform-final/engine-comparison.json"
+    },
+    {
+      "path": "platform__evidence__agent-platform-final__engine-conformance.json",
+      "digest": "sha256:9829c53da0cdb54098a33a4c6835c8c6594eed5af6ca1ad8b90546371a4dd16f",
+      "source": "platform/evidence/agent-platform-final/engine-conformance.json"
+    },
+    {
+      "path": "platform__evidence__agent-platform-final__entry-manifest.json",
+      "digest": "sha256:05032bd0e2237d80a838cda6547cf94d9d1d512bc9daf024c145bda37e1b4f9a",
+      "source": "platform/evidence/agent-platform-final/entry-manifest.json"
+    },
+    {
+      "path": "platform__evidence__agent-platform-final__entry-preflight.json",
+      "digest": "sha256:066ac0863f264b201af01da90d4485e3b15f34f1a0aa9d375deda77257bfae4d",
+      "source": "platform/evidence/agent-platform-final/entry-preflight.json"
+    },
+    {
+      "path": "platform__evidence__agent-platform-final__executed-results.json",
+      "digest": "sha256:8c9ab5d23775aab3d68d974038541084636e2b440df0cdddb8b6291fb44a2ea4",
+      "source": "platform/evidence/agent-platform-final/executed-results.json"
+    },
+    {
+      "path": "platform__evidence__agent-platform-final__explainable-replay.json",
+      "digest": "sha256:dd02724dbc0fc0587e20110893179692f069a5e39c288dc01bad9001689cf526",
+      "source": "platform/evidence/agent-platform-final/explainable-replay.json"
+    },
+    {
+      "path": "platform__evidence__agent-platform-final__fault-matrix.json",
+      "digest": "sha256:5bd2e8dd70b0185f988fe532cb1ae9f93eb7ef1539670f69fcf4f676cd1f2253",
+      "source": "platform/evidence/agent-platform-final/fault-matrix.json"
+    },
+    {
+      "path": "platform__evidence__agent-platform-final__gate-manifest.json",
+      "digest": "sha256:da1050ad0f8fd09edc1031d2cf5d690b502cbda1f7bb6a8b4b325a024101c5ca",
+      "source": "platform/evidence/agent-platform-final/gate-manifest.json"
+    },
+    {
+      "path": "platform__evidence__agent-platform-final__history-replay.json",
+      "digest": "sha256:395d5f7aecec1aae485040cb4c4183c603c4f8770d0a6ec2df0f45cf813c54f7",
+      "source": "platform/evidence/agent-platform-final/history-replay.json"
+    },
+    {
+      "path": "platform__evidence__agent-platform-final__host-equivalence.json",
+      "digest": "sha256:1d5f952b673630a8653ebb26569bb7a7512406d5ed3aabdf47c7e2d257d59f6d",
+      "source": "platform/evidence/agent-platform-final/host-equivalence.json"
+    },
+    {
+      "path": "platform__evidence__agent-platform-final__mandatory-jobs.json",
+      "digest": "sha256:67abdabadd9b5c3af15ce8dce9a0fc723194e977658e927f5101b5108baa3a41",
+      "source": "platform/evidence/agent-platform-final/mandatory-jobs.json"
+    },
+    {
+      "path": "platform__evidence__agent-platform-final__projection-rebuild.json",
+      "digest": "sha256:45d110d57b32624104a567c5b3d37ceae5169a2e3bcce6e8a5341acc92468bf1",
+      "source": "platform/evidence/agent-platform-final/projection-rebuild.json"
+    },
+    {
+      "path": "platform__evidence__agent-platform-final__promotion-denial.json",
+      "digest": "sha256:46f752de389808cc008d37d83c55517dc8ad8c1652f8ee0ed5c8bb6061d23af1",
+      "source": "platform/evidence/agent-platform-final/promotion-denial.json"
+    },
+    {
+      "path": "platform__evidence__agent-platform-final__quality.json",
+      "digest": "sha256:7069dd00dab131927d905539120f92e4603db5efa51a43cec78d488e05eb6f7e",
+      "source": "platform/evidence/agent-platform-final/quality.json"
+    },
+    {
+      "path": "platform__evidence__agent-platform-final__reports__oracle-self-test.json",
+      "digest": "sha256:f5d30328acdfa9bafd6f1905331f76a56618a87e1c89c9f0fbd8b74d0b0d44d2",
+      "source": "platform/evidence/agent-platform-final/reports/oracle-self-test.json"
+    },
+    {
+      "path": "platform__evidence__agent-platform-final__reproducibility.json",
+      "digest": "sha256:e07a0b7730c6d4d1369850c6f7442233ab76587daede538832c1a000ec23c3f2",
+      "source": "platform/evidence/agent-platform-final/reproducibility.json"
+    },
+    {
+      "path": "platform__evidence__agent-platform-final__traceability-validation.json",
+      "digest": "sha256:bee60f6625eff7eb81f92a53a3bd6dad0cbee8fec7ae7c1037f8cb12fc2d15a0",
+      "source": "platform/evidence/agent-platform-final/traceability-validation.json"
+    },
+    {
+      "path": "platform__evidence__agent-platform-final__traceability.json",
+      "digest": "sha256:67b8c19a4b215f3bd83d805697a65d2d8294cf7439c3c506ea5784f8da71f729",
+      "source": "platform/evidence/agent-platform-final/traceability.json"
+    },
+    {
+      "path": "platform__evidence__agent-platform-final__workload-protected.after.json",
+      "digest": "sha256:2472cd6f4e1334f6a23d9daf0688ecd28cfa5084deb616b902bd5f146cb85426",
+      "source": "platform/evidence/agent-platform-final/workload-protected.after.json"
+    },
+    {
+      "path": "platform__evidence__agent-platform-final__workload-protected.before.json",
+      "digest": "sha256:f333f410f2e667af0b88d84ed31f9560e788376f09fad3abf05739ca16f3de26",
+      "source": "platform/evidence/agent-platform-final/workload-protected.before.json"
+    },
+    {
+      "path": "platform__evidence__agent-platform-final__workload-protected.diff.json",
+      "digest": "sha256:7da41ecd9418ebe4d2ee81579561f54e48f9afcea4119dfccab363fa7f28e88b",
+      "source": "platform/evidence/agent-platform-final/workload-protected.diff.json"
+    },
+    {
+      "path": "offline-verify.mjs",
+      "digest": "sha256:70c4a1a8e162295eb12b0acaeca6aca510d61db3648c176111bac26159b86458",
+      "source": "bundle/offline-verify.mjs"
+    }
+  ],
+  "decision": "NO-GO",
+  "status": "BLOCKED",
+  "verifyCommand": "node offline-verify.mjs",
+  "contentDigest": "sha256:ccfb27374039e12e9b7f903df943cad21c3a24a64abfc385382d52b72bb5ad1e"
+}

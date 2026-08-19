@@ -1,0 +1,548 @@
+{
+  "schemaVersion": "1",
+  "sourceRevision": "e8ea299dcac4f1859528d2c67e31e35a58d05c9e",
+  "sourceDigest": "sha256:b639c8305cd83ef9c344fc05207757c3ecd695d4118bcf2eececfa71889c613f",
+  "toolDigest": "sha256:615a886b8b64d8fa078866d1e5da007c31c9088effdb9684eb873b16162bebde",
+  "modelDigest": "sha256:830d4046e44bcef1a1aad015eaaa6d7b5e0e0131569b4e1ec11c9459b485445a",
+  "dslDigest": "sha256:6ec4daedc6517523a77591d7ea0f6479af86665273d6fc1b3bdf33b0ffd94009",
+  "rows": [
+    {
+      "invariantId": "APGV-I01",
+      "designAnchor": "#goals--non-goals",
+      "modelIds": [
+        "control.admission"
+      ],
+      "dslRefs": [
+        "production-governance"
+      ],
+      "owner": "Quality",
+      "paths": [
+        "platform/scripts/agent-platform-final"
+      ],
+      "requirementSlug": "final-entry-dependency-gate",
+      "requirementTitle": "最终验收依赖门",
+      "taskIds": [
+        "1.1",
+        "1.2",
+        "1.3"
+      ],
+      "caseIds": [
+        "apgv/entry/v1/dependency-manifest"
+      ],
+      "evidence": {
+        "ref": "platform/evidence/agent-platform-final/entry-manifest.json",
+        "digest": "sha256:05032bd0e2237d80a838cda6547cf94d9d1d512bc9daf024c145bda37e1b4f9a"
+      }
+    },
+    {
+      "invariantId": "APGV-I02",
+      "designAnchor": "#goals--non-goals",
+      "modelIds": [
+        "runtime.kernel"
+      ],
+      "dslRefs": [
+        "execution-path"
+      ],
+      "owner": "Quality",
+      "paths": [
+        "platform/packages/agent-platform-conformance"
+      ],
+      "requirementSlug": "reviewable-generalization-evidence",
+      "requirementTitle": "通用性证据可复核",
+      "taskIds": [
+        "2.1",
+        "2.2",
+        "2.3",
+        "2.4"
+      ],
+      "caseIds": [
+        "apgv/oracle/v1/self-test"
+      ],
+      "evidence": {
+        "ref": "platform/evidence/agent-platform-final/reports/oracle-self-test.json",
+        "digest": "sha256:f5d30328acdfa9bafd6f1905331f76a56618a87e1c89c9f0fbd8b74d0b0d44d2"
+      }
+    },
+    {
+      "invariantId": "APGV-I03",
+      "designAnchor": "#goals--non-goals",
+      "modelIds": [
+        "control.release"
+      ],
+      "dslRefs": [
+        "execution-path"
+      ],
+      "owner": "Examples",
+      "paths": [
+        "platform/examples/evidence-digest"
+      ],
+      "requirementSlug": "unrelated-reference-workload",
+      "requirementTitle": "无关 reference workload 仅通过声明式平台面接入",
+      "taskIds": [
+        "3.2",
+        "3.3",
+        "3.4",
+        "3.5",
+        "3.6"
+      ],
+      "caseIds": [
+        "apgv/boundary/v1/evidence-digest"
+      ],
+      "evidence": {
+        "ref": "platform/evidence/agent-platform-final/boundary-evidence-digest.json",
+        "digest": "sha256:d96b581b9822c75c21030cd31df3d789afdc422f3d5bf694d9f453f6bc8dcb48"
+      }
+    },
+    {
+      "invariantId": "APGV-I04",
+      "designAnchor": "#goals--non-goals",
+      "modelIds": [
+        "runtime.kernel"
+      ],
+      "dslRefs": [
+        "execution-path"
+      ],
+      "owner": "Quality",
+      "paths": [
+        "platform/evidence/agent-platform-final"
+      ],
+      "requirementSlug": "second-workload-zero-core-change",
+      "requirementTitle": "第二 workload 核心零修改证明",
+      "taskIds": [
+        "3.1",
+        "3.7"
+      ],
+      "caseIds": [
+        "apgv/workload/v1/protected-diff"
+      ],
+      "evidence": {
+        "ref": "platform/evidence/agent-platform-final/workload-protected.diff.json",
+        "digest": "sha256:7da41ecd9418ebe4d2ee81579561f54e48f9afcea4119dfccab363fa7f28e88b"
+      }
+    },
+    {
+      "invariantId": "APGV-I05",
+      "designAnchor": "#decisions",
+      "modelIds": [
+        "engine.pi"
+      ],
+      "dslRefs": [
+        "execution-path"
+      ],
+      "owner": "Agent Core",
+      "paths": [
+        "platform/packages/agent-platform-conformance",
+        "platform/packages/harness-pi"
+      ],
+      "requirementSlug": "dual-engine-shared-conformance",
+      "requirementTitle": "双 Engine 共享 conformance suite",
+      "taskIds": [
+        "4.1",
+        "4.2",
+        "4.3",
+        "4.4",
+        "4.5",
+        "4.6"
+      ],
+      "caseIds": [
+        "apgv/engine/v1/preflight-capability"
+      ],
+      "evidence": {
+        "ref": "platform/evidence/agent-platform-final/engine-conformance.json",
+        "digest": "sha256:9829c53da0cdb54098a33a4c6835c8c6594eed5af6ca1ad8b90546371a4dd16f"
+      }
+    },
+    {
+      "invariantId": "APGV-I06",
+      "designAnchor": "#decisions",
+      "modelIds": [
+        "host.durable"
+      ],
+      "dslRefs": [
+        "execution-path"
+      ],
+      "owner": "Task Runtime",
+      "paths": [
+        "platform/apps/agent-worker/src/activities.ts"
+      ],
+      "requirementSlug": "interactive-durable-equivalence",
+      "requirementTitle": "Interactive 与 Durable 同 Spec 平台语义等价",
+      "taskIds": [
+        "5.1",
+        "5.2",
+        "5.3",
+        "5.4"
+      ],
+      "caseIds": [
+        "apgv/host/v1/success"
+      ],
+      "evidence": {
+        "ref": "platform/evidence/agent-platform-final/host-equivalence.json",
+        "digest": "sha256:1d5f952b673630a8653ebb26569bb7a7512406d5ed3aabdf47c7e2d257d59f6d"
+      }
+    },
+    {
+      "invariantId": "APGV-I07",
+      "designAnchor": "#decisions",
+      "modelIds": [
+        "store.effect"
+      ],
+      "dslRefs": [
+        "authority-recovery"
+      ],
+      "owner": "Quality",
+      "paths": [
+        "platform/packages/agent-platform-conformance/src/faults"
+      ],
+      "requirementSlug": "deterministic-fault-matrix",
+      "requirementTitle": "确定性故障注入矩阵",
+      "taskIds": [
+        "6.1",
+        "6.2",
+        "6.3",
+        "6.4",
+        "6.5",
+        "6.6",
+        "6.7",
+        "6.8"
+      ],
+      "caseIds": [
+        "apgv/fault/v1/case-01"
+      ],
+      "evidence": {
+        "ref": "platform/evidence/agent-platform-final/fault-matrix.json",
+        "digest": "sha256:5bd2e8dd70b0185f988fe532cb1ae9f93eb7ef1539670f69fcf4f676cd1f2253"
+      }
+    },
+    {
+      "invariantId": "APGV-I08",
+      "designAnchor": "#decisions",
+      "modelIds": [
+        "store.history"
+      ],
+      "dslRefs": [
+        "authority-recovery"
+      ],
+      "owner": "Quality",
+      "paths": [
+        "platform/packages/agent-platform-conformance/src/replay"
+      ],
+      "requirementSlug": "explainable-replay",
+      "requirementTitle": "可解释重放",
+      "taskIds": [
+        "7.1",
+        "7.2"
+      ],
+      "caseIds": [
+        "apgv/replay/v1/explainable"
+      ],
+      "evidence": {
+        "ref": "platform/evidence/agent-platform-final/explainable-replay.json",
+        "digest": "sha256:dd02724dbc0fc0587e20110893179692f069a5e39c288dc01bad9001689cf526"
+      }
+    },
+    {
+      "invariantId": "APGV-I09",
+      "designAnchor": "#decisions",
+      "modelIds": [
+        "projection.product"
+      ],
+      "dslRefs": [
+        "authority-recovery"
+      ],
+      "owner": "Quality",
+      "paths": [
+        "platform/packages/agent-platform-conformance/src/replay"
+      ],
+      "requirementSlug": "projection-rebuild",
+      "requirementTitle": "Projection 删除后可重建",
+      "taskIds": [
+        "7.3",
+        "7.4"
+      ],
+      "caseIds": [
+        "apgv/replay/v1/projection-rebuild"
+      ],
+      "evidence": {
+        "ref": "platform/evidence/agent-platform-final/projection-rebuild.json",
+        "digest": "sha256:45d110d57b32624104a567c5b3d37ceae5169a2e3bcce6e8a5341acc92468bf1"
+      }
+    },
+    {
+      "invariantId": "APGV-I10",
+      "designAnchor": "#decisions",
+      "modelIds": [
+        "coordinator.lifecycle"
+      ],
+      "dslRefs": [
+        "authority-recovery"
+      ],
+      "owner": "Task Runtime",
+      "paths": [
+        "platform/packages/temporal-workflows"
+      ],
+      "requirementSlug": "supported-history-replay",
+      "requirementTitle": "支持窗口内历史 replay",
+      "taskIds": [
+        "7.5",
+        "7.6"
+      ],
+      "caseIds": [
+        "apgv/replay/v1/history-compatibility"
+      ],
+      "evidence": {
+        "ref": "platform/evidence/agent-platform-final/history-replay.json",
+        "digest": "sha256:395d5f7aecec1aae485040cb4c4183c603c4f8770d0a6ec2df0f45cf813c54f7"
+      }
+    },
+    {
+      "invariantId": "APGV-I11",
+      "designAnchor": "#decisions",
+      "modelIds": [
+        "runtime.kernel"
+      ],
+      "dslRefs": [
+        "execution-path"
+      ],
+      "owner": "Quality",
+      "paths": [
+        "platform/scripts/agent-platform-final"
+      ],
+      "requirementSlug": "canonical-dependency-scan",
+      "requirementTitle": "Canonical dependency boundary 静态扫描",
+      "taskIds": [
+        "8.1",
+        "8.2"
+      ],
+      "caseIds": [
+        "apgv/boundary/v1/canonical"
+      ],
+      "evidence": {
+        "ref": "platform/evidence/agent-platform-final/boundary-canonical.json",
+        "digest": "sha256:bbddea8c2389616829fddb0a0b0714c28389c19d9515c3692c1276167b11e2aa"
+      }
+    },
+    {
+      "invariantId": "APGV-I12",
+      "designAnchor": "#decisions",
+      "modelIds": [
+        "control.release"
+      ],
+      "dslRefs": [
+        "execution-path"
+      ],
+      "owner": "Quality",
+      "paths": [
+        "platform/scripts/agent-platform-final"
+      ],
+      "requirementSlug": "reference-workload-direction",
+      "requirementTitle": "Reference workload 依赖方向扫描",
+      "taskIds": [
+        "8.3",
+        "8.4"
+      ],
+      "caseIds": [
+        "apgv/boundary/v1/evidence-digest"
+      ],
+      "evidence": {
+        "ref": "platform/evidence/agent-platform-final/boundary-evidence-digest.json",
+        "digest": "sha256:d96b581b9822c75c21030cd31df3d789afdc422f3d5bf694d9f453f6bc8dcb48"
+      }
+    },
+    {
+      "invariantId": "APGV-I13",
+      "designAnchor": "#decisions",
+      "modelIds": [
+        "store.history"
+      ],
+      "dslRefs": [
+        "authority-recovery"
+      ],
+      "owner": "Architecture",
+      "paths": [
+        "docs/design/_cross/generic-agent-platform-final.system-model.json"
+      ],
+      "requirementSlug": "final-system-model",
+      "requirementTitle": "最终 System Model",
+      "taskIds": [
+        "9.1",
+        "9.2"
+      ],
+      "caseIds": [
+        "apgv/architecture/v1/system-model"
+      ],
+      "evidence": {
+        "ref": "platform/evidence/agent-platform-final/architecture-model-validation.json",
+        "digest": "sha256:1e2ddba98d9017dcb37bd544deef9b29a2936575871a5f443ed87140eea02df8"
+      }
+    },
+    {
+      "invariantId": "APGV-I14",
+      "designAnchor": "#decisions",
+      "modelIds": [
+        "runtime.kernel"
+      ],
+      "dslRefs": [
+        "execution-path"
+      ],
+      "owner": "Architecture",
+      "paths": [
+        "docs/design/_cross/generic-agent-platform-final.runtime.dsl.yaml"
+      ],
+      "requirementSlug": "runtime-dsl-projection",
+      "requirementTitle": "Runtime DSL 与渲染图由模型投影",
+      "taskIds": [
+        "9.3",
+        "9.4"
+      ],
+      "caseIds": [
+        "apgv/architecture/v1/runtime-projection"
+      ],
+      "evidence": {
+        "ref": "platform/evidence/agent-platform-final/architecture-projection-validation.json",
+        "digest": "sha256:884ae9868ae03165604d99e7584e48e738c0019106ec21f491403f818bbddc47"
+      }
+    },
+    {
+      "invariantId": "APGV-I15",
+      "designAnchor": "#decisions",
+      "modelIds": [
+        "service.policy"
+      ],
+      "dslRefs": [
+        "production-governance"
+      ],
+      "owner": "Architecture",
+      "paths": [
+        "docs/design/_cross/generic-agent-platform-final.architecture-review.yaml"
+      ],
+      "requirementSlug": "formal-architecture-review",
+      "requirementTitle": "Formal Architecture Review",
+      "taskIds": [
+        "9.5",
+        "9.6"
+      ],
+      "caseIds": [
+        "apgv/architecture/v1/formal-review"
+      ],
+      "evidence": {
+        "ref": "platform/evidence/agent-platform-final/architecture-review-validation.json",
+        "digest": "sha256:00d4278b6cfccc340574e27c71aa57507d29e1afb082edf170ecb0fd53162455"
+      }
+    },
+    {
+      "invariantId": "APGV-I16",
+      "designAnchor": "#decisions",
+      "modelIds": [
+        "reconciler.authority"
+      ],
+      "dslRefs": [
+        "authority-recovery"
+      ],
+      "owner": "Architecture",
+      "paths": [
+        "platform/scripts/agent-platform-final"
+      ],
+      "requirementSlug": "document-model-implementation-consistency",
+      "requirementTitle": "文档模型实现测试一致性矩阵",
+      "taskIds": [
+        "10.1",
+        "10.2",
+        "10.3",
+        "10.4"
+      ],
+      "caseIds": [
+        "apgv/architecture/v1/runtime-projection"
+      ],
+      "evidence": {
+        "ref": "platform/evidence/agent-platform-final/architecture-projection-validation.json",
+        "digest": "sha256:884ae9868ae03165604d99e7584e48e738c0019106ec21f491403f818bbddc47"
+      }
+    },
+    {
+      "invariantId": "APGV-I17",
+      "designAnchor": "#decisions",
+      "modelIds": [
+        "control.admission"
+      ],
+      "dslRefs": [
+        "production-governance"
+      ],
+      "owner": "Quality",
+      "paths": [
+        "platform/scripts/agent-platform-final"
+      ],
+      "requirementSlug": "machine-readable-final-gate",
+      "requirementTitle": "机器可读最终 Gate manifest",
+      "taskIds": [
+        "11.1",
+        "11.2",
+        "11.3"
+      ],
+      "caseIds": [
+        "apgv/entry/v1/dependency-preflight"
+      ],
+      "evidence": {
+        "ref": "platform/evidence/agent-platform-final/entry-preflight.json",
+        "digest": "sha256:066ac0863f264b201af01da90d4485e3b15f34f1a0aa9d375deda77257bfae4d"
+      }
+    },
+    {
+      "invariantId": "APGV-I18",
+      "designAnchor": "#decisions",
+      "modelIds": [
+        "service.approval"
+      ],
+      "dslRefs": [
+        "production-governance"
+      ],
+      "owner": "Architecture",
+      "paths": [
+        "platform/scripts/agent-platform-final/promote-baseline.mjs"
+      ],
+      "requirementSlug": "fail-closed-baseline-promotion",
+      "requirementTitle": "Validated baseline fail-closed 晋级",
+      "taskIds": [
+        "11.4",
+        "11.5"
+      ],
+      "caseIds": [
+        "apgv/architecture/v1/formal-review"
+      ],
+      "evidence": {
+        "ref": "platform/evidence/agent-platform-final/architecture-review-validation.json",
+        "digest": "sha256:00d4278b6cfccc340574e27c71aa57507d29e1afb082edf170ecb0fd53162455"
+      }
+    },
+    {
+      "invariantId": "APGV-I19",
+      "designAnchor": "#decisions",
+      "modelIds": [
+        "service.observability"
+      ],
+      "dslRefs": [
+        "production-governance"
+      ],
+      "owner": "Quality",
+      "paths": [
+        "platform/scripts/agent-platform-final"
+      ],
+      "requirementSlug": "reproducible-architecture-evidence",
+      "requirementTitle": "架构证据可重复与可归档",
+      "taskIds": [
+        "12.1",
+        "12.2",
+        "12.3",
+        "12.4"
+      ],
+      "caseIds": [
+        "apgv/replay/v1/history-compatibility"
+      ],
+      "evidence": {
+        "ref": "platform/evidence/agent-platform-final/history-replay.json",
+        "digest": "sha256:395d5f7aecec1aae485040cb4c4183c603c4f8770d0a6ec2df0f45cf813c54f7"
+      }
+    }
+  ],
+  "contentDigest": "sha256:2de35a1d5408f46db693a660c3368c22b649384219c1027bd8867e65c40868a4"
+}

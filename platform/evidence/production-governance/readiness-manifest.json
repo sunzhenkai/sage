@@ -1,0 +1,10 @@
+{
+  "schemaVersion":"1",
+  "change":"agent-platform-production-governance",
+  "productionEvidence":false,
+  "decision":"NO_GO",
+  "generatedBy":"repository engineering workflow",
+  "repositoryControls":["versioned contracts and ports","semantic action vectors","additive migrations and forced RLS","OIDC/workload/secret lifecycle adapters","monotonic authorization","sandbox/egress","Effect/Consumption stores","atomic Artifact protocol","supply-chain checks","bounded resilience","audit/cardinality gates","external-only readiness"],
+  "externalBlockers":["real IdP/JWKS and workload exchange","Secret Manager/KMS/object store topology and exercises","production Policy/Approval/Revocation/Effect/Consumption authorities","approved quotas/fairness/capacity","approved SLO/RTO/RPO/retention","production trust roots and revocation feed","production-equivalent fault/recovery/capacity evidence","named Security approval","named Architecture approval","named Operations/SRE approval","named Release approval","named Data approval","current external human GO"],
+  "canEnableProduction":false
+}

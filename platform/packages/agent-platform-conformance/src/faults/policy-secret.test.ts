@@ -1,0 +1,1 @@
+import{expect,it}from'vitest';import{byDomain}from'./fault-fixtures.js';it('covers policy, approval and secret failures without bytes',()=>{const cases=[...byDomain('policy'),...byDomain('approval'),...byDomain('secret')];expect(cases).toHaveLength(7);expect(JSON.stringify(cases)).not.toContain('secretValue');});

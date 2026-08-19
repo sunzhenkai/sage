@@ -1,0 +1,1 @@
+{"schemaVersion":"1","tenantBinding":"required","artifactAcl":"resolver-authoritative","budgets":{"documents":16,"bytes":1048576,"tokens":8192,"toolCalls":18,"durationMs":30000},"retention":"P30D","sensitiveMaterial":"reference-only","externalCode":"forbidden"}
