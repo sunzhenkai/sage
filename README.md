@@ -43,8 +43,8 @@ docker compose up -d --wait postgres temporal artifact-store
 docker compose up -d --build --wait agent-api agent-worker agent-web
 
 # 健康检查
-curl http://127.0.0.1:13000/readyz
-curl http://127.0.0.1:13001/readyz
+curl http://127.0.0.1:9610/readyz
+curl http://127.0.0.1:9611/readyz
 curl http://127.0.0.1:14173/
 ```
 

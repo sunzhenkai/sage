@@ -13,7 +13,7 @@ describe('agent-api local runtime config', () => {
     delete process.env.SAGE_POSTGRES_URL;
     delete process.env.SAGE_TEMPORAL_ADDRESS;
     const config = readApiRuntimeConfig();
-    expect(config).toMatchObject({ deploymentMode: 'local', tenantId: 'tenant-local', port: 3000, temporalAddress: '127.0.0.1:17233' });
+    expect(config).toMatchObject({ deploymentMode: 'local', tenantId: 'tenant-local', port: 9610, temporalAddress: '127.0.0.1:17233' });
     expect(config.principal.roles).toEqual(expect.arrayContaining(['chat-task-promoter', 'task-operator']));
   });
 

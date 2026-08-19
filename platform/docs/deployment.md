@@ -15,7 +15,7 @@
 | `postgres` | Chat、Task Projection、Agent State 数据库 | Docker named volume `postgres-data`；自身无上游依赖 | `127.0.0.1:15432` |
 | `temporal` | Workflow、Timer、Signal、Activity Retry 运行时 | 依赖 `postgres` 健康；Namespace 为 `sage-dev` | `127.0.0.1:17233` |
 | `artifact-store` | 本地 S3-compatible Artifact 存储及控制台 | Docker named volume `artifact-data`；独立于 PostgreSQL/Temporal | API `127.0.0.1:19000`；控制台 `127.0.0.1:19001` |
-| `agent-api` / `agent-worker` / `agent-web` | 应用 API、Temporal Worker、React/Vite Web | 依赖 PostgreSQL/Temporal；由本地 Dockerfile 和 Compose 启动并健康检查 | API `127.0.0.1:13000`；Worker health `127.0.0.1:13001`；Web `127.0.0.1:14173` |
+| `agent-api` / `agent-worker` / `agent-web` | 应用 API、Temporal Worker、React/Vite Web | 依赖 PostgreSQL/Temporal；由本地 Dockerfile 和 Compose 启动并健康检查 | API `127.0.0.1:9610`；Worker health `127.0.0.1:9611`；Web `127.0.0.1:14173` |
 
 ### 资源依赖
 
@@ -24,7 +24,7 @@
 | 宿主机运行时 | Node.js `24.14.0`、Corepack/pnpm `10.33.0` | 安装依赖、执行检查、构建和集成测试 |
 | 容器运行时 | Docker Engine + Docker Compose | 构建并启动六个 Compose 服务，等待健康检查 |
 | 持久化资源 | `postgres-data`、`artifact-data` | 保存数据库和 Artifact；删除 volume 会删除本地数据 |
-| 网络端口 | `15432`、`17233`、`19000`、`19001`、`13000`、`13001`、`14173` | 分别映射基础设施、API、Worker health 和 Web；冲突时覆盖对应 `SAGE_*_PORT` |
+| 网络端口 | `15432`、`17233`、`19000`、`19001`、`9610`、`9611`、`14173` | 分别映射基础设施、API、Worker health 和 Web；冲突时覆盖对应 `SAGE_*_PORT` |
 | 外部生产资源 | HA PostgreSQL、生产 Temporal、Artifact backend、Secret Manager、OIDC/Registry | 当前仓库未提供生产实现；P7 生产准入目前为 **NO-GO** |
 
 ### 配置总览
@@ -67,8 +67,8 @@ Compose 当前启动六个服务：
 | `postgres` | `postgres:17.6-alpine` | 5432 | 15432 | Chat、Task Projection、Agent State 等 PostgreSQL 数据 |
 | `temporal` | `temporalio/auto-setup:1.29.1` | 7233 | 17233 | 本地 Temporal Server，默认 Namespace 为 `sage-dev` |
 | `artifact-store` | `quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z` | 9000/9001 | 19000/19001 | 本地 S3-compatible Artifact Store 与控制台 |
-| `agent-api` | 本地 `Dockerfile` target `agent-api` | 3000 | 13000 | Fastify Chat/Task API；`/livez`、`/readyz` |
-| `agent-worker` | 本地 `Dockerfile` target `agent-worker` | 3001 | 13001 | Temporal Worker health；固定 `sage-dev`/`sage-agent-task-v1` |
+| `agent-api` | 本地 `Dockerfile` target `agent-api` | 9610 | 9610 | Fastify Chat/Task API；`/livez`、`/readyz` |
+| `agent-worker` | 本地 `Dockerfile` target `agent-worker` | 9611 | 9611 | Temporal Worker health；固定 `sage-dev`/`sage-agent-task-v1` |
 | `agent-web` | 本地 `Dockerfile` target `agent-web` | 4173 | 14173 | Vite preview；`/v1` 代理到 API |
 
 数据卷为：
@@ -225,13 +225,13 @@ docker compose ps
 docker compose logs --tail=100 agent-api agent-worker agent-web
 
 # 应用健康端点
-curl --fail http://127.0.0.1:${SAGE_API_HOST_PORT:-13000}/livez
-curl --fail http://127.0.0.1:${SAGE_API_HOST_PORT:-13000}/readyz
-curl --fail http://127.0.0.1:${SAGE_WORKER_HEALTH_HOST_PORT:-13001}/readyz
+curl --fail http://127.0.0.1:${SAGE_API_HOST_PORT:-9610}/livez
+curl --fail http://127.0.0.1:${SAGE_API_HOST_PORT:-9610}/readyz
+curl --fail http://127.0.0.1:${SAGE_WORKER_HEALTH_HOST_PORT:-9611}/readyz
 curl --fail http://127.0.0.1:${SAGE_WEB_HOST_PORT:-14173}/
 ```
 
-`smoke:local` 会创建本地 Chat session/message，验证 Chat Run、promotion、Temporal Worker Task succeeded 和 Web `/v1` proxy；结束时执行 `docker compose down --remove-orphans`，保留 named volumes。默认应用宿主端口为 API `13000`、Worker health `13001`、Web `14173`，可分别通过 `SAGE_API_HOST_PORT`、`SAGE_WORKER_HEALTH_HOST_PORT`、`SAGE_WEB_HOST_PORT` 覆盖。
+`smoke:local` 会创建本地 Chat session/message，验证 Chat Run、promotion、Temporal Worker Task succeeded 和 Web `/v1` proxy；结束时执行 `docker compose down --remove-orphans`，保留 named volumes。默认应用宿主端口为 API `9610`、Worker health `9611`、Web `14173`，可分别通过 `SAGE_API_HOST_PORT`、`SAGE_WORKER_HEALTH_HOST_PORT`、`SAGE_WEB_HOST_PORT` 覆盖。
 
 ## 6. 代码质量、构建与集成验证
 
@@ -484,8 +484,8 @@ corepack pnpm install --frozen-lockfile
 ```bash
 docker compose ps agent-api agent-worker agent-web
 docker compose logs --tail=200 agent-api agent-worker agent-web
-curl --fail http://127.0.0.1:${SAGE_API_HOST_PORT:-13000}/readyz
-curl --fail http://127.0.0.1:${SAGE_WORKER_HEALTH_HOST_PORT:-13001}/readyz
+curl --fail http://127.0.0.1:${SAGE_API_HOST_PORT:-9610}/readyz
+curl --fail http://127.0.0.1:${SAGE_WORKER_HEALTH_HOST_PORT:-9611}/readyz
 ```
 
 API/Worker 启动阶段会在 PostgreSQL advisory lock 下串行执行 Chat/Task migration，避免并发 migration deadlock。Worker readiness 必须同时满足 `RUNNING`、workflow/activity `POLLING`；应用使用的本地 principal、Pi harness 和 credential 不得用于生产。若 Docker build 报 Docker Hub DNS/网络错误，先确认能拉取固定的 `node:24.14.0-bookworm-slim`，不要改用未批准的基础镜像。

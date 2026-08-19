@@ -38,7 +38,7 @@ export function readWorkerRuntimeConfig(): WorkerRuntimeConfig {
     deploymentMode: 'local', executionMode, lifecycleOwner: modeDecision.lifecycleOwner, executionModeAudit: modeDecision.audit, tenantId: env('SAGE_TENANT_ID', 'tenant-local'),
     postgresUrl: env('SAGE_POSTGRES_URL', 'postgres://sage:sage-local-only@127.0.0.1:15432/sage'),
     temporalAddress: env('SAGE_TEMPORAL_ADDRESS', '127.0.0.1:17233'),
-    host: env('SAGE_HEALTH_HOST', '127.0.0.1'), port: Number(env('SAGE_HEALTH_PORT', '3001'))
+    host: env('SAGE_HEALTH_HOST', '0.0.0.0'), port: Number(env('SAGE_HEALTH_PORT', '9611'))
   };
 }
 

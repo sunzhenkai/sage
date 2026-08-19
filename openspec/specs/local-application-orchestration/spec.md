@@ -16,11 +16,11 @@ Compose SHALL 编排 PostgreSQL、Temporal、Artifact Store、API、Worker 和 W
 
 #### Scenario: Full stack starts in dependency order
 - **WHEN** 执行 `docker compose up -d --build --wait`
-- **THEN** PostgreSQL/Temporal/Artifact Store 先达到 healthy，随后 API/Worker/Web 也达到 healthy，且默认应用宿主端口为 13000、13001、14173
+- **THEN** PostgreSQL/Temporal/Artifact Store 先达到 healthy，随后 API/Worker/Web 也达到 healthy，且默认应用宿主端口为 9610、9611、14173
 
 #### Scenario: Port overrides do not change container contracts
 - **WHEN** 设置 `SAGE_API_HOST_PORT`、`SAGE_WORKER_HEALTH_HOST_PORT` 或 `SAGE_WEB_HOST_PORT`
-- **THEN** 仅宿主端口改变，应用容器仍使用 3000、3001、4173 及 Compose 服务名连接
+- **THEN** 仅宿主端口改变，应用容器仍使用 9610、9611、4173 及 Compose 服务名连接
 
 ### Requirement: Dependency-aware application health
 Compose application healthchecks SHALL validate application protocol readiness rather than only process existence；API、Worker、Web 分别暴露可验证的 readiness/root semantics。

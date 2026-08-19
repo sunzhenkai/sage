@@ -60,15 +60,15 @@ services:
       SAGE_POSTGRES_URL: postgres://sage:sage-local-only@postgres:5432/sage
       SAGE_TEMPORAL_ADDRESS: temporal:7233
       SAGE_HTTP_HOST: 0.0.0.0
-      SAGE_HTTP_PORT: 3000
+      SAGE_HTTP_PORT: 9610
     depends_on:
       postgres:
         condition: service_healthy
       temporal:
         condition: service_healthy
-    ports: ["${SAGE_API_HOST_PORT:-13000}:3000"]
+    ports: ["${SAGE_API_HOST_PORT:-9610}:9610"]
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/readyz').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:9610/readyz').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 5s
       timeout: 5s
       retries: 30
@@ -84,15 +84,15 @@ services:
       SAGE_POSTGRES_URL: postgres://sage:sage-local-only@postgres:5432/sage
       SAGE_TEMPORAL_ADDRESS: temporal:7233
       SAGE_HEALTH_HOST: 0.0.0.0
-      SAGE_HEALTH_PORT: 3001
+      SAGE_HEALTH_PORT: 9611
     depends_on:
       postgres:
         condition: service_healthy
       temporal:
         condition: service_healthy
-    ports: ["${SAGE_WORKER_HEALTH_HOST_PORT:-13001}:3001"]
+    ports: ["${SAGE_WORKER_HEALTH_HOST_PORT:-9611}:9611"]
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/readyz').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:9611/readyz').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 5s
       timeout: 5s
       retries: 30
@@ -103,7 +103,7 @@ services:
       dockerfile: Dockerfile
       target: agent-web
     environment:
-      SAGE_API_PROXY_TARGET: http://agent-api:3000
+      SAGE_API_PROXY_TARGET: http://agent-api:9610
     depends_on:
       agent-api:
         condition: service_healthy

@@ -48,8 +48,8 @@ export function readApiRuntimeConfig(): ApiRuntimeConfig {
     deploymentMode: 'local', executionMode, lifecycleOwner: modeDecision.lifecycleOwner, executionModeAudit: modeDecision.audit, tenantId,
     postgresUrl: env('SAGE_POSTGRES_URL', 'postgres://sage:sage-local-only@127.0.0.1:15432/sage'),
     temporalAddress: env('SAGE_TEMPORAL_ADDRESS', '127.0.0.1:17233'),
-    host: env('SAGE_HTTP_HOST', '127.0.0.1'),
-    port: Number(env('SAGE_HTTP_PORT', '3000')),
+    host: env('SAGE_HTTP_HOST', '0.0.0.0'),
+    port: Number(env('SAGE_HTTP_PORT', '9610')),
     principal: {
       authenticationId, principalId: 'local-dev-principal', tenantId,
       roles: ['chat-task-promoter', 'task-operator', 'provider-catalog-admin']
