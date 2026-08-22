@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>代码接口与契约 · Sage · Pretty View HTML</title>
+<link rel="stylesheet" href="../assets/global.css" />
+<style>
+  pre.ts {
+    background: #fbfaf7;
+    border: 1px solid var(--pv-border);
+    border-left: 0.32rem solid var(--pv-zijing);
+    border-radius: 0.45rem;
+    padding: var(--pv-space-4) var(--pv-space-6);
+    overflow-x: auto;
+    font-family: var(--pv-mono);
+    font-size: 0.85rem;
+    line-height: 1.55;
+    color: var(--pv-strong);
+    margin-block: var(--pv-space-4);
+  }
+  pre.ts .k { color: var(--pv-zijing); font-weight: 800; }
+  pre.ts .t { color: var(--pv-zheshi); }
+  pre.ts .s { color: var(--pv-songshi); }
+  pre.ts .c { color: var(--pv-muted); font-style: italic; }
+  pre.ts .n { color: var(--pv-kongque); }
+  .iface-card {
+    border: 1px solid var(--pv-border);
+    border-radius: var(--pv-radius);
+    background: var(--pv-surface);
+    padding: var(--pv-space-4) var(--pv-space-6);
+    margin-block: var(--pv-space-6);
+    box-shadow: var(--pv-shadow);
+  }
+  .iface-card h3 { margin-top: 0; }
+  .iface-card .where {
+    font-family: var(--pv-mono);
+    font-size: 0.82rem;
+    color: var(--pv-rougui);
+  }
+  .iface-card dl { margin: 0; }
+  .iface-card dt {
+    color: var(--pv-accent);
+    font-weight: 800;
+    margin-top: var(--pv-space-3);
+  }
+  .iface-card dd {
+    margin: var(--pv-space-2) 0 0 var(0);
+    padding-left: 0;
+  }
+  .schema-strip {
+    display: grid;
+    gap: 1px;
+    background: var(--pv-border);
+    border: 1px solid var(--pv-border);
+    border-radius: var(--pv-radius);
+    overflow: hidden;
+    margin-block: var(--pv-space-4);
+  }
+  .schema-strip .row {
+    display: grid;
+    grid-template-columns: 13rem 1fr 8rem;
+    background: var(--pv-surface);
+    font-family: var(--pv-mono);
+    font-size: 0.82rem;
+  }
+  .schema-strip .row > div { padding: var(--pv-space-2) var(--pv-space-3); }
+  .schema-strip .row .key { color: var(--pv-strong); font-weight: 800; }
+  .schema-strip .row .type { color: var(--pv-rougui); }
+  @media (max-width: 56rem) {
+    .schema-strip .row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<nav class="top-nav" aria-label="Sage 导航">
+  <div class="nav-menu">
+    <a href="../index.html">Pretty View 根</a>
+    <a href="./index.html">Sage 包首页</a>
+    <a href="./overview.html">概览</a>
+    <a href="./architecture.html">整体架构</a>
+    <a href="./packages.html">Package 矩阵</a>
+    <a href="./interfaces.html" aria-current="page">接口与契约</a>
+    <a href="./runtime.html">运行时</a>
+    <a href="./conventions.html">边界与约束</a>
+  </div>
+</nav>
+
+<main class="page-shell reading-wide">
+  <p class="eyebrow">Sage · 04 · 代码接口与契约</p>
+  <h1>代码接口与契约</h1>
+  <p class="muted">所有契约通过 TypeBox 定义（<code>$id</code>、<code>pattern</code>、<code>format</code>、<code>Literal</code>），由 <code>@sage/agent-contracts</code> 与 <code>@sage/platform-ports</code> 持有。本页只整理接口形状与字段语义，不复述全部 description。</p>
+
+  <h2>1. Agent Run 契约（v1）</h2>
+
+  <section class="iface-card">
+    <h3>AgentRunSpec</h3>
+    <p class="where"><code>@sage/agent-contracts · AgentRunSpec.v1</code></p>
+    <p>一次有界执行的输入。Library 校验 <code>requiredCapabilities</code> 后再驱动 Harness。</p>
+    <div class="schema-strip">
+      <div class="row"><div class="key">schemaVersion</div><div>'1'（literal）</div><div class="type">version</div></div>
+      <div class="row"><div class="key">runId</div><div>1–128 字符</div><div class="type">string</div></div>
+      <div class="row"><div class="key">sessionRef?</div><div><code>^session://...</code></div><div class="type">ref</div></div>
+      <div class="row"><div class="key">input</div><div>≤ 100 000 字符</div><div class="type">string</div></div>
+      <div class="row"><div class="key">skillRefs[]</div><div>≤ 32 项</div><div class="type">ref[]</div></div>
+      <div class="row"><div class="key">requiredCapabilities[]</div><div><code>events · cancellation · checkpoint · skills · tools</code></div><div class="type">enum[]</div></div>
+      <div class="row"><div class="key">limits</div><div><code>maxTurns: 1..100 · maxToolCalls: 0..1000 · maxTokens: 1..10M · deadlineAt: date-time</code></div><div class="type">object</div></div>
+      <div class="row"><div class="key">resumeFrom?</div><div><code>^checkpoint://...</code></div><div class="type">ref</div></div>
+    </div>
+  </section>
+
+  <section class="iface-card">
+    <h3>AgentEvent</h3>
+    <p class="where"><code>@sage/agent-contracts · AgentEvent.v1</code></p>
+    <p>公共事件载体。payload 是 schema-less Record；外部消费时按 <code>type</code> 分支。</p>
+    <pre class="ts"><span class="k">type</span> <span class="t">AgentEventType</span> =
+  | <span class="s">'run.started'</span>
+  | <span class="s">'turn.started'</span>
+  | <span class="s">'output.delta'</span>
+  | <span class="s">'turn.completed'</span>
+  | <span class="s">'tool.completed'</span>
+  | <span class="s">'checkpoint.created'</span>
+  | <span class="s">'run.cancel.requested'</span>
+  | <span class="s">'run.paused'</span>
+  | <span class="s">'run.completed'</span>
+  | <span class="s">'run.failed'</span>
+
+<span class="c">// AgentEvent 增加 sequence 单调递增；checkpointRef 携带引用而非 payload</span></pre>
+  </section>
+
+  <section class="iface-card">
+    <h3>AgentRunOutcome</h3>
+    <p class="where"><code>@sage/agent-contracts · AgentRunOutcome.v1</code></p>
+    <p>单次 Run 的终结：status / output / error / usage / checkpointRef。usage 含 turns / toolCalls / tokens。</p>
+    <pre class="ts"><span class="k">type</span> <span class="t">AgentRunStatus</span> =
+  | <span class="s">'succeeded'</span> | <span class="s">'failed'</span> | <span class="s">'cancelled'</span>
+  | <span class="s">'deadline_exceeded'</span> | <span class="s">'budget_exhausted'</span> | <span class="s">'paused'</span></pre>
+  </section>
+
+  <section class="iface-card">
+    <h3>AgentError</h3>
+    <p class="where"><code>AgentErrorCode.v1</code></p>
+    <pre class="ts"><span class="k">enum</span>:
+  INVALID_RUN_SPEC · HARNESS_CAPABILITY_MISSING · HARNESS_FAILURE
+  CANCELLED · DEADLINE_EXCEEDED
+  TURN_BUDGET_EXHAUSTED · TOOL_BUDGET_EXHAUSTED · TOKEN_BUDGET_EXHAUSTED</pre>
+  </section>
+
+  <h2>2. Canonical 终版契约（AgentTaskSpec / Envelope / Receipt）</h2>
+
+  <section class="iface-card">
+    <h3>AgentPackageRelease</h3>
+    <p class="where"><code>AgentPackageRelease.v1</code></p>
+    <p>不可变包发布物：<code>packageDigest / lockDigest / contentDigest / provenanceDigest / signatureDigest</code>；<code>compatibility.kernelContractMajor</code> 与 <code>engineCompatibilityDigests[]</code> 用于替换可证。</p>
+    <dl>
+      <dt>关键约束</dt>
+      <dd><code>$id: 'AgentPackageRelease.v1' · additionalProperties: false</code>。</dd>
+      <dt>来源</dt>
+      <dd><code>@sage/agent-package-release</code> 输出的 <code>SupplyChainArtifactV1</code>。</dd>
+    </dl>
+  </section>
+
+  <section class="iface-card">
+    <h3>AgentTaskSpec</h3>
+    <p class="where"><code>AgentTaskSpec.v1</code></p>
+    <p>每次 Run/Attempt 唯一执行配置 authority。Spec 不含 <code>remaining_budget</code> / Secret / MCP endpoint / context 全部内容。</p>
+    <div class="schema-strip">
+      <div class="row"><div class="key">schemaVersion · specRef · specDigest</div><div>'1' · <code>^spec://</code> · <code>sha256:...</code></div><div class="type">version</div></div>
+      <div class="row"><div class="key">taskId · runId · attemptId</div><div>已 admission 写入的稳定 ID</div><div class="type">id</div></div>
+      <div class="row"><div class="key">releaseRef · releaseDigest</div><div><code>^release://</code> + digest</div><div class="type">ref</div></div>
+      <div class="row"><div class="key">targetSnapshotRef/Digest</div><div>Coordinator / Workflow target 固化</div><div class="type">ref</div></div>
+      <div class="row"><div class="key">principalRef · tenantId</div><div>服务端注入，不来自 caller</div><div class="type">id</div></div>
+      <div class="row"><div class="key">goalRef · engineId · skillRefs[]</div><div>Goal / Engine / Skill snapshot 引用</div><div class="type">ref[]</div></div>
+      <div class="row"><div class="key">modelRouteRef · contextPlanRef · capabilityGrantRef</div><div>Model / Context / Capability 快照</div><div class="type">ref</div></div>
+      <div class="row"><div class="key">executionPolicyRef · boundsRef · governanceRef</div><div>执行策略 / 边界 / 治理</div><div class="type">ref</div></div>
+      <div class="row"><div class="key">requirementsDigest</div><div>Sage 终版的 runtime requirements digest</div><div class="type">digest</div></div>
+      <div class="row"><div class="key">admittedAt</div><div>date-time（仅记录）</div><div class="type">when</div></div>
+    </div>
+  </section>
+
+  <section class="iface-card">
+    <h3>AgentExecutionEnvelope</h3>
+    <p class="where"><code>AgentExecutionEnvelope.v1</code></p>
+    <pre class="ts">{
+  schemaVersion: <span class="s">'1'</span>;
+  specRef: <span class="s">`spec://`</span>; specDigest: <span class="s">`sha256:...`</span>;
+  taskId; runId; attemptId; invocationId;
+  checkpointRef?: <span class="s">`checkpoint://`</span>;
+  correlation;
+}</pre>
+    <p class="muted">Host / Queue / Coordinator 只传递 Envelope；消费者必须从 Spec Store 加载并校验 digest。</p>
+  </section>
+
+  <section class="iface-card">
+    <h3>BoundedRunReceipt</h3>
+    <p class="where"><code>@sage/agent-contracts</code></p>
+    <p>bounded invocation 的可恢复证据，必须包含 invocationId / specDigest / model_receipts / capability_receipts / usage_receipts / effect_receipts / checkpoint_ref / actual_host_build_attestation。</p>
+  </section>
+
+  <h2>3. Chat / Session 契约</h2>
+
+  <section class="iface-card">
+    <h3>Message &amp; Session</h3>
+    <p class="where"><code>@sage/app-contracts · Message.v1 / Session.v1 / Summary.v1</code></p>
+    <pre class="ts"><span class="k">type</span> <span class="t">MessagePart</span> =
+  | { kind: <span class="s">'text'</span>; text: string }
+  | { kind: <span class="s">'artifact'</span>; artifact: ArtifactReference }
+
+<span class="k">type</span> <span class="t">ArtifactReference</span> = {
+  artifactRef: <span class="s">`artifact://`</span>;
+  name: string;
+  mediaType: string;
+  sizeBytes: <span class="k">number</span>; <span class="c">// 0..10MB</span>
+}</pre>
+    <p class="muted">Message 永远只携带 Part；大对象走 Artifact Store。</p>
+  </section>
+
+  <section class="iface-card">
+    <h3>ChatRun / TimelinePayload / ProviderRoute</h3>
+    <p class="where"><code>@sage/app-contracts</code></p>
+    <pre class="ts"><span class="k">enum</span> TimelinePayloadKind:
+  text · tool · artifact · error · task · run
+
+<span class="c">// task.kind 包含 placeholder / promotion_pending / routed / running
+//    / paused / succeeded / failed / cancelled / effect_unknown</span>
+
+<span class="k">type</span> <span class="t">ChatProviderRoute</span> = {       <span class="c">// 请求级 ephemeral</span>
+  adapterKind: <span class="s">'openai-compatible'</span> | <span class="s">'anthropic'</span>;
+  baseUrl: <span class="s">`https://`</span>;
+  modelId: string;
+  apiKey: string  <span class="c">// 不持久化</span>
+}</pre>
+  </section>
+
+  <section class="iface-card">
+    <h3>ChatErrorCode</h3>
+    <p class="where"><code>ChatErrorCode.v1</code></p>
+    <pre class="ts">CHAT_INVALID_REQUEST · CHAT_SESSION_NOT_FOUND
+CHAT_RUN_NOT_FOUND · CHAT_RUN_NOT_RETRYABLE
+CHAT_API_RESTARTED · CHAT_AGENT_FAILED · CHAT_STORE_UNAVAILABLE</pre>
+  </section>
+
+  <h2>4. Task / Workflow Target 契约</h2>
+
+  <section class="iface-card">
+    <h3>TaskTypeId &amp; Snapshot</h3>
+    <p class="where"><code>@sage/task-domain</code></p>
+    <pre class="ts"><span class="k">const</span> TASK_TYPE = <span class="s">'sage.agent-task.v1'</span>;
+<span class="k">const</span> BATCH_TASK_TYPE = <span class="s">'sage.batch-agent-task.v1'</span>;
+<span class="k">const</span> TASK_QUEUE = <span class="s">'sage-agent-task-v1'</span>;
+<span class="k">const</span> TASK_NAMESPACE = <span class="s">'sage-dev'</span>;
+<span class="k">const</span> TASK_TARGET = <span class="s">'sage-dev-single'</span>;
+
+<span class="k">enum</span> TaskStatus:
+  running · paused · effect_unknown · succeeded · failed · cancelled
+
+<span class="k">enum</span> TaskLifecyclePath:
+  LEGACY_TEMPORAL_TASK · DURABLE_COORDINATOR_V2
+
+<span class="k">enum</span> ProjectionFreshness: fresh · stale · unavailable</pre>
+  </section>
+
+  <section class="iface-card">
+    <h3>WorkflowTargetSnapshot &amp; CoordinatorTargetSnapshot</h3>
+    <p class="where"><code>WorkflowTargetSnapshot.v1 / CoordinatorTargetSnapshot.v1</code></p>
+    <pre class="ts">{
+  schemaVersion: <span class="s">'1'</span>;
+  snapshotId; routeDecisionId;
+  targetId; targetProfileVersion;
+  clusterId; isolationKey;
+  endpoint; namespace; taskQueue;
+  credentialRef: <span class="s">`secret://`</span>;
+  taskType; taskTypeVersion;
+  policyVersion; registryVersion;
+  environment: <span class="s">'development'</span> | <span class="s">'staging'</span> | <span class="s">'production'</span>;
+  region; residency; selectedAt;
+  adapterRef?; targetRef?;
+  runtimeCompatibilityRef?; runtimeBuildRef?; requirementsDigest?;
+  routingRationale?;
+}</pre>
+    <p class="muted">Snapshot 只在 Task 创建时固化；query / signal / cancel / retry 必须复用同一 Snapshot。</p>
+  </section>
+
+  <h2>5. Harness / Tool / Capability</h2>
+
+  <section class="iface-card">
+    <h3>HarnessPort</h3>
+    <p class="where"><code>@sage/agent-contracts</code></p>
+    <pre class="ts"><span class="k">interface</span> <span class="t">HarnessPort</span> {
+  <span class="k">readonly</span> capabilities: HarnessCapabilities;
+  <span class="k">executeTurn</span>(req: HarnessTurnRequest, signal: AbortSignal):
+    Promise&lt;HarnessTurnResult&gt;;
+}
+
+<span class="k">interface</span> <span class="t">HarnessTurnRequest</span> {
+  runId; input; turn; skillRefs; resumeFrom?;
+  remaining: { toolCalls; tokens };
+}</pre>
+  </section>
+
+  <section class="iface-card">
+    <h3>ToolDefinition &amp; ToolExecutionContext</h3>
+    <p class="where"><code>@sage/tool-runtime · ToolDefinition.v1</code></p>
+    <pre class="ts"><span class="k">enum</span> ToolAccess: read · write
+<span class="k">enum</span> ToolRisk:  low · medium · high
+
+<span class="k">type</span> <span class="t">ToolExecutor</span> =
+  (input: unknown, ctx: ToolExecutionContext) =&gt; Promise&lt;unknown&gt;;
+
+<span class="c">// 执行顺序固定：参数校验 → 授权 → 执行 → 结果归一化 → AgentEvent</span>
+<span class="c">// Tool 类别：Local Function / HTTP/API / MCP Adapter / Controlled Execution</span></pre>
+  </section>
+
+  <section class="iface-card">
+    <h3>CapabilityBrokerPort &amp; EffectReceipt</h3>
+    <p class="where"><code>@sage/platform-ports + @sage/agent-contracts</code></p>
+    <pre class="ts"><span class="k">interface</span> <span class="t">CapabilityRequest</span> {
+  tenantId; principalRef; resourceRefs;
+  toolVersion: <span class="s">`tool://.../v..`</span>;
+  canonicalInputDigest: <span class="s">`sha256:...`</span>;
+  approvalRef?; scope; residency;
+  idempotencyKey: stableId;
+}
+
+<span class="c">// effective grant = spec.snapshot ∩ live.denyOverlay ∩ principal scope
+//              ∩ approval ∩ current ledger budget
+// 任意依赖不可用 → fail-closed</span>
+
+<span class="k">type</span> <span class="t">semantic_action_id</span> =
+  hash(tenant, task, attempt-compatible-action-key, tool-version, canonical-input-digest)</pre>
+  </section>
+
+  <h2>6. Coordinator / Engine Adapter</h2>
+
+  <section class="iface-card">
+    <h3>CoordinatorObservation &amp; Reducer</h3>
+    <p class="where"><code>@sage/platform-ports/coordinator-conformance.ts</code></p>
+    <pre class="ts"><span class="c">// reducer 仅输入 observation + command，输出新 observation + result。
+// 不调用 adapter、不写 store、不解析 target。
+// 重复 commandKey → 复用同一 observation。</span>
+
+<span class="k">enum</span> CoordinatorLifecycleState:
+  RUNNING · PAUSED · CANCELLED · COMPLETED · FAILED
+  TIMED_OUT · WAITING_FOR_SIGNAL · EFFECT_UNKNOWN
+
+<span class="k">type</span> <span class="t">CoordinatorCommand</span> = Dispatch | Control | Receipt</pre>
+  </section>
+
+  <section class="iface-card">
+    <h3>EngineAdapter</h3>
+    <p class="where"><code>@sage/agent-runtime-conformance</code></p>
+    <p>Owner must：实现 <code>observe / reason / plan / act / reflect</code>；不允许直接访问 Model/MCP/Secret、不允许自行签发 CheckpointRef、不允许持有跨 retry 的硬预算、不允许修改 Spec / principal / tenant / target / grant。</p>
+  </section>
+
+  <h2>7. State Adapter Ports（Snapshot）</h2>
+
+  <div class="table-wrap">
+  <table>
+    <caption class="muted"><small>核心 Port 由 <code>@sage/platform-ports</code> 定义，Postgres 在 <code>agent-state-postgres</code> 实现</small></caption>
+    <thead>
+      <tr><th>Port</th><th>实现位置</th><th>关键能力</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>AgentStateAdapter</code></td><td>postgres</td><td>session / run / context / event / checkpoint</td></tr>
+      <tr><td><code>AgentTaskSpecStorePort</code></td><td>postgres</td><td>Spec 不可变读写</td></tr>
+      <tr><td><code>BoundedRunReceiptStorePort</code></td><td>postgres</td><td>幂等写入 receipts</td></tr>
+      <tr><td><code>AgentEventStorePort</code></td><td>postgres</td><td>monotonic sequence + writer fence</td></tr>
+      <tr><td><code>CheckpointStorePort</code></td><td>postgres + object store + KMS</td><td>pending → committed / quarantined</td></tr>
+      <tr><td><code>ToolEffectLedgerPort</code></td><td>postgres</td><td>CLAIMED / COMMITTED / EFFECT_UNKNOWN / RESOLVED</td></tr>
+      <tr><td><code>ProductionConsumptionLedgerPort</code></td><td>postgres</td><td>reserve / commit / release</td></tr>
+      <tr><td><code>IdempotencyStore</code></td><td>postgres</td><td>idempotency key 短租约</td></tr>
+      <tr><td><code>SecurityAuditPort</code></td><td>postgres</td><td><code>agent_security_audit</code> 追加 + 查询</td></tr>
+      <tr><td><code>DurableCoordinatorPort</code></td><td>temporal-workflows</td><td>domain contract；Temporal 作为 Adapter</td></tr>
+      <tr><td><code>ModelBrokerPort</code></td><td>model-broker</td><td>route snapshot + receipt + limiter + breaker</td></tr>
+      <tr><td><code>ContextResolverPort</code></td><td>context-resolver</td><td>only admission-frozen sources</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>8. stable ID / Digest helpers</h2>
+  <pre class="ts"><span class="c">// @sage/agent-contracts</span>
+canonicalJson(value, { excludeKeys? });      <span class="c">// RFC 8785 风格</span>
+sha256Digest(value, { excludeKeys? });       <span class="c">// 'sha256:hex'</span>
+stableId(value);                             <span class="c">// 强类型 opaque</span>
+contentRef(value);                           <span class="c">// ^[^:]+://...$</span>
+
+CANONICAL_RUNTIME_CONTRACT_V1 = Object.freeze({
+  schemaMajor: <span class="n">1</span>,
+  maxSerializedPayloadBytes: <span class="n">64 * 1024</span>,
+  maxReceiptRefs: <span class="n">128</span>
+});</pre>
+
+  <hr />
+  <nav class="pager" aria-label="分页导航">
+    <span class="muted">上一节：<a href="./packages.html">Package 矩阵</a></span>
+    <span class="muted">下一节：<a href="./runtime.html">运行时 →</a></span>
+  </nav>
+</main>
+</body>
+</html>

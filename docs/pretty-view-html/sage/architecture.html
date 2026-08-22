@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>整体技术架构 · Sage · Pretty View HTML</title>
+<link rel="stylesheet" href="../assets/global.css" />
+<style>
+  .arch-strip {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--pv-border);
+    border: 1px solid var(--pv-border);
+    border-radius: var(--pv-radius);
+    overflow: hidden;
+    margin-block: var(--pv-space-6);
+  }
+  .arch-strip div {
+    background: var(--pv-surface);
+    padding: var(--pv-space-3) var(--pv-space-4);
+  }
+  .arch-strip div:nth-child(3n+1) { background: color-mix(in srgb, var(--pv-zhusha) 8%, var(--pv-surface)); }
+  .arch-strip div:nth-child(3n+2) { background: color-mix(in srgb, var(--pv-diwang) 10%, var(--pv-surface)); }
+  .arch-strip div:nth-child(3n+3) { background: color-mix(in srgb, var(--pv-zijing) 8%, var(--pv-surface)); }
+  @media (max-width: 56rem) { .arch-strip { grid-template-columns: 1fr; } }
+  .diagram-block {
+    border: 1px solid var(--pv-border);
+    border-radius: var(--pv-radius);
+    background: var(--pv-surface);
+    padding: var(--pv-space-4) var(--pv-space-6);
+    margin-block: var(--pv-space-6);
+  }
+  .diagram-block pre {
+    margin: 0;
+    overflow-x: auto;
+    font-family: var(--pv-mono);
+    font-size: 0.85rem;
+    line-height: 1.55;
+    color: var(--pv-strong);
+  }
+  .diagram-block figcaption {
+    color: var(--pv-muted);
+    border-top: 1px solid var(--pv-border);
+    padding-top: var(--pv-space-3);
+    margin-top: var(--pv-space-3);
+  }
+  .kernel-stack {
+    --c1: var(--pv-zijing);
+    --c2: var(--pv-kongque);
+    --c3: var(--pv-diwang);
+    --c4: var(--pv-songshi);
+    --c5: var(--pv-zhusha);
+    display: grid;
+    gap: 4px;
+    margin-block: var(--pv-space-4);
+  }
+  .kernel-stack > div {
+    color: white;
+    padding: var(--pv-space-3) var(--pv-space-4);
+    border-radius: 0.45rem;
+    font-weight: 700;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--pv-space-3);
+  }
+  .kernel-stack > div small { font-weight: 400; opacity: 0.85; font-family: var(--pv-mono); }
+  .kernel-stack > div:nth-child(1) { background: var(--c1); }
+  .kernel-stack > div:nth-child(2) { background: var(--c2); }
+  .kernel-stack > div:nth-child(3) { background: var(--c3); }
+  .kernel-stack > div:nth-child(4) { background: var(--c4); }
+  .kernel-stack > div:nth-child(5) { background: var(--c5); }
+</style>
+</head>
+<body>
+<nav class="top-nav" aria-label="Sage 导航">
+  <div class="nav-menu">
+    <a href="../index.html">Pretty View 根</a>
+    <a href="./index.html">Sage 包首页</a>
+    <a href="./overview.html">概览</a>
+    <a href="./architecture.html" aria-current="page">整体架构</a>
+    <a href="./packages.html">Package 矩阵</a>
+    <a href="./interfaces.html">接口与契约</a>
+    <a href="./runtime.html">运行时</a>
+    <a href="./conventions.html">边界与约束</a>
+  </div>
+</nav>
+
+<main class="page-shell reading-wide">
+  <p class="eyebrow">Sage · 02 · 整体技术架构</p>
+  <h1>整体技术架构</h1>
+  <p class="muted">本页并置 v1.1 已交付架构与终版目标态架构。对照点：Kernel/Engine/Host 抽象、Capability Broker、AgentTaskSpec 权威、State 单一拥有者、Coordinator Adapter 边界。</p>
+
+  <div class="arch-strip" aria-label="基线 / 目标对照">
+    <div><strong>v1.1 baseline</strong><br><small>validated design · Architecture Review 87/100 · 已交付</small></div>
+    <div><strong>实现基线</strong><br><small>LocalAgentClient · PiHarness · Temporal · Postgres · MinIO</small></div>
+    <div><strong>终版目标态</strong><br><small>Proposed final architecture · machine-gate BLOCKED/NO-GO</small></div>
+  </div>
+
+  <h2>v1.1：已交付架构</h2>
+
+  <p>System Model <code>first-version-system.architecture.json</code> 把整个运行时描绘为五层（Actors / Manager / Gateway / Runtime / Platform / Infrastructure），共 25 个节点，等于 v1.1 runtime taxonomy 上限。</p>
+
+  <figure class="diagram-block">
+    <figcaption>v1.1 总体架构文字版（按层从左到右）</figcaption>
+    <pre><code>Actors     : Agent Application User, Host Application
+Manager    : Agent Web UI, Temporal Target Registry
+Gateway    : Application API (Fastify+HTTP/SSE), Agent Library API (LocalAgentClient)
+Runtime    : Chat Service, Task Service, Task Router,
+             Environment Task Workers, Agent Runner
+Platform   : Temporal Client Adapter, Pi Harness Adapter, Skill/Tool Runtime,
+             Credential Provider, Model Provider, Business Tools/MCP,
+             Identity Provider, Observability Backend
+Infra      : PostgreSQL Chat Store, PostgreSQL Task Store,
+             PostgreSQL Agent State, Artifact Store, Secret Manager,
+             Temporal Clusters</code></pre>
+  </figure>
+
+  <ol class="arch-flow" aria-label="v1.1 Chat 与 Task 链路">
+    <li>UI → Application API（HTTP/SSE）</li>
+    <li>Short Chat → Agent Library（in-process）</li>
+    <li>Long Chat → Task Service → Task Router</li>
+    <li>Router 固化 WorkflowTargetSnapshot</li>
+    <li>Temporal Client Adapter 选 Cluster</li>
+    <li>Worker Activity → LocalAgentClient → Agent Library</li>
+  </ol>
+
+  <h3>第一版决策表</h3>
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>维度</th><th>选型</th><th>边界</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>语言</td><td>TypeScript + Node.js Active LTS</td><td>实现时锁定 <code>24.14.0</code></td></tr>
+      <tr><td>Monorepo</td><td>pnpm workspaces</td><td>不引入额外构建编排平台</td></tr>
+      <tr><td>Agent Harness</td><td>PiHarness</td><td>唯一直接依赖 Pi 的 package 是 <code>harness-pi</code></td></tr>
+      <tr><td>Agent Binding</td><td><code>LocalAgentClient</code></td><td>Chat Service 与 Worker 进程内调用 Library</td></tr>
+      <tr><td>Contract</td><td>JSON Schema + TypeBox</td><td>公共契约不暴露 Pi / Temporal 类型</td></tr>
+      <tr><td>Application API</td><td>Fastify + HTTP/JSON + SSE</td><td>Chat 与 Task 共用入口与断点续传</td></tr>
+      <tr><td>UI</td><td>React + Vite + TanStack Query</td><td>同时提供 Chat 与 Task UI</td></tr>
+      <tr><td>Chat State</td><td>PostgreSQL</td><td>Session / Message / MessagePart / Summary</td></tr>
+      <tr><td>Task Runtime</td><td>Temporal TypeScript SDK</td><td>Workflow / Timer / Signal / Activity</td></tr>
+      <tr><td>Temporal Routing</td><td>Task Router + Target Registry</td><td>按 TaskType / 环境 / 能力选择固化</td></tr>
+      <tr><td>Agent State</td><td>PostgreSQL</td><td>Session / Checkpoint / Run 引用</td></tr>
+      <tr><td>Artifact</td><td>S3-compatible Adapter</td><td>附件、文件、报告和大结果</td></tr>
+      <tr><td>Credential</td><td>CredentialProvider + Secret Manager</td><td>引用 <code>connection_ref</code> / <code>secret_ref</code></td></tr>
+      <tr><td>可观测性</td><td>Pino + OpenTelemetry/OTLP</td><td>chat/task/workflow/activity/run/tool 统一关联</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>v1.1 禁止依赖</h3>
+  <ul class="checklist">
+    <li><span class="status-no">Agent Library ✕</span> Chat / Task / Temporal / Fastify / PostgreSQL</li>
+    <li><span class="status-no">Agent Application ✕</span> Pi 专有 API</li>
+    <li><span class="status-no">Chat / Task UI ✕</span> Pi / Temporal / PostgreSQL</li>
+    <li><span class="status-no">模型 / 普通用户 ✕</span> Temporal endpoint / Namespace / Task Queue</li>
+    <li><span class="status-no">Temporal Workflow ✕</span> LLM / Tool / 网络 / 数据库 I/O</li>
+    <li><span class="status-no">Session / Checkpoint ✕</span> 明文密钥</li>
+  </ul>
+
+  <h2>终版目标态：通用 Agent 平台</h2>
+
+  <p class="muted">草案文档 <code>docs/design/_cross/generic-agent-platform-final-architecture.md</code> 提出长期目标态：同一 Agent Kernel 同时支持 Chat turn、短运行、长任务、周期任务、人工审批任务和后续未知 workload。</p>
+
+  <h3>十项核心决策</h3>
+  <ol class="arch-flow">
+    <li><strong>Agent-first 而非 DAG-first</strong> · Agent 自主决定语义步骤</li>
+    <li><strong>唯一平台执行语义</strong> · Kernel 统一预算/事件/授权/取消/Receipt/Checkpoint/错误分类</li>
+    <li><strong>Package 不是运行 authority</strong> · 不可变 <code>AgentPackageRelease</code> 经 admission 绑定输入/策略/环境后才有 Spec</li>
+    <li><strong><code>AgentTaskSpec</code> 为唯一执行配置 authority</strong> · 不引入第二份 Snapshot/Manifest；<code>AgentExecutionEnvelope</code> 只传 Spec 引用、digest、稳定 ID</li>
+    <li><strong>双 Host 复用同一 Kernel</strong> · Interactive 与 Durable 独立部署、扩缩容，但不复制 Agent 语义</li>
+    <li><strong>Durable Coordinator 只负责可靠生命周期</strong> · 当前由 Temporal Adapter 实现；Coordinator 内不执行模型/Tool/Memory/DB/Agent 推理</li>
+    <li><strong>Capability authority 与 MCP 分离</strong> · MCP 是 discovery/schema/transport adapter，不产生授权</li>
+    <li><strong>单一事实单一权威</strong> · Lifecycle / 预算 / Tool effect / Checkpoint / Artifact / Chat / 业务事实分别由明确 Store 持有</li>
+    <li><strong>状态外置、执行有界</strong> · 每个 bounded run/step 有时间/turn/token/tool/context/artifact/cost 上限；跨边界通过 sealed Checkpoint 恢复</li>
+    <li><strong>框架无关以替换可证为准</strong> · 至少两个 Engine Adapter + 一个 Coordinator fake 通过相同 conformance suite</li>
+  </ol>
+
+  <h3>Kernel / Engine / Host 抽象</h3>
+  <div class="kernel-stack" aria-label="Kernel Engine Host 抽象">
+    <div>Engine Adapter<small>reasoning / planning / inner loop · 不可拥有 Secret / 硬预算 / effect commit</small></div>
+    <div>Agent Runtime Kernel<small>平台执行语义 · Broker 边界 · 预算投影 · Event/Receipt · Checkpoint 协议</small></div>
+    <div>Capability Broker<small>grant · scope · approval · 幂等 · effect · audit · usage receipt</small></div>
+    <div>Model Broker<small>primary + ordered fallback · DLP · usage receipt · circuit breaker</small></div>
+    <div>Context Resolver / Artifact / Checkpoint Store<small>解析 · 授权 · 裁剪 · 快照 · sealed CheckpointRef</small></div>
+  </div>
+
+  <h3>canonical 数据流</h3>
+  <figure class="diagram-block">
+    <figcaption>AgentPackageRelease → AgentTaskSpec → AgentExecutionEnvelope</figcaption>
+    <pre><code>Package Source
+  → schema validation
+  → dependency / version resolution
+  → capability / model / context compatibility
+  → policy static analysis
+  → eval / golden test
+  → content lock + digest
+  → SBOM / provenance / signature
+  → immutable AgentPackageRelease
+
+Untrusted Invocation
+  → authenticate principal
+  → resolve immutable Release
+  → validate input refs and tenant ACL
+  → resolve exact Engine / Model / Skill / Context / Capability / Runtime versions
+  → evaluate policy and approval prerequisites
+  → reserve initial hard budget
+  → choose trusted execution target
+  → write immutable AgentTaskSpec
+  → return spec_ref / digest</code></pre>
+  </figure>
+
+  <h3>dual Host 与 Coordinator</h3>
+  <div class="card-grid">
+    <article class="option-card recommended">
+      <p class="badge success filled">Interactive Host</p>
+      <h3>交互面</h3>
+      <p>Chat / API / SSE、短 deadline、流式、用户中断、Chat lifecycle。诚实失败并允许 retry；后台继续/高风险 Tool/审批必须提升 durable。</p>
+    </article>
+    <article class="option-card">
+      <p class="badge info filled">Durable Host</p>
+      <h3>持久执行面</h3>
+      <p>Coordinator Activity/Job poller、bounded invocation、heartbeat、cancel、Receipt/Checkpoint 提交、workload identity。绝不复制第二套 planner/tool loop。</p>
+    </article>
+    <article class="option-card">
+      <p class="badge accent filled">Coordinator Adapter</p>
+      <h3>Temporal Adapter（终版降级）</h3>
+      <p>Canonical domain contract 只表达 start / dispatch / wait / signal / pause / resume / cancel / retry / timeout / continue；temporal-workflows 保留为确定性 Adapter。</p>
+    </article>
+  </div>
+
+  <h2>v1.1 与终版的关键差异</h2>
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>维度</th><th>v1.1 已交付</th><th>终版目标态</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>执行配置 authority</td><td><code>AgentRunSpec</code>（交互）+ <code>AgentTaskWorkflowInput</code>（durable）双份</td><td>唯一 <code>AgentTaskSpec</code>，Envelope 只传引用与 digest</td></tr>
+      <tr><td>Package 编译</td><td>未要求不可变 Release</td><td><code>AgentPackageRelease</code> 不可变；签名/SBOM/provenance</td></tr>
+      <tr><td>Capability</td><td>Tool 内置授权 + Effect Ledger（v1.1 已在 P7 引入）</td><td>Capability Broker 与 MCP 解耦，所有 Tool 必须经过 Broker</td></tr>
+      <tr><td>Coordinator</td><td>Temporal 作为 Task Runtime 核心</td><td>Temporal 降为 Adapter；Coordinator Port 独立</td></tr>
+      <tr><td>Effect authority</td><td>Effect Ledger + Postgres Task Store 共存</td><td>Effect Ledger 独立为写副作用唯一 authority</td></tr>
+      <tr><td>Replay</td><td>默认承诺 durable 重投递</td><td>承诺 explainable replay，不承诺模型逐字节复现</td></tr>
+      <tr><td>Budget 余额</td><td>Checkpoint 内预留</td><td>Consumption Ledger reservation / commit / release；Spec 不含余额</td></tr>
+      <tr><td>Migration</td><td>Workflow 启动后不跨 Cluster 静默迁移</td><td>新增显式迁移协议与审计</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>开放问题（决策门）</h2>
+  <div class="callout warning" role="note">
+    <p class="callout-title">登记处：<code>docs/design/open-questions.md</code></p>
+    <ul>
+      <li>TaskType / TargetProfile 的 Owner、发布、灰度与回滚策略</li>
+      <li>环境隔离采用独立 Cluster 还是共享 Cluster + Namespace</li>
+      <li>Cluster health、容量、次优目标选择策略</li>
+      <li>跨 Cluster 显式迁移协议</li>
+      <li>Chat 保留期、Summary 阈值、自动提升 Task 规则</li>
+      <li>Pi 与 Temporal TypeScript SDK 的精确 package 与版本</li>
+      <li>生产 API / PostgreSQL / Artifact / Registry 的 HA / RTO / RPO</li>
+    </ul>
+  </div>
+
+  <hr />
+  <nav class="pager" aria-label="分页导航">
+    <span class="muted">上一节：<a href="./overview.html">项目概览</a></span>
+    <span class="muted">下一节：<a href="./packages.html">Package 矩阵 →</a></span>
+  </nav>
+</main>
+</body>
+</html>

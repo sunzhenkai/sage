@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>项目概览 · Sage · Pretty View HTML</title>
+<link rel="stylesheet" href="../assets/global.css" />
+<style>
+  .file-tree {
+    font-family: var(--pv-mono);
+    font-size: 0.9rem;
+    line-height: 1.65;
+    background: var(--pv-surface);
+    border: 1px solid var(--pv-border);
+    border-radius: var(--pv-radius);
+    padding: var(--pv-space-4) var(--pv-space-6);
+    margin-block: var(--pv-space-6);
+  }
+  .file-tree .folder { color: var(--pv-kongque); font-weight: 800; }
+  .file-tree .file { color: var(--pv-text); }
+  .file-tree .note { color: var(--pv-muted); font-style: italic; }
+  .file-tree ul { list-style: none; padding-inline-start: var(--pv-space-6); margin: var(--pv-space-2) 0; }
+  .file-tree li::before { content: '├── '; color: var(--pv-rougui); }
+  .file-tree li:last-child::before { content: '└── '; color: var(--pv-rougui); }
+</style>
+</head>
+<body>
+<nav class="top-nav" aria-label="Sage 导航">
+  <div class="nav-menu">
+    <a href="../index.html">Pretty View 根</a>
+    <a href="./index.html">Sage 包首页</a>
+    <a href="./overview.html" aria-current="page">概览</a>
+    <a href="./architecture.html">整体架构</a>
+    <a href="./packages.html">Package 矩阵</a>
+    <a href="./interfaces.html">接口与契约</a>
+    <a href="./runtime.html">运行时</a>
+    <a href="./conventions.html">边界与约束</a>
+  </div>
+</nav>
+
+<main class="page-shell reading-wide">
+  <p class="eyebrow">Sage · 01 · 项目概览</p>
+  <h1>项目概览</h1>
+  <p class="muted">仓库结构、技术栈、当前实现基线与里程碑。事实数据来自根 <code>README.md</code>、<code>platform/package.json</code> 与 <code>platform/compose.yaml</code>。</p>
+
+  <aside class="key-summary">
+    <p class="eyebrow">一句话</p>
+    <p>「<span class="highlight zijing">Agent-first shared Kernel</span>、可插拔 Engine、<span class="ink-kongque">AgentPackageRelease → AgentTaskSpec → AgentExecutionEnvelope</span>、Interactive/Durable 双 Host、Capability/MCP、Context/Model、Artifact/Checkpoint、Effect/Consumption Ledger 与单一 authority。」</p>
+  </aside>
+
+  <h2>品牌与定位</h2>
+  <dl class="definition-card">
+    <dt>中文名</dt>
+    <dd>思极（Sage）</dd>
+    <dt>定位语</dt>
+    <dd>不止于思，极致于行。</dd>
+    <dt>类型</dt>
+    <dd>通用 Agent 平台 — Agent 内核与运行时平台，不是单一产品；当前仓库是 Sage 单仓。</dd>
+    <dt>形态</dt>
+    <dd>Agent-first 共享 Kernel；不是 Package runner，也不是为每个业务建设一套 Agent 服务。</dd>
+    <dt>许可证</dt>
+    <dd>尚未声明开源许可证；对外分发前需与维护者确认。</dd>
+  </dl>
+
+  <h2>仓库结构</h2>
+  <div class="file-tree" aria-label="Sage 仓库目录">
+    <div class="folder">sage/</div>
+    <ul>
+      <li class="file"><span class="note">README.md</span> — 项目总览、里程碑、状态</li>
+      <li class="folder">platform/
+        <ul>
+          <li class="folder">apps/
+            <ul>
+              <li class="file"><span class="note">agent-api</span> — Fastify、Chat/Task Service、Task Router</li>
+              <li class="file"><span class="note">agent-worker</span> — Temporal Worker + Agent Library</li>
+              <li class="file"><span class="note">agent-web</span> — React/Vite Chat + Task UI</li>
+            </ul>
+          </li>
+          <li class="folder">packages/
+            <ul>
+              <li class="folder"><span class="note">contract/port/kernel</span>
+                <ul>
+                  <li class="file">agent-contracts</li>
+                  <li class="file">platform-ports</li>
+                  <li class="file">agent-lib</li>
+                  <li class="file">harness-pi</li>
+                  <li class="file">agent-client</li>
+                </ul>
+              </li>
+              <li class="folder"><span class="note">broker/runtime/store</span>
+                <ul>
+                  <li class="file">tool-runtime</li>
+                  <li class="file">context-resolver</li>
+                  <li class="file">model-broker</li>
+                  <li class="file">agent-state-postgres</li>
+                  <li class="file">postgres-migrations</li>
+                </ul>
+              </li>
+              <li class="folder"><span class="note">domain</span>
+                <ul>
+                  <li class="file">chat-domain</li>
+                  <li class="file">task-domain</li>
+                </ul>
+              </li>
+              <li class="folder"><span class="note">durable/adapter</span>
+                <ul>
+                  <li class="file">temporal-routing</li>
+                  <li class="file">temporal-workflows</li>
+                  <li class="file">temporal-registry</li>
+                  <li class="file">task-store-postgres</li>
+                </ul>
+              </li>
+              <li class="folder"><span class="note">release/admission/conformance</span>
+                <ul>
+                  <li class="file">agent-package-release</li>
+                  <li class="file">agent-release-registry</li>
+                  <li class="file">agent-run-admission</li>
+                  <li class="file">agent-platform-conformance</li>
+                  <li class="file">agent-runtime-conformance</li>
+                </ul>
+              </li>
+              <li class="folder"><span class="note">app store / contract</span>
+                <ul>
+                  <li class="file">app-contracts</li>
+                  <li class="file">provider-catalog</li>
+                  <li class="file">observability</li>
+                  <li class="file">production-governance</li>
+                </ul>
+              </li>
+              <li class="folder"><span class="note">local</span>
+                <ul>
+                  <li class="file">local-runtime</li>
+                  <li class="file">local-fakes</li>
+                </ul>
+              </li>
+            </ul>
+          </li>
+          <li class="folder">fixtures/ · examples/ · evidence/ · observability/</li>
+          <li class="file"><span class="note">compose.yaml</span> — Postgres / Temporal / MinIO / agent-api/worker/web</li>
+        </ul>
+      </li>
+      <li class="folder">docs/design/
+        <ul>
+          <li class="file"><span class="note">README.md</span> — MVP 总览</li>
+          <li class="file"><span class="note">first-version-system-architecture.md</span> — v1.1</li>
+          <li class="file"><span class="note">first-version-system.architecture.json</span> — 机器可校验</li>
+          <li class="file"><span class="note">_cross/generic-agent-platform-final-architecture.md</span> — 终版提案</li>
+          <li class="file"><span class="note">agent-library-mvp.md / long-running-agent-app-mvp.md</span> — 两层产品范围</li>
+        </ul>
+      </li>
+      <li class="folder">openspec/</li>
+      <li class="folder">tasks/</li>
+      <li class="folder">.kimi-code/</li>
+      <li class="folder">.service-manager.md</li>
+    </ul>
+  </div>
+
+  <h2>技术栈</h2>
+  <div class="table-wrap">
+  <table>
+    <caption class="muted"><small>Sage 选定的工程基线（第一版）</small></caption>
+    <thead>
+      <tr><th scope="col">维度</th><th scope="col">选型</th><th scope="col">来源</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>语言</td><td>TypeScript（Node.js <code>24.14.0</code> Active LTS）</td><td><code>platform/package.json#engines</code>、<code>.node-version</code></td></tr>
+      <tr><td>包管理</td><td>pnpm <code>10.33.0</code>（via Corepack）</td><td><code>packageManager</code> 字段</td></tr>
+      <tr><td>Monorepo</td><td>pnpm workspaces</td><td><code>pnpm-workspace.yaml</code></td></tr>
+      <tr><td>Web</td><td>React <code>19.2.8</code> + Vite <code>8.2.1</code></td><td><code>apps/agent-web</code></td></tr>
+      <tr><td>应用 API</td><td>Fastify + HTTP/JSON + SSE</td><td>设计文档 v1.1</td></tr>
+      <tr><td>工作流</td><td>Temporal TypeScript SDK <code>1.22.0</code>；server <code>temporalio/auto-setup:1.29.1</code></td><td>devDeps、<code>compose.yaml</code></td></tr>
+      <tr><td>数据库</td><td>PostgreSQL <code>17.6-alpine</code></td><td><code>platform/compose.yaml</code></td></tr>
+      <tr><td>对象存储</td><td>S3-compatible Artifact Store（MinIO）</td><td><code>compose.yaml#artifact-store</code></td></tr>
+      <tr><td>契约验证</td><td>TypeBox <code>1.3.13</code> + JSON Schema（<code>$id</code>）</td><td><code>platform/devDeps</code></td></tr>
+      <tr><td>Harness</td><td>PiHarness（首版固定，唯一直接依赖 <code>@mariozechner/pi-agent-core</code> / <code>@mariozechner/pi-ai</code>）</td><td><code>harness-pi</code> workspace</td></tr>
+      <tr><td>测试</td><td>Vitest <code>4.1.10</code>、<code>tsx</code></td><td><code>platform/devDeps</code></td></tr>
+      <tr><td>可观测性</td><td>Pino + OpenTelemetry/OTLP + <code>@opentelemetry/exporter-trace-otlp-http</code></td><td><code>packages/observability</code></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>当前实现基线</h2>
+  <div class="metric-grid">
+    <article class="metric-card success">
+      <span class="metric-label">实现版本</span>
+      <span class="metric-value">v1.1</span>
+      <span class="stat-delta">已交付</span>
+    </article>
+    <article class="metric-card info">
+      <span class="metric-label">Architecture Review</span>
+      <span class="metric-value">87<span class="metric-unit">/100</span></span>
+      <span class="stat-delta">pass</span>
+    </article>
+    <article class="metric-card warning">
+      <span class="metric-label">终版目标态</span>
+      <span class="metric-value">draft</span>
+      <span class="stat-delta">machine-gate BLOCKED</span>
+    </article>
+    <article class="metric-card">
+      <span class="metric-label">Workspace package</span>
+      <span class="metric-value">27</span>
+      <span class="stat-delta">@sage/*</span>
+    </article>
+  </div>
+
+  <h2>两个产品层</h2>
+  <div class="before-after">
+    <section class="before">
+      <h3>Agent Library</h3>
+      <p>向其他应用提供可嵌入的 Agent Run、Harness、Skill、Tool、Session 和 Event 能力；提供 Agent 内核、Provider Port、Skill/Tool 端口与可校验 Tool。</p>
+      <p class="muted">不感知 Chat、Task、Temporal Cluster、UI。</p>
+    </section>
+    <section class="after">
+      <h3>Agent Application</h3>
+      <p>提供 Chat UI、Task UI、Temporal Task Runtime 和多环境路由。Chat Service 与 Temporal Activity 都通过同一个 Agent Library 执行 Agent Run。</p>
+      <p class="muted"><strong>Agent Application → Agent Library 单向依赖</strong>，不允许反向引用。</p>
+    </section>
+  </div>
+
+  <h2>里程碑</h2>
+  <ol class="timeline">
+    <li class="timeline-item phase-deploy">
+      <time>P0–P3</time>
+      <h3>Agent Library MVP 基础</h3>
+      <span class="evidence">contracts / kernel / ports / harness-pi / tool-runtime / state-postgres / chat-domain / task-domain</span>
+    </li>
+    <li class="timeline-item phase-deploy">
+      <time>P4–P5</time>
+      <h3>Agent Application + Task 路由</h3>
+      <span class="evidence">temporal-routing、temporal-workflows、target-snapshot 固化、agent-api/worker/web 闭环</span>
+    </li>
+    <li class="timeline-item phase-mitigate">
+      <time>P6</time>
+      <h3>Projection reconciliation &amp; Chat 提升 durable</h3>
+      <span class="evidence"><code>p6-projection</code>、<code>p6-immutability</code>、reconcilers</span>
+    </li>
+    <li class="timeline-item phase-incident">
+      <time>P7</time>
+      <h3>生产治理 + Release Registry + Conformance</h3>
+      <span class="evidence"><code>production-governance</code>、<code>agent-package-release</code>、<code>agent-release-registry</code>、<code>agent-platform-conformance</code>、<code>agent-runtime-conformance</code></span>
+    </li>
+    <li class="timeline-item phase-deploy">
+      <time>agent-platform-generalization-validation</time>
+      <h3>通用 Agent 平台终版基线</h3>
+      <span class="evidence">AgentPackageRelease → AgentTaskSpec → Envelope；machine-gate 仍为 BLOCKED/NO-GO</span>
+    </li>
+  </ol>
+
+  <h2>快速开始</h2>
+  <ol class="steps">
+    <li class="step">进入工作区根目录：<code>cd platform</code>。</li>
+    <li class="step">启动基础设施：<code>docker compose up -d --wait postgres temporal artifact-store</code>。</li>
+    <li class="step">启动应用服务：<code>docker compose up -d --build --wait agent-api agent-worker agent-web</code>。</li>
+    <li class="step">健康检查：
+      <ul>
+        <li><code>curl http://127.0.0.1:9610/readyz</code> — agent-api</li>
+        <li><code>curl http://127.0.0.1:9611/readyz</code> — agent-worker</li>
+        <li><code>curl http://127.0.0.1:14173/</code> — agent-web</li>
+      </ul>
+    </li>
+  </ol>
+
+  <div class="callout accent" role="note">
+    <p class="callout-title">阶段产物与治理</p>
+    <p>项目按 Phase（P0–P7）滚动交付，每个 Phase 都对应 <code>docs/design/</code> 设计件、<code>platform/docs/pN-*.md</code> Exit Review、<code>platform/evidence/agent-platform-*</code> 接受产物与 OpenSpec 变更归档。</p>
+  </div>
+
+  <hr />
+  <nav class="pager" aria-label="分页导航">
+    <span class="muted">上一节：<a href="./index.html">Sage 包首页</a></span>
+    <span class="muted">下一节：<a href="./architecture.html">整体技术架构 →</a></span>
+  </nav>
+</main>
+</body>
+</html>

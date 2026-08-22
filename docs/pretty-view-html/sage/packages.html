@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Package 矩阵 · Sage · Pretty View HTML</title>
+<link rel="stylesheet" href="../assets/global.css" />
+<style>
+  .pkg-grid {
+    display: grid;
+    gap: var(--pv-space-4);
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr));
+  }
+  .pkg-card {
+    border: 1px solid var(--pv-border);
+    border-radius: var(--pv-radius);
+    background: var(--pv-surface);
+    padding: var(--pv-space-4) var(--pv-space-6);
+    box-shadow: var(--pv-shadow);
+  }
+  .pkg-card h3 { margin: 0; }
+  .pkg-card .pkg-id {
+    font-family: var(--pv-mono);
+    color: var(--pv-rougui);
+    font-size: 0.86rem;
+  }
+  .pkg-card p { margin: var(--pv-space-2) 0 0; color: var(--pv-text); }
+  .pkg-card .deps {
+    margin-top: var(--pv-space-3);
+    font-family: var(--pv-mono);
+    font-size: 0.82rem;
+    color: var(--pv-kongque);
+  }
+  .pkg-card.role-core { border-top: 0.3rem solid var(--pv-zijing); }
+  .pkg-card.role-broker { border-top: 0.3rem solid var(--pv-kongque); }
+  .pkg-card.role-domain { border-top: 0.3rem solid var(--pv-songshi); }
+  .pkg-card.role-store { border-top: 0.3rem solid var(--pv-zheshi); }
+  .pkg-card.role-conformance { border-top: 0.3rem solid var(--pv-diwang); }
+  .pkg-card.role-app { border-top: 0.3rem solid var(--pv-mudan); }
+  .pkg-card.role-local { border-top: 0.3rem solid var(--pv-rougui); }
+</style>
+</head>
+<body>
+<nav class="top-nav" aria-label="Sage 导航">
+  <div class="nav-menu">
+    <a href="../index.html">Pretty View 根</a>
+    <a href="./index.html">Sage 包首页</a>
+    <a href="./overview.html">概览</a>
+    <a href="./architecture.html">整体架构</a>
+    <a href="./packages.html" aria-current="page">Package 矩阵</a>
+    <a href="./interfaces.html">接口与契约</a>
+    <a href="./runtime.html">运行时</a>
+    <a href="./conventions.html">边界与约束</a>
+  </div>
+</nav>
+
+<main class="page-shell reading-wide">
+  <p class="eyebrow">Sage · 03 · Package 矩阵</p>
+  <h1>27 个 workspace package</h1>
+  <p class="muted">数据来自 <code>platform/packages/*/package.json</code> 的 <code>name</code> / <code>dependencies</code> 字段。每个 card 标注 <em>role</em> 颜色与最小依赖。仅写工程性结果，不复述设计文字。</p>
+
+  <aside class="key-summary">
+    <p class="eyebrow">分组约定</p>
+    <ul>
+      <li><span class="tag zijing">契约与端口</span> <span class="tag kongque">内核 / 引擎 / 客户端</span> <span class="tag songshi">领域与产品</span> <span class="tag zheshi">持久化</span></li>
+      <li><span class="tag diwang">合规与 admission</span> <span class="tag mudan">应用契约与可观测</span> <span class="tag rougui">本地与支撑</span></li>
+    </ul>
+  </aside>
+
+  <h2>契约与端口</h2>
+  <div class="pkg-grid">
+    <article class="pkg-card role-core">
+      <h3>agent-contracts</h3>
+      <p class="pkg-id">@sage/agent-contracts</p>
+      <p>TypeBox 定义 <code>AgentRunSpec</code> / <code>AgentEvent</code> / <code>AgentRunOutcome</code> / <code>AgentTaskSpec</code> / <code>AgentExecutionEnvelope</code> / <code>AgentPackageRelease</code> / <code>BoundedRunReceipt</code> / <code>EffectReceipt</code> / <code>UsageReceipt</code> / 稳定 ID / canonical JSON / sha256Digest。</p>
+      <p class="deps">无依赖 · <code>$id</code> 命名 · runtime contract v1</p>
+    </article>
+
+    <article class="pkg-card role-core">
+      <h3>platform-ports</h3>
+      <p class="pkg-id">@sage/platform-ports</p>
+      <p>Canonical Port（<code>AgentStateAdapter</code>、<code>ModelBrokerPort</code>、<code>CapabilityBrokerPort</code>、<code>ContextResolverPort</code>、<code>ConsumptionLedgerPort</code>、<code>ToolEffectLedgerPort</code>、<code>ProductionCheckpointLifecyclePort</code>、<code>DurableCoordinatorPort</code>）；Coordinator reducer（pure lifecycle authority）。</p>
+      <p class="deps">依赖 <code>agent-contracts</code>（schema）</p>
+    </article>
+  </div>
+
+  <h2>内核 / 引擎 / 客户端</h2>
+  <div class="pkg-grid">
+    <article class="pkg-card role-broker">
+      <h3>agent-lib</h3>
+      <p class="pkg-id">@sage/agent-lib</p>
+      <p><code>AgentRunner</code>、<code>KernelClient</code>、canonical bounded outcome（<code>CONTINUE / COMPLETED / FAILED / WAITING_FOR_USER / WAITING_FOR_APPROVAL / PAUSED / CANCELLED / EFFECT_UNKNOWN</code>）；预检 <code>preflightEngineAdapter</code>；不暴露 Pi / Temporal 类型。</p>
+      <p class="deps">contracts · ports</p>
+    </article>
+
+    <article class="pkg-card role-broker">
+      <h3>harness-pi</h3>
+      <p class="pkg-id">@sage/harness-pi</p>
+      <p>唯一直接依赖 Pi <code>@mariozechner/pi-agent-core</code> 与 <code>@mariozechner/pi-ai</code>；<code>LegacyPiHarness</code> / <code>LiveProviderHarness</code> 实现 <code>HarnessPort</code>，capabilities = <code>events · cancellation · checkpoint · skills · tools</code>。</p>
+      <p class="deps">contracts · agent-lib</p>
+    </article>
+
+    <article class="pkg-card role-broker">
+      <h3>agent-client</h3>
+      <p class="pkg-id">@sage/agent-client</p>
+      <p><code>LocalAgentClient</code> 提供 <code>run()</code>（旧 AgentRunner） 与 <code>runCanonical()</code>（Kernel 路径）两条；compatibility façade 与 telemetry 探针；Chat 与 Temporal Activity 共用同一 Client。</p>
+      <p class="deps">contracts · agent-lib</p>
+    </article>
+
+    <article class="pkg-card role-broker">
+      <h3>tool-runtime</h3>
+      <p class="pkg-id">@sage/tool-runtime</p>
+      <p><code>ToolRegistry</code> / <code>ToolPipeline</code> / <code>ToolPipelineCapabilityBroker</code> / <code>McpCapabilityBrokerAdapter</code>；参数校验 → 授权 → 执行 → 结果归一化 → <code>AgentEvent</code>；Effect Ledger 接入；sandbox 与 egress（<code>sandbox.ts</code> / <code>egress.ts</code>）。</p>
+      <p class="deps">contracts · ports · production-governance</p>
+    </article>
+
+    <article class="pkg-card role-broker">
+      <h3>model-broker</h3>
+      <p class="pkg-id">@sage/model-broker</p>
+      <p>SlidingWindowLimiter + CircuitBreaker；fixed route + ordered fallback；数据分级（region / no-training / no-retention / sensitivity）；usage receipt；fail-closed on unavailable。</p>
+      <p class="deps">ports</p>
+    </article>
+
+    <article class="pkg-card role-broker">
+      <h3>context-resolver</h3>
+      <p class="pkg-id">@sage/context-resolver</p>
+      <p><code>SpecBoundContextResolver</code>：解析 <code>ContextPlanSnapshot</code> → 校验允许源 → 按 <code>maxBytes</code>/<code>maxTokens</code> 截断 → 输出 <code>ContextResolverObservation</code>；只接受 admission-frozen 源。</p>
+      <p class="deps">ports</p>
+    </article>
+  </div>
+
+  <h2>领域与产品</h2>
+  <div class="pkg-grid">
+    <article class="pkg-card role-domain">
+      <h3>chat-domain</h3>
+      <p class="pkg-id">@sage/chat-domain</p>
+      <p><code>ChatStoreError</code> + session / message / parts / runs / summary / timeline SQL 仓储 + 30 天保留；<code>CHAT_RETENTION_DAYS</code> / <code>SUMMARY_MESSAGE_THRESHOLD=8</code> / <code>INLINE_AGENT_TEXT_BYTES=8192</code>；history cursor 编码。</p>
+      <p class="deps">contracts · app-contracts · postgres-migrations</p>
+    </article>
+
+    <article class="pkg-card role-domain">
+      <h3>task-domain</h3>
+      <p class="pkg-id">@sage/task-domain</p>
+      <p><code>TaskTypeId</code>（<code>sage.agent-task.v1</code>、<code>sage.batch-agent-task.v1</code>）、<code>WorkflowTargetSnapshot</code>、<code>CoordinatorTargetSnapshot</code>、<code>TaskStatus</code>、<code>TaskLifecyclePath</code>（LEGACY_TEMPORAL_TASK / DURABLE_COORDINATOR_V2）、<code>ProjectionFreshness</code>。</p>
+      <p class="deps">contracts</p>
+    </article>
+
+    <article class="pkg-card role-domain">
+      <h3>provider-catalog</h3>
+      <p class="pkg-id">@sage/provider-catalog</p>
+      <p>Provider Profile 同步、激活、投影；与 <code>ChatProviderRoute</code>（请求级 ephemeral）解耦；本地栈使用 OpenAI-compatible / Anthropic 适配。</p>
+      <p class="deps">app-contracts · postgres-migrations</p>
+    </article>
+  </div>
+
+  <h2>持久化与 Coordinator</h2>
+  <div class="pkg-grid">
+    <article class="pkg-card role-store">
+      <h3>agent-state-postgres</h3>
+      <p class="pkg-id">@sage/agent-state-postgres</p>
+      <p>八个 migration：<code>001_agent_state</code> / <code>002_canonical_agent_authority</code> / <code>003_runtime_kernel_broker</code> / <code>004_agent_package_release_registry</code> / <code>005_production_governance_core</code> / <code>006_production_rls_roles</code> / <code>007_artifact_checkpoint_lifecycle</code> / <code>008_supply_chain_governance</code>。提供 <code>PostgresAgentStateAdapter</code>、<code>PostgresToolEffectLedger</code>（<code>agent_effect_ledger</code>）、<code>PostgresConsumptionLedger</code>（<code>agent_usage_accounts</code>/<code>agent_usage_reservations</code>/<code>agent_usage_receipts</code>）、<code>PostgresCheckpointLifecycleStore</code>（sealed <code>checkpoint://sealed/{digest}</code>）、<code>PostgresSecurityAuditStore</code>（<code>agent_security_audit</code>）。</p>
+      <p class="deps">contracts · ports · production-governance · pg</p>
+    </article>
+
+    <article class="pkg-card role-store">
+      <h3>task-store-postgres</h3>
+      <p class="pkg-id">@sage/task-store-postgres</p>
+      <p>Task Projection 持久化（<code>TaskRoutingStore</code> / <code>TaskProjectionStore</code> / <code>TaskReconciliationStore</code>）；不是 Workflow 历史权威，仅是 product projection。</p>
+      <p class="deps">task-domain · ports</p>
+    </article>
+
+    <article class="pkg-card role-store">
+      <h3>chat-domain (migrations)</h3>
+      <p class="pkg-id">@sage/chat-domain/migrations</p>
+      <p>由 <code>postgres-migrations</code> 执行；<code>CHAT_MIGRATIONS</code> 提供 schema migrations 与 Session cursor 所需的索引。</p>
+      <p class="deps">postgres-migrations</p>
+    </article>
+
+    <article class="pkg-card role-broker">
+      <h3>temporal-workflows</h3>
+      <p class="pkg-id">@sage/temporal-workflows</p>
+      <p>Coordinator workflow：<code>DurableCoordinatorWorkflow.v1</code>、<code>DURABLE_COORDINATOR_TASK_QUEUE='sage-durable-coordinator-v2'</code>、signal <code>sage.coordinator.command.v1</code>、<code>sage.coordinator.receipt.v1</code>；replay-corpus / replay-fixtures / replay-gate。</p>
+      <p class="deps">contracts · ports · @temporalio/*</p>
+    </article>
+
+    <article class="pkg-card role-broker">
+      <h3>temporal-routing</h3>
+      <p class="pkg-id">@sage/temporal-routing</p>
+      <p><code>TaskRouter</code> + <code>TemporalClientAdapter</code> + Multi-target client factory；固化 <code>WorkflowTargetSnapshot</code> / <code>CoordinatorTargetSnapshot</code>；errors：<code>ROUTING_UNAVAILABLE</code> / <code>WORKFLOW_START_OUTCOME_UNKNOWN</code> / <code>TASK_LIFECYCLE_ADAPTER_UNAVAILABLE</code>。</p>
+      <p class="deps">task-domain · temporal-registry · ports</p>
+    </article>
+
+    <article class="pkg-card role-broker">
+      <h3>temporal-registry</h3>
+      <p class="pkg-id">@sage/temporal-registry</p>
+      <p><code>TemporalRegistryReader</code> / <code>TemporalTargetProfile</code> / <code>TaskTypeProfile</code> 配置数据源；不保存明文 TLS / Token，只保留 <code>credential_ref</code>。</p>
+      <p class="deps">task-domain</p>
+    </article>
+  </div>
+
+  <h2>合规 / admission / conformance</h2>
+  <div class="pkg-grid">
+    <article class="pkg-card role-conformance">
+      <h3>agent-package-release</h3>
+      <p class="pkg-id">@sage/agent-package-release</p>
+      <p><code>AgentPackageV1</code> JSON Schema 校验（<code>MAX_PACKAGE_BYTES=64KB / MAX_DEPTH=8</code>）、<code>resolveTrustedPackageDependencies</code>（trusted catalog）；<code>SupplyChainArtifactV1</code>（release / engine_adapter / model_adapter / capability_provider）+ <code>verifySupplyChainArtifact</code>。</p>
+      <p class="deps">contracts · ports</p>
+    </article>
+
+    <article class="pkg-card role-conformance">
+      <h3>agent-release-registry</h3>
+      <p class="pkg-id">@sage/agent-release-registry</p>
+      <p>Registry API：发布、灰度、撤销；与 <code>agent-package-release</code> 的 SBOM/签名验证串接。</p>
+      <p class="deps">agent-package-release</p>
+    </article>
+
+    <article class="pkg-card role-conformance">
+      <h3>agent-run-admission</h3>
+      <p class="pkg-id">@sage/agent-run-admission</p>
+      <p><code>AdmissionRequestV1</code>（request-side，不接受 principal/tenant/role/environment/credential/target）与 <code>AuthenticatedAdmissionContextV1</code>（server-side）严格分离；<code>rollout-policy</code> 给出灰度与回滚规则。</p>
+      <p class="deps">contracts · ports · production-governance</p>
+    </article>
+
+    <article class="pkg-card role-conformance">
+      <h3>production-governance</h3>
+      <p class="pkg-id">@sage/production-governance</p>
+      <p>授权（<code>authorization</code>）、ready/readiness 治理（<code>readiness</code>）、resilience（<code>resilience</code>）、canonical-input digest（<code>canonical-input</code>）、<code>golden-vectors</code> 回归、<code>secrets</code>、<code>identity</code>。负责 fail-closed 默认值。</p>
+      <p class="deps">contracts · ports</p>
+    </article>
+
+    <article class="pkg-card role-conformance">
+      <h3>agent-runtime-conformance</h3>
+      <p class="pkg-id">@sage/agent-runtime-conformance</p>
+      <p>为多 Engine Adapter 提供 conformance；事实独立于 <code>harness-pi</code>。</p>
+      <p class="deps">contracts · agent-lib</p>
+    </article>
+
+    <article class="pkg-card role-conformance">
+      <h3>agent-platform-conformance</h3>
+      <p class="pkg-id">@sage/agent-platform-conformance</p>
+      <p>Case runner、contracts、oracle、replay corpus、faults、host、engine 适配；把 <code>apgv/{...}/v1/{...}</code> case id 落为 evidence。</p>
+      <p class="deps">agent-runtime-conformance</p>
+    </article>
+  </div>
+
+  <h2>应用契约 / 可观测 / 本地支撑</h2>
+  <div class="pkg-grid">
+    <article class="pkg-card role-app">
+      <h3>app-contracts</h3>
+      <p class="pkg-id">@sage/app-contracts</p>
+      <p>Experience API schema：<code>MessagePart</code> / <code>Session</code> / <code>Summary</code> / <code>ChatRun</code> / <code>ChatError</code> / <code>TimelinePayload</code> / <code>SubmitMessageRequest</code>（含 ephemeral <code>ChatProviderRoute</code>）/ <code>SessionHistoryCursor</code>；不作为 Kernel/Coordinator authority。</p>
+      <p class="deps">无</p>
+    </article>
+
+    <article class="pkg-card role-app">
+      <h3>observability</h3>
+      <p class="pkg-id">@sage/observability</p>
+      <p>Pino + OTLP；<code>sanitizeTelemetry</code> 递归剔除 <code>sensitiveKey</code>、保留 ref；<code>P6Correlation</code>、<code>P6TelemetryRecorder</code>；HIPER-CARDINALITY ID 入 trace/log/audit，不作为 metrics label。</p>
+      <p class="deps">ports · pino · otel</p>
+    </article>
+
+    <article class="pkg-card role-local">
+      <h3>local-runtime</h3>
+      <p class="pkg-id">@sage/local-runtime</p>
+      <p><code>createLocalAgentClient()</code>：以 <code>LocalAgentClient</code> + <code>createExplicitLegacyPiHarness()</code> 默认组合；<code>createLiveProviderAgentClient()</code> 提供 Chat-only composition，route 与 transcript 仅请求范围。</p>
+      <p class="deps">agent-client · harness-pi</p>
+    </article>
+
+    <article class="pkg-card role-local">
+      <h3>local-fakes</h3>
+      <p class="pkg-id">@sage/local-fakes</p>
+      <p>无后端 in-memory 适配：Registry / SecretManager / CredentialProvider / IdempotencyStore / ArtifactAdapter / OidcAdapter / FailureInjectable；用于单测与本地集成。</p>
+      <p class="deps">ports</p>
+    </article>
+
+    <article class="pkg-card role-local">
+      <h3>postgres-migrations</h3>
+      <p class="pkg-id">@sage/postgres-migrations</p>
+      <p>通用迁移执行器：<code>runPostgresMigrations</code>；为 <code>chat-domain</code> / <code>agent-state-postgres</code> / <code>provider-catalog</code> 提供版本化迁移。</p>
+      <p class="deps">pg</p>
+    </article>
+  </div>
+
+  <h2>三个 App</h2>
+  <div class="pkg-grid">
+    <article class="pkg-card role-app">
+      <h3>agent-api</h3>
+      <p class="pkg-id">@sage/agent-api</p>
+      <p>Fastify 入口；<code>runtime.ts</code> / <code>index.ts</code> 汇聚 Chat Service、Task Service / Router、Provider Connection、Catalog API；与 TaskStore / ChatStore / Postgres 通过 <code>LocalAgentClient</code> / <code>agent-run-admission</code> 接入。</p>
+      <p class="deps">contracts · ports · app-contracts · agent-client · agent-run-admission · chat-domain · provider-catalog · local-runtime · observability</p>
+    </article>
+
+    <article class="pkg-card role-app">
+      <h3>agent-worker</h3>
+      <p class="pkg-id">@sage/agent-worker</p>
+      <p>Temporal Worker 进程：activities / reconcilers / production runtime；通过 <code>@sage/agent-client</code> + <code>temporal-workflows</code> 接入同一 Agent Library；包含 production-reconciler / production-runtime。</p>
+      <p class="deps">contracts · ports · agent-client · agent-lib · chat-domain · task-domain · task-store-postgres · temporal-workflows · @temporalio/* · pg</p>
+    </article>
+
+    <article class="pkg-card role-app">
+      <h3>agent-web</h3>
+      <p class="pkg-id">@sage/agent-web</p>
+      <p>React 19 + Vite SPA：<code>chat</code> / <code>tasks</code> / <code>composer</code> / <code>workspace</code> / <code>profiles</code> / <code>providers</code> 模块，TanStack Query 复用；只依赖 <code>app-contracts</code>。</p>
+      <p class="deps">app-contracts · react · react-dom</p>
+    </article>
+  </div>
+
+  <h2>依赖核心规则</h2>
+  <ul class="checklist">
+    <li><span class="status-yes">允许</span> Agent Application → Agent Library（单向）</li>
+    <li><span class="status-yes">允许</span> Chat Service / Temporal Activity → LocalAgentClient → Agent Library</li>
+    <li><span class="status-yes">允许</span> Task Router → Temporal Client Adapter → selected Temporal Cluster</li>
+    <li><span class="status-no">禁止</span> Agent Library 直接依赖 Chat / Task / Temporal / Fastify / PostgreSQL</li>
+    <li><span class="status-no">禁止</span> Agent Application 直接依赖 Pi 专有 API（统一通过 <code>harness-pi</code>）</li>
+    <li><span class="status-no">禁止</span> Chat / Task UI 直接依赖 Pi / Temporal / PostgreSQL</li>
+    <li><span class="status-no">禁止</span> Temporal Workflow 直接做 LLM / Tool / 数据库 / 网络 I/O</li>
+    <li><span class="status-no">禁止</span> Session / Checkpoint 保存明文 Secret</li>
+  </ul>
+
+  <hr />
+  <nav class="pager" aria-label="分页导航">
+    <span class="muted">上一节：<a href="./architecture.html">整体架构</a></span>
+    <span class="muted">下一节：<a href="./interfaces.html">接口与契约 →</a></span>
+  </nav>
+</main>
+</body>
+</html>

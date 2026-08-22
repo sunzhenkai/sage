@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>边界规则与决策约束 · Sage · Pretty View HTML</title>
+<link rel="stylesheet" href="../assets/global.css" />
+<style>
+  pre.code-block {
+    background: #fbfaf7;
+    border: 1px solid var(--pv-border);
+    border-left: 0.32rem solid var(--pv-zijing);
+    border-radius: 0.45rem;
+    padding: var(--pv-space-4) var(--pv-space-6);
+    overflow-x: auto;
+    font-family: var(--pv-mono);
+    font-size: 0.85rem;
+    line-height: 1.55;
+    color: var(--pv-strong);
+  }
+  .checks-grid {
+    display: grid;
+    gap: var(--pv-space-4);
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr));
+  }
+  .checks-grid article {
+    border: 1px solid var(--pv-border);
+    border-radius: var(--pv-radius);
+    background: var(--pv-surface);
+    padding: var(--pv-space-4) var(--pv-space-6);
+    box-shadow: var(--pv-shadow);
+  }
+  .checks-grid .head {
+    display: flex;
+    gap: var(--pv-space-3);
+    align-items: baseline;
+    margin-bottom: var(--pv-space-2);
+  }
+  .checks-grid .head .badge { flex-shrink: 0; }
+  .checks-grid h4 { margin: 0; }
+</style>
+</head>
+<body>
+<nav class="top-nav" aria-label="Sage 导航">
+  <div class="nav-menu">
+    <a href="../index.html">Pretty View 根</a>
+    <a href="./index.html">Sage 包首页</a>
+    <a href="./overview.html">概览</a>
+    <a href="./architecture.html">整体架构</a>
+    <a href="./packages.html">Package 矩阵</a>
+    <a href="./interfaces.html">接口与契约</a>
+    <a href="./runtime.html">运行时</a>
+    <a href="./conventions.html" aria-current="page">边界与约束</a>
+  </div>
+</nav>
+
+<main class="page-shell reading-wide">
+  <p class="eyebrow">Sage · 06 · 边界规则与决策约束</p>
+  <h1>边界规则与决策约束</h1>
+  <p class="muted">本页面对应 <code>docs/design/</code> 中 <em>README.md</em> / <em>first-version-system-architecture.md</em> / <em>generic-agent-platform-final-architecture.md</em> 的全部硬性约束。检查脚本与脚本见 <code>platform/scripts/check-*.mjs</code>。</p>
+
+  <h2>依赖白名单</h2>
+  <ul class="checklist">
+    <li><span class="status-yes">✓</span> Agent Application → Agent Library（<strong>单向</strong>）</li>
+    <li><span class="status-yes">✓</span> Chat Service → <code>LocalAgentClient</code> → Agent Library</li>
+    <li><span class="status-yes">✓</span> Temporal Activity → <code>LocalAgentClient</code> → Agent Library</li>
+    <li><span class="status-yes">✓</span> Task Router → Temporal Client Adapter → selected Temporal Cluster</li>
+    <li><span class="status-yes">✓</span> Skill / Tool Runtime → CredentialProvider → Secret Manager</li>
+    <li><span class="status-yes">✓</span> Engine Adapter → Kernel Capability Callback → Capability Broker → MCP/HTTP/Native/Sandbox Adapter</li>
+    <li><span class="status-yes">✓</span> Kernel → Model Broker（Kernel 不直接接触 Provider SDK）</li>
+  </ul>
+
+  <h2>禁止依赖</h2>
+  <ul class="checklist">
+    <li><span class="status-no">✕</span> Agent Library → Chat / Task / Temporal / Fastify / PostgreSQL</li>
+    <li><span class="status-no">✕</span> Agent Application → Pi 专有 API（统一过 <code>harness-pi</code>）</li>
+    <li><span class="status-no">✕</span> Chat / Task UI → Pi / Temporal / PostgreSQL</li>
+    <li><span class="status-no">✕</span> 模型 / 普通用户 → Temporal endpoint / Namespace / Task Queue</li>
+    <li><span class="status-no">✕</span> Temporal Workflow → LLM / Tool / 网络 / 数据库 I/O</li>
+    <li><span class="status-no">✕</span> Session / Checkpoint / Event / History / Trace → 明文 Secret</li>
+    <li><span class="status-no">✕</span> Engine Adapter → 直接访问 Provider 或 MCP connection</li>
+    <li><span class="status-no">✕</span> Engine Adapter → 自行签发 <code>CheckpointRef</code> / 持有硬预算余额</li>
+  </ul>
+
+  <h2>必须存 ref 而非存值</h2>
+  <ul class="checklist">
+    <li>Chat/Task/Session 只保存 <code>connection_ref</code> 或 <code>credential_ref</code>。</li>
+    <li>Workflow History 不携带 LLM prompt 内容、密钥、Tool 大结果。</li>
+    <li>Tasks 只携带 <code>AgentTaskSpec</code> 引用 + digest；不携带完整 payload。</li>
+    <li>Capability Request 只携带 canonical input digest；不携带 Secrets。</li>
+  </ul>
+
+  <h2>状态 Owner（不可漂移）</h2>
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>状态</th><th>Owner</th><th>不允许做的事</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Chat Session / Message / Summary</td><td>PostgreSQL Chat Store</td><td>不允许由 Workflow/Activity 写入</td></tr>
+      <tr><td>Workflow History / Timer / Signal</td><td>目标 Temporal Cluster</td><td>不允许被 Task Store 回写替代</td></tr>
+      <tr><td>Task 产品状态 / Snapshot / Projection</td><td>PostgreSQL Task Store</td><td>不允许作 lifecycle authority</td></tr>
+      <tr><td>Agent Session / Run / Checkpoint</td><td>PostgreSQL Agent State</td><td>不允许在 Memory/Ledger 中再写一份</td></tr>
+      <tr><td>Effect 写副作用</td><td>Tool Effect Ledger（Postgres）</td><td>不允许走 cache / trace / outbox</td></tr>
+      <tr><td>Usage 余额</td><td>Consumption Ledger（Postgres）</td><td>不允许 Engine 内部计数替代</td></tr>
+      <tr><td>Artifact / Checkpoint body</td><td>Object Store + KMS</td><td>不允许直接 inline 进 payload</td></tr>
+      <tr><td>明文 Secret / Token / mTLS Key</td><td>Secret Manager</td><td>不允许出现在任何上述 Owner 中</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>Retry 语义</h2>
+  <div class="card-grid">
+    <article class="option-card recommended">
+      <p class="badge success filled">Queue / Activity delivery retry</p>
+      <h3>同 Attempt · 同 Spec · 同 invocation_id</h3>
+      <p>Temporal Activity 重投递保持不变，避免副作用重复执行。</p>
+    </article>
+    <article class="option-card">
+      <p class="badge info filled">Agent semantic retry</p>
+      <h3>新 invocation · 复用 Effect/Usage receipt</h3>
+      <p>通常仍在同 Attempt；已提交的 Effect/Usage receipt 必须可幂等复用。</p>
+    </article>
+    <article class="option-card">
+      <p class="badge warning filled">配置漂移 / 不可兼容 Checkpoint</p>
+      <h3>新 Attempt · 新 Spec</h3>
+      <p>model / grant / target / runtime 变化时强制新 Attempt；不兼容 Checkpoint 恢复也强制新 Attempt。</p>
+    </article>
+    <article class="option-card">
+      <p class="badge danger filled"><code>EFFECT_UNKNOWN</code></p>
+      <h3>停止自动重试</h3>
+      <p>必须进入<strong>人工 resolution protocol</strong>；自动重试会被 Effect Ledger 拒绝。</p>
+    </article>
+  </div>
+
+  <h2>MCP 定位</h2>
+  <pre class="code-block"><code>Agent Engine
+  → Kernel Capability callback
+  → Capability Broker
+  → MCP / HTTP / Native / Sandbox Adapter
+  → Semantic Capability Provider
+
+MCP discovery + schema metadata → 仅描述能力，不产生 grant
+MCP 新增 Tool → 已 admission 的 Spec 不能自动获得该 Tool</code></pre>
+  <p class="muted">所有 Tool 调用必须过 Capability Broker；Effective grant = Spec grant snapshot ∩ live deny overlay ∩ principal/tenant scope ∩ approval ∩ current ledger budget。</p>
+
+  <h2>Tool 分类与处理</h2>
+  <ol class="arch-layers">
+    <li><strong>Semantic tools</strong> · 业务语义、强类型、首选</li>
+    <li><strong>Bounded generic tools</strong> · 浏览器 / 文件 / 代码检索，受控 sandbox / egress</li>
+    <li><strong>Infrastructure tools</strong> · SQL、db driver、任意 shell、任意 HTTP；<span class="ink-zhusha">默认不向 Agent 暴露</span>；必须由受信 Provider 封装或经高等级审批</li>
+  </ol>
+
+  <h2>Checkpoint Lifecycle</h2>
+  <div class="runway" aria-label="Checkpoint 状态机">
+    <div class="runway-row">
+      <div class="lane">candidate</div>
+      <div class="body">Engine Adapter 产生的 Checkpoint candidate：body + digest + schema + engine_codec + runtime_contract_major + effect/usage receipt refs</div>
+      <div class="tag">临时对象</div>
+    </div>
+    <div class="runway-row">
+      <div class="lane">pending</div>
+      <div class="body"><code>PostgresCheckpointLifecycleStore</code> 在 <code>agent_checkpoint_commit_operations</code> 中插入；fence_epoch = 1；outbox 同步写</div>
+      <div class="tag">commit-in-flight</div>
+    </div>
+    <div class="runway-row">
+      <div class="lane">committed</div>
+      <div class="body">Object promote 成功后 UPDATE；outbox 置为 published；返回 <code>checkpoint://sealed/{digest}</code></div>
+      <div class="tag">sealed</div>
+    </div>
+    <div class="runway-row">
+      <div class="lane">quarantined</div>
+      <div class="body">fence 丢失 / object promote 不可验证 / metadata conflict → 写入 <code>agent_security_audit</code></div>
+      <div class="tag">halted</div>
+    </div>
+  </div>
+
+  <h2>fail-closed 默认值</h2>
+  <ul class="checklist">
+    <li><span class="status-cond">!</span> Registry / Policy / Model / Capability / Target / Ledger 不可用时默认 fail-closed</li>
+    <li><span class="status-cond">!</span> 只读 Interactive 场景的有限降级必须由显式 policy 允许</li>
+    <li><span class="status-cond">!</span> Live overlay（revocation / emergency deny / approval expiry / scope）只能撤权或 kill，不能加 Tool / Provider / Scope</li>
+    <li><span class="status-cond">!</span> <code>EFFECT_UNKNOWN</code> 禁止自动重试</li>
+    <li><span class="status-cond">!</span> 缺 provider fingerprint / runtime compatibility → fail closed</li>
+  </ul>
+
+  <h2>核心可观测指标</h2>
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>类别</th><th>最小集</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Chat</td><td>首 Token 时间、完成时间、Promotion 成功率</td></tr>
+      <tr><td>Task</td><td>路由失败率、按 Target 的 Workflow 启动延迟、Task Queue backlog</td></tr>
+      <tr><td>Agent Run</td><td>turn / token / tool / deadline / budget / cancellation 计数，effect_unknown 频次</td></tr>
+      <tr><td>Capability</td><td>grant 命中率、approval 等待分布、deny / unknown rate</td></tr>
+      <tr><td>Storage</td><td>Agent State / Effect / Usage / Audit 写吞吐、Checkpoint seal 延迟</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>可证替换的 conformance gate</h2>
+  <p class="muted"><code>@sage/agent-runtime-conformance</code> 与 <code>@sage/agent-platform-conformance</code> 把 <code>apgv/{...}/v1/{...}</code> case id 落为 evidence。同一 case 必须被至少 <strong>两个 Engine Adapter</strong> 与 <strong>一个 Coordinator fake</strong> 通过。</p>
+
+  <h2>交付检查清单</h2>
+  <div class="checks-grid">
+    <article>
+      <div class="head"><span class="badge info">检查</span><h4>依赖方向</h4></div>
+      <ul class="checklist">
+        <li><code>scripts/check-dependencies.mjs</code> pass</li>
+        <li><code>scripts/check-pi-boundaries.mjs</code> pass</li>
+        <li><code>scripts/check-chat-boundaries.mjs</code> pass</li>
+        <li><code>scripts/check-agent-client-boundaries.mjs</code> pass</li>
+        <li><code>scripts/check-p{4..7}-boundaries.mjs</code> pass</li>
+      </ul>
+    </article>
+    <article>
+      <div class="head"><span class="badge success">阶段</span><h4>Phase Evidence</h4></div>
+      <ul class="checklist">
+        <li><code>platform/docs/pN-*.md</code> exit review</li>
+        <li><code>platform/evidence/agent-platform-*</code> acceptance</li>
+        <li>OpenSpec change 归档至 <code>openspec/changes/&lt;change&gt;</code></li>
+      </ul>
+    </article>
+    <article>
+      <div class="head"><span class="badge warning">终版</span><h4>machine gate</h4></div>
+      <p>终版状态：<strong>draft</strong>。Arch Review 仍为 NO-GO，直到外审与 accountable approvals 到位。</p>
+    </article>
+    <article>
+      <div class="head"><span class="badge danger">禁止</span><h4>Sec / Secret</h4></div>
+      <ul class="checklist">
+        <li>Secret 不进 Session / Task / Checkpoint / Event / Trace</li>
+        <li>凭据解析只为运行时短期凭据</li>
+        <li>Task 恢复时重新解析当前有效凭据</li>
+      </ul>
+    </article>
+  </div>
+
+  <hr />
+  <nav class="pager" aria-label="分页导航">
+    <span class="muted">上一节：<a href="./runtime.html">运行时</a></span>
+    <span class="muted">下一节：<a href="./index.html">Sage 包首页 →</a></span>
+  </nav>
+</main>
+</body>
+</html>

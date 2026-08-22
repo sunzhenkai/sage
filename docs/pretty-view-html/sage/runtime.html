@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>运行时拓扑与状态所有权 · Sage · Pretty View HTML</title>
+<link rel="stylesheet" href="../assets/global.css" />
+<style>
+  .runway {
+    display: grid;
+    gap: var(--pv-space-2);
+    grid-template-columns: 1fr;
+    margin-block: var(--pv-space-6);
+  }
+  .runway-row {
+    display: grid;
+    grid-template-columns: 9rem 1fr 9rem;
+    align-items: stretch;
+    border: 1px solid var(--pv-border);
+    border-radius: var(--pv-radius);
+    background: var(--pv-surface);
+    overflow: hidden;
+  }
+  .runway-row > div {
+    padding: var(--pv-space-3) var(--pv-space-4);
+  }
+  .runway-row .lane {
+    background: color-mix(in srgb, var(--pv-zijing) 14%, var(--pv-surface));
+    color: var(--pv-strong);
+    font-weight: 800;
+    text-align: center;
+  }
+  .runway-row .body { font-size: 0.95rem; }
+  .runway-row .tag {
+    background: color-mix(in srgb, var(--pv-rougui) 14%, var(--pv-surface));
+    text-align: center;
+    font-family: var(--pv-mono);
+    font-size: 0.82rem;
+    color: var(--pv-rougui);
+  }
+  @media (max-width: 56rem) {
+    .runway-row { grid-template-columns: 1fr; }
+    .runway-row .lane, .runway-row .tag { text-align: left; }
+  }
+  .runtime-mermaid {
+    border: 1px solid var(--pv-border);
+    border-radius: var(--pv-radius);
+    background: linear-gradient(180deg, #fbfaf7 0%, #ffffff 100%);
+    padding: var(--pv-space-6);
+    margin-block: var(--pv-space-6);
+    overflow-x: auto;
+  }
+  .runtime-mermaid .lane-band {
+    display: flex;
+    align-items: center;
+    gap: var(--pv-space-2);
+    padding-block: var(--pv-space-2);
+    border-bottom: 1px dashed var(--pv-border);
+  }
+  .runtime-mermaid .lane-band:last-child { border-bottom: 0; }
+  .runtime-mermaid .node {
+    border: 1px solid var(--pv-border);
+    border-radius: 0.35rem;
+    background: white;
+    padding: var(--pv-space-2) var(--pv-space-3);
+    font-family: var(--pv-mono);
+    font-size: 0.82rem;
+  }
+  .runtime-mermaid .node.accent { border-color: var(--pv-zijing); background: color-mix(in srgb, var(--pv-zijing) 8%, white); }
+  .runtime-mermaid .node.success { border-color: var(--pv-songshi); background: color-mix(in srgb, var(--pv-songshi) 8%, white); }
+  .runtime-mermaid .node.warning { border-color: var(--pv-zheshi); background: color-mix(in srgb, var(--pv-zheshi) 8%, white); }
+  .runtime-mermaid .node.danger { border-color: var(--pv-zhusha); background: color-mix(in srgb, var(--pv-zhusha) 8%, white); }
+  .runtime-mermaid .node.info { border-color: var(--pv-kongque); background: color-mix(in srgb, var(--pv-kongque) 8%, white); }
+  .runtime-mermaid .arrow {
+    color: var(--pv-rougui);
+    font-family: var(--pv-mono);
+    font-weight: 800;
+  }
+</style>
+</head>
+<body>
+<nav class="top-nav" aria-label="Sage 导航">
+  <div class="nav-menu">
+    <a href="../index.html">Pretty View 根</a>
+    <a href="./index.html">Sage 包首页</a>
+    <a href="./overview.html">概览</a>
+    <a href="./architecture.html">整体架构</a>
+    <a href="./packages.html">Package 矩阵</a>
+    <a href="./interfaces.html">接口与契约</a>
+    <a href="./runtime.html" aria-current="page">运行时</a>
+    <a href="./conventions.html">边界与约束</a>
+  </div>
+</nav>
+
+<main class="page-shell reading-wide">
+  <p class="eyebrow">Sage · 05 · 运行时拓扑与状态所有权</p>
+  <h1>运行时拓扑与状态所有权</h1>
+  <p class="muted">本页面向部署与评审，基于 v1.1 已交付架构；终版目标态的部署维度在 <a href="./architecture.html">整体架构</a> 单列。</p>
+
+  <h2>部署单元（v1.1）</h2>
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>部署单元</th><th>内容</th><th>位置</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>agent-web</code></td><td>Chat / Task SPA</td><td>控制面环境</td></tr>
+      <tr><td><code>agent-api</code></td><td>Fastify、Chat Service、Task Service、Task Router、Temporal clients</td><td>控制面环境</td></tr>
+      <tr><td><code>agent-worker-general</code></td><td>通用 Workflow/Activity、Agent Library、PiHarness</td><td>通用执行环境</td></tr>
+      <tr><td><code>agent-worker-prod</code></td><td>生产只读 / 受控 Tool Worker</td><td>生产网络环境</td></tr>
+      <tr><td><code>agent-worker-isolated</code></td><td>需要隔离能力的 Worker</td><td>隔离执行环境</td></tr>
+      <tr><td><code>postgres</code></td><td>Chat / Task Projection / Agent State</td><td>控制面数据环境</td></tr>
+      <tr><td><code>artifact-store</code></td><td>附件、报告、大对象</td><td>共享或环境内存储</td></tr>
+      <tr><td><code>temporal-clusters</code></td><td>dev / prod / isolated / region</td><td>对应目标环境</td></tr>
+      <tr><td><code>secret-manager</code></td><td>服务与用户凭据</td><td>可信基础设施</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>运行时文字图（v1.1）</h2>
+  <div class="runtime-mermaid" aria-label="运行时文字图">
+    <div class="lane-band">
+      <span class="node info">UI · Chat / Tasks</span>
+      <span class="arrow">→</span>
+      <span class="node accent">Application API (Fastify · HTTP/SSE)</span>
+      <span class="arrow">→</span>
+      <span class="node success">Chat Service</span>
+      <span class="arrow">→</span>
+      <span class="node">LocalAgentClient</span>
+      <span class="arrow">→</span>
+      <span class="node accent">Agent Library</span>
+    </div>
+    <div class="lane-band">
+      <span class="node info">Application API</span>
+      <span class="arrow">→</span>
+      <span class="node success">Task Service</span>
+      <span class="arrow">→</span>
+      <span class="node warning">Task Router</span>
+      <span class="arrow">→</span>
+      <span class="node info">Temporal Client Adapter</span>
+      <span class="arrow">→</span>
+      <span class="node danger">Temporal Clusters</span>
+      <span class="arrow">→</span>
+      <span class="node accent">Environment Worker</span>
+      <span class="arrow">→</span>
+      <span class="node accent">Agent Library</span>
+    </div>
+    <div class="lane-band">
+      <span class="node">Agent Library</span>
+      <span class="arrow">→</span>
+      <span class="node info">Harness Port (Pi Adapter)</span>
+      <span class="arrow">→</span>
+      <span class="node info">Model Provider</span>
+    </div>
+    <div class="lane-band">
+      <span class="node">Agent Library</span>
+      <span class="arrow">→</span>
+      <span class="node">Skill / Tool Runtime</span>
+      <span class="arrow">→</span>
+      <span class="node">Business Tools / MCP</span>
+      <span class="arrow">/</span>
+      <span class="node success">Credential Provider</span>
+      <span class="arrow">→</span>
+      <span class="node warning">Secret Manager</span>
+    </div>
+    <p class="muted"><small>同步调用 <span class="arrow">→</span>；异步 Temporal Task Queue 与 OTLP 遥测在本图中被压缩。</small></p>
+  </div>
+
+  <h2>运行时分层（按 ownership）</h2>
+  <div class="runway" aria-label="运行时 ownership 分层">
+    <div class="runway-row">
+      <div class="lane">Edge / Manager</div>
+      <div class="body"><code>agent-web</code> · <code>agent-api</code>（Fastify） · Temporal Target Registry（在 api 进程中）</div>
+      <div class="tag">control plane</div>
+    </div>
+    <div class="runway-row">
+      <div class="lane">Workflow Runtime</div>
+      <div class="body">Temporal <code>sage-dev</code> / <code>temporal-general</code> / <code>temporal-coding</code> / <code>temporal-prod</code> / <code>temporal-isolated</code> / <code>temporal-eu</code></div>
+      <div class="tag">durable</div>
+    </div>
+    <div class="runway-row">
+      <div class="lane">Worker</div>
+      <div class="body"><code>agent-worker-general</code> · <code>agent-worker-prod-readonly</code> · <code>agent-worker-isolated</code> — 每个只监听被授权的 Task Queue，只拿到对应 Tool/网络/Secret Scope</div>
+      <div class="tag">execution env</div>
+    </div>
+    <div class="runway-row">
+      <div class="lane">State</div>
+      <div class="body"><code>postgres</code>（Chat / Task Projection / Agent State） · <code>artifact-store</code>（S3-compatible） · <code>secret-manager</code></div>
+      <div class="tag">infra</div>
+    </div>
+    <div class="runway-row">
+      <div class="lane">External</div>
+      <div class="body">Identity Provider · LLM Provider · MCP / Business Tool Servers · Observability Backend</div>
+      <div class="tag">trust boundary</div>
+    </div>
+  </div>
+
+  <h2>Chat 短请求与长请求</h2>
+  <div class="before-after">
+    <section class="before">
+      <h3>短 Chat</h3>
+      <p>UI → Chat Service → LocalAgentClient → Agent Library → SSE；<strong>不承诺</strong> API 进程崩溃后继续生成，但用户消息已持久化，可手动 retry。</p>
+      <p class="muted"><small>需要在产品前老实失败，避免伪装为持久任务。</small></p>
+    </section>
+    <section class="after">
+      <h3>长 Chat（提升为 Task）</h3>
+      <p>UI → Chat Service → Task Service → Task Router（受信任） → Temporal WorkflowTargetSnapshot → Temporal Cluster → Environment Worker → LocalAgentClient → Agent Library；Chat 中显示 <code>task_card</code>。</p>
+      <p class="muted"><small>长请求、复杂 Tool 或高风险 Tool 必须提升 durable。</small></p>
+    </section>
+  </div>
+
+  <h2>Workflow 与 Activity 边界</h2>
+  <pre class="code-block"><code>AgentTaskWorkflow
+├── initialize
+├── runAgentSlice   Activity
+├── persistCheckpoint  Activity
+├── wait Signal / Timer（按任务需要）
+├── continue / retry
+└── complete / fail / cancel</code></pre>
+
+  <div class="callout accent" role="note">
+    <p class="callout-title">边界</p>
+    <p>Workflow <strong>只</strong>包含确定性状态、Timer、Signal、Retry 策略和稳定引用。<strong>不允许</strong>在 Workflow 内执行 LLM / Tool / 业务 API / DB / Artifact I/O / Credential 解析 / Checkpoint 持久化——这些必须进 Activity。</p>
+  </div>
+
+  <h2>Task Router 算法</h2>
+  <ol class="steps">
+    <li class="step">解析并校验 <code>TaskType</code>。</li>
+    <li class="step">读取 tenant / environment / data-residency 约束。</li>
+    <li class="step">从 Registry 过滤 <code>enabled + healthy</code> Target。</li>
+    <li class="step">匹配 <code>allowed_task_types</code>、capabilities、isolation。</li>
+    <li class="step">按显式环境、优先级和区域策略排序。</li>
+    <li class="step">选择一个 Target，写入 <code>WorkflowTargetSnapshot</code> / <code>CoordinatorTargetSnapshot</code>。</li>
+    <li class="step">使用对应 Temporal Client 启动 Workflow。</li>
+  </ol>
+
+  <p class="callout warning"><strong>无匹配目标</strong>返回 <code>ROUTING_UNAVAILABLE</code>，不得回退到 API 进程内执行。</p>
+
+  <h2>状态所有权（Single Authority）</h2>
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>状态</th><th>Owner</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Chat Session、Message、Summary</td><td><strong>PostgreSQL Chat Store</strong>（<code>chat_sessions / chat_messages / chat_message_parts</code>）</td></tr>
+      <tr><td>Workflow History、Timer、Signal、Activity Retry</td><td><strong>目标 Temporal Cluster</strong></td></tr>
+      <tr><td>Task 产品状态、WorkflowTargetSnapshot、查询视图</td><td><strong>PostgreSQL Task Store</strong>（仅 projection）</td></tr>
+      <tr><td>Agent Session、Run、Checkpoint、Spec、Receipt</td><td><strong>PostgreSQL Agent State</strong>（<code>agent_run_records / agent_checkpoint_commit_operations / agent_effect_ledger / agent_usage_accounts / agent_security_audit / ...</code>）</td></tr>
+      <tr><td>文件、附件、报告、checkpoint body</td><td><strong>Artifact Store</strong>（S3-compatible + KMS 加密）</td></tr>
+      <tr><td>明文密钥、OAuth Token、mTLS Key</td><td><strong>Secret Manager</strong></td></tr>
+      <tr><td>connection_ref / secret_ref 元数据</td><td><strong>CredentialProvider / Application DB</strong></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout danger" role="note">
+    <p class="callout-title">禁止反向 authority</p>
+    <p>Projection / cache / event / trace / prompt context 都不能反向成为 authority。<code>Task Store</code> 是产品查询投影，不是 Workflow 执行真相。检测到不一致时使用固化 <code>WorkflowTarget</code> 查询 Temporal 并修复。</p>
+  </div>
+
+  <h2>故障与降级（v1.1）</h2>
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>故障</th><th>行为</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>API 在短 Chat Run 中重启</td><td>Message 保留，当前 Run 失败，用户 Retry</td></tr>
+      <tr><td>目标 Temporal 启动前不可用</td><td>Router 按显式策略选其他健康 Target，否则 <code>ROUTING_UNAVAILABLE</code></td></tr>
+      <tr><td>已启动 Temporal Cluster 不可用</td><td>固定 Target，等待恢复或显式迁移，不静默跨 Cluster</td></tr>
+      <tr><td>环境 Worker 重启</td><td>Temporal 重新投递 Activity，副作用依赖幂等键</td></tr>
+      <tr><td>Task Store 不可用</td><td>Workflow 可继续；产品投影延迟，恢复后对账</td></tr>
+      <tr><td>Agent State 不可用</td><td>Activity 失败重试，不推进 Checkpoint 边界</td></tr>
+      <tr><td>Secret Manager 不可用</td><td>需要凭据的操作 <span class="highlight zhusha">fail closed</span></td></tr>
+      <tr><td>Artifact Store 不可用</td><td>不把大结果塞入 History/Task Store，Activity 失败或等待</td></tr>
+      <tr><td>SSE 中断</td><td>UI 使用 <code>afterSequence</code> 恢复 Chat/Task Timeline</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>跨 Cluster 故障语义</h2>
+  <div class="card-grid">
+    <article class="option-card">
+      <p class="badge accent filled">Workflow 启动前</p>
+      <h3>Router 可在健康 Target 间选择</h3>
+      <p>首选不可用时按<strong>明确</strong>策略选择次优目标。Worker 死后 Temporal 重新投递 Activity，不重新选 Target。</p>
+    </article>
+    <article class="option-card">
+      <p class="badge danger filled">Workflow 启动后</p>
+      <h3>Cluster 不可用 = 固定 Target</h3>
+      <p>保留 Task 与 <code>WorkflowTargetSnapshot</code>；query / signal / cancel 返回目标不可用；<strong>不在另一个 Cluster 静默创建相同 Workflow</strong>。</p>
+    </article>
+    <article class="option-card recommended">
+      <p class="badge warning filled">显式迁移</p>
+      <h3>需要审计与新 Workflow</h3>
+      <p>外部 Checkpoint · 稳定幂等键 · 新 <code>workflow_id</code> · 新 TargetSnapshot · 迁移审计。v1.1 不承诺自动跨 Cluster 续跑。</p>
+    </article>
+  </div>
+
+  <h2>统一关联字段</h2>
+  <pre class="code-block"><code>chat_session_id?
+message_id?
+task_id?
+workflow_id?
+temporal_target_id?
+namespace?
+task_queue?
+attempt_id?
+run_id?
+tool_call_id?
+semantic_action_id?
+correlation_id</code></pre>
+  <p class="muted">高基数 ID 进 trace / log / audit，不作为 metrics label。</p>
+
+  <hr />
+  <nav class="pager" aria-label="分页导航">
+    <span class="muted">上一节：<a href="./interfaces.html">接口与契约</a></span>
+    <span class="muted">下一节：<a href="./conventions.html">边界与约束 →</a></span>
+  </nav>
+</main>
+</body>
+</html>

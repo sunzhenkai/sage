@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sage 平台 · Pretty View HTML</title>
+<link rel="stylesheet" href="../assets/global.css" />
+<style>
+  .pages-map {
+    display: grid;
+    gap: var(--pv-space-4);
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
+  }
+  .page-card {
+    border: 1px solid var(--pv-border);
+    border-radius: var(--pv-radius);
+    background: var(--pv-surface);
+    padding: var(--pv-space-6);
+    box-shadow: var(--pv-shadow);
+    position: relative;
+    overflow: hidden;
+  }
+  .page-card::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 0.18rem;
+    background: var(--pv-accent);
+  }
+  .page-card .order {
+    font-family: var(--pv-mono);
+    font-weight: 800;
+    color: var(--pv-rougui);
+    font-size: 0.86rem;
+  }
+  .page-card h3 { margin: var(--pv-space-2) 0 var(--pv-space-2); }
+  .page-card p { margin: 0; color: var(--pv-text); }
+  .page-card .links {
+    margin-top: var(--pv-space-4);
+    display: flex;
+    gap: var(--pv-space-3);
+    flex-wrap: wrap;
+    font-family: var(--pv-mono);
+    font-size: 0.86rem;
+  }
+  .layer-strip {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 1px;
+    background: var(--pv-border);
+    border: 1px solid var(--pv-border);
+    border-radius: var(--pv-radius);
+    overflow: hidden;
+  }
+  .layer-strip div {
+    padding: var(--pv-space-3) var(--pv-space-4);
+    background: var(--pv-surface);
+  }
+  .layer-strip div:nth-child(odd) { background: color-mix(in srgb, var(--pv-kongque) 8%, var(--pv-surface)); }
+  .layer-strip div:nth-child(even) { background: color-mix(in srgb, var(--pv-zijing) 8%, var(--pv-surface)); }
+  @media (max-width: 56rem) { .layer-strip { grid-template-columns: 1fr 1fr; } }
+</style>
+</head>
+<body>
+<nav class="top-nav" aria-label="Sage 导航">
+  <div class="nav-menu">
+    <a href="../index.html">Pretty View 根</a>
+    <a href="./index.html" aria-current="page">Sage 包首页</a>
+    <a href="./overview.html">概览</a>
+    <a href="./architecture.html">整体架构</a>
+    <a href="./packages.html">Package 矩阵</a>
+    <a href="./interfaces.html">接口与契约</a>
+    <a href="./runtime.html">运行时</a>
+    <a href="./conventions.html">边界与约束</a>
+  </div>
+</nav>
+
+<main class="page-shell reading-wide">
+  <p class="eyebrow">Sage 通用 Agent 平台 · 阅读包</p>
+  <h1>代码接口与技术架构</h1>
+  <p class="muted">本包按「事实优先、可独立阅读」整理仓库中的源代码契约与架构文档。所有数据来自 <code>platform/</code> 工作区与 <code>docs/design/</code> 的最新交付件；当前实现基线为 <strong>v1.1</strong>，长期目标态来自 <em>generic-agent-platform-final-architecture</em> 草案。</p>
+
+  <aside class="key-summary">
+    <p class="eyebrow">先记住</p>
+    <ol>
+      <li><span class="ink-zijing">Sage 不是简单的 LLM 包装</span>，它是一个双产品层平台：<code>Agent Library</code> 通用执行内核 + <code>Agent Application</code> Chat/Temporal/UI。</li>
+      <li><span class="ink-kongque">共享公共契约</span>，<code>agent-contracts</code> 暴露 <code>AgentRunSpec/AgentEvent/AgentRunOutcome</code>、<code>AgentTaskSpec/Envelope/Receipt</code> 等 v1 边界。</li>
+      <li><span class="ink-songshi">唯一权威，单一事实</span>：Chat Store、Task Projection、Agent State、Artifact、Workflow History、Secret 各有 Owner，禁止投影反推 lifecycle。</li>
+      <li><span class="ink-zhusha">fail-closed &amp; 防漂移</span>：所有可漂移依赖在 admission 时固化为 <code>AgentTaskSpec</code>；旧 Run 不因活跃版本变化而漂移。</li>
+    </ol>
+  </aside>
+
+  <h2>页面地图</h2>
+  <div class="pages-map">
+    <article class="page-card">
+      <p class="order">01 · overview</p>
+      <h3><a href="./overview.html">项目概览</a></h3>
+      <p>仓库结构、技术栈（Node.js 24 / pnpm 10 / Temporal 1.29 / Postgres 17.6 / MinIO）、当前实现基线与里程碑。</p>
+      <p class="links"><a href="./overview.html">阅读 →</a></p>
+    </article>
+
+    <article class="page-card">
+      <p class="order">02 · architecture</p>
+      <h3><a href="./architecture.html">整体技术架构</a></h3>
+      <p>v1.1 已交付架构与终版目标态并置：Kernel/Engine/Host/Broker、AgentPackageRelease → AgentTaskSpec → Envelope、Capability/MCP、Context/Model。</p>
+      <p class="links"><a href="./architecture.html">阅读 →</a></p>
+    </article>
+
+    <article class="page-card">
+      <p class="order">03 · packages</p>
+      <h3><a href="./packages.html">Package 矩阵</a></h3>
+      <p>27 个 <code>@sage/*</code> package 按职责分组、依赖矩阵、禁止依赖图。涵盖 contracts / ports / kernel / engine / host / broker / store / domain。</p>
+      <p class="links"><a href="./packages.html">阅读 →</a></p>
+    </article>
+
+    <article class="page-card">
+      <p class="order">04 · interfaces</p>
+      <h3><a href="./interfaces.html">代码接口与契约</a></h3>
+      <p>TypeBox Schema 摘要：<code>AgentRunSpec</code>/<code>AgentEvent</code>/<code>AgentTaskSpec</code>/<code>AgentExecutionEnvelope</code>/<code>Chat</code>/<code>Task</code>/<code>WorkflowTargetSnapshot</code>/Harness/Port。</p>
+      <p class="links"><a href="./interfaces.html">阅读 →</a></p>
+    </article>
+
+    <article class="page-card">
+      <p class="order">05 · runtime</p>
+      <h3><a href="./runtime.html">运行时拓扑与状态所有权</a></h3>
+      <p>5 类部署单元、控制面/工作流运行时分层、状态 Owner 表、Chat 短/长请求两条链路。</p>
+      <p class="links"><a href="./runtime.html">阅读 →</a></p>
+    </article>
+
+    <article class="page-card">
+      <p class="order">06 · conventions</p>
+      <h3><a href="./conventions.html">边界规则与决策约束</a></h3>
+      <p>依赖白名单与禁止、状态所有者矩阵、Retry 语义、MCP 定位、跨 Cluster 故障语义与降级矩阵。</p>
+      <p class="links"><a href="./conventions.html">阅读 →</a></p>
+    </article>
+  </div>
+
+  <h2>阅读顺序建议</h2>
+  <ol class="arch-flow" aria-label="建议顺序">
+    <li>概览 · 看清基线</li>
+    <li>架构 · 对齐心智模型</li>
+    <li>Package 矩阵 · 模块定位</li>
+    <li>接口与契约 · 写代码前</li>
+    <li>运行时 · 部署前</li>
+    <li>边界与约束 · 评审前</li>
+  </ol>
+
+  <h2>六层参考模型（v1.1）</h2>
+  <p>System Model <code>docs/design/first-version-system.architecture.json</code> 将运行时分层固化为六层。下表用于快速对照；详细分页见 <a href="./runtime.html">运行时</a>。</p>
+  <div class="layer-strip" aria-label="v1.1 六层模型">
+    <div><strong>Actors</strong> 用户、宿主应用</div>
+    <div><strong>Manager</strong> Web UI、Target Registry</div>
+    <div><strong>Gateway</strong> Application API、Agent API</div>
+    <div><strong>Runtime</strong> Chat Service、Task Service、Router、Workers、Agent Runner</div>
+    <div><strong>Platform</strong> Temporal Adapter、Pi Harness、Tool Runtime、Credential、Model Provider</div>
+    <div><strong>Infrastructure</strong> Postgres、Artifact Store、Secret Manager、Temporal Clusters</div>
+  </div>
+
+  <h2>阅读对象与边界</h2>
+  <ul>
+    <li>面向想快速进入 Sage 代码库的工程师、架构评审、技术写作者。</li>
+    <li>仓库中 <code>platform/packages/</code> 有 27 个 <code>@sage/*</code> workspace package；本包优先覆盖 contracts / ports / kernel / engine / host / broker / store / domain 与应用入口。</li>
+    <li>设计原件（决策来源）见 <code>docs/design/README.md</code> 与 <code>docs/design/_cross/generic-agent-platform-final-architecture.md</code>；本包只整理接口与架构事实，不替代设计评审。</li>
+  </ul>
+
+  <hr />
+  <nav class="pager" aria-label="分页导航">
+    <span class="muted">上一节：<a href="../index.html">Pretty View 根</a></span>
+    <span class="muted">下一节：<a href="./overview.html">概览 →</a></span>
+  </nav>
+</main>
+</body>
+</html>

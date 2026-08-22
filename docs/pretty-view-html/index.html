@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Pretty View HTML · Sage</title>
+<link rel="stylesheet" href="./assets/global.css" />
+<style>
+  .card-grid {
+    display: grid;
+    gap: var(--pv-space-4);
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr));
+  }
+  .entry-card {
+    border: 1px solid var(--pv-border);
+    border-radius: var(--pv-radius);
+    background: var(--pv-surface);
+    padding: var(--pv-space-4) var(--pv-space-6);
+    box-shadow: var(--pv-shadow);
+    text-decoration: none;
+    color: inherit;
+    transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
+    display: block;
+  }
+  .entry-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--pv-accent);
+    background: color-mix(in srgb, var(--pv-accent) 4%, var(--pv-surface));
+  }
+  .entry-card .eyebrow { color: var(--pv-muted); }
+  .entry-card h3 { color: var(--pv-strong); margin-top: var(--pv-space-2); }
+  .entry-card p { color: var(--pv-text); margin-bottom: 0; }
+  .entry-card .entry-meta { color: var(--pv-rougui); font-family: var(--pv-mono); font-size: 0.86rem; }
+</style>
+</head>
+<body>
+<nav class="top-nav" aria-label="主导航">
+  <div class="nav-menu">
+    <a href="./index.html" aria-current="page">首页</a>
+    <a href="./sage/index.html">Sage 平台</a>
+  </div>
+</nav>
+
+<main class="page-shell reading-wide">
+  <p class="eyebrow">Sage · Pretty View HTML</p>
+  <h1>代码接口 · 技术架构</h1>
+  <p class="muted">Sage 通用 Agent 平台 的源代码级接口与运行时架构阅读页。所列事实来自仓库当前分支与 <code>docs/design/</code> 已登记的 v1.1 / 终版提案，长期目标态文档随架构评审升级再行更新。</p>
+
+  <aside class="key-summary">
+    <p class="eyebrow">目录</p>
+    <ul>
+      <li><a href="./sage/index.html">Sage 平台阅读包</a> —— 项目概览、整体架构、Package 矩阵、代码接口、运行时拓扑、边界规则 六页串联。</li>
+    </ul>
+  </aside>
+
+  <h2>内容包</h2>
+  <div class="card-grid">
+    <a class="entry-card" href="./sage/index.html">
+      <p class="eyebrow">包</p>
+      <h3>Sage 通用 Agent 平台</h3>
+      <p>Agent Library 与 Agent Application 双产品层；TypeScript + Node.js 24 + pnpm workspaces；TypeBox 契约；Temporal 多环境路由；可插拔 Engine 与 Canonical Kernel。</p>
+      <p class="entry-meta">sage/index.html · 6 内容页</p>
+    </a>
+  </div>
+
+  <h2>阅读入口</h2>
+  <ol class="steps">
+    <li class="step"><a href="./sage/overview.html">从项目概览开始</a>，先看清仓库结构、技术栈与当前实现基线。</li>
+    <li class="step">需要架构上下文读 <a href="./sage/architecture.html">整体技术架构</a>（v1.1 与终版提案对照）。</li>
+    <li class="step">想看 27 个 package 的职责与依赖关系，转到 <a href="./sage/packages.html">Package 矩阵</a>。</li>
+    <li class="step">查代码级契约（TypeBox schema、领域接口、端口）请进 <a href="./sage/interfaces.html">接口与契约</a>。</li>
+    <li class="step">看运行时拓扑与状态所有权读 <a href="./sage/runtime.html">运行时</a>。</li>
+    <li class="step">依赖规则、禁止模式、决策记录 见 <a href="./sage/conventions.html">边界与约束</a>。</li>
+  </ol>
+
+  <h2>色板与排版约定</h2>
+  <ul>
+    <li><span class="highlight zijing">紫晶</span> 主链接、强调、推荐项</li>
+    <li><span class="highlight zhusha">朱砂</span> 阻断、禁止、fail-closed</li>
+    <li><span class="highlight zheshi">赭石</span> 待决、警告、可降级</li>
+    <li><span class="highlight diwang">帝王黄</span> 关键结论、需优先阅读</li>
+    <li><span class="highlight songshi">松石</span> 成功、通过、已落地</li>
+    <li><span class="highlight kongque">孔雀蓝</span> 信息、外部引用、说明</li>
+    <li><span class="highlight mudan">牡丹粉</span> 次级标签、约定</li>
+    <li><span class="highlight rougui">肉桂</span> 元信息、版本、保留</li>
+  </ul>
+
+  <hr />
+  <p class="muted"><small>本页内容由 pretty-view-html skill 生成；事实数据为阅读快照，不替代 <code>docs/design/</code> 下的设计原件。</small></p>
+</main>
+</body>
+</html>
