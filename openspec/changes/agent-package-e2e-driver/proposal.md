@@ -62,3 +62,16 @@
 
 ### 3.2 验收标准回填
 - 上述 8 项验收标准全部勾选；实现与验证记录已回填至各子 change 的 `proposal.md` 验证记录。
+
+### 3.3 提交
+- 交付仓改动已提交：`9721d34 feat(agent-package): 端到端链路落地——源规范→编译→登记→发起运行→web 管理`，并 push 到 `origin/feat/agent-package-e2e`。
+- 提交范围：openspec 6 个子 change 产物 + platform 代码（agent-package-release/registry/run-admission/task-domain/task-store-postgres/agent-api/agent-worker/agent-web/p6-integration）。不含 `.agents/`（用户技能目录）。
+
+### 3.4 归档
+- 6 个子 change 全部归档至 `openspec/changes/archive/2026-08-23-*`；`openspec doctor` 通过。
+- 归档前已完成 delta spec → main spec 同步：
+  - `agent-package-release`：新增「源包目录规范与 manifest 契约」「本地源包编译为不可变 Release」
+  - `agent-release-registry`：新增「包管理 HTTP 端点与编译登记」
+  - `agent-run-admission`：新增「基于 Release 的运行 admission 与包输入物化」
+  - `package-management-interface`：新建 main spec（「包列表与详情浏览」「从包发起运行并追踪」）
+- driver change 保持 active（skip_specs: true，无硬依赖）。

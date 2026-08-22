@@ -85,3 +85,33 @@ Compiler SHALL 从已验证 lock 和 attestations 生成内容寻址的 `AgentPa
 #### Scenario: Package 包含动态代码或物理 endpoint
 - **WHEN** Compiler 发现 native/script payload、远程 include、Secret bytes、数据库/表、SQL/MQL、namespace/task queue 或任意 endpoint
 - **THEN** Release 构建失败并给出稳定诊断，不为该内容生成可发布 Release
+
+### Requirement: 源包目录规范与 manifest 契约
+系统 SHALL 定义 ai app 源包的目录规范与 manifest 契约：根目录必含 `app.yaml`（package id、version、description、entry prompt 引用、模型路由要求、budgets、skillRefs、capabilityRefs），可选包含 `prompts/*.md`、`references/*.md`、`output.schema.json`；manifest 校验 SHALL 拒绝未知字段与缺失必填字段，目录校验 SHALL 拒绝未声明资产与路径穿越。源包 SHALL NOT 包含可执行脚本、动态 include 或 Secret。
+
+#### Scenario: 合法源包通过校验
+- **WHEN** 校验器加载一个由 `app.yaml` 与若干 prompts/references/output schema 组成的源包目录
+- **THEN** 校验通过并返回结构化的包描述（资产相对路径、digest、manifest 内容）
+
+#### Scenario: manifest 违反契约
+- **WHEN** manifest 缺少必填字段、包含未知字段，或字段值越界（如 budgets 为负、entry prompt 不存在）
+- **THEN** 校验器返回稳定的结构化错误并列出违规路径，不产生部分结果
+
+#### Scenario: 目录包含未声明或危险资产
+- **WHEN** 目录中出现 manifest 未声明的文件、跨出包根的路径引用、可执行脚本或疑似 Secret
+- **THEN** 校验器拒绝该源包并返回稳定错误码，不读取资产内容进结果
+
+### Requirement: 本地源包编译为不可变 Release
+系统 SHALL 提供本地编译器将校验通过的源包目录编译为 canonical `AgentPackageRelease.v1`：计算全部资产与 manifest 的内容 digest，生成资产 lock，并以确定性方式填充 provenance 必填字段（本地占位，compilerBuild 标识 local-dev）。编译 SHALL 可复现：相同源内容重复编译产出相同 Release；任何资产或 manifest 变更 SHALL 改变 contentDigest 与 lockDigest。
+
+#### Scenario: 编译合法源包
+- **WHEN** 编译器处理一个校验通过的源包目录
+- **THEN** 产出通过 Release schema 校验的不可变清单，含资产 lock 与全部 digest 字段
+
+#### Scenario: 重复编译可复现
+- **WHEN** 同一源包目录被编译两次
+- **THEN** 两次产出 canonical JSON 完全一致（含占位 provenance）
+
+#### Scenario: 内容变化改变 digest
+- **WHEN** 源包内任一资产或 manifest 字段发生变更后重新编译
+- **THEN** 新 Release 的 contentDigest 与 lockDigest 均不同于旧值
