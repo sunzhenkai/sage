@@ -3,7 +3,7 @@ import { Pool, type PoolClient, type PoolConfig, type QueryResultRow } from 'pg'
 import {
   isAgentSliceResult, isRouteDecision, isTaskProjection, isTaskRoutingRecord,
   type AgentSliceResult, type ExecuteAgentSliceInput, type RouteDecision,
-  type SliceClaim, type TaskArtifactReference, type TaskListFilter, type TaskProjection, type TaskProjectionEvent,
+  type SliceClaim, type TaskArtifactReference, type TaskListFilter, type TaskPackageInputRecord, type TaskProjection, type TaskProjectionEvent,
   type TaskProjectionView, type ProjectionRepairAudit, type ReconciliationCandidate, type TaskRoutingRecord,
   type TaskStorePort, type TaskReconciliationStore, type TaskLifecyclePath, type TaskStartClaim
 } from '@sage/task-domain';
@@ -40,6 +40,10 @@ interface RoutingRow extends QueryResultRow {
   start_idempotency_key: string | null; adapter_ref: string | null; runtime_ref: string | null; logical_cursor: string | null;
   prepared_at: Date | string | null; starting_at: Date | string | null; owner_acquired_at: Date | string | null;
   owner_released_at: Date | string | null; last_owner_conflict_at: Date | string | null; last_start_error_code: string | null;
+}
+interface PackageInputRow extends QueryResultRow {
+  tenant_id: string; task_id: string; release_id: string; release_digest: string;
+  assembled_input: string; asset_digests: unknown; created_at: Date | string;
 }
 const iso = (value: Date | string): string => value instanceof Date ? value.toISOString() : new Date(value).toISOString();
 
@@ -82,7 +86,8 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
   async migrate(): Promise<void> {
     const migrationUrls = [
       new URL('../../task-domain/migrations/001_task_store.sql', import.meta.url),
-      new URL('../../task-domain/migrations/002_durable_coordinator_task_persistence.sql', import.meta.url)
+      new URL('../../task-domain/migrations/002_durable_coordinator_task_persistence.sql', import.meta.url),
+      new URL('../../task-domain/migrations/003_task_package_input.sql', import.meta.url)
     ];
     const migrations = (await Promise.all(migrationUrls.map((url) => readFile(url, 'utf8'))))
       .map((sql) => sql.replace(/^\s*BEGIN;\s*/, '').replace(/\s*COMMIT;\s*$/, '').trim());
@@ -494,5 +499,48 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
   async #projectionQuery<R extends QueryResultRow = QueryResultRow>(operation: string, text: string, values?: readonly unknown[]) {
     try { return await this.#projectionPool.query<R>(text, values as unknown[] | undefined); }
     catch (cause) { throw new TaskStoreError(operation, { cause }); }
+  }
+
+  async writePackageInput(record: TaskPackageInputRecord): Promise<{ readonly status: 'stored' | 'existing' }> {
+    if (record === null || typeof record !== 'object' || typeof record.tenantId !== 'string' || typeof record.taskId !== 'string'
+      || typeof record.releaseId !== 'string' || typeof record.releaseDigest !== 'string'
+      || typeof record.assembledInput !== 'string' || record.assembledInput.length === 0
+      || record.assetDigests === null || typeof record.assetDigests !== 'object') {
+      throw new TaskStoreError('writePackageInput.invalid');
+    }
+    const inserted = await this.#query('writePackageInput.insert', `INSERT INTO task_package_input
+      (tenant_id, task_id, release_id, release_digest, assembled_input, asset_digests, created_at)
+      VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (tenant_id, task_id) DO NOTHING RETURNING tenant_id`,
+    [record.tenantId, record.taskId, record.releaseId, record.releaseDigest, record.assembledInput, json(record.assetDigests), iso(record.createdAt)]);
+    if (inserted.rowCount === 1) return { status: 'stored' };
+    const existing = await this.#query<PackageInputRow>('writePackageInput.get', `SELECT
+      tenant_id, task_id, release_id, release_digest, assembled_input, asset_digests, created_at
+      FROM task_package_input WHERE tenant_id=$1 AND task_id=$2`, [record.tenantId, record.taskId]);
+    const row = existing.rows[0];
+    if (row === undefined) throw new TaskStoreError('writePackageInput.missing');
+    if (row.assembled_input !== record.assembledInput || row.release_id !== record.releaseId
+      || row.release_digest !== record.releaseDigest || JSON.stringify(row.asset_digests) !== JSON.stringify(record.assetDigests)) {
+      throw new TaskStoreError('writePackageInput.conflict');
+    }
+    return { status: 'existing' };
+  }
+
+  async getPackageInput(tenantId: string, taskId: string): Promise<TaskPackageInputRecord | undefined> {
+    if (typeof tenantId !== 'string' || typeof taskId !== 'string') throw new TaskStoreError('getPackageInput.invalid');
+    const result = await this.#query<PackageInputRow>('getPackageInput', `SELECT
+      tenant_id, task_id, release_id, release_digest, assembled_input, asset_digests, created_at
+      FROM task_package_input WHERE tenant_id=$1 AND task_id=$2`, [tenantId, taskId]);
+    const row = result.rows[0];
+    if (row === undefined) return undefined;
+    const record: TaskPackageInputRecord = {
+      tenantId: row.tenant_id,
+      taskId: row.task_id,
+      releaseId: row.release_id,
+      releaseDigest: row.release_digest,
+      assembledInput: row.assembled_input,
+      assetDigests: row.asset_digests as Readonly<Record<string, string>>,
+      createdAt: iso(row.created_at)
+    };
+    return record;
   }
 }

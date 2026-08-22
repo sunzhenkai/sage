@@ -74,6 +74,12 @@ importers:
       '@sage/agent-contracts':
         specifier: workspace:*
         version: link:../../packages/agent-contracts
+      '@sage/agent-package-release':
+        specifier: workspace:*
+        version: link:../../packages/agent-package-release
+      '@sage/agent-release-registry':
+        specifier: workspace:*
+        version: link:../../packages/agent-release-registry
       '@sage/agent-run-admission':
         specifier: workspace:*
         version: link:../../packages/agent-run-admission
@@ -378,6 +384,12 @@ importers:
       '@sage/agent-contracts':
         specifier: workspace:*
         version: link:../../packages/agent-contracts
+      '@sage/agent-package-release':
+        specifier: workspace:*
+        version: link:../../packages/agent-package-release
+      '@sage/agent-release-registry':
+        specifier: workspace:*
+        version: link:../../packages/agent-release-registry
       '@sage/agent-web':
         specifier: workspace:*
         version: link:../../apps/agent-web
@@ -390,6 +402,9 @@ importers:
       '@sage/chat-domain':
         specifier: workspace:*
         version: link:../../packages/chat-domain
+      '@sage/local-fakes':
+        specifier: workspace:*
+        version: link:../../packages/local-fakes
       '@sage/observability':
         specifier: workspace:*
         version: link:../../packages/observability
@@ -414,6 +429,9 @@ importers:
       '@temporalio/worker':
         specifier: 1.22.0
         version: 1.22.0(esbuild@0.28.2)
+      fastify:
+        specifier: 5.11.3
+        version: 5.11.3
       pg:
         specifier: 8.23.0
         version: 8.23.0
@@ -481,6 +499,13 @@ importers:
       '@sage/platform-ports':
         specifier: workspace:*
         version: link:../platform-ports
+      js-yaml:
+        specifier: 4.3.1
+        version: 4.3.1
+    devDependencies:
+      '@types/js-yaml':
+        specifier: 4.0.9
+        version: 4.0.9
 
   packages/agent-platform-conformance:
     dependencies:
@@ -1613,6 +1638,9 @@ packages:
 
   '@types/estree@1.0.9':
     resolution: {integrity: sha512-GhdPgy1el4/ImP05X05Uw4cw2/M93BCUmnEvWZNStlCzEKME4Fkk+YpoA5OiHNQmoS7Cafb8Xa3Pya8m1Qrzeg==}
+
+  '@types/js-yaml@4.0.9':
+    resolution: {integrity: sha512-k4MGaQl5TGo/iipqb2UDG2UwjXziSWkh0uysQelTlJpX1qGlpUZYm8PnO4DxG1qBomtJUdYJ6qR6xdIah10JLg==}
 
   '@types/json-schema@7.0.15':
     resolution: {integrity: sha512-5+fP8P8MFNC+AyZCDxrB2pkZFPGzqQWUzpSeuuVLvm8VMcorNYavBqoFcxK8bQz4Qsbn4oUEEem4wDLfcysGHA==}
@@ -4042,6 +4070,8 @@ snapshots:
   '@types/deep-eql@4.0.2': {}
 
   '@types/estree@1.0.9': {}
+
+  '@types/js-yaml@4.0.9': {}
 
   '@types/json-schema@7.0.15': {}
 

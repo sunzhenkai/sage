@@ -8,6 +8,8 @@
     "paths": {
       "@sage/agent-client": ["../../packages/agent-client/src/index.ts"],
       "@sage/agent-contracts": ["../../packages/agent-contracts/src/index.ts"],
+      "@sage/agent-package-release": ["../../packages/agent-package-release/src/index.ts"],
+      "@sage/agent-release-registry": ["../../packages/agent-release-registry/src/index.ts"],
       "@sage/agent-run-admission": ["../../packages/agent-run-admission/src/index.ts"],
       "@sage/agent-lib": ["../../packages/agent-lib/src/index.ts"],
       "@sage/app-contracts": ["../../packages/app-contracts/src/index.ts"],
@@ -27,6 +29,8 @@
   "include": ["src/**/*.ts"],
   "references": [
     { "path": "../../packages/agent-contracts" },
+    { "path": "../../packages/agent-package-release" },
+    { "path": "../../packages/agent-release-registry" },
     { "path": "../../packages/agent-run-admission" },
     { "path": "../../packages/agent-client" },
     { "path": "../../packages/agent-lib" },

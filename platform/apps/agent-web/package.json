@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     "./chat": { "types": "./dist-types/chat.d.ts", "default": "./dist-types/chat.js" },
-    "./tasks": { "types": "./dist-types/tasks.d.ts", "default": "./dist-types/tasks.js" }
+    "./tasks": { "types": "./dist-types/tasks.d.ts", "default": "./dist-types/tasks.js" },
+    "./packages": { "types": "./dist-types/packages.d.ts", "default": "./dist-types/packages.js" }
   },
   "scripts": {
     "clean": "rm -rf dist dist-types",

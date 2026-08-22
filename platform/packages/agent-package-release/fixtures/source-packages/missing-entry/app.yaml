@@ -1,0 +1,8 @@
+schemaVersion: '1'
+id: missing-entry-app
+version: 1.0.0
+description: entry 指向不存在文件的非法源包
+entry: prompts/does-not-exist.md
+modelRoute:
+  provider: anthropic
+  model: claude-sonnet-4-5

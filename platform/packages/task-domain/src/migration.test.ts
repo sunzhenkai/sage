@@ -111,3 +111,20 @@ describe('TaskLifecycleAdmissionPolicy', () => {
       'DURABLE_COORDINATOR_V2', 'DURABLE_COORDINATOR_V2', 'DURABLE_COORDINATOR_V2', 'DURABLE_COORDINATOR_V2'
     ]);
   });
+
+describe('task package input migration', () => {
+  it('is additive, rerunnable, and creates the package input table', async () => {
+    const sql = await readFile(new URL('../migrations/003_task_package_input.sql', import.meta.url), 'utf8');
+    expect(sql.startsWith('BEGIN;')).toBe(true);
+    expect(sql.endsWith('COMMIT;\n')).toBe(true);
+    expect(sql).toContain('CREATE TABLE IF NOT EXISTS task_package_input');
+    expect(sql).toContain('PRIMARY KEY (tenant_id, task_id)');
+    expect(sql).toContain('assembled_input text NOT NULL');
+    expect(sql).toContain('asset_digests jsonb NOT NULL');
+    expect(sql).toContain('CREATE INDEX IF NOT EXISTS task_package_input_release_idx');
+    expect(sql).not.toMatch(/DROP\s+TABLE/i);
+    expect(sql).not.toMatch(/DROP\s+COLUMN/i);
+    expect(sql).not.toMatch(/\bDELETE\s+FROM\b/i);
+    expect(sql).not.toMatch(/\bTRUNCATE\b/i);
+  });
+});

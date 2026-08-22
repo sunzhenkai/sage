@@ -26,9 +26,17 @@
 | . | 必须 | platform/packages/agent-package-release、openspec specs |
 
 ## 验收标准
-- [ ] 编译器输出通过 `isAgentPackageRelease` schema 校验
-- [ ] 同内容重复编译确定性一致；任一资产变更导致 contentDigest/lockDigest 变化
-- [ ] provenance 占位值可复现且带 local-dev 标识
-- [ ] 单测与静态检查通过
+- [x] 编译器输出通过 `isAgentPackageRelease` schema 校验
+- [x] 同内容重复编译确定性一致；任一资产变更导致 contentDigest/lockDigest 变化
+- [x] provenance 占位值可复现且带 local-dev 标识
+- [x] 单测与静态检查通过
 
 ## 验证记录
+
+- `pnpm --filter @sage/agent-package-release typecheck` 通过
+- `pnpm --filter @sage/agent-package-release test`：41/41 通过（compiler 6 + source-loader 12 + index 23）
+- `npx eslint packages/agent-package-release/src/ --max-warnings=0` 通过
+- `pnpm --filter @sage/agent-package-release build` 通过
+- `openspec validate --strict --type change agent-package-e2e-compiler` 通过
+- 实现说明：新增 `src/compiler.ts`（资产 lock + 编译主流程 + 确定性占位 provenance），复用既有 `buildAgentPackageLockV1/buildAgentPackageSupplyChainEvidenceV1/buildAgentPackageReleaseV1`；`compilerBuild='local-dev'`
+- 顺带修复：`scanForbiddenPackageContent` 键名匹配由子串改为词边界，避免 `description` 被误判为 `script`（此前无外部消费者，无回归）

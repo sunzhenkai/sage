@@ -106,6 +106,22 @@ export interface ReleaseResolution {
   readonly release: ReleasePayload;
 }
 
+export interface PackageIndexSummary {
+  readonly tenantId: string;
+  readonly packageId: string;
+  readonly latestVersion: string;
+  readonly releaseCount: number;
+  readonly latestContentDigest: string;
+  readonly updatedAt: string;
+}
+
+export interface PackageDetail {
+  readonly tenantId: string;
+  readonly packageId: string;
+  readonly releases: readonly StoredRelease[];
+  readonly latestContentDigest: string;
+}
+
 export type ReleaseRegistryErrorCode =
   | 'RELEASE_SUBMIT_INVALID'
   | 'RELEASE_IDENTITY_CONFLICT'
@@ -127,12 +143,15 @@ export class ReleaseRegistryError extends Error {
 export interface AgentReleaseStore {
   submit(request: ReleaseSubmitRequest): ReleaseSubmitResult;
   getByRef(tenantId: string, releaseRef: string): StoredRelease | undefined;
+  getStoredRelease(tenantId: string, releaseRef: string): StoredRelease | undefined;
   getByContentDigest(tenantId: string, contentDigest: string): StoredRelease | undefined;
   publish(input: ReleasePublicationVerificationInput): ReleaseChannelPointer;
   rollback(input: ReleasePublicationVerificationInput): ReleaseChannelPointer;
   getChannel(tenantId: string, ownerNamespace: string, packageId: string, channel: string): ReleaseChannelPointer | undefined;
   resolveImmutableRelease(tenantId: string, releaseRef: string): ReleaseResolution;
   resolveChannelRelease(tenantId: string, ownerNamespace: string, packageId: string, channel: string): ReleaseResolution;
+  listPackages(tenantId: string, options?: { readonly limit?: number }): readonly PackageIndexSummary[];
+  getPackageDetail(tenantId: string, packageId: string): PackageDetail | undefined;
   auditLog(): readonly ReleaseRegistryAuditRecord[];
 }
 
@@ -261,6 +280,7 @@ export class InMemoryAgentReleaseStore implements AgentReleaseStore {
   readonly #byIdentity = new Map<string, StoredRelease>();
   readonly #byContent = new Map<string, StoredRelease>();
   readonly #byRef = new Map<string, StoredRelease>();
+  readonly #byPackage = new Map<string, StoredRelease[]>();
   readonly #channels = new Map<string, ReleaseChannelPointer>();
   readonly #channelHistory = new Map<string, ReleaseChannelPointer[]>();
   readonly #audit: ReleaseRegistryAuditRecord[] = [];
@@ -320,6 +340,9 @@ export class InMemoryAgentReleaseStore implements AgentReleaseStore {
     this.#byIdentity.set(identityKey(request), record);
     this.#byContent.set(contentIndexKey, record);
     this.#byRef.set(refIndexKey, record);
+    const packageKey = `${keyPart(request.tenantId)}|${keyPart(request.packageId)}`;
+    const packageReleases = this.#byPackage.get(packageKey) ?? [];
+    this.#byPackage.set(packageKey, [...packageReleases, record]);
     this.#record({
       tenantId: request.tenantId, ownerNamespace: request.ownerNamespace, packageId: request.packageId,
       action: 'submit', result: 'accepted', releaseRef: request.release.releaseRef,
@@ -334,10 +357,63 @@ export class InMemoryAgentReleaseStore implements AgentReleaseStore {
     return record === undefined ? undefined : clone(record);
   }
 
+  getStoredRelease(tenantId: string, releaseRef: string): StoredRelease | undefined {
+    if (typeof tenantId !== 'string' || typeof releaseRef !== 'string') return undefined;
+    const record = this.#byRef.get(refKey(tenantId, releaseRef));
+    return record === undefined ? undefined : clone(record);
+  }
+
   getByContentDigest(tenantId: string, contentDigest: string): StoredRelease | undefined {
     if (typeof tenantId !== 'string' || typeof contentDigest !== 'string') return undefined;
     const record = this.#byContent.get(contentKey(tenantId, contentDigest));
     return record === undefined ? undefined : clone(record);
+  }
+
+  listPackages(tenantId: string, options: { readonly limit?: number } = {}): readonly PackageIndexSummary[] {
+    if (typeof tenantId !== 'string') return [];
+    const limit = options.limit === undefined ? 32 : Math.max(1, Math.min(128, options.limit));
+    const tenantPrefix = `${keyPart(tenantId)}|`;
+    const summaries: PackageIndexSummary[] = [];
+    for (const [key, records] of this.#byPackage) {
+      if (!key.startsWith(tenantPrefix)) continue;
+      const packageId = key.slice(tenantPrefix.length).replace(/^\d+:/, '');
+      // createdAt 相同时以插入顺序（后插入更新）为并列规则。
+      const ordered = [...records].map((record, index) => ({ record, index }))
+        .sort((left, right) =>
+          right.record.createdAt.localeCompare(left.record.createdAt) || right.index - left.index);
+      const latest = ordered[0]?.record;
+      if (latest === undefined) continue;
+      summaries.push({
+        tenantId,
+        packageId,
+        latestVersion: latest.packageVersion,
+        releaseCount: ordered.length,
+        latestContentDigest: latest.release.contentDigest,
+        updatedAt: latest.createdAt
+      });
+    }
+    return summaries
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+      .slice(0, limit)
+      .map(clone);
+  }
+
+  getPackageDetail(tenantId: string, packageId: string): PackageDetail | undefined {
+    if (typeof tenantId !== 'string' || typeof packageId !== 'string') return undefined;
+    const packageKey = `${keyPart(tenantId)}|${keyPart(packageId)}`;
+    const records = this.#byPackage.get(packageKey);
+    if (records === undefined || records.length === 0) return undefined;
+    const ordered = [...records].map((record, index) => ({ record, index }))
+      .sort((left, right) =>
+        right.record.createdAt.localeCompare(left.record.createdAt) || right.index - left.index)
+      .map((entry) => entry.record);
+    const latest = ordered[0] as StoredRelease;
+    return clone({
+      tenantId,
+      packageId,
+      releases: ordered,
+      latestContentDigest: latest.release.contentDigest
+    });
   }
 
   publish(input: ReleasePublicationVerificationInput): ReleaseChannelPointer {

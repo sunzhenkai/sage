@@ -25,8 +25,15 @@
 | . | 必须 | platform/packages/agent-package-release、openspec specs |
 
 ## 验收标准
-- [ ] manifest 契约（TypeBox）覆盖 id/version/entry prompt/model 要求/budgets/skillRefs/capabilityRefs，additionalProperties 收紧
-- [ ] 目录校验器：合法 fixtures 通过；缺 manifest、未知字段、未声明资产、路径穿越、可执行文件均稳定拒绝
-- [ ] 单测与静态检查通过
+- [x] manifest 契约（TypeBox）覆盖 id/version/entry prompt/model 要求/budgets/skillRefs/capabilityRefs，additionalProperties 收紧
+- [x] 目录校验器：合法 fixtures 通过；缺 manifest、未知字段、未声明资产、路径穿越、可执行文件均稳定拒绝
+- [x] 单测与静态检查通过
 
 ## 验证记录
+
+- `pnpm --filter @sage/agent-package-release typecheck` 通过
+- `pnpm --filter @sage/agent-package-release test`：35/35 通过（source-loader 12 + index 23）
+- `npx eslint packages/agent-package-release/src/ --max-warnings=0` 通过
+- `pnpm --filter @sage/agent-package-release build` 通过
+- `openspec validate --strict --type change agent-package-e2e-package-schema` 通过
+- 实现说明：新增 `src/source-manifest.ts`（TypeBox manifest 契约）与 `src/source-loader.ts`（目录加载 + 安全边界）；fixtures 位于 `packages/agent-package-release/fixtures/source-packages/`；为使用 YAML 解析新增依赖 `js-yaml@4.3.1` 与 devDep `@types/js-yaml`

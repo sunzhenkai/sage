@@ -5,7 +5,8 @@ import { Pool } from 'pg';
 import { Connection } from '@temporalio/client';
 import type { AuthenticatedPrincipal } from '@sage/app-contracts';
 import { ChatStore } from '@sage/chat-domain';
-import { InMemoryCredentialProvider } from '@sage/local-fakes';
+import { InMemoryAgentTaskSpecStore, InMemoryCredentialProvider } from '@sage/local-fakes';
+import { InMemoryAgentReleaseStore } from '@sage/agent-release-registry';
 import { createLocalAgentClient, createLocalKernelComposition } from '@sage/local-runtime';
 import { LegacyAgentRunSpecV1Adapter, parseAgentExecutionFeatureConfig, runShadowEngine, selectAgentExecutionMode, type AgentExecutionMode, type AgentLifecycleOwner, type LegacyAdapterResult } from '@sage/agent-client';
 import { PostgresTaskStore } from '@sage/task-store-postgres';
@@ -16,6 +17,8 @@ import { TemporalClientFactory, TrustedMultiTargetTaskController, TrustedTempora
 import { ChatPromotionAuthorizer, createChatApi, registerTaskRoutes } from './index.js';
 import { startChatKernelExecution, type ChatCanonicalCompatibilityOptions } from './chat-compatibility.js';
 import { registerProviderCatalogRoutes } from './catalog-api.js';
+import { registerPackagesRoutes } from './packages-api.js';
+import { registerPackageRunsRoutes, type ResolvedReleaseLockPayload } from './runs-api.js';
 
 export interface ApiRuntimeConfig {
   readonly deploymentMode: 'local';
@@ -181,6 +184,32 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
       tenantId: config.tenantId, authenticator, authorizer: { authorize: (principal, operation) =>
         principal.tenantId === config.tenantId && (operation === 'read' || principal.roles.includes('task-operator')) },
       queryStore: tasks, deploymentMode: 'development'
+    });
+    const packageStore = new InMemoryAgentReleaseStore();
+    const packageSpecStore = new InMemoryAgentTaskSpecStore();
+    registerPackagesRoutes(app, {
+      tenantId: config.tenantId, store: packageStore, ownerNamespace: 'package-platform',
+      authenticator, engineIds: ['engine-local'], deploymentMode: 'local'
+    });
+    registerPackageRunsRoutes(app, {
+      tenantId: config.tenantId,
+      controller,
+      releaseResolver: {
+        async resolveRelease(tenantId, releaseId): Promise<{ readonly release: ReturnType<InMemoryAgentReleaseStore['resolveImmutableRelease']>['release']; readonly lockPayload: ResolvedReleaseLockPayload } | undefined> {
+          try {
+            const resolution = packageStore.resolveImmutableRelease(tenantId, `release://${releaseId}`);
+            const stored = packageStore.getStoredRelease(tenantId, `release://${releaseId}`);
+            const lockPayload = stored === undefined ? {} : (stored.lockPayload as ResolvedReleaseLockPayload);
+            return { release: resolution.release as ReturnType<InMemoryAgentReleaseStore['resolveImmutableRelease']>['release'], lockPayload };
+          } catch {
+            return undefined;
+          }
+        }
+      },
+      taskStore: tasks,
+      specStore: packageSpecStore,
+      authenticator,
+      deploymentMode: 'local'
     });
     registerProviderCatalogRoutes(app, { service: catalogService, store: catalog, manager: catalogManager, authenticator });
     await catalogManager.start();

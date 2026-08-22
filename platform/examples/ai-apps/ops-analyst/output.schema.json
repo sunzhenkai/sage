@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "OpsAnalystOutput",
+  "type": "object",
+  "properties": {
+    "summary": { "type": "string" },
+    "possibleCauses": { "type": "array", "items": { "type": "string" } },
+    "nextSteps": { "type": "array", "items": { "type": "string" } }
+  },
+  "required": ["summary", "possibleCauses", "nextSteps"]
+}

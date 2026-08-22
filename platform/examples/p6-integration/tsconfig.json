@@ -1,5 +1,108 @@
 {
-  "extends":"../../tsconfig.base.json","compilerOptions":{"rootDir":"src","outDir":"dist","composite":true,"jsx":"react-jsx","baseUrl":".","paths":{
-    "@sage/agent-api":["../../apps/agent-api/src/index.ts"],"@sage/agent-client":["../../packages/agent-client/src/index.ts"],"@sage/agent-contracts":["../../packages/agent-contracts/src/index.ts"],"@sage/agent-web/tasks":["../../apps/agent-web/src/tasks.tsx"],"@sage/agent-worker":["../../apps/agent-worker/src/index.ts"],"@sage/observability":["../../packages/observability/src/index.ts"],"@sage/app-contracts":["../../packages/app-contracts/src/index.ts"],"@sage/chat-domain":["../../packages/chat-domain/src/index.ts"],"@sage/platform-ports":["../../packages/platform-ports/src/index.ts"],"@sage/task-domain":["../../packages/task-domain/src/index.ts"],"@sage/task-store-postgres":["../../packages/task-store-postgres/src/index.ts"],"@sage/temporal-registry":["../../packages/temporal-registry/src/index.ts"],"@sage/temporal-routing":["../../packages/temporal-routing/src/index.ts"]}},
-  "include":["src/**/*.ts","src/**/*.tsx"],"references":[{"path":"../../apps/agent-api"},{"path":"../../apps/agent-web"},{"path":"../../apps/agent-worker"},{"path":"../../packages/observability"},{"path":"../../packages/agent-client"},{"path":"../../packages/agent-contracts"},{"path":"../../packages/app-contracts"},{"path":"../../packages/chat-domain"},{"path":"../../packages/platform-ports"},{"path":"../../packages/task-domain"},{"path":"../../packages/task-store-postgres"},{"path":"../../packages/temporal-registry"},{"path":"../../packages/temporal-routing"}]
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "composite": true,
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@sage/agent-api": [
+        "../../apps/agent-api/src/index.ts"
+      ],
+      "@sage/agent-client": [
+        "../../packages/agent-client/src/index.ts"
+      ],
+      "@sage/agent-contracts": [
+        "../../packages/agent-contracts/src/index.ts"
+      ],
+      "@sage/agent-web/tasks": [
+        "../../apps/agent-web/src/tasks.tsx"
+      ],
+      "@sage/agent-worker": [
+        "../../apps/agent-worker/src/index.ts"
+      ],
+      "@sage/observability": [
+        "../../packages/observability/src/index.ts"
+      ],
+      "@sage/app-contracts": [
+        "../../packages/app-contracts/src/index.ts"
+      ],
+      "@sage/chat-domain": [
+        "../../packages/chat-domain/src/index.ts"
+      ],
+      "@sage/platform-ports": [
+        "../../packages/platform-ports/src/index.ts"
+      ],
+      "@sage/task-domain": [
+        "../../packages/task-domain/src/index.ts"
+      ],
+      "@sage/task-store-postgres": [
+        "../../packages/task-store-postgres/src/index.ts"
+      ],
+      "@sage/temporal-registry": [
+        "../../packages/temporal-registry/src/index.ts"
+      ],
+      "@sage/temporal-routing": [
+        "../../packages/temporal-routing/src/index.ts"
+      ],
+      "@sage/agent-package-release": [
+        "../../packages/agent-package-release/src/index.ts"
+      ],
+      "@sage/agent-release-registry": [
+        "../../packages/agent-release-registry/src/index.ts"
+      ]
+    }
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx"
+  ],
+  "references": [
+    {
+      "path": "../../packages/agent-package-release"
+    },
+    {
+      "path": "../../packages/agent-release-registry"
+    },
+    {
+      "path": "../../apps/agent-api"
+    },
+    {
+      "path": "../../apps/agent-web"
+    },
+    {
+      "path": "../../apps/agent-worker"
+    },
+    {
+      "path": "../../packages/observability"
+    },
+    {
+      "path": "../../packages/agent-client"
+    },
+    {
+      "path": "../../packages/agent-contracts"
+    },
+    {
+      "path": "../../packages/app-contracts"
+    },
+    {
+      "path": "../../packages/chat-domain"
+    },
+    {
+      "path": "../../packages/platform-ports"
+    },
+    {
+      "path": "../../packages/task-domain"
+    },
+    {
+      "path": "../../packages/task-store-postgres"
+    },
+    {
+      "path": "../../packages/temporal-registry"
+    },
+    {
+      "path": "../../packages/temporal-routing"
+    }
+  ]
 }

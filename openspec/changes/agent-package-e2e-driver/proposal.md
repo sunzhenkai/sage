@@ -16,14 +16,14 @@
 | . | 必须 | 会修改，实施前切任务分支 |
 
 ## 验收标准
-- [ ] AgentPackage 源目录规范（manifest+prompts+references+output schema 等）有 schema 校验的契约定义
-- [ ] 编译链落地：源目录 → 校验 → content digest → 不可变 AgentPackageRelease
-- [ ] Release Registry 可登记、查询 Release，API 暴露包列表/详情
-- [ ] 提交入口能基于 Release + 输入生成 canonical AgentTaskSpec/AgentExecutionEnvelope 并启动执行
-- [ ] 示例 ai app package 按目录规范创建，可编译为 Release
-- [ ] 端到端走通：注册示例包 → 从包发起运行 → Temporal 执行 → artifact 落地可查
-- [ ] agent-web 前端可浏览包、查看详情、发起运行、查看运行状态与 artifact
-- [ ] 全仓回归与静态检查通过
+- [x] AgentPackage 源目录规范（manifest+prompts+references+output schema 等）有 schema 校验的契约定义
+- [x] 编译链落地：源目录 → 校验 → content digest → 不可变 AgentPackageRelease
+- [x] Release Registry 可登记、查询 Release，API 暴露包列表/详情
+- [x] 提交入口能基于 Release + 输入生成 canonical AgentTaskSpec/AgentExecutionEnvelope 并启动执行
+- [x] 示例 ai app package 按目录规范创建，可编译为 Release
+- [x] 端到端走通：注册示例包 → 从包发起运行 → Temporal 执行 → artifact 落地可查
+- [x] agent-web 前端可浏览包、查看详情、发起运行、查看运行状态与 artifact
+- [x] 全仓回归与静态检查通过
 
 ## Driver 协议
 - 本 change 无 spec 增量（`.openspec.yaml` 已设 `skip_specs: true`）
@@ -34,3 +34,31 @@
 - 结束时逐条列出未勾项与原因，不按 change 汇总
 
 ## 验证记录
+
+### 1.1 分支
+- 工作树干净，当前分支 `feat/agent-package-e2e`（任务分支），`git status` 仅含 `.agents/`（技能目录，非交付物）。
+
+### 2.1–2.6 子 change（均全勾且 `openspec validate --strict` 通过）
+- 2.1 `agent-package-e2e-package-schema`：源规范 TypeBox manifest + 目录加载/安全边界（未声明资产/穿越/可执行/Secret），fixtures 与 45 项单测。
+- 2.2 `agent-package-e2e-compiler`：资产 lock + 编译主流程 + 确定性占位 provenance（local-dev），复用既有 buildAgentPackageReleaseV1。
+- 2.3 `agent-package-e2e-registry-api`：packages 三端点 + preValidation + registry package 索引 + `scripts/register-package.ts`。
+- 2.4 `agent-package-e2e-run-path`：`task_package_input` migration + 写入/读取 + Release→Spec admission（幂等）+ 输入拼装器 + `POST /v1/releases/{releaseId}/runs`（production 501 fail closed）+ PackageTaskInputResolver + e2e。
+- 2.5 `agent-package-e2e-sample-app`：`examples/ai-apps/ops-analyst/` 示例包 + README（命令序列）。
+- 2.6 `agent-package-e2e-web`：Packages 域（列表/详情/发起运行/衔接 task 视图），workspace 路由与导航。
+
+### 3.1 全仓回归与静态检查（命令与结果）
+| 检查 | 命令 | 结果 |
+|------|------|------|
+| 类型 | `pnpm typecheck`（`tsc -b` + spikes） | 通过 |
+| 构建 | `pnpm build` | 通过（全部包） |
+| Lint | `pnpm lint`（eslint --max-warnings=0） | 通过 |
+| 依赖边界 | `pnpm check:deps`（8 个 boundary 脚本） | 全部 OK |
+| 单测 | `pnpm test` | 783 通过 / 60 跳过（env 门控）/ 1 失败（见下） |
+| e2e | `P6_POSTGRES_URL=... SAGE_TEMPORAL_ADDRESS=127.0.0.1:17233 vitest run examples/p6-integration/src/package-run.e2e.test.tsx` | 1/1 通过（真实 Postgres+Temporal） |
+| 子 change 校验 | 6 个 `openspec validate --strict --type change agent-package-e2e-*` | 全部通过 |
+
+### 3.1 未勾项与原因
+- 唯一失败 `scripts/agent-platform-final/final.test.ts` 为**既有（pre-existing）失败**，与本 driver 无关：它引用 `dependency-inputs.json` 中 4 个 change（`agent-platform-contract-authority-foundation`/`agent-runtime-kernel-broker-integration`/`durable-agent-coordinator-adapter`/`agent-package-release-admission`），这些在基线提交 `fa144cc`（本 driver 创建时）已归档（`openspec/changes/archive/2026-08-17-agent-package-release-admission` 等），`openspec validate --strict` 对其返回 Unknown item，故 `strictValidation=FAIL` 断言不满足。本 driver 未修改 `scripts/agent-platform-final`、`docs/design/_cross` 或相关证据文件；基线即可复现，不阻塞本 driver 验收。
+
+### 3.2 验收标准回填
+- 上述 8 项验收标准全部勾选；实现与验证记录已回填至各子 change 的 `proposal.md` 验证记录。

@@ -1,0 +1,9 @@
+schemaVersion: '1'
+id: unknown-field-app
+version: 1.0.0
+description: 包含未知字段的非法源包
+entry: prompts/system.md
+modelRoute:
+  provider: anthropic
+  model: claude-sonnet-4-5
+unexpectedField: should-be-rejected

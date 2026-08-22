@@ -25,8 +25,13 @@
 | . | 必须 | platform/examples/ai-apps/、文档 |
 
 ## 验收标准
-- [ ] 示例包通过 package-schema 校验并可编译为合法 Release
-- [ ] README 提供从编译到运行的完整命令序列
-- [ ] 内容不含公司/内部系统信息
+- [x] 示例包通过 package-schema 校验并可编译为合法 Release
+- [x] README 提供从编译到运行的完整命令序列
+- [x] 内容不含公司/内部系统信息
 
 ## 验证记录
+
+- 新增 `examples/ai-apps/ops-analyst/`：`app.yaml` + `prompts/system.md` + 3 篇 references + `output.schema.json`（通用运维分析主题，无公司/内部信息）
+- `npx vitest run packages/agent-package-release/src/sample-app.smoke.test.ts`：通过（加载 5 资产、编译合法 Release、compilerBuild=local-dev、编译确定性）
+- 顺带修复：`source-loader.ts` 曾漏掉 `output.schema.json` 资产（classifyEntry 返回 output-schema 后被 continue 丢弃），现作为 output-schema 资产加载，并有 fixture `with-output-schema` 与单测覆盖
+- `openspec validate --strict --type change agent-package-e2e-sample-app` 通过
