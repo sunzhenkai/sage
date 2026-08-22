@@ -1,0 +1,4 @@
+schema: spec-driven
+created: 2026-08-23
+skip_specs: true
+goal: 补齐 AgentPackage/Release 缺口，创建示例 ai app (agent package)，走通全流程，包括前端展示和管理
