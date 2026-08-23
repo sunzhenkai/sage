@@ -1,0 +1,4 @@
+schema: spec-driven
+created: 2026-08-23
+goal: web 页面支持应用包管理（新建、更新、删除、上传、版本化）
+skip_specs: true
