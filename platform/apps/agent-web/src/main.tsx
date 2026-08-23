@@ -1,4 +1,4 @@
-import { StrictMode, type ReactNode } from 'react';
+import { StrictMode, useState, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ChatApp } from './chat.js';
 import { LocaleProvider, useLocale } from './locale.js';
@@ -17,23 +17,37 @@ export function currentView(search = location.search): WorkspaceView {
   return view === 'tasks' || view === 'providers' || view === 'packages' ? view : 'chat';
 }
 
+const SIDEBAR_STORAGE_KEY = 'sage.web.sidebar.collapsed';
+function readSidebarCollapsed(): boolean {
+  try { return typeof window !== 'undefined' && window.localStorage?.getItem(SIDEBAR_STORAGE_KEY) === 'true'; } catch { return false; }
+}
+function writeSidebarCollapsed(collapsed: boolean): void {
+  try { if (typeof window !== 'undefined') window.localStorage?.setItem(SIDEBAR_STORAGE_KEY, String(collapsed)); } catch { /* best effort persistence */ }
+}
+
 export function WorkspaceShell({ view, sessionId, children }: { readonly view: WorkspaceView; readonly sessionId?: string; readonly children: ReactNode }) {
   const { locale, setLocale, t } = useLocale();
+  const [collapsed, setCollapsed] = useState(() => readSidebarCollapsed());
+  const toggleCollapsed = () => setCollapsed((current) => { const next = !current; writeSidebarCollapsed(next); return next; });
+  const toggleLabel = collapsed ? t('expandSidebar') : t('collapseSidebar');
   return <div className="app-frame">
-    <aside className="sidebar">
-      <a className="brand" href={workspaceHref({ view: 'chat', ...(sessionId ? { sessionId } : {}) })} aria-label={`${t('brandName')} ${t('home')}`}><span className="brand-mark">S</span><span><strong>{t('brandName')}</strong><small>{t('brandSubtitle')}</small></span></a>
+    <aside className={`sidebar${collapsed ? ' is-collapsed' : ''}`}>
+      <div className="sidebar-head">
+        <a className="brand" href={workspaceHref({ view: 'chat', ...(sessionId ? { sessionId } : {}) })} aria-label={`${t('brandName')} ${t('home')}`}><span className="brand-mark">S</span><span className="brand-copy"><strong>{t('brandName')}</strong><small>{t('brandSubtitle')}</small></span></a>
+        <button className="sidebar-collapse" type="button" aria-expanded={!collapsed} aria-label={toggleLabel} title={toggleLabel} onClick={toggleCollapsed}><span aria-hidden="true">{collapsed ? '»' : '«'}</span></button>
+      </div>
       <div className="workspace-switcher"><span className="workspace-avatar">SL</span><span><strong>{t('localWorkspace')}</strong><small>tenant-local</small></span><span className="chevron">⌄</span></div>
       <nav className="main-nav" aria-label={t('mainNavigation')}>
         <p className="nav-label">{t('workspace')}</p>
-        <a className={view === 'chat' ? 'nav-item is-active' : 'nav-item'} href={workspaceHref({ view: 'chat' })}><span className="nav-icon">✦</span><span>{t('chat')}</span></a>
-        <a className={view === 'tasks' ? 'nav-item is-active' : 'nav-item'} href={workspaceHref({ view: 'tasks', ...(sessionId ? { sessionId } : {}) })}><span className="nav-icon">▣</span><span>{t('tasks')}</span></a>
-        <a className={view === 'packages' ? 'nav-item is-active' : 'nav-item'} href={workspaceHref({ view: 'packages', ...(sessionId ? { sessionId } : {}) })}><span className="nav-icon">▤</span><span>{t('packages')}</span></a>
+        <a className={view === 'chat' ? 'nav-item is-active' : 'nav-item'} href={workspaceHref({ view: 'chat' })} title={t('chat')}><span className="nav-icon">✦</span><span className="nav-copy">{t('chat')}</span></a>
+        <a className={view === 'tasks' ? 'nav-item is-active' : 'nav-item'} href={workspaceHref({ view: 'tasks', ...(sessionId ? { sessionId } : {}) })} title={t('tasks')}><span className="nav-icon">▣</span><span className="nav-copy">{t('tasks')}</span></a>
+        <a className={view === 'packages' ? 'nav-item is-active' : 'nav-item'} href={workspaceHref({ view: 'packages', ...(sessionId ? { sessionId } : {}) })} title={t('packages')}><span className="nav-icon">▤</span><span className="nav-copy">{t('packages')}</span></a>
         <p className="nav-label nav-label-spaced">{t('configuration')}</p>
-        <a className={view === 'providers' ? 'nav-item is-active' : 'nav-item'} href={workspaceHref({ view: 'providers', ...(sessionId ? { sessionId } : {}) })}><span className="nav-icon">◈</span><span>{t('providers')}</span><span className="nav-pill">{t('new')}</span></a>
+        <a className={view === 'providers' ? 'nav-item is-active' : 'nav-item'} href={workspaceHref({ view: 'providers', ...(sessionId ? { sessionId } : {}) })} title={t('providers')}><span className="nav-icon">◈</span><span className="nav-copy">{t('providers')}</span><span className="nav-pill">{t('new')}</span></a>
       </nav>
-      <div className="sidebar-bottom"><div className="runtime-card"><span className="status-dot status-dot-success" /><div><strong>{t('systemRuntime')}</strong><small>{t('localPiHarness')}</small></div><span className="runtime-menu">···</span></div><small className="sidebar-footnote">{t('runtimeFootnote')}</small><div className="user-account"><button className="user-avatar" type="button" aria-label={t('accountMenu')}>W</button><div><strong>{t('localWorkspace')}</strong><small>tenant-local</small></div></div><label className="locale-control"><span>{t('language')}</span><select aria-label={t('languageSwitcher')} value={locale} onChange={(event) => setLocale(event.target.value as 'zh-CN' | 'en')}><option value="zh-CN">{t('chinese')}</option><option value="en">{t('english')}</option></select></label></div>
+      <div className="sidebar-bottom"><div className="runtime-card"><span className="status-dot status-dot-success" /><div className="runtime-copy"><strong>{t('systemRuntime')}</strong><small>{t('localPiHarness')}</small></div><span className="runtime-menu">···</span></div><small className="sidebar-footnote">{t('runtimeFootnote')}</small><div className="user-account"><button className="user-avatar" type="button" aria-label={t('accountMenu')}>W</button><div className="account-copy"><strong>{t('localWorkspace')}</strong><small>tenant-local</small></div></div><label className="locale-control"><span className="locale-copy">{t('language')}</span><select aria-label={t('languageSwitcher')} value={locale} onChange={(event) => setLocale(event.target.value as 'zh-CN' | 'en')}><option value="zh-CN">{t('chinese')}</option><option value="en">{t('english')}</option></select></label></div>
     </aside>
-    <div className="main-column">
+    <div className={`main-column${collapsed ? ' is-collapsed' : ''}`}>
       <main className="content-wrap">{children}</main>
     </div>
   </div>;
