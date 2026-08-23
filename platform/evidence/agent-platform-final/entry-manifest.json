@@ -4,8 +4,8 @@
   "status": "BLOCKED",
   "decision": "NO-GO",
   "canonicalContractMajor": 1,
-  "sourceRevision": "cb892be7970b75f0d9ffcbb3ca7e823c8ea17280",
-  "sourceDigest": "sha256:bbe150c1cf4dcaa54adc96a6a2ba9cb2f6e0c211ca52e5315b55d6c8edfc0a9c",
+  "sourceRevision": "b5c4645d63c77b24b2aecf901fbd442dd24bd770",
+  "sourceDigest": "sha256:a1d98de5122d95585e4854efe5f62ce82cba7c283fc006c9edce3b0e0cf93c66",
   "toolDigest": "sha256:3eb1ef94b5890ca727158b106142685c8733b0ace5bcb4cf3f0ac14f9f0643f4",
   "compatibilityWindow": {
     "runtimeMajor": 1,
@@ -28,14 +28,14 @@
       "owner": "Agent Core",
       "status": "BLOCKED",
       "evidenceRef": "evidence/agent-runtime-kernel-broker-integration/phase-1-runtime-kernel-ports.md",
-      "evidenceDigest": "sha256:76959f867349567fc07be557d2a249fd703705b748bbf58aa177a47f48a3bfcf"
+      "evidenceDigest": "sha256:8f0c8836170eb0e4c3c63521ec6a6f54d4f52ef1c1c3a0c0303fb9eb291cff4c"
     },
     {
       "change": "durable-agent-coordinator-adapter",
       "owner": "Task Runtime",
       "status": "BLOCKED",
       "evidenceRef": "evidence/durable-agent-coordinator-adapter/phase-2-dependency-gate.md",
-      "evidenceDigest": "sha256:b4505a808982c1b0be9ceceb736cc268e7c18110735bfaef1c6b244da615d04b"
+      "evidenceDigest": "sha256:2b1c71ca81d07669e84c3b336244ee82813317f591665d7d6994c844c2be966d"
     },
     {
       "change": "agent-package-release-admission",
@@ -64,6 +64,6 @@
     "12.5"
   ],
   "promotionToken": null,
-  "generatedAt": "2026-08-19T14:04:19.284Z",
-  "contentDigest": "sha256:6c7808bf06f482ab16d01e2f585bb011eef3a738754fb31217d3e4846ef30b5e"
+  "generatedAt": "2026-08-23T03:44:02.852Z",
+  "contentDigest": "sha256:b6a7d81dec17b9e73fe35f3a9a868bb0c3e1fc7f7a238be85b4eb8bc73bd410e"
 }

@@ -1,5 +1,29 @@
 <!doctype html>
-<html lang="en">
-  <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="theme-color" content="#0f172a" /><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230f172a'/%3E%3Cpath d='M18 18h28v8H26v6h16v8H26v6h20v8H18z' fill='%23f8fafc'/%3E%3C/svg%3E" /><title>思极 · Sage</title></head>
-  <body><div id="root"></div><script type="module" src="/src/main.tsx"></script></body>
+<html lang="en" style="background:#f4f6fb">
+  <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="theme-color" content="#0f172a" /><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230f172a'/%3E%3Cpath d='M18 18h28v8H26v6h16v8H26v6h20v8H18z' fill='%23f8fafc'/%3E%3C/svg%3E" /><title>思极 · Sage</title><style>
+      html, body { margin: 0; min-height: 100%; }
+      #root { min-height: 100vh; }
+      /* 首帧骨架屏：仅在 React 挂载前（#root 尚无 .app-frame 时）可见，挂载后由 render() 替换移除 */
+      #root .boot-skeleton { min-height: 100vh; display: flex; background: #f4f6fb; }
+      #root .boot-skeleton .boot-skeleton-sidebar { width: 244px; flex: 0 0 auto; padding: 25px 14px 18px; background: #101828; }
+      #root .boot-skeleton .boot-skeleton-brand { width: 118px; height: 18px; margin: 4px 10px 34px; border-radius: 6px; background: #22304c; }
+      #root .boot-skeleton .boot-skeleton-nav { display: flex; flex-direction: column; gap: 9px; }
+      #root .boot-skeleton .boot-skeleton-nav i { display: block; height: 13px; border-radius: 7px; background: #22304c; }
+      #root .boot-skeleton .boot-skeleton-nav i:nth-child(1) { width: 72px; }
+      #root .boot-skeleton .boot-skeleton-nav i:nth-child(2) { width: 60px; }
+      #root .boot-skeleton .boot-skeleton-nav i:nth-child(3) { width: 66px; }
+      #root .boot-skeleton .boot-skeleton-nav i:nth-child(4) { width: 88px; }
+      #root .boot-skeleton .boot-skeleton-main { flex: 1; min-width: 0; padding: 38px 42px 70px; }
+      #root .boot-skeleton .boot-skeleton-heading { width: 46%; height: 24px; margin: 2px 0 26px; border-radius: 7px; background: #e4e9f2; }
+      #root .boot-skeleton .boot-skeleton-line { width: 100%; height: 14px; margin-bottom: 13px; border-radius: 7px; background: #e4e9f2; }
+      #root .boot-skeleton .boot-skeleton-line:nth-of-type(2) { width: 92%; }
+      #root .boot-skeleton .boot-skeleton-line:nth-of-type(3) { width: 84%; }
+      #root .boot-skeleton .boot-skeleton-card { height: 150px; margin-top: 26px; border-radius: 14px; background: #eef1f7; }
+      @media (max-width: 980px) { #root .boot-skeleton .boot-skeleton-sidebar { width: 207px; } #root .boot-skeleton .boot-skeleton-main { padding: 30px 25px 60px; } }
+      @media (max-width: 700px) { #root .boot-skeleton { flex-direction: column; } #root .boot-skeleton .boot-skeleton-sidebar { width: 100%; padding: 14px 12px; } #root .boot-skeleton .boot-skeleton-brand { margin-bottom: 16px; } #root .boot-skeleton .boot-skeleton-nav { flex-direction: row; } #root .boot-skeleton .boot-skeleton-nav i:nth-child(4) { display: none; } #root .boot-skeleton .boot-skeleton-main { padding: 24px 15px 16px; } }
+    </style></head>
+  <body><div id="root"><div class="boot-skeleton" aria-hidden="true">
+      <div class="boot-skeleton-sidebar"><div class="boot-skeleton-brand"></div><div class="boot-skeleton-nav"><i></i><i></i><i></i><i></i></div></div>
+      <div class="boot-skeleton-main"><div class="boot-skeleton-heading"></div><div class="boot-skeleton-line"></div><div class="boot-skeleton-line"></div><div class="boot-skeleton-line"></div><div class="boot-skeleton-card"></div></div>
+    </div></div><script type="module" src="/src/main.tsx"></script></body>
 </html>
