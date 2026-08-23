@@ -1,0 +1,4 @@
+schema: spec-driven
+created: 2026-08-23
+skip_specs: true
+goal: 首帧渲染：背景色内联 index.html，root 预置同色骨架屏，消除白屏/空白闪

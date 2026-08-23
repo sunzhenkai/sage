@@ -1,0 +1,3 @@
+schema: spec-driven
+created: 2026-08-23
+goal: 客户端路由：整页跳转改为 history.pushState + popstate，布局/内容分离，全局拦截 a 点击，测试适配

@@ -1,0 +1,4 @@
+schema: spec-driven
+created: 2026-08-23
+skip_specs: true
+goal: 静态资源强缓存：vite preview 对 assets 配置 immutable，index.html no-cache

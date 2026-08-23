@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ListSessionsResponse, SessionHistoryItem, SessionHistoryStatus } from '@sage/app-contracts';
+import { navigate } from './routing.js';
 import { useLocale } from './locale.js';
 
 export type WorkspaceView = 'chat' | 'tasks' | 'providers' | 'packages';
@@ -26,9 +27,12 @@ async function workspaceJson<T>(fetcher: WorkspaceFetch, url: string, init?: Req
   return (text === '' ? undefined : JSON.parse(text)) as T;
 }
 
+/** WorkspaceShell 布局与 ChatLanding 的默认导航：客户端路由（pushState），可被 props 注入覆盖。 */
+export const defaultNavigate = (href: string): void => navigate(href);
+
 export function ChatLanding({
   fetcher = fetch,
-  navigate = (href) => window.location.assign(href)
+  navigate = defaultNavigate
 }: {
   readonly fetcher?: WorkspaceFetch;
   readonly navigate?: (href: string) => void;
