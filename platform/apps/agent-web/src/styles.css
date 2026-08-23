@@ -124,3 +124,6 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .runtime-picker { display: inline-flex; align-items: center; gap: 7px; padding: 5px 9px; border: 1px solid #dbe3f3; border-radius: 7px; background: #fff; }
 .runtime-picker select { max-width: 210px; padding: 4px 6px; border: 1px solid #dbe2ee; border-radius: 6px; background: #fff; color: #31415f; font-size: 11px; font-weight: 600; }
 .runtime-picker select:focus-visible { outline: 2px solid #8ba8ef; outline-offset: 1px; }
+.task-list-heading-actions { display: flex; align-items: center; gap: 12px; }
+.detail-heading-actions { display: flex; align-items: center; gap: 10px; }
+.app-create-card { margin-bottom: 18px; }

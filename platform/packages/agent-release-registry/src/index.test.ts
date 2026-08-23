@@ -517,3 +517,109 @@ describe('Package index queries', () => {
     expect(subject.listPackages('tenant-b')).toHaveLength(1);
   });
 });
+
+describe('App subject management', () => {
+  const createApp = (overrides: Partial<Parameters<InMemoryAgentReleaseStore['createApp']>[0]> = {}) => ({
+    tenantId: 'tenant-a',
+    ownerNamespace: 'package-platform',
+    appId: 'my-app',
+    name: 'My App',
+    description: 'An example app',
+    ...overrides
+  });
+
+  // validateRelease 要求 release.packageId === request.packageId，此处同步覆盖
+  const appRelease = (packageId: string): ReleaseSubmitRequest => request({
+    packageId,
+    release: release({ packageId, packageRef: `package://owner/${packageId}` })
+  });
+
+  it('creates an app and lists it as active', () => {
+    const subject = store();
+    const app = subject.createApp(createApp());
+    expect(app.status).toBe('active');
+    expect(app.appId).toBe('my-app');
+    expect(app.name).toBe('My App');
+    expect(subject.listApps('tenant-a')).toHaveLength(1);
+    expect(subject.listApps('tenant-b')).toHaveLength(0);
+    expect(subject.auditLog().some((entry) => entry.action === 'app-create')).toBe(true);
+  });
+
+  it('rejects duplicate appId with a stable conflict', () => {
+    const subject = store();
+    subject.createApp(createApp());
+    expect(() => subject.createApp(createApp())).toThrowError(ReleaseRegistryError);
+    expect(() => subject.createApp(createApp())).toThrowError(/APP_ALREADY_EXISTS/);
+    expect(subject.listApps('tenant-a')).toHaveLength(1);
+  });
+
+  it('rejects invalid app input', () => {
+    const subject = store();
+    expect(() => subject.createApp(createApp({ appId: '' }))).toThrowError(/APP_INVALID/);
+    expect(() => subject.createApp(createApp({ name: 'x'.repeat(129) }))).toThrowError(/APP_INVALID/);
+    expect(() => subject.createApp(createApp({ description: 'x'.repeat(2049) }))).toThrowError(/APP_INVALID/);
+  });
+
+  it('soft deletes an app, hiding it from list and detail while keeping releases', () => {
+    const subject = store();
+    subject.createApp(createApp());
+    subject.submit(appRelease('my-app'));
+    const deleted = subject.softDeleteApp('tenant-a', 'my-app');
+    expect(deleted?.status).toBe('deleted');
+    expect(deleted?.deletedAt).toBeDefined();
+    expect(subject.listApps('tenant-a')).toHaveLength(0);
+    expect(subject.getApp('tenant-a', 'my-app')).toBeUndefined();
+    // release 记录保留
+    expect(subject.getPackageDetail('tenant-a', 'my-app')?.releases).toHaveLength(1);
+    expect(subject.auditLog().some((entry) => entry.action === 'app-delete')).toBe(true);
+  });
+
+  it('soft delete is idempotent and returns undefined for unknown app', () => {
+    const subject = store();
+    subject.createApp(createApp());
+    const first = subject.softDeleteApp('tenant-a', 'my-app');
+    const auditAfterFirst = subject.auditLog().length;
+    const second = subject.softDeleteApp('tenant-a', 'my-app');
+    expect(second?.status).toBe('deleted');
+    expect(subject.auditLog().length).toBe(auditAfterFirst);
+    expect(subject.softDeleteApp('tenant-a', 'missing')).toBeUndefined();
+    expect(first?.deletedAt).toBe(second?.deletedAt);
+  });
+
+  it('rejects recreating a soft-deleted appId', () => {
+    const subject = store();
+    subject.createApp(createApp());
+    subject.softDeleteApp('tenant-a', 'my-app');
+    expect(() => subject.createApp(createApp())).toThrowError(/APP_ALREADY_EXISTS/);
+  });
+
+  it('getApp returns app metadata with release history', () => {
+    const subject = store();
+    subject.createApp(createApp());
+    subject.submit(appRelease('my-app'));
+    const detail = subject.getApp('tenant-a', 'my-app');
+    expect(detail?.app.name).toBe('My App');
+    expect(detail?.releases).toHaveLength(1);
+    expect(detail?.latestContentDigest).toBe(digest('c'));
+  });
+
+  it('submit implicitly registers a placeholder app when missing', () => {
+    const subject = store();
+    subject.submit(appRelease('implicit-app'));
+    const app = subject.getApp('tenant-a', 'implicit-app');
+    expect(app?.app.appId).toBe('implicit-app');
+    expect(app?.app.status).toBe('active');
+    expect(app?.app.name).toBeUndefined();
+    // 隐式占位不产生 app-create 审计（保持既有 submit 审计条数语义）
+    expect(subject.auditLog().some((entry) => entry.action === 'app-create')).toBe(false);
+  });
+
+  it('tenant isolation for apps', () => {
+    const subject = store();
+    subject.createApp(createApp());
+    subject.createApp(createApp({ tenantId: 'tenant-b', appId: 'other-app' }));
+    expect(subject.listApps('tenant-a')).toHaveLength(1);
+    expect(subject.listApps('tenant-b')).toHaveLength(1);
+    expect(subject.getApp('tenant-a', 'other-app')).toBeUndefined();
+  });
+});

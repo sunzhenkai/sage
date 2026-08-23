@@ -66,7 +66,36 @@ export interface ReleaseSubmitResult {
   readonly record: StoredRelease;
 }
 
-export type ReleaseRegistryAuditAction = 'submit' | 'reject' | 'publish' | 'rollback';
+export type AgentAppStatus = 'active' | 'deleted';
+
+/** App 主体：包的归属主体，appId 复用 packageId 标识空间。 */
+export interface AgentApp {
+  readonly tenantId: string;
+  readonly ownerNamespace: string;
+  readonly appId: string;
+  readonly name?: string;
+  readonly description?: string;
+  readonly status: AgentAppStatus;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly deletedAt?: string;
+}
+
+export interface CreateAppRequest {
+  readonly tenantId: string;
+  readonly ownerNamespace: string;
+  readonly appId: string;
+  readonly name?: string;
+  readonly description?: string;
+}
+
+export interface AgentAppDetail {
+  readonly app: AgentApp;
+  readonly releases: readonly StoredRelease[];
+  readonly latestContentDigest?: string;
+}
+
+export type ReleaseRegistryAuditAction = 'submit' | 'reject' | 'publish' | 'rollback' | 'app-create' | 'app-delete';
 export interface ReleaseRegistryAuditRecord {
   readonly sequence: number;
   readonly tenantId: string;
@@ -131,7 +160,11 @@ export type ReleaseRegistryErrorCode =
   | 'RELEASE_INTEGRITY_FAILURE'
   | 'RELEASE_CHANNEL_CONFLICT'
   | 'RELEASE_ROLLBACK_PREDECESSOR_REQUIRED'
-  | 'RELEASE_PUBLISH_AUDIT_FAILED';
+  | 'RELEASE_PUBLISH_AUDIT_FAILED'
+  | 'APP_INVALID'
+  | 'APP_ALREADY_EXISTS'
+  | 'APP_NOT_FOUND'
+  | 'APP_DELETED';
 
 export class ReleaseRegistryError extends Error {
   constructor(readonly code: ReleaseRegistryErrorCode, message = code) {
@@ -152,6 +185,11 @@ export interface AgentReleaseStore {
   resolveChannelRelease(tenantId: string, ownerNamespace: string, packageId: string, channel: string): ReleaseResolution;
   listPackages(tenantId: string, options?: { readonly limit?: number }): readonly PackageIndexSummary[];
   getPackageDetail(tenantId: string, packageId: string): PackageDetail | undefined;
+  /** App 主体管理：创建（冲突/软删重建→APP_ALREADY_EXISTS）、列出 active、详情（含 release）、幂等软删。 */
+  createApp(request: CreateAppRequest): AgentApp;
+  listApps(tenantId: string, options?: { readonly limit?: number }): readonly AgentApp[];
+  getApp(tenantId: string, appId: string): AgentAppDetail | undefined;
+  softDeleteApp(tenantId: string, appId: string, reason?: string): AgentApp | undefined;
   auditLog(): readonly ReleaseRegistryAuditRecord[];
 }
 
@@ -269,8 +307,23 @@ const sameRecordIdentity = (left: StoredRelease, right: ReleaseSubmitRequest): b
   && canonical({ release: left.release, lockPayload: left.lockPayload, attestationRefs: left.release.attestationRefs })
     === canonical({ release: right.release, lockPayload: right.lockPayload, attestationRefs: right.release.attestationRefs });
 
+function appInvalid(): never { throw new ReleaseRegistryError('APP_INVALID'); }
+function validateCreateAppRequest(request: CreateAppRequest): void {
+  if (request === null || typeof request !== 'object' || Array.isArray(request)) appInvalid();
+  if (typeof request.tenantId !== 'string' || request.tenantId.length === 0 || request.tenantId.length > MAX_ID_LENGTH) appInvalid();
+  if (typeof request.ownerNamespace !== 'string' || !OWNER_NAMESPACE.test(request.ownerNamespace) || request.ownerNamespace.length > MAX_ID_LENGTH) appInvalid();
+  if (typeof request.appId !== 'string' || request.appId.length === 0 || request.appId.length > MAX_ID_LENGTH || !REFERENCE.test(request.appId)) appInvalid();
+  if (request.name !== undefined && (typeof request.name !== 'string' || request.name.length === 0 || request.name.length > MAX_APP_NAME_LENGTH)) appInvalid();
+  if (request.description !== undefined && (typeof request.description !== 'string' || request.description.length > MAX_APP_DESCRIPTION_LENGTH)) appInvalid();
+}
+
 const channelKey = (tenantId: string, ownerNamespace: string, packageId: string, channel: string): string =>
   [tenantId, ownerNamespace, packageId, channel].map(keyPart).join('|');
+
+const appKey = (tenantId: string, appId: string): string => `${keyPart(tenantId)}|${keyPart(appId)}`;
+
+const MAX_APP_NAME_LENGTH = 128;
+const MAX_APP_DESCRIPTION_LENGTH = 2048;
 
 /** It intentionally has no database or
  * provider dependency; production persistence is supplied by a separate adapter. Every lookup
@@ -282,6 +335,7 @@ export class InMemoryAgentReleaseStore implements AgentReleaseStore {
   readonly #byRef = new Map<string, StoredRelease>();
   readonly #byPackage = new Map<string, StoredRelease[]>();
   readonly #channels = new Map<string, ReleaseChannelPointer>();
+  readonly #apps = new Map<string, AgentApp>();
   readonly #channelHistory = new Map<string, ReleaseChannelPointer[]>();
   readonly #audit: ReleaseRegistryAuditRecord[] = [];
   readonly #clock: () => Date;
@@ -343,6 +397,8 @@ export class InMemoryAgentReleaseStore implements AgentReleaseStore {
     const packageKey = `${keyPart(request.tenantId)}|${keyPart(request.packageId)}`;
     const packageReleases = this.#byPackage.get(packageKey) ?? [];
     this.#byPackage.set(packageKey, [...packageReleases, record]);
+    // 既有 submit 路径保持 app-agnostic：App 缺失时隐式登记占位 App（无 name/description），向后兼容脚本/e2e。
+    this.#ensurePlaceholderApp(request.tenantId, request.ownerNamespace, request.packageId);
     this.#record({
       tenantId: request.tenantId, ownerNamespace: request.ownerNamespace, packageId: request.packageId,
       action: 'submit', result: 'accepted', releaseRef: request.release.releaseRef,
@@ -415,6 +471,90 @@ export class InMemoryAgentReleaseStore implements AgentReleaseStore {
       latestContentDigest: latest.release.contentDigest
     });
   }
+
+  createApp(request: CreateAppRequest): AgentApp {
+    validateCreateAppRequest(request);
+    const key = appKey(request.tenantId, request.appId);
+    const existing = this.#apps.get(key);
+    if (existing !== undefined) {
+      // 软删 tombstone 拒绝重建，保持审计清晰
+      throw new ReleaseRegistryError('APP_ALREADY_EXISTS');
+    }
+    const now = nowIso(this.#clock);
+    const app: AgentApp = {
+      tenantId: request.tenantId,
+      ownerNamespace: request.ownerNamespace,
+      appId: request.appId,
+      ...(request.name === undefined ? {} : { name: request.name }),
+      ...(request.description === undefined ? {} : { description: request.description }),
+      status: 'active',
+      createdAt: now,
+      updatedAt: now
+    };
+    this.#apps.set(key, app);
+    this.#record({
+      tenantId: request.tenantId, ownerNamespace: request.ownerNamespace, packageId: request.appId,
+      action: 'app-create', result: 'accepted', reason: 'app created', occurredAt: now
+    });
+    return clone(app);
+  }
+
+  listApps(tenantId: string, options: { readonly limit?: number } = {}): readonly AgentApp[] {
+    if (typeof tenantId !== 'string') return [];
+    const limit = options.limit === undefined ? 64 : Math.max(1, Math.min(128, options.limit));
+    const tenantPrefix = `${keyPart(tenantId)}|`;
+    const apps: AgentApp[] = [];
+    for (const [key, app] of this.#apps) {
+      if (!key.startsWith(tenantPrefix)) continue;
+      if (app.status === 'deleted') continue;
+      apps.push(app);
+    }
+    return apps
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+      .slice(0, limit)
+      .map(clone);
+  }
+
+  getApp(tenantId: string, appId: string): AgentAppDetail | undefined {
+    if (typeof tenantId !== 'string' || typeof appId !== 'string') return undefined;
+    const app = this.#apps.get(appKey(tenantId, appId));
+    if (app === undefined || app.status === 'deleted') return undefined;
+    const detail = this.getPackageDetail(tenantId, appId);
+    const releases = detail === undefined ? [] : detail.releases;
+    const latestContentDigest = detail === undefined ? undefined : detail.latestContentDigest;
+    return clone({
+      app,
+      releases,
+      ...(latestContentDigest === undefined ? {} : { latestContentDigest })
+    });
+  }
+
+  softDeleteApp(tenantId: string, appId: string, reason = 'app deleted'): AgentApp | undefined {
+    if (typeof tenantId !== 'string' || typeof appId !== 'string') return undefined;
+    const key = appKey(tenantId, appId);
+    const app = this.#apps.get(key);
+    if (app === undefined) return undefined;
+    if (app.status === 'deleted') return clone(app);
+    const now = nowIso(this.#clock);
+    const deleted: AgentApp = { ...app, status: 'deleted', updatedAt: now, deletedAt: now };
+    this.#apps.set(key, deleted);
+    this.#record({
+      tenantId, ownerNamespace: app.ownerNamespace, packageId: appId,
+      action: 'app-delete', result: 'accepted', reason: reason.slice(0, MAX_AUDIT_REASON_LENGTH), occurredAt: now
+    });
+    return clone(deleted);
+  }
+
+  /** submit 路径对缺失 App 隐式登记占位 App；已存在（含 deleted）则不触碰。 */
+  #ensurePlaceholderApp(tenantId: string, ownerNamespace: string, appId: string): void {
+    const key = appKey(tenantId, appId);
+    if (this.#apps.has(key)) return;
+    const now = nowIso(this.#clock);
+    this.#apps.set(key, {
+      tenantId, ownerNamespace, appId, status: 'active', createdAt: now, updatedAt: now
+    });
+  }
+
 
   publish(input: ReleasePublicationVerificationInput): ReleaseChannelPointer {
     return this.#transitionChannel(input, 'publish', false);

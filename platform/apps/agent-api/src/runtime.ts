@@ -18,6 +18,7 @@ import { ChatPromotionAuthorizer, createChatApi, registerTaskRoutes } from './in
 import { startChatKernelExecution, type ChatCanonicalCompatibilityOptions } from './chat-compatibility.js';
 import { registerProviderCatalogRoutes } from './catalog-api.js';
 import { registerPackagesRoutes } from './packages-api.js';
+import { registerAppsRoutes } from './apps-api.js';
 import { registerPackageRunsRoutes, type ResolvedReleaseLockPayload } from './runs-api.js';
 
 export interface ApiRuntimeConfig {
@@ -190,6 +191,10 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
     registerPackagesRoutes(app, {
       tenantId: config.tenantId, store: packageStore, ownerNamespace: 'package-platform',
       authenticator, engineIds: ['engine-local'], deploymentMode: 'local'
+    });
+    registerAppsRoutes(app, {
+      tenantId: config.tenantId, store: packageStore, ownerNamespace: 'package-platform',
+      authenticator, engineIds: ['engine-local']
     });
     registerPackageRunsRoutes(app, {
       tenantId: config.tenantId,
