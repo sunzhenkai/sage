@@ -2,13 +2,13 @@
 
 ## 1. 准备
 
-- [ ] 1.1 把涉及面里角色为必须的仓切到任务分支
+- [x] 1.1 把涉及面里角色为必须的仓切到任务分支
 
 ## 2. 实施
 
-- [ ] 2.1 完成子 change `agent-package-web-mgmt-app-registry`：apply 至全部 checkbox 勾选且 validate --strict 通过
-- [ ] 2.2 完成子 change `agent-package-web-mgmt-api`：同上
-- [ ] 2.3 完成子 change `agent-package-web-mgmt-web`：同上
+- [x] 2.1 完成子 change `agent-package-web-mgmt-app-registry`：apply 至全部 checkbox 勾选且 validate --strict 通过
+- [x] 2.2 完成子 change `agent-package-web-mgmt-api`：同上
+- [x] 2.3 完成子 change `agent-package-web-mgmt-web`：同上
 
 ## 3. 收尾
 

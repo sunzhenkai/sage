@@ -119,7 +119,7 @@ function actorFrom(principal: AuthenticatedPrincipal | undefined): Authenticated
 }
 
 /** 将内存中的文件结构物化为临时源包目录并加载（走同一套安全边界校验）。 */
-async function loadSourcePackageFromFiles(files: Record<string, string>): Promise<LoadedSourcePackage> {
+export async function loadSourcePackageFromFiles(files: Record<string, string>): Promise<LoadedSourcePackage> {
   const { mkdtemp, mkdir, writeFile, rm } = await import('node:fs/promises');
   const { tmpdir } = await import('node:os');
   const { join } = await import('node:path');
@@ -283,7 +283,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 function str(value: unknown): string | undefined { return typeof value === 'string' ? value : undefined; }
 
-function extractManifestSummary(lock: Readonly<Record<string, unknown>> | undefined): PackageDetail['manifest'] | undefined {
+export function extractManifestSummary(lock: Readonly<Record<string, unknown>> | undefined): PackageDetail['manifest'] | undefined {
   const manifest = lock?.manifest;
   if (!isRecord(manifest)) return undefined;
   const typed = manifest as LockManifestShape;
@@ -303,7 +303,7 @@ function extractManifestSummary(lock: Readonly<Record<string, unknown>> | undefi
   };
 }
 
-function extractAssetPreviews(lock: Readonly<Record<string, unknown>> | undefined): PackageDetail['assets'] | undefined {
+export function extractAssetPreviews(lock: Readonly<Record<string, unknown>> | undefined): PackageDetail['assets'] | undefined {
   const raw = lock?.assets;
   if (!Array.isArray(raw)) return undefined;
   const assets: NonNullable<PackageDetail['assets']> = [];
