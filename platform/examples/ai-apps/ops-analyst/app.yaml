@@ -1,0 +1,18 @@
+schemaVersion: '1'
+id: ops-analyst
+version: 1.0.0
+description: 通用运维分析助手：解读监控指标、定位告警、生成排查建议
+entry: prompts/system.md
+modelRoute:
+  provider: anthropic
+  model: claude-sonnet-4-5
+  fallbacks:
+    - claude-haiku-4-5
+budgets:
+  maxTokens: 8000
+  maxToolCalls: 40
+  maxDurationMs: 300000
+skillRefs:
+  - skill://ops-triage/v1
+capabilityRefs:
+  - capability://metric-reader/v1

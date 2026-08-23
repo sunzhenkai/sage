@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ChatStore } from '@sage/chat-domain';
-import { ChatTaskInputResolver, workerPollersReady } from './runtime.js';
+import { ChatTaskInputResolver, CompositeTaskInputResolver, PackageTaskInputResolver, workerPollersReady } from './runtime.js';
+import type { PostgresTaskStore } from '@sage/task-store-postgres';
 
 type StoredMessage = NonNullable<Awaited<ReturnType<ChatStore['getMessage']>>>;
 const message: StoredMessage = {
@@ -41,3 +42,29 @@ describe('ChatTaskInputResolver', () => {
     const { readWorkerRuntimeConfig } = await import('./runtime.js');
     expect(readWorkerRuntimeConfig()).toMatchObject({ executionMode: 'kernel', lifecycleOwner: 'canonical' });
   });
+
+describe('PackageTaskInputResolver', () => {
+  function fakeTaskStore(record: { assembledInput: string } | undefined) {
+    return { getPackageInput: async () => record } as unknown as Pick<PostgresTaskStore, 'getPackageInput'>;
+  }
+
+  it('resolves a materialized package input for the same tenant', async () => {
+    const resolver = new PackageTaskInputResolver(fakeTaskStore({ assembledInput: 'entry\n\n--- user input ---\nhi' }));
+    await expect(resolver.resolve('task-input://package/tenant-local/pkg-task-1', 'tenant-local')).resolves.toContain('hi');
+  });
+
+  it('rejects unsupported, cross-tenant, and missing package inputs without falling back', async () => {
+    const resolver = new PackageTaskInputResolver(fakeTaskStore(undefined));
+    await expect(resolver.resolve('task-input://package/tenant-local/missing', 'tenant-local')).rejects.toThrow('TASK_PACKAGE_INPUT_NOT_FOUND');
+    await expect(resolver.resolve('task-input://package/other-tenant/pkg-task-1', 'tenant-local')).rejects.toThrow('TASK_INPUT_REF_TENANT_MISMATCH');
+    await expect(resolver.resolve('task-input://chat/tenant-local/x' as `task-input://${string}`, 'tenant-local')).rejects.toThrow('TASK_INPUT_REF_UNSUPPORTED');
+  });
+
+  it('dispatches by scheme through the composite resolver', async () => {
+    const resolver = new CompositeTaskInputResolver([
+      { scheme: 'package', resolver: new PackageTaskInputResolver(fakeTaskStore({ assembledInput: 'pkg-input' })) }
+    ]);
+    await expect(resolver.resolve('task-input://package/tenant-local/t-1', 'tenant-local')).resolves.toBe('pkg-input');
+    await expect(resolver.resolve('task-input://chat/tenant-local/m-1' as `task-input://${string}`, 'tenant-local')).rejects.toThrow('TASK_INPUT_REF_UNSUPPORTED');
+  });
+});

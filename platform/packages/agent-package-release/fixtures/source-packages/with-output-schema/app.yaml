@@ -1,0 +1,8 @@
+schemaVersion: '1'
+id: output-schema-app
+version: 1.0.0
+description: 含可选 output.schema.json 的合法源包
+entry: prompts/system.md
+modelRoute:
+  provider: anthropic
+  model: claude-sonnet-4-5

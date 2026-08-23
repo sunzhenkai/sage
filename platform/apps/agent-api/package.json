@@ -13,12 +13,15 @@
     "clean": "rm -rf dist",
     "dev": "tsx src/runtime.ts",
     "start": "node dist/runtime.js",
+    "register-package": "tsx scripts/register-package.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
     "@sage/agent-client": "workspace:*",
     "@sage/agent-contracts": "workspace:*",
+    "@sage/agent-package-release": "workspace:*",
+    "@sage/agent-release-registry": "workspace:*",
     "@sage/agent-run-admission": "workspace:*",
     "@sage/app-contracts": "workspace:*",
     "@sage/chat-domain": "workspace:*",

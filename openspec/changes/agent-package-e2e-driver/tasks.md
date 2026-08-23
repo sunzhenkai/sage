@@ -2,20 +2,20 @@
 
 ## 1. 准备
 
-- [ ] 1.1 把涉及面里角色为必须的仓切到任务分支
+- [x] 1.1 把涉及面里角色为必须的仓切到任务分支
 
 ## 2. 实施
 
-- [ ] 2.1 完成子 change `agent-package-e2e-package-schema`：apply 至全部 checkbox 勾选且 validate --strict 通过
-- [ ] 2.2 完成子 change `agent-package-e2e-compiler`：同上
-- [ ] 2.3 完成子 change `agent-package-e2e-registry-api`：同上
-- [ ] 2.4 完成子 change `agent-package-e2e-run-path`：同上
-- [ ] 2.5 完成子 change `agent-package-e2e-sample-app`：同上
-- [ ] 2.6 完成子 change `agent-package-e2e-web`：同上
+- [x] 2.1 完成子 change `agent-package-e2e-package-schema`：apply 至全部 checkbox 勾选且 validate --strict 通过
+- [x] 2.2 完成子 change `agent-package-e2e-compiler`：同上
+- [x] 2.3 完成子 change `agent-package-e2e-registry-api`：同上
+- [x] 2.4 完成子 change `agent-package-e2e-run-path`：同上
+- [x] 2.5 完成子 change `agent-package-e2e-sample-app`：同上
+- [x] 2.6 完成子 change `agent-package-e2e-web`：同上
 
 ## 3. 收尾
 
-- [ ] 3.1 全仓回归与静态检查，命令与结果写入 proposal 验证记录
-- [ ] 3.2 回填 proposal 验收标准
-- [ ] 3.3 提交交付仓改动
-- [ ] 3.4 归档全部子 change
+- [x] 3.1 全仓回归与静态检查，命令与结果写入 proposal 验证记录
+- [x] 3.2 回填 proposal 验收标准
+- [x] 3.3 提交交付仓改动
+- [x] 3.4 归档全部子 change

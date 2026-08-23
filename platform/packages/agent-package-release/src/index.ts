@@ -202,8 +202,10 @@ export function scanForbiddenPackageContent(value: JsonValue): string[] {
     }
     if (current === null || typeof current !== 'object') return;
     for (const [key, child] of Object.entries(current)) {
-      const normalizedKey = key.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-      if (FORBIDDEN_KEY_PARTS.some((part) => normalizedKey.includes(part))) violations.push(`${path}.${key}`);
+      // 以词边界匹配键名，避免 description 等合法键被误判为 script/secret。
+      if (FORBIDDEN_KEY_PARTS.some((part) => new RegExp(`(?:^|[^a-z0-9])${part}(?:$|[^a-z0-9])`, 'i').test(key))) {
+        violations.push(`${path}.${key}`);
+      }
       visit(child, `${path}.${key}`);
     }
   };
@@ -798,3 +800,6 @@ export function isAgentPackageReleaseV1(value: unknown): value is AgentPackageRe
 }
 
 export * from './supply-chain.js';
+export * from './source-manifest.js';
+export * from './source-loader.js';
+export * from './compiler.js';

@@ -358,6 +358,11 @@ function parseAfterSequence(value: string | undefined): number {
 }
 
 export { registerTaskRoutes } from './task-api.js';
+export { registerProviderCatalogRoutes } from './catalog-api.js';
+export { registerPackagesRoutes } from './packages-api.js';
+export { registerPackageRunsRoutes } from './runs-api.js';
+export type { RegisterPackagesRoutesOptions, PackagesPrincipalAuthenticator } from './packages-api.js';
+export type { RegisterPackageRunsRoutesOptions, RunsPrincipalAuthenticator, PackageReleaseResolver, ResolvedReleaseLockPayload } from './runs-api.js';
 export { ExternalApprovalPilotAdmissionGate, PilotAdmissionDeniedError, P7_CHANGE_ID, REQUIRED_P7_EXERCISES } from './pilot-admission.js';
 export type { ExternalHumanApprovalVerifier, ExternalPilotApproval, ExternalPilotApprovalProvider, ExternalPilotApprovalRecord, PilotAdmissionEvidence, PilotAdmissionGate, PilotApprovalRole } from './pilot-admission.js';
 export { ChatPromotionAuthorizer, PromotionAuthorizationError, registerChatPromotionRoute } from './promotion.js';

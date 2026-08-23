@@ -2,13 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import type { ListSessionsResponse, SessionHistoryItem, SessionHistoryStatus } from '@sage/app-contracts';
 import { useLocale } from './locale.js';
 
-export type WorkspaceView = 'chat' | 'tasks' | 'providers';
-export interface WorkspaceLocation { readonly view: WorkspaceView; readonly sessionId?: string; readonly taskId?: string }
+export type WorkspaceView = 'chat' | 'tasks' | 'providers' | 'packages';
+export interface WorkspaceLocation { readonly view: WorkspaceView; readonly sessionId?: string; readonly taskId?: string; readonly packageId?: string }
 
-export function workspaceHref({ view, sessionId, taskId }: WorkspaceLocation): string {
+export function workspaceHref({ view, sessionId, taskId, packageId }: WorkspaceLocation): string {
   const query = new URLSearchParams();
   if (view !== 'chat') query.set('view', view);
   if (view === 'tasks' && taskId) query.set('task', taskId);
+  if (view === 'packages' && packageId) query.set('package', packageId);
   if (sessionId) query.set('session', sessionId);
   const serialized = query.toString();
   return serialized === '' ? '/' : `/?${serialized}`;

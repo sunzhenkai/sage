@@ -75,6 +75,34 @@ export class ChatTaskInputResolver implements TaskSliceInputResolver {
   }
 }
 
+/** 包运行输入 resolver：读取物化的 task_package_input 记录，缺行返回稳定错误且不回退其他输入源。 */
+export class PackageTaskInputResolver implements TaskSliceInputResolver {
+  constructor(private readonly tasks: Pick<PostgresTaskStore, 'getPackageInput'>) {}
+
+  async resolve(inputRef: TaskInputRef, tenantId: string): Promise<string> {
+    const match = /^task-input:\/\/package\/([^/]+)\/([^/]+)$/.exec(inputRef);
+    if (!match) throw new Error('TASK_INPUT_REF_UNSUPPORTED');
+    const refTenant = decodeURIComponent(match[1]!);
+    const taskId = decodeURIComponent(match[2]!);
+    if (refTenant !== tenantId) throw new Error('TASK_INPUT_REF_TENANT_MISMATCH');
+    const record = await this.tasks.getPackageInput(tenantId, taskId);
+    if (record === undefined) throw new Error('TASK_PACKAGE_INPUT_NOT_FOUND');
+    return record.assembledInput;
+  }
+}
+
+/** 按 scheme 分发的组合 resolver：chat 路径不动，package 路径新增。 */
+export class CompositeTaskInputResolver implements TaskSliceInputResolver {
+  constructor(private readonly resolvers: ReadonlyArray<{ readonly scheme: string; readonly resolver: TaskSliceInputResolver }>) {}
+
+  async resolve(inputRef: TaskInputRef, tenantId: string): Promise<string> {
+    const scheme = inputRef.match(/^task-input:\/\/([a-z]+)\//)?.[1];
+    const entry = scheme === undefined ? undefined : this.resolvers.find((item) => item.scheme === scheme);
+    if (entry === undefined) throw new Error('TASK_INPUT_REF_UNSUPPORTED');
+    return entry.resolver.resolve(inputRef, tenantId);
+  }
+}
+
 function json(statusCode: number, body: Record<string, unknown>): { statusCode: number; body: string } {
   return { statusCode, body: JSON.stringify(body) };
 }
@@ -129,7 +157,10 @@ export async function createWorkerRuntime(config = readWorkerRuntimeConfig()): P
       activities: createAgentTaskActivities({
         agentClient: createLocalAgentClient(),
         ...(canonicalCompatibility === undefined ? {} : { canonicalCompatibility }),
-        store: tasks, inputResolver: new ChatTaskInputResolver(chat)
+        store: tasks, inputResolver: new CompositeTaskInputResolver([
+          { scheme: 'chat', resolver: new ChatTaskInputResolver(chat) },
+          { scheme: 'package', resolver: new PackageTaskInputResolver(tasks) }
+        ])
       }),
       buildId: env('SAGE_WORKER_BUILD_ID', 'sage-local-worker-v1')
     });

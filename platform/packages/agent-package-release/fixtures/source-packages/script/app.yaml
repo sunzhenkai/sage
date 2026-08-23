@@ -1,0 +1,8 @@
+schemaVersion: '1'
+id: script-app
+version: 1.0.0
+description: 目录包含可执行脚本的非法源包
+entry: prompts/system.md
+modelRoute:
+  provider: anthropic
+  model: claude-sonnet-4-5

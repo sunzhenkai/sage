@@ -476,3 +476,44 @@ describe('Strict authenticated Release Registry API', () => {
       .toThrowError(new ReleaseApiError('API_REQUEST_INVALID'));
   });
 });
+
+describe('Package index queries', () => {
+  it('lists packages and returns detail grouped by package id across versions', () => {
+    const subject = store();
+    subject.submit(request());
+    const secondRelease = release({
+      releaseRef: `release://${digest('9')}`,
+      releaseId: digest('9'),
+      packageVersion: '2.0.0',
+      packageDigest: digest('6'),
+      contentDigest: digest('7'),
+      lockDigest: digest('8'),
+      provenance: { ...release().provenance, sourceDigest: digest('6'), lockDigest: digest('8') }
+    });
+    subject.submit(request({ packageVersion: '2.0.0', idempotencyKey: 'submit-2', release: secondRelease }));
+
+    const packages = subject.listPackages('tenant-a');
+    expect(packages).toHaveLength(1);
+    expect(packages[0]).toMatchObject({
+      tenantId: 'tenant-a',
+      packageId: 'reference-summary',
+      releaseCount: 2,
+      latestVersion: '2.0.0'
+    });
+
+    const detail = subject.getPackageDetail('tenant-a', 'reference-summary');
+    expect(detail).toBeDefined();
+    expect(detail?.releases).toHaveLength(2);
+    expect(detail?.latestContentDigest).toBe(digest('7'));
+    expect(subject.getPackageDetail('tenant-a', 'missing')).toBeUndefined();
+    expect(subject.listPackages('tenant-b')).toHaveLength(0);
+  });
+
+  it('binds the package index to tenant scope', () => {
+    const subject = store();
+    subject.submit(request());
+    subject.submit(request({ tenantId: 'tenant-b', idempotencyKey: 'submit-b' }));
+    expect(subject.listPackages('tenant-a')).toHaveLength(1);
+    expect(subject.listPackages('tenant-b')).toHaveLength(1);
+  });
+});
