@@ -2,7 +2,6 @@
 
 ## Purpose
 This specification defines the canonical agent-release-registry behavior, authority boundaries, compatibility rules, and fail-closed scenarios synchronized from the implemented T0005 delivery sequence.
-
 ## Requirements
 ### Requirement: 不可变 Release Registry 存储与租户隔离
 Release Registry SHALL 以 release/content digest create-only 存储 `AgentPackageRelease` 及其 lock 和 attestation refs，并 SHALL 按 tenant、owner namespace 与 package identity 强制隔离。相同 identity 的不同 payload MUST 被拒绝；已存在且 digest 完全一致的重投 SHALL 幂等返回原 Release。
@@ -89,3 +88,74 @@ agent-api SHALL 暴露包管理端点：`POST /v1/packages/{packageId}/releases`
 #### Scenario: 查询包列表与详情
 - **WHEN** 客户端调用列表/详情端点
 - **THEN** 返回该租户可见的包摘要与 release 历史，详情含资产相对路径与 digest
+
+### Requirement: App 主体管理与软删除
+Registry SHALL 提供应用（App）主体实体，App 是包的归属主体并以 `appId`（复用 `packageId` 标识空间）标识，至少携带 name、description、`status`（`active`/`deleted`）、createdAt/updatedAt/deletedAt。Registry SHALL 支持创建、查询与软删除 App；软删除 SHALL 仅将 App 标记为 deleted（不删除任何已登记 Release 或既有审计），并 SHALL 追加一条 append-only 审计记录。`appId` 冲突 SHALL 返回稳定 conflict；软删后的同名 `appId` SHALL 拒绝重建以保持审计清晰。软删除的 App MUST NOT 出现在面向用户的 App 列表中；对 deleted App 的详情查询 SHALL 视同不存在。既有 Release 登记路径（submit）在 App 缺失时 SHALL 隐式登记占位 App 以保持向后兼容，不强制要求显式建 App。
+
+#### Scenario: 创建 App 主体
+- **WHEN** 调用方以合法 `appId`、name、description 创建 App
+- **THEN** Registry 登记该 App 为 active，并可在 App 列表中查询到
+
+#### Scenario: appId 冲突
+- **WHEN** 以已存在的 `appId` 再次创建 App
+- **THEN** Registry 返回稳定 conflict，原 App 保持不变
+
+#### Scenario: 软删除 App
+- **WHEN** 调用方删除一个 active App
+- **THEN** App 被标记为 deleted、记录 deletedAt，且其全部已登记 Release 与既有审计保持不变
+
+#### Scenario: 软删审计追加
+- **WHEN** App 被软删除
+- **THEN** Registry 追加一条 append-only 审计记录（`action='app-delete'`），含 actor、时间与原因
+
+#### Scenario: 列表隐藏已删除 App
+- **WHEN** 查询 App 列表
+- **THEN** 仅返回 active App，deleted App 不出现
+
+#### Scenario: 软删后同名拒绝重建
+- **WHEN** 以已软删除的 `appId` 再次创建 App
+- **THEN** Registry 返回稳定 conflict，不复活或覆盖 tombstone
+
+#### Scenario: 删除幂等
+- **WHEN** 对已删除或不存在的 App 再次执行删除
+- **THEN** 操作幂等返回成功且不重复追加审计
+
+#### Scenario: 既有 submit 隐式占位 App
+- **WHEN** 通过既有 Release 登记路径提交一个 App 尚未显式创建的包
+- **THEN** Registry 隐式登记一个占位 App（无 name/description），保持向后兼容且登记成功
+
+### Requirement: App 管理 HTTP 端点
+agent-api SHALL 暴露应用（App）管理端点：`POST /v1/apps` 创建 App 主体，`GET /v1/apps` 返回 active App 列表（含最新 release 版本/时间），`GET /v1/apps/{appId}` 返回 App 详情（元信息、manifest 摘要、资产清单与 release 历史），`DELETE /v1/apps/{appId}` 幂等软删除，`POST /v1/apps/{appId}/releases` 上传源包登记为该 App 的新版本。上传 SHALL 前置校验 App 存在且为 active，且源包 manifest.id 与路径 `appId` 一致；App 不存在/已删除或 manifest.id 不一致 SHALL 返回稳定错误且不产生部分登记。端点 SHALL 要求认证（与既有 packages 端点风格一致），非法字段 SHALL 被拒绝。
+
+#### Scenario: 新建 App
+- **WHEN** 认证调用方以合法 `{ appId, name, description }` 调用 `POST /v1/apps`
+- **THEN** 服务端创建 active App 主体并返回其元信息
+
+#### Scenario: appId 冲突
+- **WHEN** 以已存在或已软删除的 `appId` 再次创建
+- **THEN** 端点返回稳定 conflict 错误，原 App 不变
+
+#### Scenario: 列出与查看 App
+- **WHEN** 调用 `GET /v1/apps` 或 `GET /v1/apps/{appId}`
+- **THEN** 返回 active App 列表或 App 详情；deleted App 不出现在列表、详情返回 404
+
+#### Scenario: 软删除 App
+- **WHEN** 调用 `DELETE /v1/apps/{appId}`
+- **THEN** App 被标记 deleted，重复调用幂等返回成功
+
+#### Scenario: 上传登记新版本
+- **WHEN** 对存在的 active App 上传合法源包且 manifest.id 与 appId 一致
+- **THEN** 服务端编译登记为该 App 的新版本 release 并返回 releaseId 与 digest
+
+#### Scenario: 上传到不存在或已删除 App
+- **WHEN** 对不存在或已删除的 appId 调用上传端点
+- **THEN** 端点返回稳定错误，registry 状态不变
+
+#### Scenario: manifest.id 与 appId 不一致
+- **WHEN** 上传源包的 manifest.id 与路径 appId 不一致
+- **THEN** 端点返回稳定错误，不产生登记
+
+#### Scenario: 未认证访问被拒
+- **WHEN** 未携带认证的调用方访问任一 App 管理端点
+- **THEN** 端点返回 401 稳定错误
+
