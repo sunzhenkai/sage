@@ -3,10 +3,10 @@
   "caseId": "apgv/entry/v1/dependency-preflight",
   "status": "BLOCKED",
   "decision": "NO-GO",
-  "sourceRevision": "cb892be7970b75f0d9ffcbb3ca7e823c8ea17280",
-  "sourceDigest": "sha256:bbe150c1cf4dcaa54adc96a6a2ba9cb2f6e0c211ca52e5315b55d6c8edfc0a9c",
+  "sourceRevision": "b5c4645d63c77b24b2aecf901fbd442dd24bd770",
+  "sourceDigest": "sha256:a1d98de5122d95585e4854efe5f62ce82cba7c283fc006c9edce3b0e0cf93c66",
   "toolDigest": "sha256:3eb1ef94b5890ca727158b106142685c8733b0ace5bcb4cf3f0ac14f9f0643f4",
-  "checkedAt": "2026-08-19T14:04:19.279Z",
+  "checkedAt": "2026-08-23T03:44:02.851Z",
   "dependencies": [
     {
       "change": "agent-platform-contract-authority-foundation",
@@ -37,7 +37,7 @@
       },
       "planningArtifacts": "PRESENT",
       "strictValidation": "FAIL",
-      "evidenceDigest": "sha256:76959f867349567fc07be557d2a249fd703705b748bbf58aa177a47f48a3bfcf",
+      "evidenceDigest": "sha256:8f0c8836170eb0e4c3c63521ec6a6f54d4f52ef1c1c3a0c0303fb9eb291cff4c",
       "repositoryInputConsumable": false,
       "status": "BLOCKED",
       "reason": "STRICT_VALIDATION_FAILED"
@@ -54,7 +54,7 @@
       },
       "planningArtifacts": "PRESENT",
       "strictValidation": "FAIL",
-      "evidenceDigest": "sha256:b4505a808982c1b0be9ceceb736cc268e7c18110735bfaef1c6b244da615d04b",
+      "evidenceDigest": "sha256:2b1c71ca81d07669e84c3b336244ee82813317f591665d7d6994c844c2be966d",
       "repositoryInputConsumable": false,
       "status": "BLOCKED",
       "reason": "STRICT_VALIDATION_FAILED"
@@ -106,5 +106,5 @@
     "12.5"
   ],
   "promotionStarted": false,
-  "contentDigest": "sha256:c555fd2844e2a055fb7bfbe1e70f3d9e0c821e8dab179469006ee9c1b5f10a7d"
+  "contentDigest": "sha256:e80454a38eb854094751c5dacbc1f7eb6eb21b73155036befeadb87cb1079207"
 }
