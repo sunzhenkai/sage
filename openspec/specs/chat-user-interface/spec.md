@@ -194,3 +194,12 @@ Chat landing SHALL 提供未归档与归档两个视图的切换入口（如「�
 - **WHEN** 归档视图加载成功且无归档 session
 - **THEN** UI 展示归档专属空态文案，而非主列表空态或错误状态
 
+### Requirement: 聊天导航走客户端路由
+
+Chat 视图相关的所有站内导航（侧边栏 Chat 项、历史条目、任务→对话深链、返回列表链接）SHALL 通过客户端路由完成，不触发整页重载；跨视图 session 上下文保留的既有语义（Tasks/Providers 导航保留 `session` query、侧边栏 Chat 项不带 `session` query）保持成立。
+
+#### Scenario: 任务详情深链返回会话
+- **WHEN** 用户从任务详情点击「前往对话」深链
+- **THEN** 携带原 `session` query 以客户端路由切换回对应 Chat session，不整页重载，展示同一 timeline
+
+
