@@ -6,6 +6,7 @@ import { ProvidersApp } from './providers.js';
 import { PackagesApp } from './packages.js';
 import { TasksApp } from './tasks.js';
 import { ChatLanding, workspaceHref, type WorkspaceView } from './workspace.js';
+import { handleAnchorNavigation, navigate, useLocation } from './routing.js';
 import './styles.css';
 // Local development mode and Local Pi Harness are rendered through the locale dictionary.
 
@@ -53,4 +54,32 @@ export function renderWorkspace(search = location.search): ReactNode {
   return <StrictMode><LocaleProvider><WorkspaceShell view={view} {...(sessionId ? { sessionId } : {})}>{content}</WorkspaceShell></LocaleProvider></StrictMode>;
 }
 
-if (root) { try { createRoot(root).render(renderWorkspace()); } catch (cause) { createRoot(root).render(<StrictMode><LocaleProvider><WorkspaceShell view={currentView()}><BootError cause={cause} /></WorkspaceShell></LocaleProvider></StrictMode>); } }
+export function WorkspaceApp({ searchOverride, fetcher }: { readonly searchOverride?: string; readonly fetcher?: typeof fetch }) {
+  const location = useLocation(searchOverride);
+  const view = currentView(location.toString());
+  const sessionId = location.get('session') ?? undefined;
+  const taskId = location.get('task') ?? undefined;
+  const packageId = location.get('package') ?? undefined;
+  const content = view === 'providers' ? <ProvidersApp fetcher={fetcher ?? fetch} /> : view === 'tasks' ? <TasksApp key={`tasks-${sessionId ?? ''}`} fetcher={fetcher ?? fetch} {...(sessionId ? { sessionId } : {})} {...(taskId ? { taskId } : {})} /> : view === 'packages' ? <PackagesApp key={`packages-${sessionId ?? ''}`} fetcher={fetcher ?? fetch} {...(packageId ? { packageId } : {})} /> : sessionId ? <ChatApp key={`chat-${sessionId}`} sessionId={sessionId} fetcher={fetcher ?? fetch} /> : <ChatLanding fetcher={fetcher ?? fetch} />;
+  return <LocaleProvider><WorkspaceShell view={view} {...(sessionId ? { sessionId } : {})}>{content}</WorkspaceShell></LocaleProvider>;
+}
+
+if (root) {
+  try {
+    createRoot(root).render(<StrictMode><WorkspaceApp /></StrictMode>);
+  } catch (cause) {
+    createRoot(root).render(<StrictMode><LocaleProvider><WorkspaceShell view={currentView()}><BootError cause={cause} /></WorkspaceShell></LocaleProvider></StrictMode>);
+  }
+}
+
+// 全局 `<a>` 点击委托：站内查询路由链接走客户端路由，外部/下载/新标签放行。
+if (typeof document !== 'undefined') {
+  document.addEventListener('click', (event: MouseEvent) => {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const anchor = target.closest('a[href]');
+    if (anchor === null) return;
+    if (handleAnchorNavigation(anchor, navigate)) event.preventDefault();
+  });
+}

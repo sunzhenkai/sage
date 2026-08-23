@@ -1,15 +1,31 @@
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin, type PreviewServer } from 'vite';
 import react from '@vitejs/plugin-react';
 
 // 默认值与本机 dev 模式下 agent-api 的监听端口（9610）保持一致；可通过 SAGE_API_PROXY_TARGET 覆盖到容器内或 compose 暴露的端口。
 const apiProxyTarget = process.env.SAGE_API_PROXY_TARGET ?? 'http://127.0.0.1:9610';
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), previewCacheHeaders()],
   // host: true 绑定 0.0.0.0，供局域网/其他主机访问 dev server。
   server: { host: true, port: 9612, strictPort: true, proxy: { '/v1': proxyOptions() } },
   preview: { proxy: { '/v1': proxyOptions() } }
 });
+
+/** 仅对 /assets/ 下带内容哈希的构建产物设 immutable 强缓存；index.html 与 /v1 代理（含 SSE）保持 ETag/304。 */
+function previewCacheHeaders(): Plugin {
+  return {
+    name: 'sage-preview-cache-headers',
+    configurePreviewServer(server: PreviewServer) {
+      server.middlewares.use((req, res, next) => {
+        if (req.url === undefined || !req.url.startsWith('/assets/')) { next(); return; }
+        const pathname = req.url.split('?')[0];
+        if (!pathname.includes('.')) { next(); return; }
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        next();
+      });
+    }
+  };
+}
 
 function proxyOptions() {
   return {

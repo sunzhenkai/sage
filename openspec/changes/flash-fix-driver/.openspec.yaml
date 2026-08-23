@@ -1,0 +1,4 @@
+schema: spec-driven
+created: 2026-08-23
+skip_specs: true
+goal: 修复 sage web 页面闪屏：整页跳转改为客户端路由（根因），首帧骨架屏与背景内联治白闪/空白闪，静态资源强缓存治重复下载
