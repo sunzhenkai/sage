@@ -9,12 +9,20 @@ class MemoryStorage implements Storage { #data = new Map<string,string>(); get l
 const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 const wait = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 const page = { schemaVersion: '1', snapshotId: 'snapshot-1', activeSince: '2026-08-14T00:00:00.000Z', stale: false };
+const runAgentSettings = (defaultProvider: 'auto' | 'minimax' | 'echo' = 'auto', available = false) => ({
+  schemaVersion: 'RunAgentSettings.v1', defaultProvider,
+  providers: [{ id: 'minimax', available, ...(available ? {} : { reason: 'MINIMAX_API_KEY is not set in the trusted process environment' }) }]
+});
 
 describe('Provider profile UX', () => {
   afterEach(() => vi.unstubAllGlobals());
   it('shows one read-only System runtime and starts with no external profile', async () => {
     const localStorage = new MemoryStorage(); const sessionStorage = new MemoryStorage(); vi.stubGlobal('window', { localStorage, sessionStorage });
-    const fetcher = vi.fn(async () => response({ schemaVersion: '1', source: 'models-dev', availability: 'unavailable', providerCount: 0, modelCount: 0, nextSyncAt: '2026-08-15T00:00:00.000Z', projection: 'unavailable' })) as typeof fetch;
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/run-agent/settings')) return response(runAgentSettings());
+      return response({ schemaVersion: '1', source: 'models-dev', availability: 'unavailable', providerCount: 0, modelCount: 0, nextSyncAt: '2026-08-15T00:00:00.000Z', projection: 'unavailable' });
+    }) as typeof fetch;
     let tree!: ReturnType<typeof create>; await act(async () => { tree = create(<ProvidersApp fetcher={fetcher} />); await wait(); });
     expect(tree.root.findByProps({ 'aria-label': 'System runtime' })).toBeTruthy();
     expect(tree.root.findByProps({ children: 'In use' })).toBeTruthy();
@@ -28,6 +36,7 @@ describe('Provider profile UX', () => {
     const calls: { url: string; signal?: AbortSignal }[] = [];
     const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input); calls.push({ url, ...(init?.signal ? { signal: init.signal } : {}) });
+      if (url.endsWith('/run-agent/settings')) return response(runAgentSettings());
       if (url.endsWith('/status')) return response({ schemaVersion: '1', source: 'models-dev', availability: 'available', providerCount: 1, modelCount: 1, lastCheckedAt: '2026-08-14T00:00:00.000Z', nextSyncAt: '2026-08-15T00:00:00.000Z', projection: 'ready' });
       if (url.includes('/providers?')) return response({ ...page, items: [{ providerId: 'alpha', name: 'Alpha', api: 'https://alpha.example/v1' }, { providerId: 'beta', name: 'Beta', api: 'https://beta.example/v1' }] });
       if (url.includes('/models?')) return response({ ...page, items: [{ modelId: 'model', providerId: 'alpha', name: 'Model', status: 'active', capabilities: [] }] });
@@ -67,7 +76,8 @@ describe('Provider profile UX', () => {
     expect(tree.root.findAllByProps({ role: 'status' }).some((node) => node.children.join('').includes('Connected'))).toBe(true);
     await act(async () => { tree.root.findByProps({ className: 'profile-card ' }).props.onClick(); });
     const baseUrl = tree.root.findByProps({ placeholder: 'Source did not publish a URL; enter HTTPS manually if needed' });
-    await act(async () => { tree.root.findByType('select').props.onChange({ target: { value: 'openai-compatible' } }); baseUrl.props.onChange({ target: { value: '' } }); });
+    const adapterSelect = tree.root.findAllByType('select').find((node) => node.props['aria-label'] !== 'Default provider')!;
+    await act(async () => { adapterSelect.props.onChange({ target: { value: 'openai-compatible' } }); baseUrl.props.onChange({ target: { value: '' } }); });
     await act(async () => { tree.root.findByType('form').props.onSubmit({ preventDefault(){} }); });
     expect(JSON.parse(localStorage.getItem(PROVIDER_V2_STORAGE_KEY)!)[0]).not.toHaveProperty('baseUrl');
     const enabled = tree.root.findAllByProps({ type: 'checkbox' }).at(-1)!;
@@ -94,6 +104,7 @@ describe('Provider profile UX', () => {
     vi.stubGlobal('window', { localStorage, sessionStorage }); vi.stubGlobal('document', { documentElement: { lang: '' } });
     const fetcher = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
+      if (url.endsWith('/run-agent/settings')) return response(runAgentSettings());
       if (url.endsWith('/status')) return response({ schemaVersion: '1', source: 'models-dev', availability: 'available', providerCount: 1, modelCount: 1, nextSyncAt: '2026-08-15T00:00:00.000Z', projection: 'ready' });
       if (url.includes('/providers?')) return response({ ...page, items: [{ providerId: 'alpha', name: 'Alpha', api: 'https://alpha.example/v1' }] });
       if (url.includes('/models?')) return response({ ...page, items: [{ modelId: 'model', providerId: 'alpha', name: 'Model', status: 'active', capabilities: [] }] });
@@ -126,6 +137,7 @@ describe('Provider profile UX', () => {
     const first = new Promise<Response>((resolve) => { resolveFirst = resolve; });
     const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
+      if (url.endsWith('/run-agent/settings')) return response(runAgentSettings());
       if (url.endsWith('/status')) return response({ schemaVersion: '1', source: 'models-dev', availability: 'available', providerCount: 2, modelCount: 2, nextSyncAt: '2026-08-15T00:00:00.000Z', projection: 'ready' });
       if (url.endsWith('/check-connection')) {
         const body = JSON.parse(String(init?.body)) as { apiKey: string };
@@ -150,6 +162,7 @@ describe('Provider profile UX', () => {
     const localStorage = new MemoryStorage(); const sessionStorage = new MemoryStorage(); vi.stubGlobal('window', { localStorage, sessionStorage });
     const fetcher = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
+      if (url.endsWith('/run-agent/settings')) return response(runAgentSettings());
       if (url.endsWith('/status')) return response({ schemaVersion: '1', source: 'models-dev', availability: 'available', providerCount: 1, modelCount: 1, nextSyncAt: '2026-08-15T00:00:00.000Z', projection: 'ready' });
       if (url.includes('/providers?')) return response({ ...page, items: [{ providerId: 'alpha', name: 'Alpha', api: 'https://alpha.example/v1' }] });
       throw new Error(url);
@@ -176,6 +189,7 @@ describe('Provider profile UX', () => {
     const signals: AbortSignal[] = [];
     const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
+      if (url.endsWith('/run-agent/settings')) return response(runAgentSettings());
       if (url.endsWith('/status')) return response({ schemaVersion: '1', source: 'models-dev', availability: 'available', providerCount: 1, modelCount: 1, nextSyncAt: '2026-08-15T00:00:00.000Z', projection: 'ready' });
       if (url.includes('/providers?')) { providerCalls += 1; if (init?.signal) signals.push(init.signal); return providerCalls === 1 ? first : response({ code: 'CATALOG_SNAPSHOT_CHANGED' }, 409); }
       throw new Error(url);
@@ -191,6 +205,34 @@ describe('Provider profile UX', () => {
     expect(tree.root.findAllByProps({ role: 'status' }).some((node) => node.children.join('').includes('Catalog updated'))).toBe(true);
     await act(async () => { resolveFirst(response({ ...page, items: [{ providerId: 'stale', name: 'Stale' }] })); await wait(); });
     expect(tree.root.findByProps({ id: 'provider-options' }).findAllByType('button')).toHaveLength(0);
+    await act(async () => tree.unmount());
+  });
+
+  it('shows the Run agent card, availability badge, and PUTs the default provider on change', async () => {
+    const localStorage = new MemoryStorage(); const sessionStorage = new MemoryStorage(); vi.stubGlobal('window', { localStorage, sessionStorage });
+    const puts: { url: string; method?: string; body?: unknown }[] = [];
+    const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/run-agent/settings')) {
+        if (init?.method === 'PUT') { puts.push({ url, method: init.method, body: JSON.parse(String(init.body)) }); return response(runAgentSettings('minimax', true)); }
+        return response(runAgentSettings());
+      }
+      if (url.endsWith('/status')) return response({ schemaVersion: '1', source: 'models-dev', availability: 'available', providerCount: 0, modelCount: 0, nextSyncAt: '2026-08-15T00:00:00.000Z', projection: 'ready' });
+      throw new Error(url);
+    }) as typeof fetch;
+    let tree!: ReturnType<typeof create>; await act(async () => { tree = create(<ProvidersApp fetcher={fetcher} />); await wait(); });
+    expect(tree.root.findByProps({ 'aria-label': 'Run agent' })).toBeTruthy();
+    const select = tree.root.findByProps({ 'aria-label': 'Default provider' });
+    expect(select.props.value).toBe('auto');
+    expect(tree.root.findByProps({ children: 'MiniMax not detected — MINIMAX_API_KEY missing in this process environment' })).toBeTruthy();
+    await act(async () => { select.props.onChange({ target: { value: 'minimax' } }); await wait(); });
+    expect(puts).toHaveLength(1);
+    expect(puts[0]?.url).toBe('/v1/run-agent/settings');
+    expect(puts[0]?.method).toBe('PUT');
+    expect(puts[0]?.body).toEqual({ defaultProvider: 'minimax' });
+    expect(tree.root.findByProps({ 'aria-label': 'Default provider' }).props.value).toBe('minimax');
+    expect(tree.root.findByProps({ children: 'MiniMax available in this process environment' })).toBeTruthy();
+    expect(tree.root.findAllByProps({ role: 'status' }).some((node) => node.children.join('').includes('Run agent settings saved.'))).toBe(true);
     await act(async () => tree.unmount());
   });
 });

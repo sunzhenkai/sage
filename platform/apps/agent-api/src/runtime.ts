@@ -20,6 +20,8 @@ import { registerProviderCatalogRoutes } from './catalog-api.js';
 import { registerPackagesRoutes } from './packages-api.js';
 import { registerAppsRoutes } from './apps-api.js';
 import { registerPackageRunsRoutes, type ResolvedReleaseLockPayload } from './runs-api.js';
+import { registerRunAgentSettingsRoutes } from './run-agent-settings-api.js';
+import { createRunOutputArtifactResolver } from './run-output-resolver.js';
 
 export interface ApiRuntimeConfig {
   readonly deploymentMode: 'local';
@@ -184,7 +186,8 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
     registerTaskRoutes(app, controller, {
       tenantId: config.tenantId, authenticator, authorizer: { authorize: (principal, operation) =>
         principal.tenantId === config.tenantId && (operation === 'read' || principal.roles.includes('task-operator')) },
-      queryStore: tasks, deploymentMode: 'development'
+      queryStore: tasks, deploymentMode: 'development',
+      artifactResolver: createRunOutputArtifactResolver({ tenantId: config.tenantId, lookup: tasks })
     });
     const packageStore = new InMemoryAgentReleaseStore();
     const packageSpecStore = new InMemoryAgentTaskSpecStore();
@@ -213,9 +216,11 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
       },
       taskStore: tasks,
       specStore: packageSpecStore,
+      settingsStore: tasks,
       authenticator,
       deploymentMode: 'local'
     });
+    registerRunAgentSettingsRoutes(app, { tenantId: config.tenantId, settingsStore: tasks, authenticator });
     registerProviderCatalogRoutes(app, { service: catalogService, store: catalog, manager: catalogManager, authenticator });
     await catalogManager.start();
     app.get('/livez', async () => ({ status: 'alive' }));

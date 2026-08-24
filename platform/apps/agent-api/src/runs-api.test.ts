@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { AuthenticatedPrincipal } from '@sage/app-contracts';
 import { InMemoryAgentTaskSpecStore } from '@sage/local-fakes';
 import type { AgentTaskSpecStorePort } from '@sage/platform-ports';
-import type { TaskPackageInputRecord } from '@sage/task-domain';
+import type { TaskPackageInputRecord, RunAgentSettingsRecord } from '@sage/task-domain';
 import {
   registerPackageRunsRoutes,
   type PackageReleaseResolver,
@@ -101,7 +101,18 @@ const resolver: PackageReleaseResolver = {
   },
 };
 
-async function api(options: { readonly principal?: AuthenticatedPrincipal; readonly specStore?: AgentTaskSpecStorePort; readonly deploymentMode?: 'local' | 'production'; readonly controller?: FakeController; readonly taskStore?: FakeTaskStore } = {}) {
+class FakeSettingsStore {
+  readonly records = new Map<string, RunAgentSettingsRecord>();
+  async getRunAgentSettings(tenantId: string): Promise<RunAgentSettingsRecord | undefined> {
+    return this.records.get(tenantId);
+  }
+  async upsertRunAgentSettings(record: RunAgentSettingsRecord): Promise<{ readonly status: 'stored' | 'existing' }> {
+    this.records.set(record.tenantId, record);
+    return { status: 'stored' };
+  }
+}
+
+async function api(options: { readonly principal?: AuthenticatedPrincipal; readonly specStore?: AgentTaskSpecStorePort; readonly deploymentMode?: 'local' | 'production'; readonly controller?: FakeController; readonly taskStore?: FakeTaskStore; readonly settingsStore?: FakeSettingsStore; readonly providerEnv?: Record<string, string | undefined> } = {}) {
   const app = Fastify({ logger: false, ajv: { customOptions: { removeAdditional: false } } });
   const controller = options.controller ?? new FakeController();
   const taskStore = options.taskStore ?? new FakeTaskStore();
@@ -111,6 +122,8 @@ async function api(options: { readonly principal?: AuthenticatedPrincipal; reado
     releaseResolver: resolver,
     taskStore,
     specStore: options.specStore ?? new InMemoryAgentTaskSpecStore(),
+    ...(options.settingsStore === undefined ? {} : { settingsStore: options.settingsStore }),
+    providerEnv: options.providerEnv ?? {},
     authenticator: { authenticateRequest: () => options.principal },
     deploymentMode: options.deploymentMode ?? 'local',
     now: () => new Date('2026-08-17T00:00:00.000Z'),
@@ -145,6 +158,8 @@ describe('Package run API boundaries', () => {
     expect(body.inputRef).toBe(`task-input://package/tenant-local/${body.taskId}`);
     expect(controller.created).toHaveLength(1);
     expect(controller.created[0]?.taskId).toBe(body.taskId);
+    // slice 预算来自 manifest budgets（toolCalls 超过 schema 上限 16 被截断；无 maxDurationMs 回退默认超时）。
+    expect(controller.created[0]).toMatchObject({ slice: { maxTurns: 1, maxToolCalls: 16, maxTokens: 4000, timeoutMs: 10_000 } });
     const stored = await taskStore.getPackageInput('tenant-local', body.taskId);
     expect(stored?.assembledInput).toContain('你是演示助手。');
     expect(stored?.assembledInput).toContain('--- user input ---');
@@ -178,5 +193,39 @@ describe('Package run API boundaries', () => {
     expect(response.statusCode).toBe(404);
     expect(response.json().error.code).toBe('RELEASE_NOT_FOUND');
     await app.close();
+  });
+
+  it('rejects admission when minimax is pinned but the trusted env lacks MINIMAX_API_KEY', async () => {
+    const settings = new FakeSettingsStore();
+    await settings.upsertRunAgentSettings({ tenantId: 'tenant-local', defaultProvider: 'minimax', updatedAt: '2026-08-25T00:00:00.000Z', updatedBy: 'principal://op' });
+    const { app, controller, taskStore } = await api({ principal: operator, settingsStore: settings, providerEnv: {} });
+    const response = await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: { input: 'hi' } });
+    expect(response.statusCode).toBe(409);
+    const error = response.json().error;
+    expect(error.code).toBe('PROVIDER_DEPENDENCY_MISSING');
+    expect(error.retryable).toBe(false);
+    expect(error.message).toContain('MINIMAX_API_KEY');
+    // 依赖检查发生在物化输入与创建任务之前。
+    expect(controller.created).toHaveLength(0);
+    expect(taskStore.records.size).toBe(0);
+    await app.close();
+  });
+
+  it('admits normally for pinned minimax with the key present, and for auto/echo without it', async () => {
+    const pinned = new FakeSettingsStore();
+    await pinned.upsertRunAgentSettings({ tenantId: 'tenant-local', defaultProvider: 'minimax', updatedAt: '2026-08-25T00:00:00.000Z', updatedBy: 'principal://op' });
+    const withKey = await api({ principal: operator, settingsStore: pinned, providerEnv: { MINIMAX_API_KEY: 'trusted' } });
+    expect((await withKey.app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: { input: 'hi' } })).statusCode).toBe(202);
+    await withKey.app.close();
+
+    const echo = new FakeSettingsStore();
+    await echo.upsertRunAgentSettings({ tenantId: 'tenant-local', defaultProvider: 'echo', updatedAt: '2026-08-25T00:00:00.000Z', updatedBy: 'principal://op' });
+    const echoNoKey = await api({ principal: operator, settingsStore: echo, providerEnv: {} });
+    expect((await echoNoKey.app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: { input: 'hi' } })).statusCode).toBe(202);
+    await echoNoKey.app.close();
+
+    const autoNoKey = await api({ principal: operator, providerEnv: {} });
+    expect((await autoNoKey.app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: { input: 'hi' } })).statusCode).toBe(202);
+    await autoNoKey.app.close();
   });
 });

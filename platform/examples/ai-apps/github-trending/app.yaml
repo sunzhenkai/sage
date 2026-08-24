@@ -1,0 +1,16 @@
+schemaVersion: '1'
+id: github-trending
+version: 1.0.0
+description: GitHub 热门项目解读助手：分析 trending 项目快照，产出排名解读、亮点与趋势 digest
+entry: prompts/system.md
+modelRoute:
+  provider: minimax-cn
+  model: MiniMax-M3
+budgets:
+  maxTokens: 8000
+  maxToolCalls: 40
+  maxDurationMs: 300000
+skillRefs:
+  - skill://repo-digest/v1
+capabilityRefs:
+  - capability://web-snapshot-reader/v1

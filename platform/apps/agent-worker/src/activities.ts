@@ -1,4 +1,4 @@
-import { activityInfo, cancellationSignal, CancelledFailure, heartbeat } from '@temporalio/activity';
+import { activityInfo, cancellationSignal, CancelledFailure, ApplicationFailure, heartbeat } from '@temporalio/activity';
 import type { P6TelemetryRecorder } from '@sage/observability';
 import {
   assertCanonicalPayloadBounds,
@@ -21,7 +21,7 @@ import type { EngineAdapter, KernelEngineResult, KernelInvocationResult, KernelB
 import type { BoundedKernelClient, LocalAgentClient } from '@sage/agent-client';
 import {
   type AgentSliceResult, type ExecuteAgentSliceInput, type TaskArtifactRef,
-  type TaskCommitStore, type TaskInputRef, type TaskProjection
+  type TaskCommitStore, type TaskInputRef, type TaskProjection, type RunAgentSettingsStore, type TaskRunOutputStore
 } from '@sage/task-domain';
 import { runTaskAgentPath, type TaskCanonicalCompatibilityOptions } from './task-compatibility.js';
 
@@ -30,7 +30,12 @@ export interface TaskSliceInputResolver {
 }
 export interface AgentTaskActivityOptions {
   readonly agentClient: LocalAgentClient;
+  /** live provider 客户端：仅 package 路径的 slice 使用；未提供时全部走 agentClient（echo）。 */
+  readonly packageAgentClient?: LocalAgentClient;
+  /** 运行 agent 设置读取：缺省视 defaultProvider=auto（env 驱动现状）。 */
+  readonly settingsStore?: Pick<RunAgentSettingsStore, 'getRunAgentSettings'>;
   readonly store: TaskCommitStore;
+  readonly outputStore?: TaskRunOutputStore;
   readonly inputResolver: TaskSliceInputResolver;
   readonly leaseMs?: number;
   readonly now?: () => Date;
@@ -40,6 +45,24 @@ export interface AgentTaskActivityOptions {
 }
 export interface AgentTaskActivities { executeAgentSlice(input: ExecuteAgentSliceInput): Promise<AgentSliceResult> }
 
+/**
+ * 运行 agent 设置 → 执行 harness 的纯决策：
+ * - 非 package 输入（chat 路径）恒走本地 client，设置不参与；
+ * - echo：显式本地确定性 harness，即使 live 可用也不发起模型调用；
+ * - minimax：必须 live；live 不可用返回 'unavailable'（调用方以稳定错误 fail-closed，绝不回退 echo）；
+ * - auto（缺省）：live 可用走 live，否则回退本地（既有 env 驱动行为）。
+ */
+export function decidePackageRunClientChoice(
+  isPackageInput: boolean,
+  defaultProvider: 'auto' | 'minimax' | 'echo',
+  liveClientAvailable: boolean
+): 'live' | 'echo' | 'unavailable' {
+  if (!isPackageInput) return 'echo';
+  if (defaultProvider === 'echo') return 'echo';
+  if (liveClientAvailable) return 'live';
+  return defaultProvider === 'minimax' ? 'unavailable' : 'echo';
+}
+
 export function createAgentTaskActivities(options: AgentTaskActivityOptions): AgentTaskActivities {
   const now = options.now ?? (() => new Date());
   const leaseMs = options.leaseMs ?? 35_000;
@@ -47,6 +70,20 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
     async executeAgentSlice(input): Promise<AgentSliceResult> {
       const info = activityInfo();
       if(input.sessionId&&input.runId&&input.messageId)try{options.telemetry?.record('sage_task_worker_attempt_total',1,{tenant_id:input.tenantId,message_id:input.messageId,session_id:input.sessionId,run_id:input.runId,task_id:input.taskId,workflow_id:input.workflowId,target_id:input.targetId,attempt:input.attempt},{activity_attempt:info.attempt,slice_number:input.sliceNumber});}catch{/* Telemetry cannot change Activity semantics. */}
+      // 执行前依赖检查（fail-closed）：固定 minimax 而无受信 live route 时以不可重试错误显式失败，
+      // 不 claim slice、不执行 echo、不写 run 输出。设置每 slice 现读，改设置即时生效。
+      const isPackageInput = input.inputRef.startsWith('task-input://package/');
+      const settings = isPackageInput && options.settingsStore !== undefined
+        ? await options.settingsStore.getRunAgentSettings(input.tenantId)
+        : undefined;
+      const defaultProvider = settings?.defaultProvider ?? 'auto';
+      const clientChoice = decidePackageRunClientChoice(isPackageInput, defaultProvider, options.packageAgentClient !== undefined);
+      if (clientChoice === 'unavailable') {
+        throw ApplicationFailure.nonRetryable(
+          'PROVIDER_DEPENDENCY_MISSING: run agent default provider is pinned to minimax but MINIMAX_API_KEY is not set in the worker environment. Set MINIMAX_API_KEY and restart agent-worker, or switch the default provider back to auto/echo.',
+          'PROVIDER_DEPENDENCY_MISSING'
+        );
+      }
       const idempotencyKey = `${input.workflowId}:attempt:${input.attempt}:slice:${input.sliceNumber}`;
       const ownerToken = `${info.activityId}:delivery:${info.attempt}`;
       const claim = await options.store.claimSlice(input, idempotencyKey, ownerToken, new Date(now().getTime() + leaseMs).toISOString());
@@ -79,6 +116,7 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
           },
           ...(input.checkpointRef === undefined ? {} : { resumeFrom: input.checkpointRef })
         };
+        // echo 显式优先：即使配置了受信 key 也走本地确定性 harness；auto 保持 env 驱动现状。
         execution = await runTaskAgentPath({
           tenantId: input.tenantId,
           taskId: input.taskId,
@@ -88,7 +126,9 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
           runId,
           idempotencyKey,
           legacySpec: spec,
-          legacyClient: options.agentClient,
+          legacyClient: clientChoice === 'live' && isPackageInput
+            ? options.packageAgentClient!
+            : options.agentClient,
           signal,
           deadlineAt: startedAt + input.limits.timeoutMs,
           ...(options.canonicalCompatibility === undefined
@@ -115,6 +155,17 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
         const projection = projectionOf(input, result, result.done ? 'succeeded' : 'running', input.sliceNumber, now().toISOString());
         await options.store.commitSlice(idempotencyKey, ownerToken, result, projection);
         committed = true;
+        if (artifactRef !== undefined && outcome.output !== undefined && outcome.output.length > 0 && options.outputStore !== undefined) {
+          // 输出物化是 best-effort：slice 已提交是权威终态，写失败不改变任务结果。
+          try {
+            await options.outputStore.writeRunOutput({
+              tenantId: input.tenantId, taskId: input.taskId, artifactRef,
+              output: outcome.output, mediaType: 'text/plain', createdAt: now().toISOString()
+            });
+          } catch (cause) {
+            process.stderr.write(`task run output materialization failed for ${input.taskId}: ${cause instanceof Error ? cause.message : String(cause)}\n`);
+          }
+        }
         heartbeat({ phase: 'committed', sliceNumber: input.sliceNumber });
         await options.afterCommit?.(result);
         return result;

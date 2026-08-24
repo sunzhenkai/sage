@@ -1,8 +1,13 @@
-# ops-analyst 示例 ai app 包
+# 示例 ai app 包
 
-通用运维分析助手的源包示例，用于端到端验证 agent-package 链路（源规范 → 编译 → 登记 → 从包发起运行 → 前端展示管理）。内容仅使用通用运维准则，不涉及任何公司或内部系统信息。
+两个示例源包，用于端到端验证 agent-package 链路（源规范 → 编译 → 登记 → 从包发起运行 → 前端展示管理）。内容均为通用公开领域知识，不涉及任何公司或内部系统信息。
 
-## 目录结构
+| 示例包 | 主题 | 说明 |
+|--------|------|------|
+| `ops-analyst/` | 通用运维分析 | 解读监控指标、定位告警、生成排查建议 |
+| `github-trending/` | GitHub 热门项目解读 | 分析 trending 项目快照，产出排名解读、亮点与趋势 digest（展示页见 `docs/showcase/github-trending.html`） |
+
+## 目录结构（以 ops-analyst 为例）
 
 ```
 ops-analyst/
@@ -27,8 +32,8 @@ ops-analyst/
 
 ```bash
 cd platform
-pnpm --filter @sage/agent-package-release test   # 含 sample-app.smoke.test.ts
-# 预期：src/sample-app.smoke.test.ts 通过，输出合法 AgentPackageRelease.v1（compilerBuild=local-dev）
+pnpm --filter @sage/agent-package-release test   # 含 sample-app / github-trending 两个 smoke 测试
+# 预期：src/sample-app.smoke.test.ts、src/github-trending.smoke.test.ts 通过，输出合法 AgentPackageRelease.v1（compilerBuild=local-dev）
 ```
 
 ### 2. 登记到运行中的 agent-api
@@ -100,3 +105,15 @@ curl -sS http://127.0.0.1:9610/v1/packages/ops-analyst -H 'x-authentication-id: 
 
 - 同一 Release + 相同输入重复发起运行：`status` 返回 `existing`，不产生新 Attempt。
 - production 模式（`SAGE_DEPLOYMENT_MODE != local`）下 runs 端点返回 `501 PACKAGE_RUN_ADMISSION_NOT_AVAILABLE`（fail closed）。
+
+## 真实 provider 执行（local 专属）
+
+默认情况下 worker 用本地确定性 echo harness 执行包运行（输出「已收到：…」）。给 agent-worker 进程配置以下环境变量后，`task-input://package/` 路径的 slice 改为真实模型调用（github-trending 的 modelRoute 即 `minimax-cn` / `MiniMax-M3`）：
+
+| 环境变量 | 必填 | 默认 | 说明 |
+|----------|------|------|------|
+| `MINIMAX_API_KEY` | 启用开关 | —（未设则 echo） | MiniMax 中国站 API key，只留在 worker 进程内存，不落日志/存储 |
+| `MINIMAX_BASE_URL` | 否 | `https://api.minimaxi.com/anthropic` | Anthropic 兼容端点（SDK 自动拼 `/v1/messages`） |
+| `MINIMAX_MODEL` | 否 | `MiniMax-M3` | 模型名 |
+
+运行成功后，输出文本物化在 `task_run_output`，可经 `GET /v1/tasks/<taskId>/artifacts/<artifactId>` 取回（响应含 `content` 字段）。

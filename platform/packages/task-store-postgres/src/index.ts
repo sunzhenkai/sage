@@ -3,7 +3,9 @@ import { Pool, type PoolClient, type PoolConfig, type QueryResultRow } from 'pg'
 import {
   isAgentSliceResult, isRouteDecision, isTaskProjection, isTaskRoutingRecord,
   type AgentSliceResult, type ExecuteAgentSliceInput, type RouteDecision,
+  type RunAgentSettingsRecord,
   type SliceClaim, type TaskArtifactReference, type TaskListFilter, type TaskPackageInputRecord, type TaskProjection, type TaskProjectionEvent,
+  type TaskRunOutputRecord,
   type TaskProjectionView, type ProjectionRepairAudit, type ReconciliationCandidate, type TaskRoutingRecord,
   type TaskStorePort, type TaskReconciliationStore, type TaskLifecyclePath, type TaskStartClaim
 } from '@sage/task-domain';
@@ -44,6 +46,16 @@ interface RoutingRow extends QueryResultRow {
 interface PackageInputRow extends QueryResultRow {
   tenant_id: string; task_id: string; release_id: string; release_digest: string;
   assembled_input: string; asset_digests: unknown; created_at: Date | string;
+}
+
+interface RunOutputRow extends QueryResultRow {
+  tenant_id: string; task_id: string; artifact_ref: string; output: string;
+  media_type: string; created_at: Date | string;
+}
+
+interface RunAgentSettingsRow extends QueryResultRow {
+  tenant_id: string; default_provider: RunAgentSettingsRecord['defaultProvider'];
+  updated_at: Date | string; updated_by: string;
 }
 const iso = (value: Date | string): string => value instanceof Date ? value.toISOString() : new Date(value).toISOString();
 
@@ -87,7 +99,9 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
     const migrationUrls = [
       new URL('../../task-domain/migrations/001_task_store.sql', import.meta.url),
       new URL('../../task-domain/migrations/002_durable_coordinator_task_persistence.sql', import.meta.url),
-      new URL('../../task-domain/migrations/003_task_package_input.sql', import.meta.url)
+      new URL('../../task-domain/migrations/003_task_package_input.sql', import.meta.url),
+      new URL('../../task-domain/migrations/004_task_run_output.sql', import.meta.url),
+      new URL('../../task-domain/migrations/005_run_agent_settings.sql', import.meta.url)
     ];
     const migrations = (await Promise.all(migrationUrls.map((url) => readFile(url, 'utf8'))))
       .map((sql) => sql.replace(/^\s*BEGIN;\s*/, '').replace(/\s*COMMIT;\s*$/, '').trim());
@@ -542,5 +556,84 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
       createdAt: iso(row.created_at)
     };
     return record;
+  }
+
+  async writeRunOutput(record: TaskRunOutputRecord): Promise<{ readonly status: 'stored' | 'existing' }> {
+    if (record === null || typeof record !== 'object' || typeof record.tenantId !== 'string' || typeof record.taskId !== 'string'
+      || typeof record.artifactRef !== 'string' || !record.artifactRef.startsWith('artifact://')
+      || typeof record.output !== 'string' || record.output.length === 0 || typeof record.mediaType !== 'string') {
+      throw new TaskStoreError('writeRunOutput.invalid');
+    }
+    const inserted = await this.#query('writeRunOutput.insert', `INSERT INTO task_run_output
+      (tenant_id, task_id, artifact_ref, output, media_type, created_at)
+      VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (tenant_id, task_id) DO NOTHING RETURNING tenant_id`,
+      [record.tenantId, record.taskId, record.artifactRef, record.output, record.mediaType, iso(record.createdAt)]);
+    // 本地栈没有常驻 reconciler 派生引用行；随输出一并幂等登记，使 artifact 列表/详情可用。
+    const artifactId = `artifact-${record.artifactRef.split('/').slice(-2).join('-')}`;
+    await this.#query('writeRunOutput.artifactRef', `INSERT INTO task_artifact_reference
+      (tenant_id, task_id, artifact_id, artifact_ref, attempt, name, media_type) VALUES ($1,$2,$3,$4,1,'task-output',$5)
+      ON CONFLICT (tenant_id, task_id, artifact_ref) DO NOTHING`,
+      [record.tenantId, record.taskId, artifactId, record.artifactRef, record.mediaType]);
+    if (inserted.rowCount === 1) return { status: 'stored' };
+    const existing = await this.#query<RunOutputRow>('writeRunOutput.get', `SELECT
+      tenant_id, task_id, artifact_ref, output, media_type, created_at
+      FROM task_run_output WHERE tenant_id=$1 AND task_id=$2`, [record.tenantId, record.taskId]);
+    const row = existing.rows[0];
+    if (row === undefined) throw new TaskStoreError('writeRunOutput.missing');
+    if (row.artifact_ref !== record.artifactRef || row.output !== record.output) {
+      throw new TaskStoreError('writeRunOutput.conflict');
+    }
+    return { status: 'existing' };
+  }
+
+  async getRunOutput(tenantId: string, taskId: string): Promise<TaskRunOutputRecord | undefined> {
+    if (typeof tenantId !== 'string' || typeof taskId !== 'string') throw new TaskStoreError('getRunOutput.invalid');
+    const result = await this.#query<RunOutputRow>('getRunOutput', `SELECT
+      tenant_id, task_id, artifact_ref, output, media_type, created_at
+      FROM task_run_output WHERE tenant_id=$1 AND task_id=$2`, [tenantId, taskId]);
+    const row = result.rows[0];
+    if (row === undefined) return undefined;
+    const record: TaskRunOutputRecord = {
+      tenantId: row.tenant_id,
+      taskId: row.task_id,
+      artifactRef: row.artifact_ref as TaskRunOutputRecord['artifactRef'],
+      output: row.output,
+      mediaType: row.media_type,
+      createdAt: iso(row.created_at)
+    };
+    return record;
+  }
+
+  async getRunAgentSettings(tenantId: string): Promise<RunAgentSettingsRecord | undefined> {
+    if (typeof tenantId !== 'string') throw new TaskStoreError('getRunAgentSettings.invalid');
+    const result = await this.#query<RunAgentSettingsRow>('getRunAgentSettings', `SELECT
+      tenant_id, default_provider, updated_at, updated_by
+      FROM run_agent_settings WHERE tenant_id=$1`, [tenantId]);
+    const row = result.rows[0];
+    if (row === undefined) return undefined;
+    return {
+      tenantId: row.tenant_id,
+      defaultProvider: row.default_provider,
+      updatedAt: iso(row.updated_at),
+      updatedBy: row.updated_by
+    };
+  }
+
+  async upsertRunAgentSettings(record: RunAgentSettingsRecord): Promise<{ readonly status: 'stored' | 'existing' }> {
+    if (record === null || typeof record !== 'object' || typeof record.tenantId !== 'string'
+      || (record.defaultProvider !== 'auto' && record.defaultProvider !== 'minimax' && record.defaultProvider !== 'echo')
+      || typeof record.updatedAt !== 'string' || typeof record.updatedBy !== 'string') {
+      throw new TaskStoreError('upsertRunAgentSettings.invalid');
+    }
+    const upserted = await this.#query('upsertRunAgentSettings', `INSERT INTO run_agent_settings
+      (tenant_id, default_provider, updated_at, updated_by)
+      VALUES ($1,$2,$3,$4)
+      ON CONFLICT (tenant_id) DO UPDATE SET
+        default_provider=EXCLUDED.default_provider,
+        updated_at=EXCLUDED.updated_at,
+        updated_by=EXCLUDED.updated_by
+      RETURNING (xmax = 0) AS inserted`, [record.tenantId, record.defaultProvider, iso(record.updatedAt), record.updatedBy]);
+    // 单例 upsert：无并发写者场景下同值重写视为 existing，语义与 package input 幂等一致。
+    return { status: upserted.rows[0]?.inserted === true ? 'stored' : 'existing' };
   }
 }

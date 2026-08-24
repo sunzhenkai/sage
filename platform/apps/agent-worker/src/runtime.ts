@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { Pool } from 'pg';
 import { bundleWorkflowCode, NativeConnection, Worker, type WorkerStatus } from '@temporalio/worker';
 import { ChatStore } from '@sage/chat-domain';
-import { createLocalAgentClient, createLocalKernelComposition } from '@sage/local-runtime';
+import { createLivePackageAgentClient, createLocalAgentClient, createLocalKernelComposition, PACKAGE_RUN_SYSTEM_PROMPT, type LiveProviderRoute } from '@sage/local-runtime';
 import { LegacyAgentRunSpecV1Adapter, parseAgentExecutionFeatureConfig, selectAgentExecutionMode, type AgentExecutionMode, type AgentLifecycleOwner, type LegacyAdapterResult } from '@sage/agent-client';
 import { PostgresTaskStore } from '@sage/task-store-postgres';
 import { TASK_NAMESPACE, TASK_QUEUE, type TaskInputRef } from '@sage/task-domain';
@@ -40,6 +40,34 @@ export function readWorkerRuntimeConfig(): WorkerRuntimeConfig {
     temporalAddress: env('SAGE_TEMPORAL_ADDRESS', '127.0.0.1:17233'),
     host: env('SAGE_HEALTH_HOST', '0.0.0.0'), port: Number(env('SAGE_HEALTH_PORT', '9611'))
   };
+}
+
+export const DEFAULT_MINIMAX_BASE_URL = 'https://api.minimaxi.com/anthropic';
+export const DEFAULT_MINIMAX_MODEL = 'MiniMax-M3';
+
+/**
+ * 受信进程级 live provider 路由：MINIMAX_API_KEY 非空时启用，未配置返回 undefined（回退本地 echo）。
+ * pi-ai 的 anthropic 适配走官方 SDK（baseURL 后拼 /v1/messages），故默认 baseUrl 不带 /v1 后缀。
+ * key 只留在进程内存：不得写入日志、事件、spec 或任何存储。
+ */
+export function readLiveProviderRouteFromEnv(source: Record<string, string | undefined> = process.env): LiveProviderRoute | undefined {
+  const apiKey = source.MINIMAX_API_KEY?.trim();
+  if (apiKey === undefined || apiKey.length === 0) return undefined;
+  return {
+    adapterKind: 'anthropic',
+    baseUrl: source.MINIMAX_BASE_URL?.trim() || DEFAULT_MINIMAX_BASE_URL,
+    modelId: source.MINIMAX_MODEL?.trim() || DEFAULT_MINIMAX_MODEL,
+    apiKey
+  };
+}
+
+export function describeLiveProviderRoute(route: LiveProviderRoute): string {
+  return `live provider=anthropic-compatible model=${route.modelId} baseUrl=${route.baseUrl}`;
+}
+
+/** 非敏感 provider 模式（/readyz 携带）：live/echo 与模型标识，绝不包含 key。 */
+export function providerStatusOf(route: LiveProviderRoute | undefined): { readonly mode: 'echo' } | { readonly mode: 'live'; readonly modelId: string } {
+  return route === undefined ? { mode: 'echo' } : { mode: 'live', modelId: route.modelId };
 }
 
 async function migrateStores(connectionString: string, chat: ChatStore, tasks: PostgresTaskStore): Promise<void> {
@@ -152,12 +180,20 @@ export async function createWorkerRuntime(config = readWorkerRuntimeConfig()): P
       })
     };
     native = await NativeConnection.connect({ address: config.temporalAddress });
+    const liveRoute = readLiveProviderRouteFromEnv();
+    if (liveRoute !== undefined) process.stdout.write(`agent-worker package runs use ${describeLiveProviderRoute(liveRoute)}\n`);
+    else process.stdout.write('WARN: MINIMAX_API_KEY not set — package runs fall back to the local echo harness (settings defaultProvider=auto). Pin minimax in run agent settings to fail closed instead.\n');
+    const providerStatus = providerStatusOf(liveRoute);
     worker = await Worker.create({
       connection: native, namespace: TASK_NAMESPACE, taskQueue: TASK_QUEUE, workflowBundle,
       activities: createAgentTaskActivities({
         agentClient: createLocalAgentClient(),
+        ...(liveRoute === undefined ? {} : {
+          packageAgentClient: createLivePackageAgentClient({ route: liveRoute, systemPrompt: PACKAGE_RUN_SYSTEM_PROMPT })
+        }),
+        settingsStore: tasks,
         ...(canonicalCompatibility === undefined ? {} : { canonicalCompatibility }),
-        store: tasks, inputResolver: new CompositeTaskInputResolver([
+        store: tasks, outputStore: tasks, inputResolver: new CompositeTaskInputResolver([
           { scheme: 'chat', resolver: new ChatTaskInputResolver(chat) },
           { scheme: 'package', resolver: new PackageTaskInputResolver(tasks) }
         ])
@@ -174,14 +210,14 @@ export async function createWorkerRuntime(config = readWorkerRuntimeConfig()): P
       };
       if (path === '/livez') return send(json(stopping ? 503 : 200, { status: stopping ? 'stopping' : 'alive' }));
       if (path !== '/readyz') { response.statusCode = 404; response.end(); return; }
-      if (stopping) return send(json(503, { status: 'not_ready', reason: 'shutting_down' }));
+      if (stopping) return send(json(503, { status: 'not_ready', reason: 'shutting_down', provider: providerStatus }));
       const status = subject.getStatus();
       if (!workerPollersReady(status)) {
-        return send(json(503, { status: 'not_ready', worker: { runState: status.runState, workflowPollerState: status.workflowPollerState, activityPollerState: status.activityPollerState } }));
+        return send(json(503, { status: 'not_ready', worker: { runState: status.runState, workflowPollerState: status.workflowPollerState, activityPollerState: status.activityPollerState }, provider: providerStatus }));
       }
       void Promise.all([chat.getSession(config.tenantId, 'health-sentinel'), tasks.listTaskViews(config.tenantId, { limit: 1 })])
-        .then(() => send(json(200, { status: 'ready', namespace: TASK_NAMESPACE, taskQueue: TASK_QUEUE, worker: { runState: status.runState, workflowPollerState: status.workflowPollerState, activityPollerState: status.activityPollerState } })))
-        .catch(() => send(json(503, { status: 'not_ready', dependencies: ['postgres'] })));
+        .then(() => send(json(200, { status: 'ready', namespace: TASK_NAMESPACE, taskQueue: TASK_QUEUE, provider: providerStatus, worker: { runState: status.runState, workflowPollerState: status.workflowPollerState, activityPollerState: status.activityPollerState } })))
+        .catch(() => send(json(503, { status: 'not_ready', dependencies: ['postgres'], provider: providerStatus })));
     });
     const runningPromise = subject.run();
     running = runningPromise;

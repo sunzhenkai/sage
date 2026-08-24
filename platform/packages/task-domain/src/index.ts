@@ -55,7 +55,8 @@ export const TaskSliceLimitsSchema = Type.Object({
   maxTurns: Type.Integer({ minimum: 1, maximum: 4 }),
   maxToolCalls: Type.Integer({ minimum: 0, maximum: 16 }),
   maxTokens: Type.Integer({ minimum: 1, maximum: 32_000 }),
-  timeoutMs: Type.Integer({ minimum: 100, maximum: 30_000 })
+  // 上限对齐 live provider 真实推理（活动 startToClose 5 分钟 + 重试余量）；echo 执行毫秒级完成不受影响。
+  timeoutMs: Type.Integer({ minimum: 100, maximum: 600_000 })
 }, { additionalProperties: false, $id: 'TaskSliceLimits.v1' });
 export type TaskSliceLimits = Static<typeof TaskSliceLimitsSchema>;
 
@@ -228,7 +229,7 @@ export interface TaskRoutingStore {
   markTargetUnavailable(tenantId: string, taskId: string, failureCode: string, ownerToken: string, startIdempotencyKey: string): Promise<void>;
   recordRoutingRejection(decision: RouteDecision): Promise<void>;
 }
-export type TaskStorePort = TaskCommitStore & TaskProjectionStore & TaskRoutingStore & TaskPackageInputStore & { migrate(): Promise<void>; close(): Promise<void> };
+export type TaskStorePort = TaskCommitStore & TaskProjectionStore & TaskRoutingStore & TaskPackageInputStore & TaskRunOutputStore & RunAgentSettingsStore & { migrate(): Promise<void>; close(): Promise<void> };
 
 export const isAgentTaskWorkflowInput = (value: unknown): value is AgentTaskWorkflowInput => Value.Check(AgentTaskWorkflowInputSchema, value);
 export const isExecuteAgentSliceInput = (value: unknown): value is ExecuteAgentSliceInput => Value.Check(ExecuteAgentSliceInputSchema, value);
@@ -250,6 +251,9 @@ export interface TaskProjectionEvent {
 export interface TaskArtifactReference {
   readonly artifactId: string; readonly artifactRef: TaskArtifactRef; readonly taskId: string;
   readonly attempt: number; readonly name: string; readonly mediaType: string;
+  /** Resolved content, present only when the local run-output store holds the body. */
+  readonly content?: string;
+  readonly encoding?: 'utf-8';
 }
 
 /** 包运行输入的物化记录：entry prompt + references 清单 + 用户输入，含资产 digest 清单。 */
@@ -267,6 +271,38 @@ export interface TaskPackageInputStore {
   /** 创建型写入：同 (tenant, taskId) 已存在且内容一致则返回 existing，否则冲突。 */
   writePackageInput(record: TaskPackageInputRecord): Promise<{ readonly status: 'stored' | 'existing' }>;
   getPackageInput(tenantId: string, taskId: string): Promise<TaskPackageInputRecord | undefined>;
+}
+
+/** 包运行输出的物化记录：slice 提交成功后由 worker 写入，按 (tenant, task) 取回。 */
+export interface TaskRunOutputRecord {
+  readonly tenantId: string;
+  readonly taskId: string;
+  readonly artifactRef: TaskArtifactRef;
+  readonly output: string;
+  readonly mediaType: string;
+  readonly createdAt: string;
+}
+
+export interface TaskRunOutputStore {
+  /** 幂等写入：同 (tenant, taskId) 且内容一致返回 existing，内容不一致抛冲突错误。 */
+  writeRunOutput(record: TaskRunOutputRecord): Promise<{ readonly status: 'stored' | 'existing' }>;
+  getRunOutput(tenantId: string, taskId: string): Promise<TaskRunOutputRecord | undefined>;
+}
+
+/** 运行 agent 默认 provider 的三态：auto=env 驱动（缺省），minimax=固定 live（缺依赖显式失败），echo=显式本地确定性。 */
+export type RunAgentDefaultProvider = 'auto' | 'minimax' | 'echo';
+
+/** 运行 agent 设置记录：per-tenant 单例、非密钥；无行等效 auto。 */
+export interface RunAgentSettingsRecord {
+  readonly tenantId: string;
+  readonly defaultProvider: RunAgentDefaultProvider;
+  readonly updatedAt: string;
+  readonly updatedBy: string;
+}
+
+export interface RunAgentSettingsStore {
+  getRunAgentSettings(tenantId: string): Promise<RunAgentSettingsRecord | undefined>;
+  upsertRunAgentSettings(record: RunAgentSettingsRecord): Promise<{ readonly status: 'stored' | 'existing' }>;
 }
 export type ProjectionStaleReason = 'age_threshold_exceeded' | 'history_ahead' | 'target_unavailable' | 'projection_unavailable';
 export interface TaskProjectionView {
