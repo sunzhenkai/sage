@@ -1,0 +1,4 @@
+schema: spec-driven
+created: 2026-08-25
+skip_specs: true
+goal: 把包运行与对话的模型凭据来源统一为受信 provider 注册表：API key 由预设 provider 提供，env（MINIMAX_API_KEY）降级为部署级引导条目。分四个 stage 推进：S0 徽章文案作用域修复、S1 注册表核心（表+凭据加密+providerRef+env 自动注册+UI）、S2 对话页接入工作区 provider、S3 SecretBackend 抽象与 fail-closed。用户决策：同 provider 多条目允许；暂不加计费报账维度。
