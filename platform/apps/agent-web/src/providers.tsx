@@ -5,17 +5,25 @@ import {
   secretPresent, validHttpsUrl, PROVIDER_SECRET_PREFIX, type AdapterKind, type BaseUrlSource, type ProviderProfileV2
 } from './profiles.js';
 import { useLocale } from './locale.js';
+import { WorkspaceProvidersCard } from './workspace-providers.js';
 
 type ConnectionCheckState = 'idle' | 'checking' | 'connected' | 'unauthorized' | 'unavailable';
 type Draft = Omit<ProviderProfileV2, 'updatedAt'> & { apiKey: string };
 type EditorState = { mode: 'idle' } | { mode: 'creating'; draft: Draft; nameDirty: boolean } | { mode: 'editing'; profileId: string; draft: Draft; nameDirty: boolean } | { mode: 'saving'; profileId?: string; draft: Draft; nameDirty: boolean };
-/** GET/PUT /v1/run-agent/settings 的视图模型：默认 provider + 进程环境可用性（不含任何密钥）。 */
+/** GET/PUT /v1/run-agent/settings 的视图模型：默认 provider + 可用性（注册表条目 + legacy env，不含任何密钥）。 */
 interface RunAgentSettingsView {
-  readonly defaultProvider: 'auto' | 'minimax' | 'echo';
-  readonly providers?: ReadonlyArray<{ readonly id: string; readonly available: boolean; readonly reason?: string }>;
+  readonly defaultProvider: 'auto' | 'minimax' | 'echo' | 'connection';
+  readonly providerConnectionId?: string;
+  readonly providers?: ReadonlyArray<{ readonly id: string; readonly name?: string; readonly available: boolean; readonly reason?: string }>;
 }
 const minimaxAvailableIn = (view: RunAgentSettingsView | undefined): boolean =>
   view?.providers?.some((provider) => provider.id === 'minimax' && provider.available) ?? false;
+const connectionStatusIn = (view: RunAgentSettingsView | undefined): { readonly name: string; readonly available: boolean } | undefined => {
+  const id = view?.providerConnectionId;
+  if (view?.defaultProvider !== 'connection' || id === undefined) return undefined;
+  const entry = view.providers?.find((provider) => provider.id === id);
+  return { name: entry?.name ?? id, available: entry?.available ?? false };
+};
 const local = (): Storage | undefined => typeof window === 'undefined' ? undefined : window.localStorage;
 const session = (): Storage | undefined => typeof window === 'undefined' ? undefined : window.sessionStorage;
 const blank = (): Draft => ({ id: '', name: '', enabled: false, adapterKind: 'unassigned', baseUrlSource: 'none', apiKey: '' });
@@ -52,13 +60,16 @@ export function ProvidersApp({ fetcher = fetch }: { readonly fetcher?: typeof fe
     if (!response.ok) throw new Error(`Run agent settings ${response.status}`); setRunAgent(await response.json() as RunAgentSettingsView);
   }).catch((cause) => setNotice(safeMessage(cause, t('runAgentUnavailable')))); }, [fetcher]);
 
-  const saveRunAgent = async (defaultProvider: RunAgentSettingsView['defaultProvider']) => {
+  const saveRunAgent = async (selection: string) => {
     if (runAgentSaving) return;
     setRunAgentSaving(true);
+    const payload = selection.startsWith('connection:')
+      ? { defaultProvider: 'connection', providerConnectionId: selection.slice('connection:'.length) }
+      : { defaultProvider: selection };
     try {
       const response = await fetcher('/v1/run-agent/settings', {
         method: 'PUT', credentials: 'include', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ defaultProvider })
+        body: JSON.stringify(payload)
       });
       if (!response.ok) throw new Error(`Run agent settings ${response.status}`);
       setRunAgent(await response.json() as RunAgentSettingsView);
@@ -244,17 +255,29 @@ export function ProvidersApp({ fetcher = fetch }: { readonly fetcher?: typeof fe
         <small>{t('runAgentSubtitle')}</small>
         <label className="field" style={{ maxWidth: 420, marginTop: 12 }}>
           <span>{t('defaultProviderLabel')}</span>
-          <select aria-label={t('defaultProviderLabel')} value={runAgent?.defaultProvider ?? 'auto'} disabled={runAgentSaving || runAgent === undefined} onChange={(event) => void saveRunAgent(event.target.value as RunAgentSettingsView['defaultProvider'])}>
+          <select aria-label={t('defaultProviderLabel')} value={runAgent?.defaultProvider === 'connection' ? `connection:${runAgent.providerConnectionId ?? ''}` : (runAgent?.defaultProvider ?? 'auto')} disabled={runAgentSaving || runAgent === undefined} onChange={(event) => void saveRunAgent(event.target.value)}>
             <option value="auto">{t('providerOptionAuto')}</option>
             <option value="minimax">{t('providerOptionMinimax')}</option>
             <option value="echo">{t('providerOptionEcho')}</option>
+            {(runAgent?.providers ?? []).filter((provider) => provider.id !== 'minimax').map((provider) => (
+              <option key={provider.id} value={`connection:${provider.id}`}>{t('providerOptionConnection', { name: provider.name ?? provider.id })}</option>
+            ))}
           </select>
         </label>
       </div>
-      {runAgent && <span className={minimaxAvailableIn(runAgent) ? 'badge badge-success' : 'badge badge-warning'}>
-        {minimaxAvailableIn(runAgent) ? t('minimaxDetected') : t('minimaxNotDetected')}
-      </span>}
+      {runAgent && (() => {
+        const connection = connectionStatusIn(runAgent);
+        if (connection !== undefined) {
+          return <span className={connection.available ? 'badge badge-success' : 'badge badge-warning'}>
+            {connection.available ? t('connectionReady', { name: connection.name }) : t('connectionUnavailable', { name: connection.name })}
+          </span>;
+        }
+        return <span className={minimaxAvailableIn(runAgent) ? 'badge badge-success' : 'badge badge-warning'}>
+          {minimaxAvailableIn(runAgent) ? t('minimaxDetected') : t('minimaxNotDetected')}
+        </span>;
+      })()}
     </section>
+    <WorkspaceProvidersCard fetcher={fetcher} onNotice={setNotice} />
     <div className="catalog-state-row"><p className="catalog-state" role="status">{catalogLabel}{catalog?.lastCheckedAt ? ` · ${t('checked', { value: formatDateTime(catalog.lastCheckedAt) })}` : ''}</p><button className="button button-secondary" type="button" disabled={syncing} onClick={() => void syncCatalog()}>{syncing ? t('syncing') : t('syncCatalog')}</button></div>
     {notice && <div className="inline-notice" role="status">{notice}</div>}
     <div className="provider-layout"><aside className="provider-list panel" aria-label={t('externalProfiles')}><div className="panel-heading"><div><span className="eyebrow">{t('externalProfiles')}</span><h2>{t('configured', { count: profiles.length })}</h2></div></div><div className="profile-stack">{profiles.map((profile) => { const completion = profileCompletion(profile); const state = connectionStates[profile.id] ?? 'idle'; const stateLabel = state === 'checking' ? t('checking') : state === 'connected' ? t('connected') : state === 'unauthorized' ? t('unauthorized') : state === 'unavailable' ? t('profileUnavailable') : t('check'); return <div className={`profile-card ${editor.mode === 'editing' && editor.profileId === profile.id ? 'is-active' : ''}`} role="button" tabIndex={0} key={profile.id} onClick={() => edit(profile)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); edit(profile); } }}><span className="provider-mark">◇</span><span className="profile-card-copy"><strong>{profile.name}</strong><small>{profile.providerName ?? t('providerUnassigned')} · {profile.modelName ?? t('modelUnassigned')}</small></span><span className={`profile-state ${completion.status === 'Available metadata' ? 'profile-state-on' : ''}`}>{completion.status === 'Available metadata' ? t('profileReady') : completion.status === 'Incomplete' ? t('profileIncomplete') : t('profileOff')}</span><button className={`icon-button connection-check-button connection-check-${state}`} type="button" aria-label={t('checkConnection', { name: profile.name })} title={stateLabel} disabled={state === 'checking'} onClick={(event) => { event.stopPropagation(); void checkConnection(profile); }}>{state === 'checking' ? '…' : state === 'connected' ? '✓' : state === 'unauthorized' ? '!' : state === 'unavailable' ? '×' : '↻'}</button></div>; })}</div>{profiles.length === 0 && <p className="muted-copy">{t('noExternalProfiles')}</p>}<div className="info-callout"><strong>{t('runtimeBoundary')}</strong><span>{t('profilesNeverEnter')}</span></div></aside>

@@ -19,10 +19,12 @@ import {
 } from '@sage/platform-ports';
 import type { EngineAdapter, KernelEngineResult, KernelInvocationResult, KernelBounds } from '@sage/agent-lib';
 import type { BoundedKernelClient, LocalAgentClient } from '@sage/agent-client';
+import type { LiveProviderRoute } from '@sage/local-runtime';
 import {
   type AgentSliceResult, type ExecuteAgentSliceInput, type TaskArtifactRef,
-  type TaskCommitStore, type TaskInputRef, type TaskProjection, type RunAgentSettingsStore, type TaskRunOutputStore
+  type TaskCommitStore, type TaskInputRef, type TaskProjection, type ProviderConnectionStore, type RunAgentSettingsStore, type TaskRunOutputStore
 } from '@sage/task-domain';
+import type { SecretBackend } from '@sage/secret-vault';
 import { runTaskAgentPath, type TaskCanonicalCompatibilityOptions } from './task-compatibility.js';
 
 export interface TaskSliceInputResolver {
@@ -34,6 +36,12 @@ export interface AgentTaskActivityOptions {
   readonly packageAgentClient?: LocalAgentClient;
   /** 运行 agent 设置读取：缺省视 defaultProvider=auto（env 驱动现状）。 */
   readonly settingsStore?: Pick<RunAgentSettingsStore, 'getRunAgentSettings'>;
+  /** 注册表访问：connection 模式在 slice 执行边界解析条目与密封凭据。 */
+  readonly providerConnections?: ProviderConnectionStore;
+  /** 凭据解密后端；connection 模式必需，缺失即 fail-closed。 */
+  readonly secretBackend?: SecretBackend;
+  /** 按解析出的路由构造 live client（仅执行边界调用，key 只留进程内存）。 */
+  readonly liveClientFactory?: (route: LiveProviderRoute) => LocalAgentClient;
   readonly store: TaskCommitStore;
   readonly outputStore?: TaskRunOutputStore;
   readonly inputResolver: TaskSliceInputResolver;
@@ -49,18 +57,57 @@ export interface AgentTaskActivities { executeAgentSlice(input: ExecuteAgentSlic
  * 运行 agent 设置 → 执行 harness 的纯决策：
  * - 非 package 输入（chat 路径）恒走本地 client，设置不参与；
  * - echo：显式本地确定性 harness，即使 live 可用也不发起模型调用；
- * - minimax：必须 live；live 不可用返回 'unavailable'（调用方以稳定错误 fail-closed，绝不回退 echo）；
+ * - minimax / connection：必须 live；live 不可用返回 'unavailable'（调用方以稳定错误 fail-closed，绝不回退 echo）；
  * - auto（缺省）：live 可用走 live，否则回退本地（既有 env 驱动行为）。
  */
 export function decidePackageRunClientChoice(
   isPackageInput: boolean,
-  defaultProvider: 'auto' | 'minimax' | 'echo',
+  defaultProvider: 'auto' | 'minimax' | 'echo' | 'connection',
   liveClientAvailable: boolean
 ): 'live' | 'echo' | 'unavailable' {
   if (!isPackageInput) return 'echo';
   if (defaultProvider === 'echo') return 'echo';
   if (liveClientAvailable) return 'live';
-  return defaultProvider === 'minimax' ? 'unavailable' : 'echo';
+  return defaultProvider === 'minimax' || defaultProvider === 'connection' ? 'unavailable' : 'echo';
+}
+
+/**
+ * connection 模式的执行边界解析：注册表条目 + 密封凭据 → live 路由。
+ * 条目缺失/停用/无凭据/后端不可用一律 fail-closed（不可重试），绝不回退 echo；
+ * 解密后的 key 只留在本函数返回的路由对象中，不进入任何事件、payload 或日志。
+ */
+export async function resolveConnectionLiveClient(
+  providerConnections: ProviderConnectionStore | undefined,
+  secretBackend: SecretBackend | undefined,
+  liveClientFactory: ((route: LiveProviderRoute) => LocalAgentClient) | undefined,
+  tenantId: string,
+  connectionId: string
+): Promise<LocalAgentClient> {
+  const failure = (): string =>
+    `PROVIDER_DEPENDENCY_MISSING: run agent default provider is pinned to provider connection ${connectionId} which is missing, disabled, or has no stored credential. Fix or re-select the connection in run agent settings.`;
+  if (providerConnections === undefined || secretBackend === undefined || liveClientFactory === undefined) {
+    throw ApplicationFailure.nonRetryable(failure(), 'PROVIDER_DEPENDENCY_MISSING');
+  }
+  const connection = await providerConnections.getProviderConnection(tenantId, connectionId);
+  if (connection === undefined || !connection.enabled) {
+    throw ApplicationFailure.nonRetryable(failure(), 'PROVIDER_DEPENDENCY_MISSING');
+  }
+  const sealed = await providerConnections.getProviderCredential(tenantId, connectionId);
+  if (sealed === undefined) {
+    throw ApplicationFailure.nonRetryable(failure(), 'PROVIDER_DEPENDENCY_MISSING');
+  }
+  let apiKey: string;
+  try {
+    apiKey = secretBackend.open({ ciphertext: sealed.ciphertext, keyVersion: sealed.keyVersion });
+  } catch {
+    throw ApplicationFailure.nonRetryable(failure(), 'PROVIDER_DEPENDENCY_MISSING');
+  }
+  return liveClientFactory({
+    adapterKind: connection.adapterKind,
+    baseUrl: connection.baseUrl,
+    modelId: connection.modelId,
+    apiKey
+  });
 }
 
 export function createAgentTaskActivities(options: AgentTaskActivityOptions): AgentTaskActivities {
@@ -77,7 +124,11 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
         ? await options.settingsStore.getRunAgentSettings(input.tenantId)
         : undefined;
       const defaultProvider = settings?.defaultProvider ?? 'auto';
-      const clientChoice = decidePackageRunClientChoice(isPackageInput, defaultProvider, options.packageAgentClient !== undefined);
+      // connection 模式：执行边界从注册表解析路由并解密凭据（reference-only，key 不落任何持久化面）。
+      const packageClient = isPackageInput && defaultProvider === 'connection' && settings?.providerConnectionId !== undefined
+        ? await resolveConnectionLiveClient(options.providerConnections, options.secretBackend, options.liveClientFactory, input.tenantId, settings.providerConnectionId)
+        : options.packageAgentClient;
+      const clientChoice = decidePackageRunClientChoice(isPackageInput, defaultProvider, packageClient !== undefined);
       if (clientChoice === 'unavailable') {
         throw ApplicationFailure.nonRetryable(
           'PROVIDER_DEPENDENCY_MISSING: run agent default provider is pinned to minimax but MINIMAX_API_KEY is not set in the worker environment. Set MINIMAX_API_KEY and restart agent-worker, or switch the default provider back to auto/echo.',
@@ -127,7 +178,7 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
           idempotencyKey,
           legacySpec: spec,
           legacyClient: clientChoice === 'live' && isPackageInput
-            ? options.packageAgentClient!
+            ? packageClient!
             : options.agentClient,
           signal,
           deadlineAt: startedAt + input.limits.timeoutMs,

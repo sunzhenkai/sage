@@ -10,6 +10,7 @@ import { InMemoryAgentReleaseStore } from '@sage/agent-release-registry';
 import { createLocalAgentClient, createLocalKernelComposition } from '@sage/local-runtime';
 import { LegacyAgentRunSpecV1Adapter, parseAgentExecutionFeatureConfig, runShadowEngine, selectAgentExecutionMode, type AgentExecutionMode, type AgentLifecycleOwner, type LegacyAdapterResult } from '@sage/agent-client';
 import { PostgresTaskStore } from '@sage/task-store-postgres';
+import { createLocalSecretBackendFromEnv, type SecretBackend } from '@sage/secret-vault';
 import { CatalogServiceError, CatalogSyncManager, ProviderCatalogService, ProviderCatalogStore } from '@sage/provider-catalog';
 import { TASK_NAMESPACE, TASK_QUEUE } from '@sage/task-domain';
 import { createDevRegistryBundle, publishDevRegistry } from '@sage/temporal-registry';
@@ -21,6 +22,7 @@ import { registerPackagesRoutes } from './packages-api.js';
 import { registerAppsRoutes } from './apps-api.js';
 import { registerPackageRunsRoutes, type ResolvedReleaseLockPayload } from './runs-api.js';
 import { registerRunAgentSettingsRoutes } from './run-agent-settings-api.js';
+import { bootstrapDeploymentEnvProviderConnection, registerProviderConnectionRoutes } from './provider-connections-api.js';
 import { createRunOutputArtifactResolver } from './run-output-resolver.js';
 
 export interface ApiRuntimeConfig {
@@ -34,6 +36,8 @@ export interface ApiRuntimeConfig {
   readonly host: string;
   readonly port: number;
   readonly principal: AuthenticatedPrincipal;
+  /** 可注入的受信 env 视图（测试用）；缺省读 process.env。 */
+  readonly secretEnv?: Record<string, string | undefined>;
 }
 
 const env = (name: string, fallback?: string): string => {
@@ -217,10 +221,21 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
       taskStore: tasks,
       specStore: packageSpecStore,
       settingsStore: tasks,
+      providerConnections: tasks,
       authenticator,
       deploymentMode: 'local'
     });
-    registerRunAgentSettingsRoutes(app, { tenantId: config.tenantId, settingsStore: tasks, authenticator });
+    const secretBackend: SecretBackend | undefined = createLocalSecretBackendFromEnv(config.secretEnv);
+    if (secretBackend === undefined) {
+      process.stdout.write('WARN: SAGE_SECRET_MASTER_KEY not set — provider connection credential writes are unavailable (fail-closed)\n');
+    }
+    try {
+      await bootstrapDeploymentEnvProviderConnection(tasks, secretBackend, config.secretEnv ?? process.env, config.tenantId);
+    } catch (cause) {
+      process.stdout.write(`WARN: deployment-env provider bootstrap skipped (${cause instanceof Error ? cause.message : 'unknown cause'})\n`);
+    }
+    registerRunAgentSettingsRoutes(app, { tenantId: config.tenantId, settingsStore: tasks, providerConnections: tasks, authenticator });
+    registerProviderConnectionRoutes(app, { tenantId: config.tenantId, store: tasks, ...(secretBackend === undefined ? {} : { secretBackend }), authenticator });
     registerProviderCatalogRoutes(app, { service: catalogService, store: catalog, manager: catalogManager, authenticator });
     await catalogManager.start();
     app.get('/livez', async () => ({ status: 'alive' }));

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { AuthenticatedPrincipal } from '@sage/app-contracts';
 import { InMemoryAgentTaskSpecStore } from '@sage/local-fakes';
 import type { AgentTaskSpecStorePort } from '@sage/platform-ports';
-import type { TaskPackageInputRecord, RunAgentSettingsRecord } from '@sage/task-domain';
+import type { TaskPackageInputRecord, RunAgentSettingsRecord, ProviderConnectionRecord } from '@sage/task-domain';
 import {
   registerPackageRunsRoutes,
   type PackageReleaseResolver,
@@ -112,7 +112,14 @@ class FakeSettingsStore {
   }
 }
 
-async function api(options: { readonly principal?: AuthenticatedPrincipal; readonly specStore?: AgentTaskSpecStorePort; readonly deploymentMode?: 'local' | 'production'; readonly controller?: FakeController; readonly taskStore?: FakeTaskStore; readonly settingsStore?: FakeSettingsStore; readonly providerEnv?: Record<string, string | undefined> } = {}) {
+class FakeConnectionStore {
+  readonly entries = new Map<string, ProviderConnectionRecord>();
+  async getProviderConnection(tenantId: string, id: string): Promise<ProviderConnectionRecord | undefined> {
+    return this.entries.get(`${tenantId}/${id}`);
+  }
+}
+
+async function api(options: { readonly principal?: AuthenticatedPrincipal; readonly specStore?: AgentTaskSpecStorePort; readonly deploymentMode?: 'local' | 'production'; readonly controller?: FakeController; readonly taskStore?: FakeTaskStore; readonly settingsStore?: FakeSettingsStore; readonly connections?: FakeConnectionStore; readonly providerEnv?: Record<string, string | undefined> } = {}) {
   const app = Fastify({ logger: false, ajv: { customOptions: { removeAdditional: false } } });
   const controller = options.controller ?? new FakeController();
   const taskStore = options.taskStore ?? new FakeTaskStore();
@@ -123,6 +130,7 @@ async function api(options: { readonly principal?: AuthenticatedPrincipal; reado
     taskStore,
     specStore: options.specStore ?? new InMemoryAgentTaskSpecStore(),
     ...(options.settingsStore === undefined ? {} : { settingsStore: options.settingsStore }),
+    ...(options.connections === undefined ? {} : { providerConnections: options.connections }),
     providerEnv: options.providerEnv ?? {},
     authenticator: { authenticateRequest: () => options.principal },
     deploymentMode: options.deploymentMode ?? 'local',
@@ -227,5 +235,47 @@ describe('Package run API boundaries', () => {
     const autoNoKey = await api({ principal: operator, providerEnv: {} });
     expect((await autoNoKey.app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: { input: 'hi' } })).statusCode).toBe(202);
     await autoNoKey.app.close();
+  });
+
+  it('rejects admission when connection mode points at a missing, disabled, or credential-less entry', async () => {
+    const connections = new FakeConnectionStore();
+    connections.entries.set('tenant-local/conn-ok', {
+      tenantId: 'tenant-local', id: 'conn-ok', name: 'ok', source: 'user', adapterKind: 'anthropic',
+      baseUrl: 'https://api.minimaxi.com/anthropic', modelId: 'MiniMax-M3', enabled: true, credentialPresent: true,
+      createdAt: '2026-08-25T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z'
+    });
+    connections.entries.set('tenant-local/conn-disabled', {
+      tenantId: 'tenant-local', id: 'conn-disabled', name: 'off', source: 'user', adapterKind: 'anthropic',
+      baseUrl: 'https://api.minimaxi.com/anthropic', modelId: 'MiniMax-M3', enabled: false, credentialPresent: true,
+      createdAt: '2026-08-25T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z'
+    });
+    connections.entries.set('tenant-local/conn-nokey', {
+      tenantId: 'tenant-local', id: 'conn-nokey', name: 'nokey', source: 'user', adapterKind: 'anthropic',
+      baseUrl: 'https://api.minimaxi.com/anthropic', modelId: 'MiniMax-M3', enabled: true, credentialPresent: false,
+      createdAt: '2026-08-25T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z'
+    });
+    for (const id of ['missing-conn', 'conn-disabled', 'conn-nokey']) {
+      const settings = new FakeSettingsStore();
+      await settings.upsertRunAgentSettings({
+        tenantId: 'tenant-local', defaultProvider: 'connection', providerConnectionId: id,
+        updatedAt: '2026-08-25T00:00:00.000Z', updatedBy: 'principal://op'
+      });
+      const { app, controller, taskStore } = await api({ principal: operator, settingsStore: settings, connections });
+      const response = await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: { input: 'hi' } });
+      expect(response.statusCode).toBe(409);
+      expect(response.json().error.code).toBe('PROVIDER_DEPENDENCY_MISSING');
+      expect(controller.created).toHaveLength(0);
+      expect(taskStore.records.size).toBe(0);
+      await app.close();
+    }
+    const settings = new FakeSettingsStore();
+    await settings.upsertRunAgentSettings({
+      tenantId: 'tenant-local', defaultProvider: 'connection', providerConnectionId: 'conn-ok',
+      updatedAt: '2026-08-25T00:00:00.000Z', updatedBy: 'principal://op'
+    });
+    const ok = await api({ principal: operator, settingsStore: settings, connections, providerEnv: {} });
+    const admitted = await ok.app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: { input: 'hi' } });
+    expect(admitted.statusCode).toBe(202);
+    await ok.app.close();
   });
 });

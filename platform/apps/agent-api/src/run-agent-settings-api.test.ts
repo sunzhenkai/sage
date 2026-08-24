@@ -1,6 +1,6 @@
 import Fastify from 'fastify';
 import { describe, expect, it } from 'vitest';
-import type { RunAgentSettingsRecord, RunAgentSettingsStore } from '@sage/task-domain';
+import type { ProviderConnectionRecord, ProviderConnectionStore, RunAgentSettingsRecord, RunAgentSettingsStore } from '@sage/task-domain';
 import { registerRunAgentSettingsRoutes } from './run-agent-settings-api.js';
 
 class FakeSettingsStore implements RunAgentSettingsStore {
@@ -17,12 +17,33 @@ class FakeSettingsStore implements RunAgentSettingsStore {
   }
 }
 
-async function api(options: { readonly authenticated?: boolean; readonly env?: Record<string, string | undefined>; readonly store?: FakeSettingsStore } = {}) {
+class FakeConnectionStore implements ProviderConnectionStore {
+  readonly entries = new Map<string, ProviderConnectionRecord>();
+  async listProviderConnections(tenantId: string): Promise<readonly ProviderConnectionRecord[]> {
+    return [...this.entries.values()].filter((entry) => entry.tenantId === tenantId);
+  }
+  async getProviderConnection(tenantId: string, id: string): Promise<ProviderConnectionRecord | undefined> {
+    return this.entries.get(`${tenantId}/${id}`);
+  }
+  async createProviderConnection(): Promise<ProviderConnectionRecord> { throw new Error('unused'); }
+  async updateProviderConnection(): Promise<ProviderConnectionRecord | undefined> { throw new Error('unused'); }
+  async getProviderCredential(): Promise<undefined> { return undefined; }
+  async deleteProviderConnection(): Promise<boolean> { throw new Error('unused'); }
+}
+
+const connectionRecord = (overrides: Partial<ProviderConnectionRecord> = {}): ProviderConnectionRecord => ({
+  tenantId: 'tenant-local', id: 'conn-1', name: 'MiniMax 个人', source: 'user', adapterKind: 'anthropic',
+  baseUrl: 'https://api.minimaxi.com/anthropic', modelId: 'MiniMax-M3', enabled: true, credentialPresent: true,
+  createdAt: '2026-08-25T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z', ...overrides
+});
+
+async function api(options: { readonly authenticated?: boolean; readonly env?: Record<string, string | undefined>; readonly store?: FakeSettingsStore; readonly connections?: FakeConnectionStore } = {}) {
   const app = Fastify({ logger: false, ajv: { customOptions: { removeAdditional: false } } });
   const store = options.store ?? new FakeSettingsStore();
   registerRunAgentSettingsRoutes(app, {
     tenantId: 'tenant-local',
     settingsStore: store,
+    ...(options.connections === undefined ? {} : { providerConnections: options.connections }),
     authenticator: options.authenticated === false
       ? { authenticateRequest: () => undefined }
       : { authenticateRequest: () => ({ principalId: 'op', tenantId: 'tenant-local' }) },
@@ -78,6 +99,44 @@ describe('Run agent settings API', () => {
     expect(invalid.statusCode).toBe(400);
     expect(invalid.json().error.code).toBe('RUN_AGENT_SETTINGS_INVALID_PROVIDER');
     expect(await store.getRunAgentSettings('tenant-local')).toBeUndefined();
+    await app.close();
+  });
+  it('GET derives availability from the registry alongside the legacy env check', async () => {
+    const connections = new FakeConnectionStore();
+    connections.entries.set('tenant-local/conn-1', connectionRecord());
+    connections.entries.set('tenant-local/conn-2', connectionRecord({ id: 'conn-2', name: '停用条目', enabled: false }));
+    connections.entries.set('tenant-local/conn-3', connectionRecord({ id: 'conn-3', name: '缺凭据条目', credentialPresent: false }));
+    const { app } = await api({ env: {}, connections });
+    const response = await app.inject({ method: 'GET', url: '/v1/run-agent/settings' });
+    const providers = response.json().providers;
+    expect(providers).toEqual(expect.arrayContaining([
+      { id: 'conn-1', name: 'MiniMax 个人', available: true },
+      { id: 'conn-2', name: '停用条目', available: false, reason: 'Connection is disabled' },
+      { id: 'conn-3', name: '缺凭据条目', available: false, reason: 'Connection has no stored credential' },
+      { id: 'minimax', available: false, reason: expect.any(String) }
+    ]));
+    await app.close();
+  });
+
+  it('PUT accepts connection mode only with a usable connection id', async () => {
+    const connections = new FakeConnectionStore();
+    connections.entries.set('tenant-local/conn-1', connectionRecord());
+    connections.entries.set('tenant-local/conn-disabled', connectionRecord({ id: 'conn-disabled', enabled: false }));
+    const { app, store } = await api({ connections });
+    const ok = await app.inject({ method: 'PUT', url: '/v1/run-agent/settings', payload: { defaultProvider: 'connection', providerConnectionId: 'conn-1' } });
+    expect(ok.statusCode).toBe(200);
+    expect(ok.json()).toMatchObject({ defaultProvider: 'connection', providerConnectionId: 'conn-1' });
+    expect(await store.getRunAgentSettings('tenant-local')).toMatchObject({ defaultProvider: 'connection', providerConnectionId: 'conn-1' });
+
+    const missing = await app.inject({ method: 'PUT', url: '/v1/run-agent/settings', payload: { defaultProvider: 'connection', providerConnectionId: 'nope' } });
+    expect(missing.statusCode).toBe(400);
+    const disabled = await app.inject({ method: 'PUT', url: '/v1/run-agent/settings', payload: { defaultProvider: 'connection', providerConnectionId: 'conn-disabled' } });
+    expect(disabled.statusCode).toBe(400);
+    const withoutId = await app.inject({ method: 'PUT', url: '/v1/run-agent/settings', payload: { defaultProvider: 'connection' } });
+    expect(withoutId.statusCode).toBe(400);
+    const idWithoutMode = await app.inject({ method: 'PUT', url: '/v1/run-agent/settings', payload: { defaultProvider: 'echo', providerConnectionId: 'conn-1' } });
+    expect(idWithoutMode.statusCode).toBe(400);
+    expect(await store.getRunAgentSettings('tenant-local')).toMatchObject({ defaultProvider: 'connection' });
     await app.close();
   });
 });

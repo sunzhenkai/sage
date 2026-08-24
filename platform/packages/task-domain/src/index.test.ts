@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { ProviderConnectionRecord, RunAgentSettingsRecord } from './index.js';
 import { Value } from 'typebox/value';
 import {
   AgentTaskWorkflowInputSchema, CreateTaskRequestSchema, TASK_NAMESPACE, TASK_QUEUE, TASK_TARGET, TASK_TYPE, WorkflowTargetSnapshotSchema
@@ -37,6 +38,20 @@ describe('task-domain v1 contracts', () => {
     delete incomplete.isolationKey;
     expect(Value.Check(WorkflowTargetSnapshotSchema, incomplete)).toBe(false);
     expect(Value.Check(WorkflowTargetSnapshotSchema, { ...snapshot, credentialValue: 'must-not-exist' })).toBe(false);
+  });
+
+  it('extends run agent settings with the connection mode while keeping legacy providers', () => {
+    const legacy: RunAgentSettingsRecord = { tenantId: 't1', defaultProvider: 'auto', updatedAt: '2026-08-25T00:00:00.000Z', updatedBy: 'p' };
+    const connected: RunAgentSettingsRecord = { ...legacy, defaultProvider: 'connection', providerConnectionId: 'conn-1' };
+    expect(legacy.defaultProvider).toBe('auto');
+    expect(connected.providerConnectionId).toBe('conn-1');
+    // 注册表条目记录不含任何凭据字段：credentialPresent 是派生布尔。
+    const entry: ProviderConnectionRecord = {
+      tenantId: 't1', id: 'conn-1', name: 'MiniMax', source: 'user', adapterKind: 'anthropic',
+      baseUrl: 'https://api.minimaxi.com/anthropic', modelId: 'MiniMax-M3', enabled: true,
+      credentialPresent: true, createdAt: '2026-08-25T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z'
+    };
+    expect(Object.keys(entry).some((key) => key.toLowerCase().includes('key') && key !== 'modelId')).toBe(false);
   });
 
 });

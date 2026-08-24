@@ -5,6 +5,7 @@ import { Pool } from 'pg';
 import { bundleWorkflowCode, NativeConnection, Worker, type WorkerStatus } from '@temporalio/worker';
 import { ChatStore } from '@sage/chat-domain';
 import { createLivePackageAgentClient, createLocalAgentClient, createLocalKernelComposition, PACKAGE_RUN_SYSTEM_PROMPT, type LiveProviderRoute } from '@sage/local-runtime';
+import { createLocalSecretBackendFromEnv } from '@sage/secret-vault';
 import { LegacyAgentRunSpecV1Adapter, parseAgentExecutionFeatureConfig, selectAgentExecutionMode, type AgentExecutionMode, type AgentLifecycleOwner, type LegacyAdapterResult } from '@sage/agent-client';
 import { PostgresTaskStore } from '@sage/task-store-postgres';
 import { TASK_NAMESPACE, TASK_QUEUE, type TaskInputRef } from '@sage/task-domain';
@@ -179,6 +180,7 @@ export async function createWorkerRuntime(config = readWorkerRuntimeConfig()): P
         ...(context?.signal === undefined ? {} : { signal: context.signal })
       })
     };
+    const secretBackend = createLocalSecretBackendFromEnv();
     native = await NativeConnection.connect({ address: config.temporalAddress });
     const liveRoute = readLiveProviderRouteFromEnv();
     if (liveRoute !== undefined) process.stdout.write(`agent-worker package runs use ${describeLiveProviderRoute(liveRoute)}\n`);
@@ -192,6 +194,11 @@ export async function createWorkerRuntime(config = readWorkerRuntimeConfig()): P
           packageAgentClient: createLivePackageAgentClient({ route: liveRoute, systemPrompt: PACKAGE_RUN_SYSTEM_PROMPT })
         }),
         settingsStore: tasks,
+        providerConnections: tasks,
+        ...(secretBackend === undefined ? {} : {
+          secretBackend,
+          liveClientFactory: (route: LiveProviderRoute) => createLivePackageAgentClient({ route, systemPrompt: PACKAGE_RUN_SYSTEM_PROMPT })
+        }),
         ...(canonicalCompatibility === undefined ? {} : { canonicalCompatibility }),
         store: tasks, outputStore: tasks, inputResolver: new CompositeTaskInputResolver([
           { scheme: 'chat', resolver: new ChatTaskInputResolver(chat) },

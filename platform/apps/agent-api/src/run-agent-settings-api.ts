@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { Type, type Static } from 'typebox';
-import type { RunAgentDefaultProvider, RunAgentSettingsStore } from '@sage/task-domain';
+import type { ProviderConnectionStore, RunAgentDefaultProvider, RunAgentSettingsStore } from '@sage/task-domain';
 
 export interface RunAgentSettingsPrincipalAuthenticator {
   authenticateRequest?(request: FastifyRequest): { readonly principalId: string; readonly tenantId: string } | undefined;
@@ -10,6 +10,8 @@ export interface RegisterRunAgentSettingsRoutesOptions {
   readonly tenantId: string;
   /** 缺省时 GET/PUT 仍可用，defaultProvider 恒为 auto（内存降级，便于测试）。 */
   readonly settingsStore?: RunAgentSettingsStore;
+  /** 可用性来源：注册表条目（缺省时仅保留 legacy minimax env 检测）。 */
+  readonly providerConnections?: ProviderConnectionStore;
   readonly authenticator: RunAgentSettingsPrincipalAuthenticator;
   /** 可注入的受信 env 视图；缺省读 process.env，只做非空检测、绝不回显值。 */
   readonly providerEnv?: Record<string, string | undefined>;
@@ -19,15 +21,18 @@ export interface RegisterRunAgentSettingsRoutesOptions {
 export const RunAgentDefaultProviderSchema = Type.Union([
   Type.Literal('auto'),
   Type.Literal('minimax'),
-  Type.Literal('echo')
+  Type.Literal('echo'),
+  Type.Literal('connection')
 ]);
 export const UpdateRunAgentSettingsRequestSchema = Type.Object({
-  defaultProvider: RunAgentDefaultProviderSchema
+  defaultProvider: RunAgentDefaultProviderSchema,
+  providerConnectionId: Type.Optional(Type.String({ minLength: 1, maxLength: 128 }))
 }, { additionalProperties: false });
 export type UpdateRunAgentSettingsRequest = Static<typeof UpdateRunAgentSettingsRequestSchema>;
 
 export interface RunAgentProviderStatus {
-  readonly id: 'minimax';
+  readonly id: string;
+  readonly name?: string;
   readonly available: boolean;
   readonly reason?: string;
 }
@@ -35,6 +40,7 @@ export interface RunAgentProviderStatus {
 export interface RunAgentSettingsResponse {
   readonly schemaVersion: 'RunAgentSettings.v1';
   readonly defaultProvider: RunAgentDefaultProvider;
+  readonly providerConnectionId?: string;
   readonly updatedAt?: string;
   readonly updatedBy?: string;
   readonly providers: readonly RunAgentProviderStatus[];
@@ -47,11 +53,31 @@ const sendError = (reply: FastifyReply, status: number, code: string, message: s
 export const minimaxAvailableFromEnv = (source: Record<string, string | undefined> = process.env): boolean =>
   (source.MINIMAX_API_KEY ?? '').trim().length > 0;
 
-const providerStatuses = (providerEnv: Record<string, string | undefined>): readonly RunAgentProviderStatus[] => [{
-  id: 'minimax',
-  available: minimaxAvailableFromEnv(providerEnv),
-  ...(minimaxAvailableFromEnv(providerEnv) ? {} : { reason: 'MINIMAX_API_KEY is not set in the trusted process environment' })
-}];
+/** 可用性解析：注册表 enabled 且凭据在场的条目列为 available；legacy minimax 继续按受信 env 非空判定。 */
+export const providerStatuses = async (
+  providerEnv: Record<string, string | undefined>,
+  connections?: ProviderConnectionStore,
+  tenantId?: string
+): Promise<readonly RunAgentProviderStatus[]> => {
+  const statuses: RunAgentProviderStatus[] = [];
+  if (connections !== undefined && tenantId !== undefined) {
+    const entries = await connections.listProviderConnections(tenantId);
+    for (const entry of entries) {
+      statuses.push({
+        id: entry.id,
+        name: entry.name,
+        available: entry.enabled && entry.credentialPresent,
+        ...(entry.enabled && entry.credentialPresent ? {} : { reason: entry.credentialPresent ? 'Connection is disabled' : 'Connection has no stored credential' })
+      });
+    }
+  }
+  statuses.push({
+    id: 'minimax',
+    available: minimaxAvailableFromEnv(providerEnv),
+    ...(minimaxAvailableFromEnv(providerEnv) ? {} : { reason: 'MINIMAX_API_KEY is not set in the trusted process environment' })
+  });
+  return statuses;
+};
 
 export function registerRunAgentSettingsRoutes(app: FastifyInstance, options: RegisterRunAgentSettingsRoutesOptions): void {
   const now = options.now ?? (() => new Date());
@@ -69,8 +95,9 @@ export function registerRunAgentSettingsRoutes(app: FastifyInstance, options: Re
     return {
       schemaVersion: 'RunAgentSettings.v1',
       defaultProvider: record?.defaultProvider ?? 'auto',
+      ...(record?.providerConnectionId === undefined ? {} : { providerConnectionId: record.providerConnectionId }),
       ...(record === undefined ? {} : { updatedAt: record.updatedAt, updatedBy: record.updatedBy }),
-      providers: providerStatuses(providerEnv)
+      providers: await providerStatuses(providerEnv, options.providerConnections, options.tenantId)
     };
   };
 
@@ -94,14 +121,28 @@ export function registerRunAgentSettingsRoutes(app: FastifyInstance, options: Re
     if (!principal) return sendError(reply, 401, 'RUN_AGENT_SETTINGS_AUTHENTICATION_REQUIRED', 'Run agent settings API requires authentication');
     const body = request.body as Partial<UpdateRunAgentSettingsRequest> | undefined;
     if (body === null || typeof body !== 'object' || typeof body.defaultProvider !== 'string'
-      || !['auto', 'minimax', 'echo'].includes(body.defaultProvider)) {
-      return sendError(reply, 400, 'RUN_AGENT_SETTINGS_INVALID_PROVIDER', 'defaultProvider must be one of auto, minimax, echo');
+      || !['auto', 'minimax', 'echo', 'connection'].includes(body.defaultProvider)) {
+      return sendError(reply, 400, 'RUN_AGENT_SETTINGS_INVALID_PROVIDER', 'defaultProvider must be one of auto, minimax, echo, connection');
+    }
+    if (body.defaultProvider === 'connection') {
+      if (typeof body.providerConnectionId !== 'string' || body.providerConnectionId.length === 0) {
+        return sendError(reply, 400, 'RUN_AGENT_SETTINGS_INVALID_PROVIDER', 'providerConnectionId is required when defaultProvider is connection');
+      }
+      const connection = options.providerConnections === undefined
+        ? undefined
+        : await options.providerConnections.getProviderConnection(options.tenantId, body.providerConnectionId);
+      if (connection === undefined || !connection.enabled) {
+        return sendError(reply, 400, 'RUN_AGENT_SETTINGS_INVALID_PROVIDER', 'providerConnectionId must reference an existing enabled provider connection');
+      }
+    } else if (body.providerConnectionId !== undefined) {
+      return sendError(reply, 400, 'RUN_AGENT_SETTINGS_INVALID_PROVIDER', 'providerConnectionId is only allowed when defaultProvider is connection');
     }
     if (settingsStore === undefined) return sendError(reply, 503, 'RUN_AGENT_SETTINGS_UNAVAILABLE', 'Run agent settings store is unavailable', true);
     try {
       await settingsStore.upsertRunAgentSettings({
         tenantId: options.tenantId,
         defaultProvider: body.defaultProvider,
+        ...(body.defaultProvider === 'connection' ? { providerConnectionId: body.providerConnectionId } : {}),
         updatedAt: now().toISOString(),
         updatedBy: `principal://${principal.principalId}`
       });
@@ -112,7 +153,7 @@ export function registerRunAgentSettingsRoutes(app: FastifyInstance, options: Re
   });
 }
 
-const settingsFields = new Set(['defaultProvider']);
+const settingsFields = new Set(['defaultProvider', 'providerConnectionId']);
 function rejectedSettingsFields(body: unknown): string[] {
   const rejected: string[] = [];
   if (body === null || typeof body !== 'object' || Array.isArray(body)) return ['body'];

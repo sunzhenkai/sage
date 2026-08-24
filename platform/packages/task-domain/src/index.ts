@@ -229,7 +229,7 @@ export interface TaskRoutingStore {
   markTargetUnavailable(tenantId: string, taskId: string, failureCode: string, ownerToken: string, startIdempotencyKey: string): Promise<void>;
   recordRoutingRejection(decision: RouteDecision): Promise<void>;
 }
-export type TaskStorePort = TaskCommitStore & TaskProjectionStore & TaskRoutingStore & TaskPackageInputStore & TaskRunOutputStore & RunAgentSettingsStore & { migrate(): Promise<void>; close(): Promise<void> };
+export type TaskStorePort = TaskCommitStore & TaskProjectionStore & TaskRoutingStore & TaskPackageInputStore & TaskRunOutputStore & RunAgentSettingsStore & ProviderConnectionStore & { migrate(): Promise<void>; close(): Promise<void> };
 
 export const isAgentTaskWorkflowInput = (value: unknown): value is AgentTaskWorkflowInput => Value.Check(AgentTaskWorkflowInputSchema, value);
 export const isExecuteAgentSliceInput = (value: unknown): value is ExecuteAgentSliceInput => Value.Check(ExecuteAgentSliceInputSchema, value);
@@ -289,13 +289,14 @@ export interface TaskRunOutputStore {
   getRunOutput(tenantId: string, taskId: string): Promise<TaskRunOutputRecord | undefined>;
 }
 
-/** 运行 agent 默认 provider 的三态：auto=env 驱动（缺省），minimax=固定 live（缺依赖显式失败），echo=显式本地确定性。 */
-export type RunAgentDefaultProvider = 'auto' | 'minimax' | 'echo';
+/** 运行 agent 默认 provider：auto=env 驱动（缺省），minimax=固定 live（缺依赖显式失败），echo=显式本地确定性，connection=指向受信 provider 注册表条目。 */
+export type RunAgentDefaultProvider = 'auto' | 'minimax' | 'echo' | 'connection';
 
-/** 运行 agent 设置记录：per-tenant 单例、非密钥；无行等效 auto。 */
+/** 运行 agent 设置记录：per-tenant 单例、非密钥；无行等效 auto。connection 模式下 providerConnectionId 必填。 */
 export interface RunAgentSettingsRecord {
   readonly tenantId: string;
   readonly defaultProvider: RunAgentDefaultProvider;
+  readonly providerConnectionId?: string;
   readonly updatedAt: string;
   readonly updatedBy: string;
 }
@@ -303,6 +304,64 @@ export interface RunAgentSettingsRecord {
 export interface RunAgentSettingsStore {
   getRunAgentSettings(tenantId: string): Promise<RunAgentSettingsRecord | undefined>;
   upsertRunAgentSettings(record: RunAgentSettingsRecord): Promise<{ readonly status: 'stored' | 'existing' }>;
+}
+
+/** 部署 env 引导条目的固定 id：MINIMAX_API_KEY 非空时由 agent-api 启动幂等 upsert。 */
+export const DEPLOYMENT_ENV_MINIMAX_CONNECTION_ID = 'deployment-env-minimax';
+export const DEFAULT_MINIMAX_BASE_URL = 'https://api.minimaxi.com/anthropic';
+export const DEFAULT_MINIMAX_MODEL = 'MiniMax-M3';
+
+/** 受信 provider 条目来源：user=经 API 创建，deployment-env=启动时从受信 env 幂等引导。 */
+export type ProviderConnectionSource = 'user' | 'deployment-env';
+export type ProviderConnectionAdapterKind = 'openai-compatible' | 'anthropic';
+
+/** 受信 provider 条目：元数据 + 凭据在场派生布尔；密文只存在于 provider_credentials 表，永不进入本记录。 */
+export interface ProviderConnectionRecord {
+  readonly tenantId: string;
+  readonly id: string;
+  readonly name: string;
+  readonly source: ProviderConnectionSource;
+  readonly adapterKind: ProviderConnectionAdapterKind;
+  readonly baseUrl: string;
+  readonly modelId: string;
+  readonly providerName?: string;
+  readonly modelName?: string;
+  readonly enabled: boolean;
+  readonly credentialPresent: boolean;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly updatedBy?: string;
+}
+
+/** 密封凭据：调用方（持 SecretBackend 的装配层）密封后提交，存储只见密文与 key version。 */
+export interface ProviderCredentialSealed {
+  readonly ciphertext: Buffer;
+  readonly keyVersion: number;
+  readonly updatedAt: string;
+}
+
+/** 条目创建/更新输入：credential 可选以支持只改元数据；轮换 key 即替换 credential。 */
+export interface ProviderConnectionWrite {
+  readonly name: string;
+  readonly source: ProviderConnectionSource;
+  readonly adapterKind: ProviderConnectionAdapterKind;
+  readonly baseUrl: string;
+  readonly modelId: string;
+  readonly providerName?: string;
+  readonly modelName?: string;
+  readonly enabled: boolean;
+  readonly updatedBy?: string;
+  readonly credential?: ProviderCredentialSealed;
+}
+
+export interface ProviderConnectionStore {
+  listProviderConnections(tenantId: string): Promise<readonly ProviderConnectionRecord[]>;
+  getProviderConnection(tenantId: string, id: string): Promise<ProviderConnectionRecord | undefined>;
+  createProviderConnection(tenantId: string, id: string, write: ProviderConnectionWrite, createdAt: string): Promise<ProviderConnectionRecord>;
+  updateProviderConnection(tenantId: string, id: string, write: ProviderConnectionWrite, updatedAt: string): Promise<ProviderConnectionRecord | undefined>;
+  /** 执行边界专用：取密封凭据（不校验 enabled，由调用方决定语义）；不存在返回 undefined。 */
+  getProviderCredential(tenantId: string, id: string): Promise<ProviderCredentialSealed | undefined>;
+  deleteProviderConnection(tenantId: string, id: string): Promise<boolean>;
 }
 export type ProjectionStaleReason = 'age_threshold_exceeded' | 'history_ahead' | 'target_unavailable' | 'projection_unavailable';
 export interface TaskProjectionView {
