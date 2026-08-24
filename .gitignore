@@ -10,6 +10,7 @@ node_modules/
 **/dist/
 **/dist-types/
 **/*.tsbuildinfo
+.vite/
 
 # Test / coverage artefacts
 coverage/
