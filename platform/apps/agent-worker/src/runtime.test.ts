@@ -89,6 +89,14 @@ describe('ChatTaskInputResolver', () => {
     expect(JSON.stringify(live)).not.toContain('secret-key');
   });
 
+  it('exposes a non-sensitive secret backend mode for /readyz', async () => {
+    const { createLocalSecretBackendFromEnv } = await import('@sage/secret-vault');
+    const { randomBytes } = await import('node:crypto');
+    const configured = createLocalSecretBackendFromEnv({ SAGE_SECRET_MASTER_KEY: randomBytes(32).toString('base64') })!;
+    expect(configured.describe()).toEqual({ mode: 'local-aes-gcm' });
+    expect(createLocalSecretBackendFromEnv({})?.describe().mode ?? 'unavailable').toBe('unavailable');
+  });
+
   it('resolves the execution harness from run agent settings with fail-closed minimax', () => {
     // 固定 minimax 缺 live route：显式不可用，绝不回退 echo。
     expect(decidePackageRunClientChoice(true, 'minimax', false)).toBe('unavailable');

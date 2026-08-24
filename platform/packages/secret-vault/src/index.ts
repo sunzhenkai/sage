@@ -22,6 +22,8 @@ export class SecretBackendUnavailableError extends Error {
 }
 
 export const SECRET_MASTER_KEY_ENV = 'SAGE_SECRET_MASTER_KEY';
+/** 历史主密钥列表（逗号分隔 base64，时间升序，用于轮换后解密旧密文）；current 恒为 SECRET_MASTER_KEY_ENV。 */
+export const SECRET_MASTER_KEYS_PREVIOUS_ENV = 'SAGE_SECRET_MASTER_KEYS_PREVIOUS';
 const KEY_LENGTH_BYTES = 32;
 const CIPHER = 'aes-256-gcm';
 const VERSION_BYTES = 4;
@@ -86,12 +88,21 @@ export class LocalAesGcmSecretBackend implements SecretBackend {
   }
 }
 
-/** 从受信 env 构造本地后端；缺主密钥或格式错误返回 undefined（调用方 fail-closed 而非抛出）。 */
+/**
+ * 从受信 env 构造本地 keyring 后端：`SAGE_SECRET_MASTER_KEY` 为 current（版本 = previous 数量），
+ * `SAGE_SECRET_MASTER_KEYS_PREVIOUS`（逗号分隔 base64，时间升序）为历史版本，轮换后旧密文仍可解。
+ * 缺 current 或任一 key 格式错误返回 undefined（调用方 fail-closed 而非抛出）。
+ */
 export const createLocalSecretBackendFromEnv = (source: Record<string, string | undefined> = process.env): SecretBackend | undefined => {
   const raw = source[SECRET_MASTER_KEY_ENV]?.trim();
   if (raw === undefined || raw.length === 0) return undefined;
   try {
-    return new LocalAesGcmSecretBackend([decodeKey(raw)]);
+    const previous = (source[SECRET_MASTER_KEYS_PREVIOUS_ENV] ?? '')
+      .split(',')
+      .map((item) => item.trim())
+      .filter((item) => item.length > 0)
+      .map(decodeKey);
+    return new LocalAesGcmSecretBackend([...previous, decodeKey(raw)]);
   } catch {
     return undefined;
   }

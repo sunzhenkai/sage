@@ -186,6 +186,7 @@ export async function createWorkerRuntime(config = readWorkerRuntimeConfig()): P
     if (liveRoute !== undefined) process.stdout.write(`agent-worker package runs use ${describeLiveProviderRoute(liveRoute)}\n`);
     else process.stdout.write('WARN: MINIMAX_API_KEY not set — package runs fall back to the local echo harness (settings defaultProvider=auto). Pin minimax in run agent settings to fail closed instead.\n');
     const providerStatus = providerStatusOf(liveRoute);
+    const secretBackendMode = secretBackend?.describe().mode ?? 'unavailable';
     worker = await Worker.create({
       connection: native, namespace: TASK_NAMESPACE, taskQueue: TASK_QUEUE, workflowBundle,
       activities: createAgentTaskActivities({
@@ -217,14 +218,14 @@ export async function createWorkerRuntime(config = readWorkerRuntimeConfig()): P
       };
       if (path === '/livez') return send(json(stopping ? 503 : 200, { status: stopping ? 'stopping' : 'alive' }));
       if (path !== '/readyz') { response.statusCode = 404; response.end(); return; }
-      if (stopping) return send(json(503, { status: 'not_ready', reason: 'shutting_down', provider: providerStatus }));
+      if (stopping) return send(json(503, { status: 'not_ready', reason: 'shutting_down', provider: providerStatus, secretBackend: { mode: secretBackendMode } }));
       const status = subject.getStatus();
       if (!workerPollersReady(status)) {
-        return send(json(503, { status: 'not_ready', worker: { runState: status.runState, workflowPollerState: status.workflowPollerState, activityPollerState: status.activityPollerState }, provider: providerStatus }));
+        return send(json(503, { status: 'not_ready', worker: { runState: status.runState, workflowPollerState: status.workflowPollerState, activityPollerState: status.activityPollerState }, provider: providerStatus, secretBackend: { mode: secretBackendMode } }));
       }
       void Promise.all([chat.getSession(config.tenantId, 'health-sentinel'), tasks.listTaskViews(config.tenantId, { limit: 1 })])
-        .then(() => send(json(200, { status: 'ready', namespace: TASK_NAMESPACE, taskQueue: TASK_QUEUE, provider: providerStatus, worker: { runState: status.runState, workflowPollerState: status.workflowPollerState, activityPollerState: status.activityPollerState } })))
-        .catch(() => send(json(503, { status: 'not_ready', dependencies: ['postgres'], provider: providerStatus })));
+        .then(() => send(json(200, { status: 'ready', namespace: TASK_NAMESPACE, taskQueue: TASK_QUEUE, provider: providerStatus, secretBackend: { mode: secretBackendMode }, worker: { runState: status.runState, workflowPollerState: status.workflowPollerState, activityPollerState: status.activityPollerState } })))
+        .catch(() => send(json(503, { status: 'not_ready', dependencies: ['postgres'], provider: providerStatus, secretBackend: { mode: secretBackendMode } })));
     });
     const runningPromise = subject.run();
     running = runningPromise;

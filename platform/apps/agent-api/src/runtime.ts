@@ -242,6 +242,7 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
     registerProviderCatalogRoutes(app, { service: catalogService, store: catalog, manager: catalogManager, authenticator });
     await catalogManager.start();
     app.get('/livez', async () => ({ status: 'alive' }));
+    const secretBackendMode = secretBackend?.describe().mode ?? 'unavailable';
     app.get('/readyz', async (_request, reply) => {
       try {
         await Promise.all([
@@ -249,9 +250,9 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
           tasks.listTaskViews(config.tenantId, { limit: 1 }),
           temporalReady(config.temporalAddress)
         ]);
-        return { status: 'ready' };
+        return { status: 'ready', secretBackend: { mode: secretBackendMode } };
       } catch {
-        return reply.code(503).send({ status: 'not_ready', dependencies: ['postgres', 'temporal'] });
+        return reply.code(503).send({ status: 'not_ready', dependencies: ['postgres', 'temporal'], secretBackend: { mode: secretBackendMode } });
       }
     });
     const close = async (): Promise<void> => {

@@ -58,5 +58,24 @@ describe('createLocalSecretBackendFromEnv', () => {
     expect(createLocalSecretBackendFromEnv({})).toBeUndefined();
     expect(createLocalSecretBackendFromEnv({ SAGE_SECRET_MASTER_KEY: '' })).toBeUndefined();
     expect(createLocalSecretBackendFromEnv({ SAGE_SECRET_MASTER_KEY: 'not-base64-32-bytes!!' })).toBeUndefined();
+    expect(createLocalSecretBackendFromEnv({ SAGE_SECRET_MASTER_KEY: key(), SAGE_SECRET_MASTER_KEYS_PREVIOUS: 'garbage' })).toBeUndefined();
+  });
+
+  it('supports key rotation via current + previous env list', () => {
+    const oldKey = key();
+    const newKey = key();
+    const before = createLocalSecretBackendFromEnv({ SAGE_SECRET_MASTER_KEY: oldKey })!;
+    const sealed = before.seal('rotating-secret');
+    expect(sealed.keyVersion).toBe(0);
+    const rotated = createLocalSecretBackendFromEnv({ SAGE_SECRET_MASTER_KEY: newKey, SAGE_SECRET_MASTER_KEYS_PREVIOUS: oldKey })!;
+    // 轮换后：旧密文按版本仍可解，新密文落在 current 版本。
+    expect(rotated.open(sealed)).toBe('rotating-secret');
+    const resealed = rotated.seal('rotating-secret');
+    expect(resealed.keyVersion).toBe(1);
+    expect(() => before.open(resealed)).toThrow();
+    // 旧 current 移出 previous 后：版本 0 对应 newKey（认证失败）且 version 1 超出 keyring，均 fail-closed。
+    const onlyNew = createLocalSecretBackendFromEnv({ SAGE_SECRET_MASTER_KEY: newKey })!;
+    expect(() => onlyNew.open(sealed)).toThrow();
+    expect(() => onlyNew.open(resealed)).toThrow();
   });
 });
