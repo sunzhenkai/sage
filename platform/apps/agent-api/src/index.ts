@@ -17,6 +17,8 @@ import {
 } from '@sage/app-contracts';
 import { AgentObservability } from '@sage/observability';
 import { ChatStoreError, outputAsReferenceOnly, type ChatStore } from '@sage/chat-domain';
+import type { ProviderConnectionStore } from '@sage/task-domain';
+import type { SecretBackend } from '@sage/secret-vault';
 import { isPublicHttpsUrl } from './provider-connection.js';
 import { registerChatPromotionRoute, type RegisterPromotionOptions } from './promotion.js';
 import { runChatAgentPath, type ChatCanonicalCompatibilityOptions } from './chat-compatibility.js';
@@ -48,6 +50,10 @@ export interface CreateChatApiOptions {
   /** Test seam: replaces the default live provider client construction for provider-routed runs. */
   readonly liveClientFactory?: (input: { readonly route: LiveProviderRoute; readonly transcript: readonly LiveProviderTurnMessage[] }) => Pick<LocalAgentClient, 'run'>;
   readonly canonicalCompatibility?: ChatCanonicalCompatibilityOptions;
+  /** 工作区 provider 注册表：provider 引用形态（connectionId）在提交边界解析为该次 Run 的路由。 */
+  readonly providerConnections?: ProviderConnectionStore;
+  /** 凭据解密后端；引用形态解析必需，缺失即稳定拒绝（fail-closed）。 */
+  readonly secretBackend?: SecretBackend;
   readonly tenantId?: string;
   readonly metrics?: ChatMetricRecorder;
   readonly onSequencingEvidence?: (evidence: SequencingEvidence) => void;
@@ -72,6 +78,41 @@ const parseProviderRoute = (value: unknown): ChatProviderRoute | undefined => {
   if (typeof route.modelId !== 'string' || route.modelId.trim().length === 0 || route.modelId.length > 300) throw invalid('modelId must be a non-empty model id');
   if (typeof route.apiKey !== 'string' || route.apiKey.length === 0 || route.apiKey.length > 4_096) throw invalid('apiKey must be a non-empty secret');
   return { adapterKind: route.adapterKind, baseUrl: route.baseUrl, modelId: route.modelId, apiKey: route.apiKey };
+};
+
+/**
+ * Provider 参数双形态判别（提交边界一次性解析，随 Run 携带）：
+ * - 内联形态 { adapterKind, baseUrl, modelId, apiKey }：沿用既有公共 HTTPS 校验；
+ * - 引用形态 { connectionId }：从受信 provider 注册表解析（enabled + 凭据在场 → 服务端解密），
+ *   明文 key 只进入本次 Run 的内存路由，不落任何持久化；解析失败以稳定错误拒绝，不回退本地运行时。
+ */
+const resolveProviderSelection = async (
+  value: unknown,
+  providerConnections: ProviderConnectionStore | undefined,
+  secretBackend: SecretBackend | undefined,
+  tenantId: string
+): Promise<ChatProviderRoute | undefined> => {
+  if (value === undefined) return undefined;
+  if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+    const record = value as Record<string, unknown>;
+    if (typeof record.connectionId === 'string') {
+      const invalid = (detail: string): ChatStoreError => new ChatStoreError('CHAT_INVALID_REQUEST', `provider route rejected: ${detail}`, false);
+      if (Object.keys(record).some((key) => key !== 'connectionId')) throw invalid('connectionId cannot be combined with inline route fields');
+      const connectionId = record.connectionId;
+      if (connectionId.length === 0 || connectionId.length > 128) throw invalid('connectionId must be 1-128 characters');
+      const unavailable = (): ChatStoreError => new ChatStoreError('CHAT_INVALID_REQUEST', `provider connection ${connectionId} is missing, disabled, or has no stored credential`, false);
+      if (providerConnections === undefined || secretBackend === undefined) throw unavailable();
+      const connection = await providerConnections.getProviderConnection(tenantId, connectionId);
+      if (connection === undefined || !connection.enabled) throw unavailable();
+      const sealed = await providerConnections.getProviderCredential(tenantId, connectionId);
+      if (sealed === undefined) throw unavailable();
+      let apiKey: string;
+      try { apiKey = secretBackend.open({ ciphertext: sealed.ciphertext, keyVersion: sealed.keyVersion }); }
+      catch { throw unavailable(); }
+      return { adapterKind: connection.adapterKind, baseUrl: connection.baseUrl, modelId: connection.modelId, apiKey };
+    }
+  }
+  return parseProviderRoute(value);
 };
 
 const routeClient = (route: LiveProviderRoute | undefined, transcript: readonly LiveProviderTurnMessage[], fallback: LocalAgentClient, liveClientFactory: CreateChatApiOptions['liveClientFactory']): Pick<LocalAgentClient, 'run'> =>
@@ -225,7 +266,7 @@ export async function createChatApi(options: CreateChatApiOptions): Promise<Fast
   app.post<{ Params: { sessionId: string }; Body: SubmitMessageRequest }>('/v1/chat/sessions/:sessionId/messages', {
     schema: { body: SubmitMessageRequestSchema }
   }, async (request, reply) => {
-    const route = parseProviderRoute(request.body.provider);
+    const route = await resolveProviderSelection(request.body.provider, options.providerConnections, options.secretBackend, tenantId);
     const messageId = `message-${randomUUID()}`;
     const runId = `run-${randomUUID()}`;
     const accepted = await options.store.acceptUserMessage({ tenantId, sessionId: request.params.sessionId, messageId, runId, parts: request.body.parts, now: now().toISOString() });
@@ -237,7 +278,7 @@ export async function createChatApi(options: CreateChatApiOptions): Promise<Fast
   });
 
   app.post<{ Params: { runId: string }; Body: RetryRunRequest | undefined }>('/v1/chat/runs/:runId/retry', async (request, reply) => {
-    const route = parseProviderRoute(request.body?.provider);
+    const route = await resolveProviderSelection(request.body?.provider, options.providerConnections, options.secretBackend, tenantId);
     const run = await options.store.createRetryRun(tenantId, request.params.runId, `run-${randomUUID()}`, now().toISOString());
     const durable = await options.store.getMessage(tenantId, run.userMessageId);
     if (!durable) throw new ChatStoreError('CHAT_STORE_UNAVAILABLE', 'Retry source Message commit could not be confirmed', true);

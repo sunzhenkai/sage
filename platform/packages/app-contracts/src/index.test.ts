@@ -17,6 +17,7 @@ import {
   ModelCatalogPageSchema,
   PromoteChatMessageRequestSchema,
   ProviderCatalogPageSchema,
+  RetryRunRequestSchema,
   SessionHistoryItemSchema,
   SubmitMessageRequestSchema,
   TimelineEventSchema
@@ -115,6 +116,15 @@ describe('workspace payload boundaries and promotion eligibility', () => {
       expect(Value.Check(SubmitMessageRequestSchema, { parts: [{ kind: 'text', text: 'hello' }], [field]: 'forbidden' })).toBe(false);
       expect(Value.Check(PromoteChatMessageRequestSchema, { mode: 'explicit', [field]: 'forbidden' })).toBe(false);
     }
+  });
+
+  it('accepts either an inline provider route or a workspace connection reference, but not both', () => {
+    expect(Value.Check(SubmitMessageRequestSchema, { parts: [{ kind: 'text', text: 'hi' }], provider: { connectionId: 'conn-1' } })).toBe(true);
+    expect(Value.Check(SubmitMessageRequestSchema, { parts: [{ kind: 'text', text: 'hi' }], provider: { adapterKind: 'anthropic', baseUrl: 'https://api.example.com', modelId: 'm', apiKey: 'k' } })).toBe(true);
+    expect(Value.Check(SubmitMessageRequestSchema, { parts: [{ kind: 'text', text: 'hi' }], provider: { connectionId: 'conn-1', apiKey: 'leak' } })).toBe(false);
+    expect(Value.Check(SubmitMessageRequestSchema, { parts: [{ kind: 'text', text: 'hi' }], provider: { connectionId: '' } })).toBe(false);
+    expect(Value.Check(SubmitMessageRequestSchema, { parts: [{ kind: 'text', text: 'hi' }], provider: { adapterKind: 'anthropic', baseUrl: 'https://api.example.com', modelId: 'm', apiKey: 'k', connectionId: 'conn-1' } })).toBe(false);
+    expect(Value.Check(RetryRunRequestSchema, { provider: { connectionId: 'conn-1' } })).toBe(true);
   });
 });
 

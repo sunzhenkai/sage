@@ -2,11 +2,13 @@ import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEven
 import type { ChatProviderRoute, ChatRun, TimelineEvent, TimelinePayload } from '@sage/app-contracts';
 import { ChatLanding, workspaceHref } from './workspace.js';
 import { loadProviderProfiles, profileCompletion, PROVIDER_SECRET_PREFIX } from './profiles.js';
+import type { WorkspaceProviderView } from './workspace-providers.js';
 import { Markdown } from './markdown.js';
 import { useLocale } from './locale.js';
 
-/** Browser-local Chat runtime selection: 'local' (Local Pi echo harness) or a provider profile id. */
+/** Browser-local Chat runtime selection: 'local' (Local Pi echo harness), 'ws:<connectionId>' (workspace provider), or a provider profile id. */
 export const CHAT_RUNTIME_STORAGE_KEY = 'sage.chat-runtime.v1';
+const WS_RUNTIME_PREFIX = 'ws:';
 const browserLocalStorage = (): Storage | undefined => typeof window === 'undefined' ? undefined : window.localStorage;
 const browserSessionStorage = (): Storage | undefined => typeof window === 'undefined' ? undefined : window.sessionStorage;
 
@@ -201,14 +203,33 @@ export function ChatApp({ sessionId, apiBase = '', fetcher = fetch }: ChatAppPro
     return storage === undefined ? [] : loadProviderProfiles(storage).profiles.filter((profile) => profileCompletion(profile).executionAvailable);
   }, []);
   const [runtimeId, setRuntimeId] = useState<string>(() => browserLocalStorage()?.getItem(CHAT_RUNTIME_STORAGE_KEY) || 'local');
-  useEffect(() => { if (runtimeId !== 'local' && !executableProfiles.some((profile) => profile.id === runtimeId)) setRuntimeId('local'); }, [runtimeId, executableProfiles]);
+  const [workspaceConnections, setWorkspaceConnections] = useState<readonly WorkspaceProviderView[]>([]);
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetcher('/v1/provider-connections', { credentials: 'include', signal: controller.signal }).then(async (response) => {
+      if (!response.ok) return;
+      const body = await response.json() as { connections: readonly WorkspaceProviderView[] };
+      setWorkspaceConnections(body.connections.filter((connection) => connection.enabled && connection.credentialPresent));
+    }).catch(() => undefined);
+    return () => controller.abort();
+  }, [fetcher]);
+  useEffect(() => {
+    const inWorkspace = workspaceConnections.some((connection) => runtimeId === `${WS_RUNTIME_PREFIX}${connection.id}`);
+    if (runtimeId !== 'local' && !inWorkspace && !executableProfiles.some((profile) => profile.id === runtimeId)) setRuntimeId('local');
+  }, [runtimeId, executableProfiles, workspaceConnections]);
   const selectRuntime = (id: string) => {
     setRuntimeId(id);
     const storage = browserLocalStorage();
     if (storage !== undefined) storage.setItem(CHAT_RUNTIME_STORAGE_KEY, id);
   };
-  const resolveRoute = (): { readonly provider?: ChatProviderRoute; readonly error?: string } => {
+  /** 提交形态：内联 route（browser-local profile，key 只在当前 tab）或工作区引用（connectionId，key 在服务端）。 */
+  const resolveRoute = (): { readonly provider?: ChatProviderRoute | { readonly connectionId: string }; readonly error?: string } => {
     if (runtimeId === 'local') return {};
+    if (runtimeId.startsWith(WS_RUNTIME_PREFIX)) {
+      const connectionId = runtimeId.slice(WS_RUNTIME_PREFIX.length);
+      if (connectionId.length === 0) return { error: t('runtimeUnavailable') };
+      return { provider: { connectionId } };
+    }
     const profile = executableProfiles.find((candidate) => candidate.id === runtimeId);
     if (profile === undefined || profile.adapterKind === 'unassigned' || profile.baseUrl === undefined || profile.modelId === undefined) {
       return { error: t('runtimeUnavailable') };
@@ -266,7 +287,7 @@ export function ChatApp({ sessionId, apiBase = '', fetcher = fetch }: ChatAppPro
         <a className="chat-back" href={workspaceHref({ view: 'chat' })} aria-label={t('backToConversations')} title={t('backToConversations')}>←</a>
         <div><p className="eyebrow">{t('liveConversation')}</p><h1>{t('chat')}</h1></div>
       </div>
-      <div className="chat-heading-meta"><div className="session-info-bar"><span><span className="overview-label">{t('session')}</span><code>{sessionId}</code></span><span><span className="overview-label">{t('events')}</span><strong>{events.length}</strong></span><span><span className="overview-label">{t('run')}</span><strong>{terminal?.status ?? t('ready')}</strong></span><a className="task-workspace-link" href={workspaceHref({ view: 'tasks', sessionId })}>{t('openTaskWorkspace')} <span aria-hidden="true">→</span></a></div><div className="chat-heading-actions"><span className={`connection-status connection-${connection}`}><span className="status-dot" />{connection === 'live' ? t('liveStreamConnected') : connection === 'connecting' ? t('connecting') : t('streamReconnecting')}</span><label className="runtime-picker"><span className="overview-label">{t('runtime')}</span><select aria-label={t('chatRuntime')} value={runtimeId} onChange={(event) => selectRuntime(event.target.value)}><option value="local">{t('localPiRuntime')}</option>{executableProfiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}{profile.modelName === undefined ? '' : ` · ${profile.modelName}`}</option>)}</select></label>{executableProfiles.length === 0 && <a className="task-workspace-link" href={workspaceHref({ view: 'providers', sessionId })}>+ {t('addProvider')}</a>}{events.length > 0 && !hasTask && <a className="button button-secondary task-card-link" href={workspaceHref({ view: 'tasks', sessionId })} title={t('taskCardBody')}><span aria-hidden="true">▣</span>{t('taskCardTitle')}</a>}<button className="button button-secondary stream-toggle" type="button" aria-expanded={streamOpen} aria-controls="chat-event-stream" onClick={() => setStreamOpen((open) => !open)}>{t('eventStream')}</button></div></div>
+      <div className="chat-heading-meta"><div className="session-info-bar"><span><span className="overview-label">{t('session')}</span><code>{sessionId}</code></span><span><span className="overview-label">{t('events')}</span><strong>{events.length}</strong></span><span><span className="overview-label">{t('run')}</span><strong>{terminal?.status ?? t('ready')}</strong></span><a className="task-workspace-link" href={workspaceHref({ view: 'tasks', sessionId })}>{t('openTaskWorkspace')} <span aria-hidden="true">→</span></a></div><div className="chat-heading-actions"><span className={`connection-status connection-${connection}`}><span className="status-dot" />{connection === 'live' ? t('liveStreamConnected') : connection === 'connecting' ? t('connecting') : t('streamReconnecting')}</span><label className="runtime-picker"><span className="overview-label">{t('runtime')}</span><select aria-label={t('chatRuntime')} value={runtimeId} onChange={(event) => selectRuntime(event.target.value)}><option value="local">{t('localPiRuntime')}</option>{workspaceConnections.length > 0 && <optgroup label={t('workspaceProviders')}>{workspaceConnections.map((connection) => <option key={`${WS_RUNTIME_PREFIX}${connection.id}`} value={`${WS_RUNTIME_PREFIX}${connection.id}`}>{connection.name}{connection.modelName === undefined ? '' : ` · ${connection.modelName}`}</option>)}</optgroup>}{executableProfiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}{profile.modelName === undefined ? '' : ` · ${profile.modelName}`}</option>)}</select></label>{executableProfiles.length === 0 && <a className="task-workspace-link" href={workspaceHref({ view: 'providers', sessionId })}>+ {t('addProvider')}</a>}{events.length > 0 && !hasTask && <a className="button button-secondary task-card-link" href={workspaceHref({ view: 'tasks', sessionId })} title={t('taskCardBody')}><span aria-hidden="true">▣</span>{t('taskCardTitle')}</a>}<button className="button button-secondary stream-toggle" type="button" aria-expanded={streamOpen} aria-controls="chat-event-stream" onClick={() => setStreamOpen((open) => !open)}>{t('eventStream')}</button></div></div>
     </header>
     {error && <div className="error-banner" role="alert"><span>!</span><div><strong>{t('somethingNeedsAttention')}</strong><p>{error}</p></div><button className="icon-button" type="button" aria-label={t('dismissError')} onClick={() => setError(undefined)}>×</button></div>}
     {notice && <div className="success-banner" role="status"><span>✓</span><p>{notice}</p><button className="icon-button" type="button" aria-label={t('dismissNotice')} onClick={() => setNotice(undefined)}>×</button></div>}

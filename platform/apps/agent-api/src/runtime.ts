@@ -177,8 +177,11 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
   };
     const authenticate = (authenticationId?: string): AuthenticatedPrincipal | undefined =>
       authenticationId === undefined || authenticationId === config.principal.authenticationId ? config.principal : undefined;
+    const chatSecretBackend = createLocalSecretBackendFromEnv(config.secretEnv);
     app = await createChatApi({
       store: chat, tenantId: config.tenantId, agentClient: createLocalAgentClient(),
+      providerConnections: tasks,
+      ...(chatSecretBackend === undefined ? {} : { secretBackend: chatSecretBackend }),
       ...(canonicalCompatibility === undefined ? {} : { canonicalCompatibility }),
       promotion: {
         controller,
