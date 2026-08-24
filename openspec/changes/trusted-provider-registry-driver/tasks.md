@@ -13,7 +13,7 @@
 
 ## 3. 收尾
 
-- [ ] 3.1 全仓回归与静态检查（`pnpm typecheck` + 受影响包测试 + eslint 改动文件），命令与结果写入 proposal 验证记录
-- [ ] 3.2 回填 proposal 验收标准
-- [ ] 3.3 提交交付仓改动
-- [ ] 3.4 归档全部子 change
+- [x] 3.1 全仓回归与静态检查（`pnpm typecheck` + 受影响包测试 + eslint 改动文件），命令与结果写入 proposal 验证记录
+- [x] 3.2 回填 proposal 验收标准
+- [x] 3.3 提交交付仓改动
+- [x] 3.4 归档全部子 change

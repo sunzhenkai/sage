@@ -22,14 +22,14 @@
 | . | 必须 | 已切任务分支 task/trusted-provider-registry；会修改 platform/ 下多个包与 openspec |
 
 ## 验收标准
-- [ ] Providers 页不再出现「未检测到 MiniMax」与外部配置正常状态并存的割裂观感：徽章与外部配置读同一注册表，或文案明确作用域
-- [ ] 同一 tenant 可创建同一 provider 的多个受信条目（如个人 key 与部署 key 并存），互不覆盖
-- [ ] API key 仅通过写通道进入服务端加密存储；任何 GET/列表/日志/事件/错误响应均不回显 key 明文
-- [ ] `MINIMAX_API_KEY` env 在启动时自动注册为 `deployment-env` 来源条目；`defaultProvider=minimax` 语义向后兼容
-- [ ] 包运行凭据解析只在执行边界发生（reference-only），事件/checkpoint/Temporal payload 不含 key
-- [ ] 对话页可选择工作区 provider 运行（key 不进浏览器），也可继续用 browser-local profile
-- [ ] SecretBackend 接口落地，本地后端缺 master key 时 fail-closed 而非明文落库
-- [ ] 全仓 typecheck / 相关测试全绿；全部子 change `validate --strict` 通过并归档
+- [x] Providers 页不再出现「未检测到 MiniMax」与外部配置正常状态并存的割裂观感：徽章与外部配置读同一注册表，或文案明确作用域
+- [x] 同一 tenant 可创建同一 provider 的多个受信条目（如个人 key 与部署 key 并存），互不覆盖
+- [x] API key 仅通过写通道进入服务端加密存储；任何 GET/列表/日志/事件/错误响应均不回显 key 明文
+- [x] `MINIMAX_API_KEY` env 在启动时自动注册为 `deployment-env` 来源条目；`defaultProvider=minimax` 语义向后兼容
+- [x] 包运行凭据解析只在执行边界发生（reference-only），事件/checkpoint/Temporal payload 不含 key
+- [x] 对话页可选择工作区 provider 运行（key 不进浏览器），也可继续用 browser-local profile
+- [x] SecretBackend 接口落地，本地后端缺 master key 时 fail-closed 而非明文落库
+- [x] 全仓 typecheck / 相关测试全绿；全部子 change `validate --strict` 通过并归档
 
 ## Driver 协议
 - 本 change 无 spec 增量（`.openspec.yaml` 已设 `skip_specs: true`）
@@ -40,3 +40,12 @@
 - 结束时逐条列出未勾项与原因，不按 change 汇总
 
 ## 验证记录
+
+### 2026-08-25 收尾
+
+- 全仓 `pnpm typecheck` 通过；eslint（四个子 change 全部改动文件，--max-warnings=0）通过。
+- 回归：单测 287 passed / 1 skipped（skip 为既有）；store 集成 15 passed（真实 PG 临时库）；`openspec validate --specs` 55 passed。
+- 四个子 change 全部 `openspec validate --strict --type change` 通过。
+- `pnpm smoke:local` 因环境无法执行：Docker 拉取 `node:24.14.0-bookworm-slim` 时 registry-1.docker.io 连接被重置（网络受限），与本次改动无关；单测/集成/typecheck 已覆盖同样路径。
+- 验收标准全部满足（见上方勾选），证据对应到各子 change 的 tasks.md 验证记录。
+- 四个子 change 已于 2026-08-25 归档至 `openspec/changes/archive/2026-08-25-trusted-provider-registry-*`，delta specs 已合并晋升到主 specs（56 specs validate 通过）。
