@@ -224,14 +224,14 @@ describe('Provider profile UX', () => {
     expect(tree.root.findByProps({ 'aria-label': 'Run agent' })).toBeTruthy();
     const select = tree.root.findByProps({ 'aria-label': 'Default provider' });
     expect(select.props.value).toBe('auto');
-    expect(tree.root.findByProps({ children: 'MiniMax not detected — MINIMAX_API_KEY missing in this process environment' })).toBeTruthy();
+    expect(tree.root.findByProps({ children: 'Package runs: MiniMax not detected — MINIMAX_API_KEY missing in the trusted server environment; chat external profiles are unaffected' })).toBeTruthy();
     await act(async () => { select.props.onChange({ target: { value: 'minimax' } }); await wait(); });
     expect(puts).toHaveLength(1);
     expect(puts[0]?.url).toBe('/v1/run-agent/settings');
     expect(puts[0]?.method).toBe('PUT');
     expect(puts[0]?.body).toEqual({ defaultProvider: 'minimax' });
     expect(tree.root.findByProps({ 'aria-label': 'Default provider' }).props.value).toBe('minimax');
-    expect(tree.root.findByProps({ children: 'MiniMax available in this process environment' })).toBeTruthy();
+    expect(tree.root.findByProps({ children: 'Package runs: MiniMax available in the trusted server environment (chat external profiles unaffected)' })).toBeTruthy();
     expect(tree.root.findAllByProps({ role: 'status' }).some((node) => node.children.join('').includes('Run agent settings saved.'))).toBe(true);
     await act(async () => tree.unmount());
   });
