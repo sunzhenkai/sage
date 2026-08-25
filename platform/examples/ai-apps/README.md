@@ -1,8 +1,13 @@
-# ops-analyst 示例 ai app 包
+# 示例 ai app 包
 
-通用运维分析助手的源包示例，用于端到端验证 agent-package 链路（源规范 → 编译 → 登记 → 从包发起运行 → 前端展示管理）。内容仅使用通用运维准则，不涉及任何公司或内部系统信息。
+两个示例源包，用于端到端验证 agent-package 链路（源规范 → 编译 → 登记 → 从包发起运行 → 前端展示管理）。内容均为通用公开领域知识，不涉及任何公司或内部系统信息。
 
-## 目录结构
+| 示例包 | 主题 | 说明 |
+|--------|------|------|
+| `ops-analyst/` | 通用运维分析 | 解读监控指标、定位告警、生成排查建议 |
+| `github-trending/` | GitHub 热门项目解读 | 分析 trending 项目快照，产出排名解读、亮点与趋势 digest（展示页见 `docs/showcase/github-trending.html`） |
+
+## 目录结构（以 ops-analyst 为例）
 
 ```
 ops-analyst/
@@ -27,8 +32,8 @@ ops-analyst/
 
 ```bash
 cd platform
-pnpm --filter @sage/agent-package-release test   # 含 sample-app.smoke.test.ts
-# 预期：src/sample-app.smoke.test.ts 通过，输出合法 AgentPackageRelease.v1（compilerBuild=local-dev）
+pnpm --filter @sage/agent-package-release test   # 含 sample-app / github-trending 两个 smoke 测试
+# 预期：src/sample-app.smoke.test.ts、src/github-trending.smoke.test.ts 通过，输出合法 AgentPackageRelease.v1（compilerBuild=local-dev）
 ```
 
 ### 2. 登记到运行中的 agent-api
@@ -100,3 +105,21 @@ curl -sS http://127.0.0.1:9610/v1/packages/ops-analyst -H 'x-authentication-id: 
 
 - 同一 Release + 相同输入重复发起运行：`status` 返回 `existing`，不产生新 Attempt。
 - production 模式（`SAGE_DEPLOYMENT_MODE != local`）下 runs 端点返回 `501 PACKAGE_RUN_ADMISSION_NOT_AVAILABLE`（fail closed）。
+
+## 真实 provider 执行（local 专属）
+
+默认情况下包运行为离线模式（`defaultProvider=echo`，本地确定性 harness，输出「已收到：…」）。真实模型执行只经受信 provider 注册表：在 Providers 页添加「工作区 provider」（凭据服务端密封，只写不读），并把运行 Agent 设置的默认 provider 切到该条目；worker 在执行边界解密凭据，进程 env 不再持有任何 provider key。
+
+前置：`SAGE_SECRET_MASTER_KEY`（base64 编码 32 字节）必须同时注入 agent-api 与 agent-worker，否则凭据写入与解析 fail-closed。
+
+自动化部署可改用 env 引导（agent-api 启动时幂等注册 `deployment-env` 条目）：
+
+| 环境变量 | 必填 | 说明 |
+|----------|------|------|
+| `SAGE_BOOTSTRAP_PROVIDER_API_KEY` | 是（启用开关） | provider API key，密封后入库，不明文落盘 |
+| `SAGE_BOOTSTRAP_PROVIDER_BASE_URL` | 是 | 公共 HTTPS 端点（无默认值） |
+| `SAGE_BOOTSTRAP_PROVIDER_MODEL` | 是 | 模型名（无默认值） |
+| `SAGE_BOOTSTRAP_PROVIDER_NAME` | 否 | 条目显示名（缺省「部署环境 Provider」） |
+| `SAGE_BOOTSTRAP_PROVIDER_ADAPTER` | 否 | 适配器类型（缺省 `anthropic`，可选 `openai-compatible`） |
+
+运行成功后，输出文本物化在 `task_run_output`，可经 `GET /v1/tasks/<taskId>/artifacts/<artifactId>` 取回（响应含 `content` 字段）。

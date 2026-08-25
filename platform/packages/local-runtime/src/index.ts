@@ -17,5 +17,28 @@ export function createLiveProviderAgentClient(options: {
   return new LocalAgentClient({ harness: new LiveProviderHarness(options) });
 }
 
+/**
+ * Package-run composition: the assembled run input (entry prompt + references +
+ * user input) becomes the single user message of one provider turn. The route is
+ * process-scoped trusted config (env-sourced), never persisted.
+ */
+export const PACKAGE_RUN_SYSTEM_PROMPT = 'You are executing an agent package run. Follow the instructions embedded in the user message exactly and produce the requested output.';
+
+export function createLivePackageAgentClient(options: {
+  readonly route: LiveProviderRoute;
+  readonly systemPrompt?: string;
+  readonly maxOutputTokens?: number;
+}): LocalAgentClient {
+  return new LocalAgentClient({
+    harness: new LiveProviderHarness({
+      route: options.route,
+      transcript: [],
+      turnInput: true,
+      systemPrompt: options.systemPrompt ?? PACKAGE_RUN_SYSTEM_PROMPT,
+      ...(options.maxOutputTokens === undefined ? {} : { maxOutputTokens: options.maxOutputTokens })
+    })
+  });
+}
+
 export type { LiveProviderRoute, LiveProviderTurnMessage };
 export * from './kernel.js';

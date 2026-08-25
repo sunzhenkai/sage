@@ -55,7 +55,8 @@ export const TaskSliceLimitsSchema = Type.Object({
   maxTurns: Type.Integer({ minimum: 1, maximum: 4 }),
   maxToolCalls: Type.Integer({ minimum: 0, maximum: 16 }),
   maxTokens: Type.Integer({ minimum: 1, maximum: 32_000 }),
-  timeoutMs: Type.Integer({ minimum: 100, maximum: 30_000 })
+  // 上限对齐 live provider 真实推理（活动 startToClose 5 分钟 + 重试余量）；echo 执行毫秒级完成不受影响。
+  timeoutMs: Type.Integer({ minimum: 100, maximum: 600_000 })
 }, { additionalProperties: false, $id: 'TaskSliceLimits.v1' });
 export type TaskSliceLimits = Static<typeof TaskSliceLimitsSchema>;
 
@@ -228,7 +229,7 @@ export interface TaskRoutingStore {
   markTargetUnavailable(tenantId: string, taskId: string, failureCode: string, ownerToken: string, startIdempotencyKey: string): Promise<void>;
   recordRoutingRejection(decision: RouteDecision): Promise<void>;
 }
-export type TaskStorePort = TaskCommitStore & TaskProjectionStore & TaskRoutingStore & TaskPackageInputStore & { migrate(): Promise<void>; close(): Promise<void> };
+export type TaskStorePort = TaskCommitStore & TaskProjectionStore & TaskRoutingStore & TaskPackageInputStore & TaskRunOutputStore & RunAgentSettingsStore & ProviderConnectionStore & { migrate(): Promise<void>; close(): Promise<void> };
 
 export const isAgentTaskWorkflowInput = (value: unknown): value is AgentTaskWorkflowInput => Value.Check(AgentTaskWorkflowInputSchema, value);
 export const isExecuteAgentSliceInput = (value: unknown): value is ExecuteAgentSliceInput => Value.Check(ExecuteAgentSliceInputSchema, value);
@@ -250,6 +251,9 @@ export interface TaskProjectionEvent {
 export interface TaskArtifactReference {
   readonly artifactId: string; readonly artifactRef: TaskArtifactRef; readonly taskId: string;
   readonly attempt: number; readonly name: string; readonly mediaType: string;
+  /** Resolved content, present only when the local run-output store holds the body. */
+  readonly content?: string;
+  readonly encoding?: 'utf-8';
 }
 
 /** 包运行输入的物化记录：entry prompt + references 清单 + 用户输入，含资产 digest 清单。 */
@@ -267,6 +271,100 @@ export interface TaskPackageInputStore {
   /** 创建型写入：同 (tenant, taskId) 已存在且内容一致则返回 existing，否则冲突。 */
   writePackageInput(record: TaskPackageInputRecord): Promise<{ readonly status: 'stored' | 'existing' }>;
   getPackageInput(tenantId: string, taskId: string): Promise<TaskPackageInputRecord | undefined>;
+}
+
+/** 包运行输出的物化记录：slice 提交成功后由 worker 写入，按 (tenant, task) 取回。 */
+export interface TaskRunOutputRecord {
+  readonly tenantId: string;
+  readonly taskId: string;
+  readonly artifactRef: TaskArtifactRef;
+  readonly output: string;
+  readonly mediaType: string;
+  readonly createdAt: string;
+}
+
+export interface TaskRunOutputStore {
+  /** 幂等写入：同 (tenant, taskId) 且内容一致返回 existing，内容不一致抛冲突错误。 */
+  writeRunOutput(record: TaskRunOutputRecord): Promise<{ readonly status: 'stored' | 'existing' }>;
+  getRunOutput(tenantId: string, taskId: string): Promise<TaskRunOutputRecord | undefined>;
+}
+
+/** 运行 agent 默认 provider：echo=显式本地确定性 harness（离线模式，缺省），connection=指向受信 provider 注册表条目。legacy 取值（auto/minimax）在读取时归一为 echo。 */
+export type RunAgentDefaultProvider = 'echo' | 'connection';
+
+/** legacy 存储值归一：connection 保留，其余（含已删除的 auto/minimax 与未知值）一律按 echo 处理。 */
+export function normalizeRunAgentDefaultProvider(raw: string): RunAgentDefaultProvider {
+  return raw === 'connection' ? 'connection' : 'echo';
+}
+
+/** 运行 agent 设置记录：per-tenant 单例、非密钥；无行等效 echo（离线模式）。connection 模式下 providerConnectionId 必填。 */
+export interface RunAgentSettingsRecord {
+  readonly tenantId: string;
+  readonly defaultProvider: RunAgentDefaultProvider;
+  readonly providerConnectionId?: string;
+  readonly updatedAt: string;
+  readonly updatedBy: string;
+}
+
+export interface RunAgentSettingsStore {
+  getRunAgentSettings(tenantId: string): Promise<RunAgentSettingsRecord | undefined>;
+  upsertRunAgentSettings(record: RunAgentSettingsRecord): Promise<{ readonly status: 'stored' | 'existing' }>;
+}
+
+/** 部署 env 引导条目的固定 id：SAGE_BOOTSTRAP_PROVIDER_API_KEY 非空时由 agent-api 启动幂等 upsert。 */
+export const DEPLOYMENT_ENV_CONNECTION_ID = 'deployment-env-default';
+
+/** 受信 provider 条目来源：user=经 API 创建，deployment-env=启动时从受信 env 幂等引导。 */
+export type ProviderConnectionSource = 'user' | 'deployment-env';
+export type ProviderConnectionAdapterKind = 'openai-compatible' | 'anthropic';
+
+/** 受信 provider 条目：元数据 + 凭据在场派生布尔；密文只存在于 provider_credentials 表，永不进入本记录。 */
+export interface ProviderConnectionRecord {
+  readonly tenantId: string;
+  readonly id: string;
+  readonly name: string;
+  readonly source: ProviderConnectionSource;
+  readonly adapterKind: ProviderConnectionAdapterKind;
+  readonly baseUrl: string;
+  readonly modelId: string;
+  readonly providerName?: string;
+  readonly modelName?: string;
+  readonly enabled: boolean;
+  readonly credentialPresent: boolean;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly updatedBy?: string;
+}
+
+/** 密封凭据：调用方（持 SecretBackend 的装配层）密封后提交，存储只见密文与 key version。 */
+export interface ProviderCredentialSealed {
+  readonly ciphertext: Buffer;
+  readonly keyVersion: number;
+  readonly updatedAt: string;
+}
+
+/** 条目创建/更新输入：credential 可选以支持只改元数据；轮换 key 即替换 credential。 */
+export interface ProviderConnectionWrite {
+  readonly name: string;
+  readonly source: ProviderConnectionSource;
+  readonly adapterKind: ProviderConnectionAdapterKind;
+  readonly baseUrl: string;
+  readonly modelId: string;
+  readonly providerName?: string;
+  readonly modelName?: string;
+  readonly enabled: boolean;
+  readonly updatedBy?: string;
+  readonly credential?: ProviderCredentialSealed;
+}
+
+export interface ProviderConnectionStore {
+  listProviderConnections(tenantId: string): Promise<readonly ProviderConnectionRecord[]>;
+  getProviderConnection(tenantId: string, id: string): Promise<ProviderConnectionRecord | undefined>;
+  createProviderConnection(tenantId: string, id: string, write: ProviderConnectionWrite, createdAt: string): Promise<ProviderConnectionRecord>;
+  updateProviderConnection(tenantId: string, id: string, write: ProviderConnectionWrite, updatedAt: string): Promise<ProviderConnectionRecord | undefined>;
+  /** 执行边界专用：取密封凭据（不校验 enabled，由调用方决定语义）；不存在返回 undefined。 */
+  getProviderCredential(tenantId: string, id: string): Promise<ProviderCredentialSealed | undefined>;
+  deleteProviderConnection(tenantId: string, id: string): Promise<boolean>;
 }
 export type ProjectionStaleReason = 'age_threshold_exceeded' | 'history_ahead' | 'target_unavailable' | 'projection_unavailable';
 export interface TaskProjectionView {

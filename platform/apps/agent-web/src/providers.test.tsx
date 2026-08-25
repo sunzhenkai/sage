@@ -9,12 +9,22 @@ class MemoryStorage implements Storage { #data = new Map<string,string>(); get l
 const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 const wait = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 const page = { schemaVersion: '1', snapshotId: 'snapshot-1', activeSince: '2026-08-14T00:00:00.000Z', stale: false };
+const runAgentSettings = (defaultProvider: 'echo' | 'connection' = 'echo', connections: readonly { id: string; name: string; available: boolean }[] = []) => ({
+  schemaVersion: 'RunAgentSettings.v1', defaultProvider,
+  ...(defaultProvider === 'connection' ? { providerConnectionId: connections[0]?.id ?? 'conn-1' } : {}),
+  providers: connections.map((connection) => ({ id: connection.id, name: connection.name, available: connection.available, ...(connection.available ? {} : { reason: 'Connection has no stored credential' }) }))
+});
 
 describe('Provider profile UX', () => {
   afterEach(() => vi.unstubAllGlobals());
   it('shows one read-only System runtime and starts with no external profile', async () => {
     const localStorage = new MemoryStorage(); const sessionStorage = new MemoryStorage(); vi.stubGlobal('window', { localStorage, sessionStorage });
-    const fetcher = vi.fn(async () => response({ schemaVersion: '1', source: 'models-dev', availability: 'unavailable', providerCount: 0, modelCount: 0, nextSyncAt: '2026-08-15T00:00:00.000Z', projection: 'unavailable' })) as typeof fetch;
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/provider-connections')) return response({ schemaVersion: 'ProviderConnections.v1', connections: [] });
+      if (url.endsWith('/run-agent/settings')) return response(runAgentSettings());
+      return response({ schemaVersion: '1', source: 'models-dev', availability: 'unavailable', providerCount: 0, modelCount: 0, nextSyncAt: '2026-08-15T00:00:00.000Z', projection: 'unavailable' });
+    }) as typeof fetch;
     let tree!: ReturnType<typeof create>; await act(async () => { tree = create(<ProvidersApp fetcher={fetcher} />); await wait(); });
     expect(tree.root.findByProps({ 'aria-label': 'System runtime' })).toBeTruthy();
     expect(tree.root.findByProps({ children: 'In use' })).toBeTruthy();
@@ -28,6 +38,8 @@ describe('Provider profile UX', () => {
     const calls: { url: string; signal?: AbortSignal }[] = [];
     const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input); calls.push({ url, ...(init?.signal ? { signal: init.signal } : {}) });
+      if (url.endsWith('/provider-connections')) return response({ schemaVersion: 'ProviderConnections.v1', connections: [] });
+      if (url.endsWith('/run-agent/settings')) return response(runAgentSettings());
       if (url.endsWith('/status')) return response({ schemaVersion: '1', source: 'models-dev', availability: 'available', providerCount: 1, modelCount: 1, lastCheckedAt: '2026-08-14T00:00:00.000Z', nextSyncAt: '2026-08-15T00:00:00.000Z', projection: 'ready' });
       if (url.includes('/providers?')) return response({ ...page, items: [{ providerId: 'alpha', name: 'Alpha', api: 'https://alpha.example/v1' }, { providerId: 'beta', name: 'Beta', api: 'https://beta.example/v1' }] });
       if (url.includes('/models?')) return response({ ...page, items: [{ modelId: 'model', providerId: 'alpha', name: 'Model', status: 'active', capabilities: [] }] });
@@ -67,7 +79,8 @@ describe('Provider profile UX', () => {
     expect(tree.root.findAllByProps({ role: 'status' }).some((node) => node.children.join('').includes('Connected'))).toBe(true);
     await act(async () => { tree.root.findByProps({ className: 'profile-card ' }).props.onClick(); });
     const baseUrl = tree.root.findByProps({ placeholder: 'Source did not publish a URL; enter HTTPS manually if needed' });
-    await act(async () => { tree.root.findByType('select').props.onChange({ target: { value: 'openai-compatible' } }); baseUrl.props.onChange({ target: { value: '' } }); });
+    const adapterSelect = tree.root.findAllByType('select').find((node) => node.props['aria-label'] !== 'Default provider')!;
+    await act(async () => { adapterSelect.props.onChange({ target: { value: 'openai-compatible' } }); baseUrl.props.onChange({ target: { value: '' } }); });
     await act(async () => { tree.root.findByType('form').props.onSubmit({ preventDefault(){} }); });
     expect(JSON.parse(localStorage.getItem(PROVIDER_V2_STORAGE_KEY)!)[0]).not.toHaveProperty('baseUrl');
     const enabled = tree.root.findAllByProps({ type: 'checkbox' }).at(-1)!;
@@ -94,6 +107,8 @@ describe('Provider profile UX', () => {
     vi.stubGlobal('window', { localStorage, sessionStorage }); vi.stubGlobal('document', { documentElement: { lang: '' } });
     const fetcher = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
+      if (url.endsWith('/provider-connections')) return response({ schemaVersion: 'ProviderConnections.v1', connections: [] });
+      if (url.endsWith('/run-agent/settings')) return response(runAgentSettings());
       if (url.endsWith('/status')) return response({ schemaVersion: '1', source: 'models-dev', availability: 'available', providerCount: 1, modelCount: 1, nextSyncAt: '2026-08-15T00:00:00.000Z', projection: 'ready' });
       if (url.includes('/providers?')) return response({ ...page, items: [{ providerId: 'alpha', name: 'Alpha', api: 'https://alpha.example/v1' }] });
       if (url.includes('/models?')) return response({ ...page, items: [{ modelId: 'model', providerId: 'alpha', name: 'Model', status: 'active', capabilities: [] }] });
@@ -126,6 +141,8 @@ describe('Provider profile UX', () => {
     const first = new Promise<Response>((resolve) => { resolveFirst = resolve; });
     const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
+      if (url.endsWith('/provider-connections')) return response({ schemaVersion: 'ProviderConnections.v1', connections: [] });
+      if (url.endsWith('/run-agent/settings')) return response(runAgentSettings());
       if (url.endsWith('/status')) return response({ schemaVersion: '1', source: 'models-dev', availability: 'available', providerCount: 2, modelCount: 2, nextSyncAt: '2026-08-15T00:00:00.000Z', projection: 'ready' });
       if (url.endsWith('/check-connection')) {
         const body = JSON.parse(String(init?.body)) as { apiKey: string };
@@ -150,6 +167,8 @@ describe('Provider profile UX', () => {
     const localStorage = new MemoryStorage(); const sessionStorage = new MemoryStorage(); vi.stubGlobal('window', { localStorage, sessionStorage });
     const fetcher = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
+      if (url.endsWith('/provider-connections')) return response({ schemaVersion: 'ProviderConnections.v1', connections: [] });
+      if (url.endsWith('/run-agent/settings')) return response(runAgentSettings());
       if (url.endsWith('/status')) return response({ schemaVersion: '1', source: 'models-dev', availability: 'available', providerCount: 1, modelCount: 1, nextSyncAt: '2026-08-15T00:00:00.000Z', projection: 'ready' });
       if (url.includes('/providers?')) return response({ ...page, items: [{ providerId: 'alpha', name: 'Alpha', api: 'https://alpha.example/v1' }] });
       throw new Error(url);
@@ -176,6 +195,8 @@ describe('Provider profile UX', () => {
     const signals: AbortSignal[] = [];
     const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
+      if (url.endsWith('/provider-connections')) return response({ schemaVersion: 'ProviderConnections.v1', connections: [] });
+      if (url.endsWith('/run-agent/settings')) return response(runAgentSettings());
       if (url.endsWith('/status')) return response({ schemaVersion: '1', source: 'models-dev', availability: 'available', providerCount: 1, modelCount: 1, nextSyncAt: '2026-08-15T00:00:00.000Z', projection: 'ready' });
       if (url.includes('/providers?')) { providerCalls += 1; if (init?.signal) signals.push(init.signal); return providerCalls === 1 ? first : response({ code: 'CATALOG_SNAPSHOT_CHANGED' }, 409); }
       throw new Error(url);
@@ -191,6 +212,121 @@ describe('Provider profile UX', () => {
     expect(tree.root.findAllByProps({ role: 'status' }).some((node) => node.children.join('').includes('Catalog updated'))).toBe(true);
     await act(async () => { resolveFirst(response({ ...page, items: [{ providerId: 'stale', name: 'Stale' }] })); await wait(); });
     expect(tree.root.findByProps({ id: 'provider-options' }).findAllByType('button')).toHaveLength(0);
+    await act(async () => tree.unmount());
+  });
+
+  it('shows the Run agent card, offline/no-provider badge, and PUTs the default provider on change', async () => {
+    const localStorage = new MemoryStorage(); const sessionStorage = new MemoryStorage(); vi.stubGlobal('window', { localStorage, sessionStorage });
+    const puts: { url: string; method?: string; body?: unknown }[] = [];
+    let settings = runAgentSettings();
+    const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/provider-connections')) return response({ schemaVersion: 'ProviderConnections.v1', connections: [] });
+      if (url.endsWith('/run-agent/settings')) {
+        if (init?.method === 'PUT') { puts.push({ url, method: init.method, body: JSON.parse(String(init.body)) }); settings = runAgentSettings('echo', [{ id: 'conn-1', name: '条目一', available: true }]); return response(settings); }
+        return response(settings);
+      }
+      if (url.endsWith('/status')) return response({ schemaVersion: '1', source: 'models-dev', availability: 'available', providerCount: 0, modelCount: 0, nextSyncAt: '2026-08-15T00:00:00.000Z', projection: 'ready' });
+      throw new Error(url);
+    }) as typeof fetch;
+    let tree!: ReturnType<typeof create>; await act(async () => { tree = create(<ProvidersApp fetcher={fetcher} />); await wait(); });
+    expect(tree.root.findByProps({ 'aria-label': 'Run agent' })).toBeTruthy();
+    const select = tree.root.findByProps({ 'aria-label': 'Default provider' });
+    expect(select.props.value).toBe('echo');
+    expect(tree.root.findByProps({ children: 'Package runs: no usable workspace provider — add and select one below, or stay in offline mode; chat external profiles are unaffected' })).toBeTruthy();
+    await act(async () => { select.props.onChange({ target: { value: 'echo' } }); await wait(); });
+    expect(puts).toHaveLength(1);
+    expect(puts[0]?.url).toBe('/v1/run-agent/settings');
+    expect(puts[0]?.method).toBe('PUT');
+    expect(puts[0]?.body).toEqual({ defaultProvider: 'echo' });
+    expect(tree.root.findByProps({ 'aria-label': 'Default provider' }).props.value).toBe('echo');
+    expect(tree.root.findByProps({ children: 'Package runs: offline mode (no model calls); chat external profiles are unaffected' })).toBeTruthy();
+    expect(tree.root.findAllByProps({ role: 'status' }).some((node) => node.children.join('').includes('Run agent settings saved.'))).toBe(true);
+    await act(async () => tree.unmount());
+  });
+  it('lists workspace providers with source badges and no edit affordances for deployment-env entries', async () => {
+    const localStorage = new MemoryStorage(); const sessionStorage = new MemoryStorage(); vi.stubGlobal('window', { localStorage, sessionStorage });
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/provider-connections')) return response({
+        schemaVersion: 'ProviderConnections.v1',
+        connections: [
+          { id: 'conn-1', name: 'MiniMax 个人', source: 'user', adapterKind: 'anthropic', baseUrl: 'https://api.minimaxi.com/anthropic', modelId: 'MiniMax-M3', providerName: 'MiniMax', modelName: 'MiniMax-M3', enabled: true, credentialPresent: true },
+          { id: 'deployment-env-default', name: '部署环境 Provider', source: 'deployment-env', adapterKind: 'anthropic', baseUrl: 'https://api.minimaxi.com/anthropic', modelId: 'MiniMax-M3', providerName: 'MiniMax', enabled: true, credentialPresent: true }
+        ]
+      });
+      if (url.endsWith('/run-agent/settings')) return response(runAgentSettings());
+      if (url.endsWith('/status')) return response({ schemaVersion: '1', source: 'models-dev', availability: 'unavailable', providerCount: 0, modelCount: 0, nextSyncAt: '2026-08-15T00:00:00.000Z', projection: 'unavailable' });
+      throw new Error(url);
+    }) as typeof fetch;
+    let tree!: ReturnType<typeof create>; await act(async () => { tree = create(<ProvidersApp fetcher={fetcher} />); await wait(); });
+    expect(tree.root.findByProps({ 'aria-label': 'Workspace providers' })).toBeTruthy();
+    expect(tree.root.findByProps({ children: 'MiniMax 个人' })).toBeTruthy();
+    expect(tree.root.findAllByProps({ children: 'Credential stored' })).toHaveLength(2);
+    const editButtons = tree.root.findAllByProps({ 'aria-label': 'Edit workspace provider MiniMax 个人' });
+    expect(editButtons).toHaveLength(1);
+    // deployment-env 条目受保护：无编辑/删除入口。
+    expect(tree.root.findAllByProps({ 'aria-label': 'Edit workspace provider MiniMax（部署环境）' })).toHaveLength(0);
+    expect(tree.root.findAllByProps({ 'aria-label': 'Delete workspace provider MiniMax（部署环境）' })).toHaveLength(0);
+    await act(async () => tree.unmount());
+  });
+
+  it('creates a workspace provider via POST and never renders the submitted key', async () => {
+    const localStorage = new MemoryStorage(); const sessionStorage = new MemoryStorage(); vi.stubGlobal('window', { localStorage, sessionStorage });
+    const posts: { url: string; method?: string; body?: unknown }[] = [];
+    const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/provider-connections')) {
+        if (init?.method === 'POST') {
+          posts.push({ url, method: init.method, body: JSON.parse(String(init.body)) });
+          return response({ schemaVersion: 'ProviderConnection.v1', connection: { id: 'conn-9', name: '新建条目', source: 'user', adapterKind: 'anthropic', baseUrl: 'https://api.minimaxi.com/anthropic', modelId: 'MiniMax-M3', enabled: true, credentialPresent: true } }, 201);
+        }
+        return response({ schemaVersion: 'ProviderConnections.v1', connections: [] });
+      }
+      if (url.endsWith('/run-agent/settings')) return response(runAgentSettings());
+      if (url.endsWith('/status')) return response({ schemaVersion: '1', source: 'models-dev', availability: 'unavailable', providerCount: 0, modelCount: 0, nextSyncAt: '2026-08-15T00:00:00.000Z', projection: 'unavailable' });
+      throw new Error(url);
+    }) as typeof fetch;
+    let tree!: ReturnType<typeof create>; await act(async () => { tree = create(<ProvidersApp fetcher={fetcher} />); await wait(); });
+    await act(async () => { tree.root.findByProps({ children: '+ Add workspace provider' }).props.onClick(); await wait(); });
+    // 逐字段填表：name、baseUrl（placeholder 定位）、modelId、apiKey(password)
+    const fields = tree.root.findAllByType('input');
+    const setValue = async (index: number, value: string) => { await act(async () => { fields[index]!.props.onChange({ target: { value } }); await wait(); }); };
+    await setValue(0, '新建条目');
+    const baseUrlField = fields.find((node) => node.props.placeholder === 'https://api.example.com')!;
+    await act(async () => { baseUrlField.props.onChange({ target: { value: 'https://api.minimaxi.com/anthropic' } }); await wait(); });
+    const modelField = fields.filter((node) => node.props.type !== 'password' && node !== fields[0] && node !== baseUrlField)[0]!;
+    await act(async () => { modelField.props.onChange({ target: { value: 'MiniMax-M3' } }); await wait(); });
+    const keyField = fields.find((node) => node.props.type === 'password')!;
+    await act(async () => { keyField.props.onChange({ target: { value: 'sk-server-side-key' } }); await wait(); });
+    await act(async () => { tree.root.findByProps({ className: 'workspace-provider-form' }).props.onSubmit({ preventDefault: () => undefined }); await wait(); });
+    expect(posts).toHaveLength(1);
+    expect(posts[0]?.body).toEqual({ name: '新建条目', adapterKind: 'anthropic', baseUrl: 'https://api.minimaxi.com/anthropic', modelId: 'MiniMax-M3', apiKey: 'sk-server-side-key' });
+    expect(JSON.stringify(tree.toJSON() ?? [])).not.toContain('sk-server-side-key');
+    await act(async () => tree.unmount());
+  });
+
+  it('offers workspace connections in the run agent dropdown and PUTs connection mode with badge status', async () => {
+    const localStorage = new MemoryStorage(); const sessionStorage = new MemoryStorage(); vi.stubGlobal('window', { localStorage, sessionStorage });
+    const puts: { url: string; method?: string; body?: unknown }[] = [];
+    const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/provider-connections')) return response({ schemaVersion: 'ProviderConnections.v1', connections: [] });
+      if (url.endsWith('/run-agent/settings')) {
+        if (init?.method === 'PUT') { puts.push({ url, method: init.method, body: JSON.parse(String(init.body)) }); return response(runAgentSettings('connection', [{ id: 'conn-1', name: 'MiniMax 个人', available: true }])); }
+        return response(runAgentSettings('echo', [{ id: 'conn-1', name: 'MiniMax 个人', available: true }]));
+      }
+      if (url.endsWith('/status')) return response({ schemaVersion: '1', source: 'models-dev', availability: 'unavailable', providerCount: 0, modelCount: 0, nextSyncAt: '2026-08-15T00:00:00.000Z', projection: 'unavailable' });
+      throw new Error(url);
+    }) as typeof fetch;
+    let tree!: ReturnType<typeof create>; await act(async () => { tree = create(<ProvidersApp fetcher={fetcher} />); await wait(); });
+    const select = tree.root.findByProps({ 'aria-label': 'Default provider' });
+    const option = select.findAllByProps({ value: 'connection:conn-1' })[0];
+    expect(option).toBeTruthy();
+    await act(async () => { select.props.onChange({ target: { value: 'connection:conn-1' } }); await wait(); });
+    expect(puts).toHaveLength(1);
+    expect(puts[0]?.body).toEqual({ defaultProvider: 'connection', providerConnectionId: 'conn-1' });
+    expect(tree.root.findByProps({ children: 'Package runs: workspace provider "MiniMax 个人" ready' })).toBeTruthy();
     await act(async () => tree.unmount());
   });
 });

@@ -65,6 +65,28 @@ describe('LiveProviderHarness', () => {
       runId: 'run-live', input: 'ignored', turn: 1, skillRefs: [], remaining: { toolCalls: 16, tokens: 32_000 }
     }, new AbortController().signal)).rejects.toThrow('HTTP 401');
   });
+
+  it('turnInput mode sends the assembled run input as the single user message with the overridden system prompt', async () => {
+    const invoker = vi.fn(async () => ({ text: 'digest', tokens: 7 }));
+    const result = await new LiveProviderHarness({
+      route, transcript, invoker, turnInput: true, systemPrompt: '执行包内指令并产出要求的输出。'
+    }).executeTurn({
+      runId: 'run-package', input: '# github-trending\n你是一名…\nuser: 快照数据…', turn: 1, skillRefs: [], remaining: { toolCalls: 16, tokens: 32_000 }
+    }, new AbortController().signal);
+    expect(result.output).toBe('digest');
+    expect(invoker).toHaveBeenCalledWith(expect.objectContaining({
+      systemPrompt: '执行包内指令并产出要求的输出。',
+      messages: [{ role: 'user', text: '# github-trending\n你是一名…\nuser: 快照数据…' }]
+    }));
+  });
+
+  it('keeps the chat default when turnInput is not set', async () => {
+    const invoker = vi.fn(async () => ({ text: 'ok', tokens: 1 }));
+    await new LiveProviderHarness({ route, transcript, invoker }).executeTurn({
+      runId: 'run-live', input: 'would leak if used', turn: 1, skillRefs: [], remaining: { toolCalls: 16, tokens: 32_000 }
+    }, new AbortController().signal);
+    expect(invoker).toHaveBeenCalledWith(expect.objectContaining({ messages: transcript }));
+  });
 });
 
 describe('PiHarness canonical adapter identity', () => {

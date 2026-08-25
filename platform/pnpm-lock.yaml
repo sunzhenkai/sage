@@ -107,6 +107,9 @@ importers:
       '@sage/provider-catalog':
         specifier: workspace:*
         version: link:../../packages/provider-catalog
+      '@sage/secret-vault':
+        specifier: workspace:*
+        version: link:../../packages/secret-vault
       '@sage/task-domain':
         specifier: workspace:*
         version: link:../../packages/task-domain
@@ -193,6 +196,9 @@ importers:
       '@sage/production-governance':
         specifier: workspace:*
         version: link:../../packages/production-governance
+      '@sage/secret-vault':
+        specifier: workspace:*
+        version: link:../../packages/secret-vault
       '@sage/task-domain':
         specifier: workspace:*
         version: link:../../packages/task-domain
@@ -699,6 +705,8 @@ importers:
       '@types/pg':
         specifier: 8.21.0
         version: 8.21.0
+
+  packages/secret-vault: {}
 
   packages/task-domain:
     dependencies:

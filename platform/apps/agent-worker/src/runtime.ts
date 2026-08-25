@@ -4,7 +4,8 @@ import { fileURLToPath } from 'node:url';
 import { Pool } from 'pg';
 import { bundleWorkflowCode, NativeConnection, Worker, type WorkerStatus } from '@temporalio/worker';
 import { ChatStore } from '@sage/chat-domain';
-import { createLocalAgentClient, createLocalKernelComposition } from '@sage/local-runtime';
+import { createLivePackageAgentClient, createLocalAgentClient, createLocalKernelComposition, PACKAGE_RUN_SYSTEM_PROMPT, type LiveProviderRoute } from '@sage/local-runtime';
+import { createLocalSecretBackendFromEnv } from '@sage/secret-vault';
 import { LegacyAgentRunSpecV1Adapter, parseAgentExecutionFeatureConfig, selectAgentExecutionMode, type AgentExecutionMode, type AgentLifecycleOwner, type LegacyAdapterResult } from '@sage/agent-client';
 import { PostgresTaskStore } from '@sage/task-store-postgres';
 import { TASK_NAMESPACE, TASK_QUEUE, type TaskInputRef } from '@sage/task-domain';
@@ -151,13 +152,21 @@ export async function createWorkerRuntime(config = readWorkerRuntimeConfig()): P
         ...(context?.signal === undefined ? {} : { signal: context.signal })
       })
     };
+    const secretBackend = createLocalSecretBackendFromEnv();
     native = await NativeConnection.connect({ address: config.temporalAddress });
+    const secretBackendMode = secretBackend?.describe().mode ?? 'unavailable';
     worker = await Worker.create({
       connection: native, namespace: TASK_NAMESPACE, taskQueue: TASK_QUEUE, workflowBundle,
       activities: createAgentTaskActivities({
         agentClient: createLocalAgentClient(),
+        settingsStore: tasks,
+        providerConnections: tasks,
+        ...(secretBackend === undefined ? {} : {
+          secretBackend,
+          liveClientFactory: (route: LiveProviderRoute) => createLivePackageAgentClient({ route, systemPrompt: PACKAGE_RUN_SYSTEM_PROMPT })
+        }),
         ...(canonicalCompatibility === undefined ? {} : { canonicalCompatibility }),
-        store: tasks, inputResolver: new CompositeTaskInputResolver([
+        store: tasks, outputStore: tasks, inputResolver: new CompositeTaskInputResolver([
           { scheme: 'chat', resolver: new ChatTaskInputResolver(chat) },
           { scheme: 'package', resolver: new PackageTaskInputResolver(tasks) }
         ])
@@ -174,14 +183,14 @@ export async function createWorkerRuntime(config = readWorkerRuntimeConfig()): P
       };
       if (path === '/livez') return send(json(stopping ? 503 : 200, { status: stopping ? 'stopping' : 'alive' }));
       if (path !== '/readyz') { response.statusCode = 404; response.end(); return; }
-      if (stopping) return send(json(503, { status: 'not_ready', reason: 'shutting_down' }));
+      if (stopping) return send(json(503, { status: 'not_ready', reason: 'shutting_down', secretBackend: { mode: secretBackendMode } }));
       const status = subject.getStatus();
       if (!workerPollersReady(status)) {
-        return send(json(503, { status: 'not_ready', worker: { runState: status.runState, workflowPollerState: status.workflowPollerState, activityPollerState: status.activityPollerState } }));
+        return send(json(503, { status: 'not_ready', worker: { runState: status.runState, workflowPollerState: status.workflowPollerState, activityPollerState: status.activityPollerState }, secretBackend: { mode: secretBackendMode } }));
       }
       void Promise.all([chat.getSession(config.tenantId, 'health-sentinel'), tasks.listTaskViews(config.tenantId, { limit: 1 })])
-        .then(() => send(json(200, { status: 'ready', namespace: TASK_NAMESPACE, taskQueue: TASK_QUEUE, worker: { runState: status.runState, workflowPollerState: status.workflowPollerState, activityPollerState: status.activityPollerState } })))
-        .catch(() => send(json(503, { status: 'not_ready', dependencies: ['postgres'] })));
+        .then(() => send(json(200, { status: 'ready', namespace: TASK_NAMESPACE, taskQueue: TASK_QUEUE, secretBackend: { mode: secretBackendMode }, worker: { runState: status.runState, workflowPollerState: status.workflowPollerState, activityPollerState: status.activityPollerState } })))
+        .catch(() => send(json(503, { status: 'not_ready', dependencies: ['postgres'], secretBackend: { mode: secretBackendMode } })));
     });
     const runningPromise = subject.run();
     running = runningPromise;

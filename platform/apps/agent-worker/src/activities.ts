@@ -1,4 +1,4 @@
-import { activityInfo, cancellationSignal, CancelledFailure, heartbeat } from '@temporalio/activity';
+import { activityInfo, cancellationSignal, CancelledFailure, ApplicationFailure, heartbeat } from '@temporalio/activity';
 import type { P6TelemetryRecorder } from '@sage/observability';
 import {
   assertCanonicalPayloadBounds,
@@ -19,10 +19,12 @@ import {
 } from '@sage/platform-ports';
 import type { EngineAdapter, KernelEngineResult, KernelInvocationResult, KernelBounds } from '@sage/agent-lib';
 import type { BoundedKernelClient, LocalAgentClient } from '@sage/agent-client';
+import type { LiveProviderRoute } from '@sage/local-runtime';
 import {
   type AgentSliceResult, type ExecuteAgentSliceInput, type TaskArtifactRef,
-  type TaskCommitStore, type TaskInputRef, type TaskProjection
+  type TaskCommitStore, type TaskInputRef, type TaskProjection, type ProviderConnectionStore, type RunAgentSettingsStore, type TaskRunOutputStore
 } from '@sage/task-domain';
+import type { SecretBackend } from '@sage/secret-vault';
 import { runTaskAgentPath, type TaskCanonicalCompatibilityOptions } from './task-compatibility.js';
 
 export interface TaskSliceInputResolver {
@@ -30,7 +32,18 @@ export interface TaskSliceInputResolver {
 }
 export interface AgentTaskActivityOptions {
   readonly agentClient: LocalAgentClient;
+  /** live provider 客户端：仅 package 路径的 slice 使用；未提供时全部走 agentClient（echo）。 */
+  readonly packageAgentClient?: LocalAgentClient;
+  /** 运行 agent 设置读取：缺省视 defaultProvider=echo（离线模式）。 */
+  readonly settingsStore?: Pick<RunAgentSettingsStore, 'getRunAgentSettings'>;
+  /** 注册表访问：connection 模式在 slice 执行边界解析条目与密封凭据。 */
+  readonly providerConnections?: ProviderConnectionStore;
+  /** 凭据解密后端；connection 模式必需，缺失即 fail-closed。 */
+  readonly secretBackend?: SecretBackend;
+  /** 按解析出的路由构造 live client（仅执行边界调用，key 只留进程内存）。 */
+  readonly liveClientFactory?: (route: LiveProviderRoute) => LocalAgentClient;
   readonly store: TaskCommitStore;
+  readonly outputStore?: TaskRunOutputStore;
   readonly inputResolver: TaskSliceInputResolver;
   readonly leaseMs?: number;
   readonly now?: () => Date;
@@ -40,6 +53,61 @@ export interface AgentTaskActivityOptions {
 }
 export interface AgentTaskActivities { executeAgentSlice(input: ExecuteAgentSliceInput): Promise<AgentSliceResult> }
 
+/**
+ * 运行 agent 设置 → 执行 harness 的纯决策：
+ * - 非 package 输入（chat 路径）恒走本地 client，设置不参与；
+ * - echo（含缺省与 legacy 归一）：显式本地确定性 harness，不发起模型调用；
+ * - connection：必须 live；live 不可用返回 'unavailable'（调用方以稳定错误 fail-closed，绝不回退 echo）。
+ */
+export function decidePackageRunClientChoice(
+  isPackageInput: boolean,
+  defaultProvider: 'echo' | 'connection',
+  liveClientAvailable: boolean
+): 'live' | 'echo' | 'unavailable' {
+  if (!isPackageInput) return 'echo';
+  if (defaultProvider === 'echo') return 'echo';
+  return liveClientAvailable ? 'live' : 'unavailable';
+}
+
+/**
+ * connection 模式的执行边界解析：注册表条目 + 密封凭据 → live 路由。
+ * 条目缺失/停用/无凭据/后端不可用一律 fail-closed（不可重试），绝不回退 echo；
+ * 解密后的 key 只留在本函数返回的路由对象中，不进入任何事件、payload 或日志。
+ */
+export async function resolveConnectionLiveClient(
+  providerConnections: ProviderConnectionStore | undefined,
+  secretBackend: SecretBackend | undefined,
+  liveClientFactory: ((route: LiveProviderRoute) => LocalAgentClient) | undefined,
+  tenantId: string,
+  connectionId: string
+): Promise<LocalAgentClient> {
+  const failure = (): string =>
+    `PROVIDER_DEPENDENCY_MISSING: run agent default provider is pinned to provider connection ${connectionId} which is missing, disabled, or has no stored credential. Fix or re-select the connection in run agent settings.`;
+  if (providerConnections === undefined || secretBackend === undefined || liveClientFactory === undefined) {
+    throw ApplicationFailure.nonRetryable(failure(), 'PROVIDER_DEPENDENCY_MISSING');
+  }
+  const connection = await providerConnections.getProviderConnection(tenantId, connectionId);
+  if (connection === undefined || !connection.enabled) {
+    throw ApplicationFailure.nonRetryable(failure(), 'PROVIDER_DEPENDENCY_MISSING');
+  }
+  const sealed = await providerConnections.getProviderCredential(tenantId, connectionId);
+  if (sealed === undefined) {
+    throw ApplicationFailure.nonRetryable(failure(), 'PROVIDER_DEPENDENCY_MISSING');
+  }
+  let apiKey: string;
+  try {
+    apiKey = secretBackend.open({ ciphertext: sealed.ciphertext, keyVersion: sealed.keyVersion });
+  } catch {
+    throw ApplicationFailure.nonRetryable(failure(), 'PROVIDER_DEPENDENCY_MISSING');
+  }
+  return liveClientFactory({
+    adapterKind: connection.adapterKind,
+    baseUrl: connection.baseUrl,
+    modelId: connection.modelId,
+    apiKey
+  });
+}
+
 export function createAgentTaskActivities(options: AgentTaskActivityOptions): AgentTaskActivities {
   const now = options.now ?? (() => new Date());
   const leaseMs = options.leaseMs ?? 35_000;
@@ -47,6 +115,24 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
     async executeAgentSlice(input): Promise<AgentSliceResult> {
       const info = activityInfo();
       if(input.sessionId&&input.runId&&input.messageId)try{options.telemetry?.record('sage_task_worker_attempt_total',1,{tenant_id:input.tenantId,message_id:input.messageId,session_id:input.sessionId,run_id:input.runId,task_id:input.taskId,workflow_id:input.workflowId,target_id:input.targetId,attempt:input.attempt},{activity_attempt:info.attempt,slice_number:input.sliceNumber});}catch{/* Telemetry cannot change Activity semantics. */}
+      // 执行前依赖检查（fail-closed）：connection 模式在执行边界解析注册表路由，不可用时以不可重试错误显式失败，
+      // 不 claim slice、不执行 echo、不写 run 输出。设置每 slice 现读，改设置即时生效。
+      const isPackageInput = input.inputRef.startsWith('task-input://package/');
+      const settings = isPackageInput && options.settingsStore !== undefined
+        ? await options.settingsStore.getRunAgentSettings(input.tenantId)
+        : undefined;
+      const defaultProvider = settings?.defaultProvider ?? 'echo';
+      // connection 模式：执行边界从注册表解析路由并解密凭据（reference-only，key 不落任何持久化面）。
+      const packageClient = isPackageInput && defaultProvider === 'connection' && settings?.providerConnectionId !== undefined
+        ? await resolveConnectionLiveClient(options.providerConnections, options.secretBackend, options.liveClientFactory, input.tenantId, settings.providerConnectionId)
+        : options.packageAgentClient;
+      const clientChoice = decidePackageRunClientChoice(isPackageInput, defaultProvider, packageClient !== undefined);
+      if (clientChoice === 'unavailable') {
+        throw ApplicationFailure.nonRetryable(
+          'PROVIDER_DEPENDENCY_MISSING: run agent default provider is connection but no provider connection is selected. Select a workspace provider connection in run agent settings, or switch the default provider to echo.',
+          'PROVIDER_DEPENDENCY_MISSING'
+        );
+      }
       const idempotencyKey = `${input.workflowId}:attempt:${input.attempt}:slice:${input.sliceNumber}`;
       const ownerToken = `${info.activityId}:delivery:${info.attempt}`;
       const claim = await options.store.claimSlice(input, idempotencyKey, ownerToken, new Date(now().getTime() + leaseMs).toISOString());
@@ -79,6 +165,7 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
           },
           ...(input.checkpointRef === undefined ? {} : { resumeFrom: input.checkpointRef })
         };
+        // echo 显式优先：即使配置了受信 key 也走本地确定性 harness；auto 保持 env 驱动现状。
         execution = await runTaskAgentPath({
           tenantId: input.tenantId,
           taskId: input.taskId,
@@ -88,7 +175,9 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
           runId,
           idempotencyKey,
           legacySpec: spec,
-          legacyClient: options.agentClient,
+          legacyClient: clientChoice === 'live' && isPackageInput
+            ? packageClient!
+            : options.agentClient,
           signal,
           deadlineAt: startedAt + input.limits.timeoutMs,
           ...(options.canonicalCompatibility === undefined
@@ -115,6 +204,17 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
         const projection = projectionOf(input, result, result.done ? 'succeeded' : 'running', input.sliceNumber, now().toISOString());
         await options.store.commitSlice(idempotencyKey, ownerToken, result, projection);
         committed = true;
+        if (artifactRef !== undefined && outcome.output !== undefined && outcome.output.length > 0 && options.outputStore !== undefined) {
+          // 输出物化是 best-effort：slice 已提交是权威终态，写失败不改变任务结果。
+          try {
+            await options.outputStore.writeRunOutput({
+              tenantId: input.tenantId, taskId: input.taskId, artifactRef,
+              output: outcome.output, mediaType: 'text/plain', createdAt: now().toISOString()
+            });
+          } catch (cause) {
+            process.stderr.write(`task run output materialization failed for ${input.taskId}: ${cause instanceof Error ? cause.message : String(cause)}\n`);
+          }
+        }
         heartbeat({ phase: 'committed', sliceNumber: input.sliceNumber });
         await options.afterCommit?.(result);
         return result;

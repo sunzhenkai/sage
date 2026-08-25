@@ -84,6 +84,7 @@ describe('Chat canonical recovery', () => {
     const calls: string[] = [];
     const fetcher = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input); calls.push(url);
+      if (url.endsWith('/provider-connections')) return response({ schemaVersion: 'ProviderConnections.v1', connections: [] });
       if (url.endsWith('/v1/chat/sessions/session-1')) return response({ session: { status: 'open' } });
       if (url.includes('/events?')) return response({ events: [
         { schemaVersion: '1', sessionId: 'session-1', runId: 'run-1', sequence: 2, occurredAt: '2026-08-14T00:00:02.000Z', payload: { kind: 'text', text: 'two' } },
@@ -94,8 +95,8 @@ describe('Chat canonical recovery', () => {
     }) as typeof fetch;
     let tree!: ReturnType<typeof create>;
     await act(async () => { tree = create(<ChatApp sessionId="session-1" fetcher={fetcher} />); await flush(); await flush(); });
-    expect(calls[0]).toMatch(/\/sessions\/session-1$/);
-    expect(calls[1]).toContain('/events?afterSequence=0');
+    expect(calls.some((call) => call.match(/\/sessions\/session-1$/))).toBe(true);
+    expect(calls.some((call) => call.includes('/events?afterSequence=0'))).toBe(true);
     expect(RecordingEventSource.urls).toEqual(['/v1/chat/sessions/session-1/timeline?afterSequence=2']);
     expect(tree.root.findAllByProps({ 'data-sequence': 2 })).toHaveLength(1);
     await act(async () => tree.unmount());
