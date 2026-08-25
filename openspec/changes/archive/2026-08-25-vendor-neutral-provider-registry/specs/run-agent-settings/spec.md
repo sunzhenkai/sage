@@ -1,10 +1,4 @@
-# run-agent-settings Specification
-
-## Purpose
-
-本地部署模式下包运行（ai-app）的「运行 agent」默认 provider 设置契约：设置持久化与 API、运行前（准入）与执行前（worker）的 provider 依赖检查，使执行依赖缺失在运行前显式暴露而不是静默回退 echo。
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: 默认 provider 设置持久化
 系统 SHALL 以 tenant 为单位持久化运行 agent 设置，核心字段为 `defaultProvider`（取值 `echo`、`connection`）与审计字段（更新时间、更新主体）；取值 `connection` 时 SHALL 携带非空 `providerConnectionId`（指向受信 provider 注册表条目），取值 `echo` 时 SHALL 将其置空。设置记录 SHALL NOT 包含任何密钥、endpoint 凭据或敏感值。tenant 无设置记录时读取结果 SHALL 等效 `echo`（离线模式）。存量记录中的 legacy 取值（`auto`、`minimax`）SHALL 在读取时归一为 `echo`，且 SHALL NOT 因此产生写入副作用。

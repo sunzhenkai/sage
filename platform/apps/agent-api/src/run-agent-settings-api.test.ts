@@ -37,7 +37,7 @@ const connectionRecord = (overrides: Partial<ProviderConnectionRecord> = {}): Pr
   createdAt: '2026-08-25T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z', ...overrides
 });
 
-async function api(options: { readonly authenticated?: boolean; readonly env?: Record<string, string | undefined>; readonly store?: FakeSettingsStore; readonly connections?: FakeConnectionStore } = {}) {
+async function api(options: { readonly authenticated?: boolean; readonly store?: FakeSettingsStore; readonly connections?: FakeConnectionStore } = {}) {
   const app = Fastify({ logger: false, ajv: { customOptions: { removeAdditional: false } } });
   const store = options.store ?? new FakeSettingsStore();
   registerRunAgentSettingsRoutes(app, {
@@ -47,42 +47,47 @@ async function api(options: { readonly authenticated?: boolean; readonly env?: R
     authenticator: options.authenticated === false
       ? { authenticateRequest: () => undefined }
       : { authenticateRequest: () => ({ principalId: 'op', tenantId: 'tenant-local' }) },
-    providerEnv: options.env ?? {},
     now: () => new Date('2026-08-25T00:00:00.000Z')
   });
   return { app, store };
 }
 
 describe('Run agent settings API', () => {
-  it('GET returns auto defaults with non-sensitive provider availability', async () => {
-    const { app } = await api({ env: {} });
+  it('GET returns echo defaults with registry-only provider availability', async () => {
+    const { app } = await api();
     const response = await app.inject({ method: 'GET', url: '/v1/run-agent/settings' });
     expect(response.statusCode).toBe(200);
     const body = response.json();
-    expect(body).toMatchObject({ schemaVersion: 'RunAgentSettings.v1', defaultProvider: 'auto' });
-    expect(body.providers).toEqual([{ id: 'minimax', available: false, reason: expect.stringContaining('MINIMAX_API_KEY') }]);
+    expect(body).toMatchObject({ schemaVersion: 'RunAgentSettings.v1', defaultProvider: 'echo' });
+    expect(body.providers).toEqual([]);
     expect(JSON.stringify(body)).not.toContain('sk-');
     await app.close();
   });
 
-  it('GET reports minimax available when the trusted env holds a non-empty key', async () => {
-    const { app } = await api({ env: { MINIMAX_API_KEY: 'secret-value-not-echoed' } });
-    const response = await app.inject({ method: 'GET', url: '/v1/run-agent/settings' });
-    expect(response.json().providers).toEqual([{ id: 'minimax', available: true }]);
-    expect(JSON.stringify(response.json())).not.toContain('secret-value-not-echoed');
-    await app.close();
+  it('GET availability never derives from process env (vendor keys produce no entry)', async () => {
+    const original = process.env.MINIMAX_API_KEY;
+    process.env.MINIMAX_API_KEY = 'secret-value-not-echoed';
+    try {
+      const { app } = await api();
+      const response = await app.inject({ method: 'GET', url: '/v1/run-agent/settings' });
+      expect(response.json().providers).toEqual([]);
+      expect(JSON.stringify(response.json())).not.toContain('secret-value-not-echoed');
+      await app.close();
+    } finally {
+      if (original === undefined) delete process.env.MINIMAX_API_KEY; else process.env.MINIMAX_API_KEY = original;
+    }
   });
 
   it('PUT persists the default provider and reflects it on GET', async () => {
-    const { app, store } = await api({ env: { MINIMAX_API_KEY: 'x' } });
-    const put = await app.inject({ method: 'PUT', url: '/v1/run-agent/settings', payload: { defaultProvider: 'minimax' } });
+    const { app, store } = await api();
+    const put = await app.inject({ method: 'PUT', url: '/v1/run-agent/settings', payload: { defaultProvider: 'echo' } });
     expect(put.statusCode).toBe(200);
-    expect(put.json().defaultProvider).toBe('minimax');
+    expect(put.json().defaultProvider).toBe('echo');
     expect(put.json().updatedAt).toBe('2026-08-25T00:00:00.000Z');
     const stored = await store.getRunAgentSettings('tenant-local');
-    expect(stored).toMatchObject({ defaultProvider: 'minimax', updatedBy: 'principal://op' });
+    expect(stored).toMatchObject({ defaultProvider: 'echo', updatedBy: 'principal://op' });
     const get = await app.inject({ method: 'GET', url: '/v1/run-agent/settings' });
-    expect(get.json().defaultProvider).toBe('minimax');
+    expect(get.json().defaultProvider).toBe('echo');
     await app.close();
   });
 
@@ -98,23 +103,27 @@ describe('Run agent settings API', () => {
     const invalid = await app.inject({ method: 'PUT', url: '/v1/run-agent/settings', payload: { defaultProvider: 'openai' } });
     expect(invalid.statusCode).toBe(400);
     expect(invalid.json().error.code).toBe('RUN_AGENT_SETTINGS_INVALID_PROVIDER');
+    for (const legacy of ['auto', 'minimax']) {
+      const rejected = await app.inject({ method: 'PUT', url: '/v1/run-agent/settings', payload: { defaultProvider: legacy } });
+      expect(rejected.statusCode).toBe(400);
+      expect(rejected.json().error.code).toBe('RUN_AGENT_SETTINGS_INVALID_PROVIDER');
+    }
     expect(await store.getRunAgentSettings('tenant-local')).toBeUndefined();
     await app.close();
   });
-  it('GET derives availability from the registry alongside the legacy env check', async () => {
+  it('GET derives availability from the registry only', async () => {
     const connections = new FakeConnectionStore();
     connections.entries.set('tenant-local/conn-1', connectionRecord());
     connections.entries.set('tenant-local/conn-2', connectionRecord({ id: 'conn-2', name: '停用条目', enabled: false }));
     connections.entries.set('tenant-local/conn-3', connectionRecord({ id: 'conn-3', name: '缺凭据条目', credentialPresent: false }));
-    const { app } = await api({ env: {}, connections });
+    const { app } = await api({ connections });
     const response = await app.inject({ method: 'GET', url: '/v1/run-agent/settings' });
     const providers = response.json().providers;
-    expect(providers).toEqual(expect.arrayContaining([
+    expect(providers).toEqual([
       { id: 'conn-1', name: 'MiniMax 个人', available: true },
       { id: 'conn-2', name: '停用条目', available: false, reason: 'Connection is disabled' },
-      { id: 'conn-3', name: '缺凭据条目', available: false, reason: 'Connection has no stored credential' },
-      { id: 'minimax', available: false, reason: expect.any(String) }
-    ]));
+      { id: 'conn-3', name: '缺凭据条目', available: false, reason: 'Connection has no stored credential' }
+    ]);
     await app.close();
   });
 

@@ -10,14 +10,14 @@ import { WorkspaceProvidersCard } from './workspace-providers.js';
 type ConnectionCheckState = 'idle' | 'checking' | 'connected' | 'unauthorized' | 'unavailable';
 type Draft = Omit<ProviderProfileV2, 'updatedAt'> & { apiKey: string };
 type EditorState = { mode: 'idle' } | { mode: 'creating'; draft: Draft; nameDirty: boolean } | { mode: 'editing'; profileId: string; draft: Draft; nameDirty: boolean } | { mode: 'saving'; profileId?: string; draft: Draft; nameDirty: boolean };
-/** GET/PUT /v1/run-agent/settings 的视图模型：默认 provider + 可用性（注册表条目 + legacy env，不含任何密钥）。 */
+/** GET/PUT /v1/run-agent/settings 的视图模型：默认 provider + 注册表条目可用性（不含任何密钥）。 */
 interface RunAgentSettingsView {
-  readonly defaultProvider: 'auto' | 'minimax' | 'echo' | 'connection';
+  readonly defaultProvider: 'echo' | 'connection';
   readonly providerConnectionId?: string;
   readonly providers?: ReadonlyArray<{ readonly id: string; readonly name?: string; readonly available: boolean; readonly reason?: string }>;
 }
-const minimaxAvailableIn = (view: RunAgentSettingsView | undefined): boolean =>
-  view?.providers?.some((provider) => provider.id === 'minimax' && provider.available) ?? false;
+const anyAvailableIn = (view: RunAgentSettingsView | undefined): boolean =>
+  view?.providers?.some((provider) => provider.available) ?? false;
 const connectionStatusIn = (view: RunAgentSettingsView | undefined): { readonly name: string; readonly available: boolean } | undefined => {
   const id = view?.providerConnectionId;
   if (view?.defaultProvider !== 'connection' || id === undefined) return undefined;
@@ -255,11 +255,9 @@ export function ProvidersApp({ fetcher = fetch }: { readonly fetcher?: typeof fe
         <small>{t('runAgentSubtitle')}</small>
         <label className="field" style={{ maxWidth: 420, marginTop: 12 }}>
           <span>{t('defaultProviderLabel')}</span>
-          <select aria-label={t('defaultProviderLabel')} value={runAgent?.defaultProvider === 'connection' ? `connection:${runAgent.providerConnectionId ?? ''}` : (runAgent?.defaultProvider ?? 'auto')} disabled={runAgentSaving || runAgent === undefined} onChange={(event) => void saveRunAgent(event.target.value)}>
-            <option value="auto">{t('providerOptionAuto')}</option>
-            <option value="minimax">{t('providerOptionMinimax')}</option>
+          <select aria-label={t('defaultProviderLabel')} value={runAgent?.defaultProvider === 'connection' ? `connection:${runAgent.providerConnectionId ?? ''}` : 'echo'} disabled={runAgentSaving || runAgent === undefined} onChange={(event) => void saveRunAgent(event.target.value)}>
             <option value="echo">{t('providerOptionEcho')}</option>
-            {(runAgent?.providers ?? []).filter((provider) => provider.id !== 'minimax').map((provider) => (
+            {(runAgent?.providers ?? []).map((provider) => (
               <option key={provider.id} value={`connection:${provider.id}`}>{t('providerOptionConnection', { name: provider.name ?? provider.id })}</option>
             ))}
           </select>
@@ -272,9 +270,9 @@ export function ProvidersApp({ fetcher = fetch }: { readonly fetcher?: typeof fe
             {connection.available ? t('connectionReady', { name: connection.name }) : t('connectionUnavailable', { name: connection.name })}
           </span>;
         }
-        return <span className={minimaxAvailableIn(runAgent) ? 'badge badge-success' : 'badge badge-warning'}>
-          {minimaxAvailableIn(runAgent) ? t('minimaxDetected') : t('minimaxNotDetected')}
-        </span>;
+        return anyAvailableIn(runAgent)
+          ? <span className="badge">{t('offlineModeActive')}</span>
+          : <span className="badge badge-warning">{t('noUsableWorkspaceProvider')}</span>;
       })()}
     </section>
     <WorkspaceProvidersCard fetcher={fetcher} onNotice={setNotice} />

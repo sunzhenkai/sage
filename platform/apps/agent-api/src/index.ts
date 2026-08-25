@@ -403,7 +403,7 @@ export { registerProviderCatalogRoutes } from './catalog-api.js';
 export { registerPackagesRoutes } from './packages-api.js';
 export { registerAppsRoutes } from './apps-api.js';
 export { registerPackageRunsRoutes } from './runs-api.js';
-export { registerRunAgentSettingsRoutes, minimaxAvailableFromEnv } from './run-agent-settings-api.js';
+export { registerRunAgentSettingsRoutes } from './run-agent-settings-api.js';
 export type { RegisterRunAgentSettingsRoutesOptions, RunAgentSettingsPrincipalAuthenticator, RunAgentSettingsResponse, RunAgentProviderStatus, UpdateRunAgentSettingsRequest } from './run-agent-settings-api.js';
 export type { RegisterPackagesRoutesOptions, PackagesPrincipalAuthenticator } from './packages-api.js';
 export type { RegisterAppsRoutesOptions, AppsPrincipalAuthenticator } from './apps-api.js';

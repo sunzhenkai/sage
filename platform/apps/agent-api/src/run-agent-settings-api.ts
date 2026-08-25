@@ -10,17 +10,13 @@ export interface RegisterRunAgentSettingsRoutesOptions {
   readonly tenantId: string;
   /** 缺省时 GET/PUT 仍可用，defaultProvider 恒为 auto（内存降级，便于测试）。 */
   readonly settingsStore?: RunAgentSettingsStore;
-  /** 可用性来源：注册表条目（缺省时仅保留 legacy minimax env 检测）。 */
+  /** 可用性来源：注册表条目。 */
   readonly providerConnections?: ProviderConnectionStore;
   readonly authenticator: RunAgentSettingsPrincipalAuthenticator;
-  /** 可注入的受信 env 视图；缺省读 process.env，只做非空检测、绝不回显值。 */
-  readonly providerEnv?: Record<string, string | undefined>;
   readonly now?: () => Date;
 }
 
 export const RunAgentDefaultProviderSchema = Type.Union([
-  Type.Literal('auto'),
-  Type.Literal('minimax'),
   Type.Literal('echo'),
   Type.Literal('connection')
 ]);
@@ -49,13 +45,8 @@ export interface RunAgentSettingsResponse {
 const sendError = (reply: FastifyReply, status: number, code: string, message: string, retryable = false): FastifyReply =>
   reply.code(status).send({ error: { code, message, retryable } });
 
-/** 受信 env 非空检测：不做网络探测，不读取值内容，结果只含布尔与非敏感 reason。 */
-export const minimaxAvailableFromEnv = (source: Record<string, string | undefined> = process.env): boolean =>
-  (source.MINIMAX_API_KEY ?? '').trim().length > 0;
-
-/** 可用性解析：注册表 enabled 且凭据在场的条目列为 available；legacy minimax 继续按受信 env 非空判定。 */
+/** 可用性解析：注册表 enabled 且凭据在场的条目列为 available；不再含基于进程 env 的检测条目。 */
 export const providerStatuses = async (
-  providerEnv: Record<string, string | undefined>,
   connections?: ProviderConnectionStore,
   tenantId?: string
 ): Promise<readonly RunAgentProviderStatus[]> => {
@@ -71,17 +62,11 @@ export const providerStatuses = async (
       });
     }
   }
-  statuses.push({
-    id: 'minimax',
-    available: minimaxAvailableFromEnv(providerEnv),
-    ...(minimaxAvailableFromEnv(providerEnv) ? {} : { reason: 'MINIMAX_API_KEY is not set in the trusted process environment' })
-  });
   return statuses;
 };
 
 export function registerRunAgentSettingsRoutes(app: FastifyInstance, options: RegisterRunAgentSettingsRoutesOptions): void {
   const now = options.now ?? (() => new Date());
-  const providerEnv = options.providerEnv ?? process.env;
   const settingsStore = options.settingsStore;
 
   const principalFor = (request: FastifyRequest): { readonly principalId: string } | undefined => {
@@ -94,10 +79,10 @@ export function registerRunAgentSettingsRoutes(app: FastifyInstance, options: Re
     const record = settingsStore === undefined ? undefined : await settingsStore.getRunAgentSettings(options.tenantId);
     return {
       schemaVersion: 'RunAgentSettings.v1',
-      defaultProvider: record?.defaultProvider ?? 'auto',
+      defaultProvider: record?.defaultProvider ?? 'echo',
       ...(record?.providerConnectionId === undefined ? {} : { providerConnectionId: record.providerConnectionId }),
       ...(record === undefined ? {} : { updatedAt: record.updatedAt, updatedBy: record.updatedBy }),
-      providers: await providerStatuses(providerEnv, options.providerConnections, options.tenantId)
+      providers: await providerStatuses(options.providerConnections, options.tenantId)
     };
   };
 
@@ -121,8 +106,8 @@ export function registerRunAgentSettingsRoutes(app: FastifyInstance, options: Re
     if (!principal) return sendError(reply, 401, 'RUN_AGENT_SETTINGS_AUTHENTICATION_REQUIRED', 'Run agent settings API requires authentication');
     const body = request.body as Partial<UpdateRunAgentSettingsRequest> | undefined;
     if (body === null || typeof body !== 'object' || typeof body.defaultProvider !== 'string'
-      || !['auto', 'minimax', 'echo', 'connection'].includes(body.defaultProvider)) {
-      return sendError(reply, 400, 'RUN_AGENT_SETTINGS_INVALID_PROVIDER', 'defaultProvider must be one of auto, minimax, echo, connection');
+      || !['echo', 'connection'].includes(body.defaultProvider)) {
+      return sendError(reply, 400, 'RUN_AGENT_SETTINGS_INVALID_PROVIDER', 'defaultProvider must be one of echo, connection');
     }
     if (body.defaultProvider === 'connection') {
       if (typeof body.providerConnectionId !== 'string' || body.providerConnectionId.length === 0) {

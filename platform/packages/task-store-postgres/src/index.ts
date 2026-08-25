@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { Pool, type PoolClient, type PoolConfig, type QueryResultRow } from 'pg';
 import {
   isAgentSliceResult, isRouteDecision, isTaskProjection, isTaskRoutingRecord,
+  normalizeRunAgentDefaultProvider,
   type AgentSliceResult, type ExecuteAgentSliceInput, type ProviderConnectionAdapterKind, type ProviderConnectionRecord, type ProviderConnectionSource,
   type ProviderConnectionWrite, type ProviderCredentialSealed, type RouteDecision,
   type RunAgentSettingsRecord,
@@ -55,7 +56,8 @@ interface RunOutputRow extends QueryResultRow {
 }
 
 interface RunAgentSettingsRow extends QueryResultRow {
-  tenant_id: string; default_provider: RunAgentSettingsRecord['defaultProvider'];
+  /** 可能含 legacy 值（auto/minimax），读取时经 normalizeRunAgentDefaultProvider 归一。 */
+  tenant_id: string; default_provider: string;
   provider_connection_id: string | null;
   updated_at: Date | string; updated_by: string;
 }
@@ -625,10 +627,12 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
       FROM run_agent_settings WHERE tenant_id=$1`, [tenantId]);
     const row = result.rows[0];
     if (row === undefined) return undefined;
+    // legacy 取值（auto/minimax）读取时归一为 echo，不写回；providerConnectionId 仅在 connection 模式下保留。
+    const defaultProvider = normalizeRunAgentDefaultProvider(row.default_provider);
     return {
       tenantId: row.tenant_id,
-      defaultProvider: row.default_provider,
-      ...(row.provider_connection_id === null ? {} : { providerConnectionId: row.provider_connection_id }),
+      defaultProvider,
+      ...(defaultProvider === 'connection' && row.provider_connection_id !== null ? { providerConnectionId: row.provider_connection_id } : {}),
       updatedAt: iso(row.updated_at),
       updatedBy: row.updated_by
     };
@@ -636,7 +640,7 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
 
   async upsertRunAgentSettings(record: RunAgentSettingsRecord): Promise<{ readonly status: 'stored' | 'existing' }> {
     const provider = record.defaultProvider;
-    const validProvider = provider === 'auto' || provider === 'minimax' || provider === 'echo' || provider === 'connection';
+    const validProvider = provider === 'echo' || provider === 'connection';
     const validConnection = provider === 'connection'
       ? typeof record.providerConnectionId === 'string' && record.providerConnectionId.length > 0
       : record.providerConnectionId === undefined;

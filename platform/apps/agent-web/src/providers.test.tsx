@@ -9,13 +9,10 @@ class MemoryStorage implements Storage { #data = new Map<string,string>(); get l
 const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 const wait = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 const page = { schemaVersion: '1', snapshotId: 'snapshot-1', activeSince: '2026-08-14T00:00:00.000Z', stale: false };
-const runAgentSettings = (defaultProvider: 'auto' | 'minimax' | 'echo' | 'connection' = 'auto', available = false, connections: readonly { id: string; name: string; available: boolean }[] = []) => ({
+const runAgentSettings = (defaultProvider: 'echo' | 'connection' = 'echo', connections: readonly { id: string; name: string; available: boolean }[] = []) => ({
   schemaVersion: 'RunAgentSettings.v1', defaultProvider,
   ...(defaultProvider === 'connection' ? { providerConnectionId: connections[0]?.id ?? 'conn-1' } : {}),
-  providers: [
-    ...connections.map((connection) => ({ id: connection.id, name: connection.name, available: connection.available, ...(connection.available ? {} : { reason: 'Connection has no stored credential' }) })),
-    { id: 'minimax', available, ...(available ? {} : { reason: 'MINIMAX_API_KEY is not set in the trusted process environment' }) }
-  ]
+  providers: connections.map((connection) => ({ id: connection.id, name: connection.name, available: connection.available, ...(connection.available ? {} : { reason: 'Connection has no stored credential' }) }))
 });
 
 describe('Provider profile UX', () => {
@@ -218,15 +215,16 @@ describe('Provider profile UX', () => {
     await act(async () => tree.unmount());
   });
 
-  it('shows the Run agent card, availability badge, and PUTs the default provider on change', async () => {
+  it('shows the Run agent card, offline/no-provider badge, and PUTs the default provider on change', async () => {
     const localStorage = new MemoryStorage(); const sessionStorage = new MemoryStorage(); vi.stubGlobal('window', { localStorage, sessionStorage });
     const puts: { url: string; method?: string; body?: unknown }[] = [];
+    let settings = runAgentSettings();
     const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.endsWith('/provider-connections')) return response({ schemaVersion: 'ProviderConnections.v1', connections: [] });
       if (url.endsWith('/run-agent/settings')) {
-        if (init?.method === 'PUT') { puts.push({ url, method: init.method, body: JSON.parse(String(init.body)) }); return response(runAgentSettings('minimax', true)); }
-        return response(runAgentSettings());
+        if (init?.method === 'PUT') { puts.push({ url, method: init.method, body: JSON.parse(String(init.body)) }); settings = runAgentSettings('echo', [{ id: 'conn-1', name: '条目一', available: true }]); return response(settings); }
+        return response(settings);
       }
       if (url.endsWith('/status')) return response({ schemaVersion: '1', source: 'models-dev', availability: 'available', providerCount: 0, modelCount: 0, nextSyncAt: '2026-08-15T00:00:00.000Z', projection: 'ready' });
       throw new Error(url);
@@ -234,15 +232,15 @@ describe('Provider profile UX', () => {
     let tree!: ReturnType<typeof create>; await act(async () => { tree = create(<ProvidersApp fetcher={fetcher} />); await wait(); });
     expect(tree.root.findByProps({ 'aria-label': 'Run agent' })).toBeTruthy();
     const select = tree.root.findByProps({ 'aria-label': 'Default provider' });
-    expect(select.props.value).toBe('auto');
-    expect(tree.root.findByProps({ children: 'Package runs: MiniMax not detected — MINIMAX_API_KEY missing in the trusted server environment; chat external profiles are unaffected' })).toBeTruthy();
-    await act(async () => { select.props.onChange({ target: { value: 'minimax' } }); await wait(); });
+    expect(select.props.value).toBe('echo');
+    expect(tree.root.findByProps({ children: 'Package runs: no usable workspace provider — add and select one below, or stay in offline mode; chat external profiles are unaffected' })).toBeTruthy();
+    await act(async () => { select.props.onChange({ target: { value: 'echo' } }); await wait(); });
     expect(puts).toHaveLength(1);
     expect(puts[0]?.url).toBe('/v1/run-agent/settings');
     expect(puts[0]?.method).toBe('PUT');
-    expect(puts[0]?.body).toEqual({ defaultProvider: 'minimax' });
-    expect(tree.root.findByProps({ 'aria-label': 'Default provider' }).props.value).toBe('minimax');
-    expect(tree.root.findByProps({ children: 'Package runs: MiniMax available in the trusted server environment (chat external profiles unaffected)' })).toBeTruthy();
+    expect(puts[0]?.body).toEqual({ defaultProvider: 'echo' });
+    expect(tree.root.findByProps({ 'aria-label': 'Default provider' }).props.value).toBe('echo');
+    expect(tree.root.findByProps({ children: 'Package runs: offline mode (no model calls); chat external profiles are unaffected' })).toBeTruthy();
     expect(tree.root.findAllByProps({ role: 'status' }).some((node) => node.children.join('').includes('Run agent settings saved.'))).toBe(true);
     await act(async () => tree.unmount());
   });
@@ -254,7 +252,7 @@ describe('Provider profile UX', () => {
         schemaVersion: 'ProviderConnections.v1',
         connections: [
           { id: 'conn-1', name: 'MiniMax 个人', source: 'user', adapterKind: 'anthropic', baseUrl: 'https://api.minimaxi.com/anthropic', modelId: 'MiniMax-M3', providerName: 'MiniMax', modelName: 'MiniMax-M3', enabled: true, credentialPresent: true },
-          { id: 'deployment-env-minimax', name: 'MiniMax（部署环境）', source: 'deployment-env', adapterKind: 'anthropic', baseUrl: 'https://api.minimaxi.com/anthropic', modelId: 'MiniMax-M3', providerName: 'MiniMax', enabled: true, credentialPresent: true }
+          { id: 'deployment-env-default', name: '部署环境 Provider', source: 'deployment-env', adapterKind: 'anthropic', baseUrl: 'https://api.minimaxi.com/anthropic', modelId: 'MiniMax-M3', providerName: 'MiniMax', enabled: true, credentialPresent: true }
         ]
       });
       if (url.endsWith('/run-agent/settings')) return response(runAgentSettings());
@@ -315,8 +313,8 @@ describe('Provider profile UX', () => {
       const url = String(input);
       if (url.endsWith('/provider-connections')) return response({ schemaVersion: 'ProviderConnections.v1', connections: [] });
       if (url.endsWith('/run-agent/settings')) {
-        if (init?.method === 'PUT') { puts.push({ url, method: init.method, body: JSON.parse(String(init.body)) }); return response(runAgentSettings('connection', false, [{ id: 'conn-1', name: 'MiniMax 个人', available: true }])); }
-        return response(runAgentSettings('auto', false, [{ id: 'conn-1', name: 'MiniMax 个人', available: true }]));
+        if (init?.method === 'PUT') { puts.push({ url, method: init.method, body: JSON.parse(String(init.body)) }); return response(runAgentSettings('connection', [{ id: 'conn-1', name: 'MiniMax 个人', available: true }])); }
+        return response(runAgentSettings('echo', [{ id: 'conn-1', name: 'MiniMax 个人', available: true }]));
       }
       if (url.endsWith('/status')) return response({ schemaVersion: '1', source: 'models-dev', availability: 'unavailable', providerCount: 0, modelCount: 0, nextSyncAt: '2026-08-15T00:00:00.000Z', projection: 'unavailable' });
       throw new Error(url);

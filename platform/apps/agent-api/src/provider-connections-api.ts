@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import {
-  DEFAULT_MINIMAX_BASE_URL, DEFAULT_MINIMAX_MODEL, DEPLOYMENT_ENV_MINIMAX_CONNECTION_ID,
+  DEPLOYMENT_ENV_CONNECTION_ID,
   type ProviderConnectionAdapterKind, type ProviderConnectionRecord, type ProviderConnectionStore, type RunAgentSettingsStore
 } from '@sage/task-domain';
 import type { SecretBackend } from '@sage/secret-vault';
@@ -215,8 +215,9 @@ export function registerProviderConnectionRoutes(app: FastifyInstance, options: 
 }
 
 /**
- * 部署 env 引导：MINIMAX_API_KEY 非空且 SecretBackend 可用时幂等 upsert deployment-env 条目；
- * 缺 key 或缺后端时跳过（WARN 由调用方输出），不阻塞启动。
+ * 部署 env 引导（vendor 中立）：SAGE_BOOTSTRAP_PROVIDER_API_KEY 非空且 SecretBackend 可用时幂等 upsert
+ * deployment-env 条目；baseUrl/model 由 SAGE_BOOTSTRAP_PROVIDER_BASE_URL / SAGE_BOOTSTRAP_PROVIDER_MODEL
+ * 必填提供（无任何 vendor 默认值），缺失或不合法时跳过（WARN 由调用方输出），不阻塞启动。
  */
 export async function bootstrapDeploymentEnvProviderConnection(
   store: ProviderConnectionStore,
@@ -225,22 +226,27 @@ export async function bootstrapDeploymentEnvProviderConnection(
   tenantId: string,
   now: () => Date = () => new Date()
 ): Promise<'registered' | 'skipped'> {
-  const apiKey = env.MINIMAX_API_KEY?.trim();
+  const apiKey = env.SAGE_BOOTSTRAP_PROVIDER_API_KEY?.trim();
   if (apiKey === undefined || apiKey.length === 0 || secretBackend === undefined) return 'skipped';
+  const baseUrl = env.SAGE_BOOTSTRAP_PROVIDER_BASE_URL?.trim();
+  const modelId = env.SAGE_BOOTSTRAP_PROVIDER_MODEL?.trim();
+  const adapterOverride = env.SAGE_BOOTSTRAP_PROVIDER_ADAPTER?.trim();
+  const adapterKind = (adapterOverride === undefined || adapterOverride.length === 0 ? 'anthropic' : adapterOverride) as ProviderConnectionAdapterKind;
+  if (baseUrl === undefined || baseUrl.length === 0 || !isPublicHttpsUrl(baseUrl)) return 'skipped';
+  if (modelId === undefined || modelId.length === 0) return 'skipped';
+  if (!ADAPTER_KINDS.includes(adapterKind)) return 'skipped';
   const sealed = secretBackend.seal(apiKey);
   const credential = { ciphertext: sealed.ciphertext, keyVersion: sealed.keyVersion, updatedAt: now().toISOString() };
   const write = {
-    name: 'MiniMax（部署环境）', source: 'deployment-env' as const, adapterKind: 'anthropic' as const,
-    baseUrl: env.MINIMAX_BASE_URL?.trim() || DEFAULT_MINIMAX_BASE_URL,
-    modelId: env.MINIMAX_MODEL?.trim() || DEFAULT_MINIMAX_MODEL,
-    providerName: 'MiniMax', modelName: env.MINIMAX_MODEL?.trim() || DEFAULT_MINIMAX_MODEL,
+    name: env.SAGE_BOOTSTRAP_PROVIDER_NAME?.trim() || '部署环境 Provider', source: 'deployment-env' as const,
+    adapterKind, baseUrl, modelId, modelName: modelId,
     enabled: true, updatedBy: 'bootstrap://deployment-env', credential
   };
-  const existing = await store.getProviderConnection(tenantId, DEPLOYMENT_ENV_MINIMAX_CONNECTION_ID);
+  const existing = await store.getProviderConnection(tenantId, DEPLOYMENT_ENV_CONNECTION_ID);
   if (existing === undefined) {
-    await store.createProviderConnection(tenantId, DEPLOYMENT_ENV_MINIMAX_CONNECTION_ID, write, now().toISOString());
+    await store.createProviderConnection(tenantId, DEPLOYMENT_ENV_CONNECTION_ID, write, now().toISOString());
   } else {
-    await store.updateProviderConnection(tenantId, DEPLOYMENT_ENV_MINIMAX_CONNECTION_ID, write, now().toISOString());
+    await store.updateProviderConnection(tenantId, DEPLOYMENT_ENV_CONNECTION_ID, write, now().toISOString());
   }
   return 'registered';
 }

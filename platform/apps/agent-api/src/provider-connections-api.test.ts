@@ -162,11 +162,15 @@ describe('Provider connections API', () => {
 
   it('protects deployment-env entries and in-use connections from deletion', async () => {
     const { app, store } = await api();
-    await bootstrapDeploymentEnvProviderConnection(store, backendWithKey(), { MINIMAX_API_KEY: 'env-key' }, 'tenant-local');
-    const protectedDelete = await app.inject({ method: 'DELETE', url: '/v1/provider-connections/deployment-env-minimax' });
+    await bootstrapDeploymentEnvProviderConnection(store, backendWithKey(), {
+      SAGE_BOOTSTRAP_PROVIDER_API_KEY: 'env-key',
+      SAGE_BOOTSTRAP_PROVIDER_BASE_URL: 'https://api.example.com/anthropic',
+      SAGE_BOOTSTRAP_PROVIDER_MODEL: 'model-v1'
+    }, 'tenant-local');
+    const protectedDelete = await app.inject({ method: 'DELETE', url: '/v1/provider-connections/deployment-env-default' });
     expect(protectedDelete.statusCode).toBe(409);
     expect(protectedDelete.json().error.code).toBe('PROVIDER_CONNECTION_PROTECTED');
-    const protectedPut = await app.inject({ method: 'PUT', url: '/v1/provider-connections/deployment-env-minimax', payload: createPayload({ name: '抢占改名' }) });
+    const protectedPut = await app.inject({ method: 'PUT', url: '/v1/provider-connections/deployment-env-default', payload: createPayload({ name: '抢占改名' }) });
     expect(protectedPut.statusCode).toBe(409);
 
     const created = await app.inject({ method: 'POST', url: '/v1/provider-connections', payload: createPayload() });
@@ -179,7 +183,7 @@ describe('Provider connections API', () => {
     expect(inUse.statusCode).toBe(409);
     expect(inUse.json().error.code).toBe('PROVIDER_CONNECTION_IN_USE');
     await store.upsertRunAgentSettings({
-      tenantId: 'tenant-local', defaultProvider: 'auto', updatedAt: '2026-08-25T01:00:00.000Z', updatedBy: 'principal://op'
+      tenantId: 'tenant-local', defaultProvider: 'echo', updatedAt: '2026-08-25T01:00:00.000Z', updatedBy: 'principal://op'
     });
     const deleted = await app.inject({ method: 'DELETE', url: `/v1/provider-connections/${id}` });
     expect(deleted.statusCode).toBe(200);
@@ -189,22 +193,51 @@ describe('Provider connections API', () => {
 });
 
 describe('deployment-env bootstrap', () => {
-  it('registers idempotently when the env key and backend exist, skips otherwise', async () => {
+  const bootEnv = {
+    SAGE_BOOTSTRAP_PROVIDER_API_KEY: 'env-key',
+    SAGE_BOOTSTRAP_PROVIDER_BASE_URL: 'https://api.example.com/anthropic',
+    SAGE_BOOTSTRAP_PROVIDER_MODEL: 'model-v1'
+  };
+
+  it('registers idempotently when the generic env group and backend exist, skips otherwise', async () => {
     const store = new FakeRegistryStore();
     const backend = backendWithKey();
-    const env = { MINIMAX_API_KEY: 'env-key', MINIMAX_MODEL: 'MiniMax-M2.5' };
+    const env = { ...bootEnv, SAGE_BOOTSTRAP_PROVIDER_NAME: '部署 key' };
     expect(await bootstrapDeploymentEnvProviderConnection(store, backend, env, 'tenant-local')).toBe('registered');
     expect(await bootstrapDeploymentEnvProviderConnection(store, backend, env, 'tenant-local')).toBe('registered');
     const list = await store.listProviderConnections('tenant-local');
     expect(list).toHaveLength(1);
     expect(list[0]).toMatchObject({
-      id: 'deployment-env-minimax', source: 'deployment-env', modelId: 'MiniMax-M2.5', credentialPresent: true
+      id: 'deployment-env-default', source: 'deployment-env', name: '部署 key', modelId: 'model-v1', credentialPresent: true
     });
-    expect(backend.open((await store.getProviderCredential('tenant-local', 'deployment-env-minimax'))!)).toBe('env-key');
+    expect(backend.open((await store.getProviderCredential('tenant-local', 'deployment-env-default'))!)).toBe('env-key');
     expect(await bootstrapDeploymentEnvProviderConnection(store, backend, {}, 'tenant-local')).toBe('skipped');
     expect(await bootstrapDeploymentEnvProviderConnection(store, undefined, env, 'tenant-local')).toBe('skipped');
     const fresh = new FakeRegistryStore();
     expect(await bootstrapDeploymentEnvProviderConnection(fresh, backend, {}, 'tenant-local')).toBe('skipped');
+    expect(await fresh.listProviderConnections('tenant-local')).toHaveLength(0);
+  });
+
+  it('skips when baseUrl or model is missing — no vendor defaults apply', async () => {
+    const backend = backendWithKey();
+    for (const env of [
+      { SAGE_BOOTSTRAP_PROVIDER_API_KEY: 'env-key', SAGE_BOOTSTRAP_PROVIDER_MODEL: 'model-v1' },
+      { SAGE_BOOTSTRAP_PROVIDER_API_KEY: 'env-key', SAGE_BOOTSTRAP_PROVIDER_BASE_URL: 'https://api.example.com/anthropic' },
+      { SAGE_BOOTSTRAP_PROVIDER_API_KEY: 'env-key', SAGE_BOOTSTRAP_PROVIDER_BASE_URL: 'http://127.0.0.1:8080', SAGE_BOOTSTRAP_PROVIDER_MODEL: 'model-v1' },
+      { ...bootEnv, SAGE_BOOTSTRAP_PROVIDER_ADAPTER: 'unknown-adapter' }
+    ]) {
+      const fresh = new FakeRegistryStore();
+      expect(await bootstrapDeploymentEnvProviderConnection(fresh, backend, env, 'tenant-local')).toBe('skipped');
+      expect(await fresh.listProviderConnections('tenant-local')).toHaveLength(0);
+    }
+  });
+
+  it('ignores vendor-specific env vars as bootstrap input', async () => {
+    const fresh = new FakeRegistryStore();
+    const backend = backendWithKey();
+    expect(await bootstrapDeploymentEnvProviderConnection(fresh, backend, {
+      MINIMAX_API_KEY: 'vendor-key', MINIMAX_BASE_URL: 'https://api.minimaxi.com/anthropic', MINIMAX_MODEL: 'MiniMax-M3'
+    }, 'tenant-local')).toBe('skipped');
     expect(await fresh.listProviderConnections('tenant-local')).toHaveLength(0);
   });
 });

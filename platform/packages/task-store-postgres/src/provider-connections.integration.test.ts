@@ -92,9 +92,9 @@ integration.sequential('PostgreSQL provider connections', () => {
     });
     expect(await store.getRunAgentSettings(tenantId)).toMatchObject({ defaultProvider: 'connection', providerConnectionId: connectionId });
     await store.upsertRunAgentSettings({
-      tenantId, defaultProvider: 'auto', updatedAt: '2026-08-25T01:00:00.000Z', updatedBy: 'principal://tester'
+      tenantId, defaultProvider: 'echo', updatedAt: '2026-08-25T01:00:00.000Z', updatedBy: 'principal://tester'
     });
-    expect((await store.getRunAgentSettings(tenantId))?.defaultProvider).toBe('auto');
+    expect((await store.getRunAgentSettings(tenantId))?.defaultProvider).toBe('echo');
     expect((await store.getRunAgentSettings(tenantId))?.providerConnectionId).toBeUndefined();
     await expect(store.upsertRunAgentSettings({
       tenantId, defaultProvider: 'connection', updatedAt: '2026-08-25T02:00:00.000Z', updatedBy: 'principal://tester'

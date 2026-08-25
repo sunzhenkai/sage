@@ -2,8 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ProviderConnectionRecord, ProviderConnectionStore, ProviderCredentialSealed } from '@sage/task-domain';
 import type { ChatStore } from '@sage/chat-domain';
 import {
-  ChatTaskInputResolver, CompositeTaskInputResolver, DEFAULT_MINIMAX_BASE_URL, DEFAULT_MINIMAX_MODEL,
-  PackageTaskInputResolver, describeLiveProviderRoute, providerStatusOf, readLiveProviderRouteFromEnv, workerPollersReady
+  ChatTaskInputResolver, CompositeTaskInputResolver, PackageTaskInputResolver, workerPollersReady
 } from './runtime.js';
 import { decidePackageRunClientChoice, resolveConnectionLiveClient } from './activities.js';
 import type { LiveProviderRoute } from '@sage/local-runtime';
@@ -58,37 +57,6 @@ describe('ChatTaskInputResolver', () => {
     expect(workerPollersReady({ runState: 'RUNNING', workflowPollerState: 'FAILED', activityPollerState: 'POLLING' })).toBe(false);
   });
 
-  it('falls back to undefined without MINIMAX_API_KEY so package runs stay on the local echo harness', () => {
-    expect(readLiveProviderRouteFromEnv({})).toBeUndefined();
-    expect(readLiveProviderRouteFromEnv({ MINIMAX_API_KEY: '   ' })).toBeUndefined();
-  });
-
-  it('builds an anthropic-compatible route from env with MiniMax China defaults and overridable base/model', () => {
-    expect(readLiveProviderRouteFromEnv({ MINIMAX_API_KEY: 'secret-key' })).toEqual({
-      adapterKind: 'anthropic', baseUrl: DEFAULT_MINIMAX_BASE_URL, modelId: DEFAULT_MINIMAX_MODEL, apiKey: 'secret-key'
-    });
-    expect(readLiveProviderRouteFromEnv({
-      MINIMAX_API_KEY: 'secret-key', MINIMAX_BASE_URL: 'https://proxy.example/anthropic', MINIMAX_MODEL: 'MiniMax-M2.1'
-    })).toEqual({
-      adapterKind: 'anthropic', baseUrl: 'https://proxy.example/anthropic', modelId: 'MiniMax-M2.1', apiKey: 'secret-key'
-    });
-    expect(readLiveProviderRouteFromEnv({ MINIMAX_API_KEY: 'secret-key' })?.modelId).toBe('MiniMax-M3');
-  });
-
-  it('describes the live route without ever including the API key', () => {
-    const line = describeLiveProviderRoute(readLiveProviderRouteFromEnv({ MINIMAX_API_KEY: 'secret-key' })!);
-    expect(line).toContain('model=MiniMax-M3');
-    expect(line).toContain(DEFAULT_MINIMAX_BASE_URL);
-    expect(line).not.toContain('secret-key');
-  });
-
-  it('exposes a non-sensitive provider status for /readyz in both modes', () => {
-    expect(providerStatusOf(undefined)).toEqual({ mode: 'echo' });
-    const live = providerStatusOf(readLiveProviderRouteFromEnv({ MINIMAX_API_KEY: 'secret-key' }));
-    expect(live).toEqual({ mode: 'live', modelId: 'MiniMax-M3' });
-    expect(JSON.stringify(live)).not.toContain('secret-key');
-  });
-
   it('exposes a non-sensitive secret backend mode for /readyz', async () => {
     const { createLocalSecretBackendFromEnv } = await import('@sage/secret-vault');
     const { randomBytes } = await import('node:crypto');
@@ -97,19 +65,13 @@ describe('ChatTaskInputResolver', () => {
     expect(createLocalSecretBackendFromEnv({})?.describe().mode ?? 'unavailable').toBe('unavailable');
   });
 
-  it('resolves the execution harness from run agent settings with fail-closed minimax', () => {
-    // 固定 minimax 缺 live route：显式不可用，绝不回退 echo。
-    expect(decidePackageRunClientChoice(true, 'minimax', false)).toBe('unavailable');
-    expect(decidePackageRunClientChoice(true, 'minimax', true)).toBe('live');
-    // 固定 echo：即使 live 可用也走本地确定性 harness。
+  it('resolves the execution harness from run agent settings: echo offline, connection fail-closed', () => {
+    // echo（含缺省与 legacy 归一）：本地确定性 harness，与 live 可用性无关。
     expect(decidePackageRunClientChoice(true, 'echo', true)).toBe('echo');
     expect(decidePackageRunClientChoice(true, 'echo', false)).toBe('echo');
-    // auto（缺省）：env 驱动现状——有 key 走 live，无 key 回退 echo。
-    expect(decidePackageRunClientChoice(true, 'auto', true)).toBe('live');
-    expect(decidePackageRunClientChoice(true, 'auto', false)).toBe('echo');
     // 非 package 输入（chat 路径）不受设置影响。
-    expect(decidePackageRunClientChoice(false, 'minimax', false)).toBe('echo');
-    // connection：与 minimax 同为 fail-closed——解析出 live client 才走 live，否则 unavailable，绝不回退 echo。
+    expect(decidePackageRunClientChoice(false, 'connection', false)).toBe('echo');
+    // connection：fail-closed——解析出 live client 才走 live，否则 unavailable，绝不回退 echo。
     expect(decidePackageRunClientChoice(true, 'connection', true)).toBe('live');
     expect(decidePackageRunClientChoice(true, 'connection', false)).toBe('unavailable');
   });

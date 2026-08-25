@@ -289,10 +289,15 @@ export interface TaskRunOutputStore {
   getRunOutput(tenantId: string, taskId: string): Promise<TaskRunOutputRecord | undefined>;
 }
 
-/** 运行 agent 默认 provider：auto=env 驱动（缺省），minimax=固定 live（缺依赖显式失败），echo=显式本地确定性，connection=指向受信 provider 注册表条目。 */
-export type RunAgentDefaultProvider = 'auto' | 'minimax' | 'echo' | 'connection';
+/** 运行 agent 默认 provider：echo=显式本地确定性 harness（离线模式，缺省），connection=指向受信 provider 注册表条目。legacy 取值（auto/minimax）在读取时归一为 echo。 */
+export type RunAgentDefaultProvider = 'echo' | 'connection';
 
-/** 运行 agent 设置记录：per-tenant 单例、非密钥；无行等效 auto。connection 模式下 providerConnectionId 必填。 */
+/** legacy 存储值归一：connection 保留，其余（含已删除的 auto/minimax 与未知值）一律按 echo 处理。 */
+export function normalizeRunAgentDefaultProvider(raw: string): RunAgentDefaultProvider {
+  return raw === 'connection' ? 'connection' : 'echo';
+}
+
+/** 运行 agent 设置记录：per-tenant 单例、非密钥；无行等效 echo（离线模式）。connection 模式下 providerConnectionId 必填。 */
 export interface RunAgentSettingsRecord {
   readonly tenantId: string;
   readonly defaultProvider: RunAgentDefaultProvider;
@@ -306,10 +311,8 @@ export interface RunAgentSettingsStore {
   upsertRunAgentSettings(record: RunAgentSettingsRecord): Promise<{ readonly status: 'stored' | 'existing' }>;
 }
 
-/** 部署 env 引导条目的固定 id：MINIMAX_API_KEY 非空时由 agent-api 启动幂等 upsert。 */
-export const DEPLOYMENT_ENV_MINIMAX_CONNECTION_ID = 'deployment-env-minimax';
-export const DEFAULT_MINIMAX_BASE_URL = 'https://api.minimaxi.com/anthropic';
-export const DEFAULT_MINIMAX_MODEL = 'MiniMax-M3';
+/** 部署 env 引导条目的固定 id：SAGE_BOOTSTRAP_PROVIDER_API_KEY 非空时由 agent-api 启动幂等 upsert。 */
+export const DEPLOYMENT_ENV_CONNECTION_ID = 'deployment-env-default';
 
 /** 受信 provider 条目来源：user=经 API 创建，deployment-env=启动时从受信 env 幂等引导。 */
 export type ProviderConnectionSource = 'user' | 'deployment-env';

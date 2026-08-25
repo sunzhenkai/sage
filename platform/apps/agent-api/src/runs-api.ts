@@ -16,7 +16,6 @@ import type { ReleasePayload } from '@sage/agent-release-registry';
 import type { AuthenticatedPrincipal } from '@sage/app-contracts';
 import type { ProviderConnectionStore, RunAgentSettingsStore, TaskPackageInputStore, TaskPackageInputRecord } from '@sage/task-domain';
 import type { TaskControllerPort } from './task-api.js';
-import { minimaxAvailableFromEnv } from './run-agent-settings-api.js';
 
 export interface RunsPrincipalAuthenticator {
   authenticateRequest?(request: FastifyRequest): Promise<AuthenticatedPrincipal | undefined> | AuthenticatedPrincipal | undefined;
@@ -45,8 +44,6 @@ export interface RegisterPackageRunsRoutesOptions {
   readonly settingsStore?: Pick<RunAgentSettingsStore, 'getRunAgentSettings'>;
   /** 注册表访问：connection 模式的准入依赖检查（条目存在、启用且凭据在场）。 */
   readonly providerConnections?: Pick<ProviderConnectionStore, 'getProviderConnection'>;
-  /** 可注入的受信 env 视图（测试用）；缺省读 process.env，只做非空检测。 */
-  readonly providerEnv?: Record<string, string | undefined>;
   readonly idempotencyStore?: AdmissionIdempotencyStoreV1;
   readonly auditOutbox?: AdmissionAuditOutboxPortV1;
   readonly now?: () => Date;
@@ -135,13 +132,9 @@ export function registerPackageRunsRoutes(app: FastifyInstance, options: Registe
       }
       const principal = await principalFor(request, options);
       if (!principal) return sendError(reply, 401, 'PACKAGE_RUN_AUTHENTICATION_REQUIRED', 'Package run API requires authentication');
-      // 运行前依赖检查：固定 minimax 而受信 env 缺 MINIMAX_API_KEY，或 connection 指向的条目不可用时显式拒绝，不创建任务、不物化输入。
+      // 运行前依赖检查：connection 指向的条目不可用时显式拒绝，不创建任务、不物化输入；echo（含缺省与 legacy 归一）照常准入。
       if (options.settingsStore !== undefined) {
         const settings = await options.settingsStore.getRunAgentSettings(options.tenantId);
-        if ((settings?.defaultProvider ?? 'auto') === 'minimax' && !minimaxAvailableFromEnv(options.providerEnv)) {
-          return sendError(reply, 409, 'PROVIDER_DEPENDENCY_MISSING',
-            'Run agent default provider is pinned to minimax but MINIMAX_API_KEY is not set in the trusted environment. Set MINIMAX_API_KEY (and optional MINIMAX_BASE_URL/MINIMAX_MODEL) and restart agent-api and agent-worker, or switch the default provider back to auto/echo.', false);
-        }
         if (settings?.defaultProvider === 'connection') {
           const connectionId = settings.providerConnectionId ?? '';
           const connection = options.providerConnections === undefined ? undefined : await options.providerConnections.getProviderConnection(options.tenantId, connectionId);

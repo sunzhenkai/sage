@@ -233,7 +233,11 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
       process.stdout.write('WARN: SAGE_SECRET_MASTER_KEY not set — provider connection credential writes are unavailable (fail-closed)\n');
     }
     try {
-      await bootstrapDeploymentEnvProviderConnection(tasks, secretBackend, config.secretEnv ?? process.env, config.tenantId);
+      const bootstrapEnv = config.secretEnv ?? process.env;
+      const bootstrap = await bootstrapDeploymentEnvProviderConnection(tasks, secretBackend, bootstrapEnv, config.tenantId);
+      if (bootstrap === 'skipped' && (bootstrapEnv.SAGE_BOOTSTRAP_PROVIDER_API_KEY ?? '').trim().length > 0) {
+        process.stdout.write('WARN: deployment-env provider bootstrap skipped — SAGE_BOOTSTRAP_PROVIDER_BASE_URL/SAGE_BOOTSTRAP_PROVIDER_MODEL are required (baseUrl must be a public HTTPS URL) alongside SAGE_BOOTSTRAP_PROVIDER_API_KEY\n');
+      }
     } catch (cause) {
       process.stdout.write(`WARN: deployment-env provider bootstrap skipped (${cause instanceof Error ? cause.message : 'unknown cause'})\n`);
     }

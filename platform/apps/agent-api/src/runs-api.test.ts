@@ -119,7 +119,7 @@ class FakeConnectionStore {
   }
 }
 
-async function api(options: { readonly principal?: AuthenticatedPrincipal; readonly specStore?: AgentTaskSpecStorePort; readonly deploymentMode?: 'local' | 'production'; readonly controller?: FakeController; readonly taskStore?: FakeTaskStore; readonly settingsStore?: FakeSettingsStore; readonly connections?: FakeConnectionStore; readonly providerEnv?: Record<string, string | undefined> } = {}) {
+async function api(options: { readonly principal?: AuthenticatedPrincipal; readonly specStore?: AgentTaskSpecStorePort; readonly deploymentMode?: 'local' | 'production'; readonly controller?: FakeController; readonly taskStore?: FakeTaskStore; readonly settingsStore?: FakeSettingsStore; readonly connections?: FakeConnectionStore } = {}) {
   const app = Fastify({ logger: false, ajv: { customOptions: { removeAdditional: false } } });
   const controller = options.controller ?? new FakeController();
   const taskStore = options.taskStore ?? new FakeTaskStore();
@@ -131,7 +131,6 @@ async function api(options: { readonly principal?: AuthenticatedPrincipal; reado
     specStore: options.specStore ?? new InMemoryAgentTaskSpecStore(),
     ...(options.settingsStore === undefined ? {} : { settingsStore: options.settingsStore }),
     ...(options.connections === undefined ? {} : { providerConnections: options.connections }),
-    providerEnv: options.providerEnv ?? {},
     authenticator: { authenticateRequest: () => options.principal },
     deploymentMode: options.deploymentMode ?? 'local',
     now: () => new Date('2026-08-17T00:00:00.000Z'),
@@ -203,38 +202,23 @@ describe('Package run API boundaries', () => {
     await app.close();
   });
 
-  it('rejects admission when minimax is pinned but the trusted env lacks MINIMAX_API_KEY', async () => {
-    const settings = new FakeSettingsStore();
-    await settings.upsertRunAgentSettings({ tenantId: 'tenant-local', defaultProvider: 'minimax', updatedAt: '2026-08-25T00:00:00.000Z', updatedBy: 'principal://op' });
-    const { app, controller, taskStore } = await api({ principal: operator, settingsStore: settings, providerEnv: {} });
-    const response = await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: { input: 'hi' } });
-    expect(response.statusCode).toBe(409);
-    const error = response.json().error;
-    expect(error.code).toBe('PROVIDER_DEPENDENCY_MISSING');
-    expect(error.retryable).toBe(false);
-    expect(error.message).toContain('MINIMAX_API_KEY');
-    // 依赖检查发生在物化输入与创建任务之前。
-    expect(controller.created).toHaveLength(0);
-    expect(taskStore.records.size).toBe(0);
-    await app.close();
-  });
-
-  it('admits normally for pinned minimax with the key present, and for auto/echo without it', async () => {
-    const pinned = new FakeSettingsStore();
-    await pinned.upsertRunAgentSettings({ tenantId: 'tenant-local', defaultProvider: 'minimax', updatedAt: '2026-08-25T00:00:00.000Z', updatedBy: 'principal://op' });
-    const withKey = await api({ principal: operator, settingsStore: pinned, providerEnv: { MINIMAX_API_KEY: 'trusted' } });
-    expect((await withKey.app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: { input: 'hi' } })).statusCode).toBe(202);
-    await withKey.app.close();
+  it('admits normally for legacy minimax rows (normalized to echo) and for echo without any provider key', async () => {
+    // 存量 legacy 行（store 读取归一为 echo；此处 fake 原样返回）：准入不再做 env 检查，照常放行。
+    const legacy = new FakeSettingsStore();
+    await legacy.upsertRunAgentSettings({ tenantId: 'tenant-local', defaultProvider: 'minimax', updatedAt: '2026-08-25T00:00:00.000Z', updatedBy: 'principal://op' } as unknown as RunAgentSettingsRecord);
+    const legacyApp = await api({ principal: operator, settingsStore: legacy });
+    expect((await legacyApp.app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: { input: 'hi' } })).statusCode).toBe(202);
+    await legacyApp.app.close();
 
     const echo = new FakeSettingsStore();
     await echo.upsertRunAgentSettings({ tenantId: 'tenant-local', defaultProvider: 'echo', updatedAt: '2026-08-25T00:00:00.000Z', updatedBy: 'principal://op' });
-    const echoNoKey = await api({ principal: operator, settingsStore: echo, providerEnv: {} });
-    expect((await echoNoKey.app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: { input: 'hi' } })).statusCode).toBe(202);
-    await echoNoKey.app.close();
+    const echoApp = await api({ principal: operator, settingsStore: echo });
+    expect((await echoApp.app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: { input: 'hi' } })).statusCode).toBe(202);
+    await echoApp.app.close();
 
-    const autoNoKey = await api({ principal: operator, providerEnv: {} });
-    expect((await autoNoKey.app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: { input: 'hi' } })).statusCode).toBe(202);
-    await autoNoKey.app.close();
+    const noSettings = await api({ principal: operator });
+    expect((await noSettings.app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: { input: 'hi' } })).statusCode).toBe(202);
+    await noSettings.app.close();
   });
 
   it('rejects admission when connection mode points at a missing, disabled, or credential-less entry', async () => {
@@ -273,7 +257,7 @@ describe('Package run API boundaries', () => {
       tenantId: 'tenant-local', defaultProvider: 'connection', providerConnectionId: 'conn-ok',
       updatedAt: '2026-08-25T00:00:00.000Z', updatedBy: 'principal://op'
     });
-    const ok = await api({ principal: operator, settingsStore: settings, connections, providerEnv: {} });
+    const ok = await api({ principal: operator, settingsStore: settings, connections });
     const admitted = await ok.app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: { input: 'hi' } });
     expect(admitted.statusCode).toBe(202);
     await ok.app.close();

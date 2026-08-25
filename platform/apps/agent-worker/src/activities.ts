@@ -34,7 +34,7 @@ export interface AgentTaskActivityOptions {
   readonly agentClient: LocalAgentClient;
   /** live provider 客户端：仅 package 路径的 slice 使用；未提供时全部走 agentClient（echo）。 */
   readonly packageAgentClient?: LocalAgentClient;
-  /** 运行 agent 设置读取：缺省视 defaultProvider=auto（env 驱动现状）。 */
+  /** 运行 agent 设置读取：缺省视 defaultProvider=echo（离线模式）。 */
   readonly settingsStore?: Pick<RunAgentSettingsStore, 'getRunAgentSettings'>;
   /** 注册表访问：connection 模式在 slice 执行边界解析条目与密封凭据。 */
   readonly providerConnections?: ProviderConnectionStore;
@@ -56,19 +56,17 @@ export interface AgentTaskActivities { executeAgentSlice(input: ExecuteAgentSlic
 /**
  * 运行 agent 设置 → 执行 harness 的纯决策：
  * - 非 package 输入（chat 路径）恒走本地 client，设置不参与；
- * - echo：显式本地确定性 harness，即使 live 可用也不发起模型调用；
- * - minimax / connection：必须 live；live 不可用返回 'unavailable'（调用方以稳定错误 fail-closed，绝不回退 echo）；
- * - auto（缺省）：live 可用走 live，否则回退本地（既有 env 驱动行为）。
+ * - echo（含缺省与 legacy 归一）：显式本地确定性 harness，不发起模型调用；
+ * - connection：必须 live；live 不可用返回 'unavailable'（调用方以稳定错误 fail-closed，绝不回退 echo）。
  */
 export function decidePackageRunClientChoice(
   isPackageInput: boolean,
-  defaultProvider: 'auto' | 'minimax' | 'echo' | 'connection',
+  defaultProvider: 'echo' | 'connection',
   liveClientAvailable: boolean
 ): 'live' | 'echo' | 'unavailable' {
   if (!isPackageInput) return 'echo';
   if (defaultProvider === 'echo') return 'echo';
-  if (liveClientAvailable) return 'live';
-  return defaultProvider === 'minimax' || defaultProvider === 'connection' ? 'unavailable' : 'echo';
+  return liveClientAvailable ? 'live' : 'unavailable';
 }
 
 /**
@@ -117,13 +115,13 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
     async executeAgentSlice(input): Promise<AgentSliceResult> {
       const info = activityInfo();
       if(input.sessionId&&input.runId&&input.messageId)try{options.telemetry?.record('sage_task_worker_attempt_total',1,{tenant_id:input.tenantId,message_id:input.messageId,session_id:input.sessionId,run_id:input.runId,task_id:input.taskId,workflow_id:input.workflowId,target_id:input.targetId,attempt:input.attempt},{activity_attempt:info.attempt,slice_number:input.sliceNumber});}catch{/* Telemetry cannot change Activity semantics. */}
-      // 执行前依赖检查（fail-closed）：固定 minimax 而无受信 live route 时以不可重试错误显式失败，
+      // 执行前依赖检查（fail-closed）：connection 模式在执行边界解析注册表路由，不可用时以不可重试错误显式失败，
       // 不 claim slice、不执行 echo、不写 run 输出。设置每 slice 现读，改设置即时生效。
       const isPackageInput = input.inputRef.startsWith('task-input://package/');
       const settings = isPackageInput && options.settingsStore !== undefined
         ? await options.settingsStore.getRunAgentSettings(input.tenantId)
         : undefined;
-      const defaultProvider = settings?.defaultProvider ?? 'auto';
+      const defaultProvider = settings?.defaultProvider ?? 'echo';
       // connection 模式：执行边界从注册表解析路由并解密凭据（reference-only，key 不落任何持久化面）。
       const packageClient = isPackageInput && defaultProvider === 'connection' && settings?.providerConnectionId !== undefined
         ? await resolveConnectionLiveClient(options.providerConnections, options.secretBackend, options.liveClientFactory, input.tenantId, settings.providerConnectionId)
@@ -131,7 +129,7 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
       const clientChoice = decidePackageRunClientChoice(isPackageInput, defaultProvider, packageClient !== undefined);
       if (clientChoice === 'unavailable') {
         throw ApplicationFailure.nonRetryable(
-          'PROVIDER_DEPENDENCY_MISSING: run agent default provider is pinned to minimax but MINIMAX_API_KEY is not set in the worker environment. Set MINIMAX_API_KEY and restart agent-worker, or switch the default provider back to auto/echo.',
+          'PROVIDER_DEPENDENCY_MISSING: run agent default provider is connection but no provider connection is selected. Select a workspace provider connection in run agent settings, or switch the default provider to echo.',
           'PROVIDER_DEPENDENCY_MISSING'
         );
       }
