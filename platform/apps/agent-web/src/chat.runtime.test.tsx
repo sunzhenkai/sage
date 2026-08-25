@@ -92,7 +92,56 @@ describe('chat runtime quick selector', () => {
     const tree = await mount(storage, fetcher);
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
     expect(tree.root.findByProps({ 'aria-label': 'Chat runtime' }).props.value).toBe('');
-    await act(async () => { tree.unmount(); });
+    await act(async () => tree.unmount());
+  });
+});
+
+describe('chat runtime workspace default model', () => {
+  const connOther = { ...conn, id: 'conn-other', name: '另一个条目' };
+
+  const withDefault = (connections: readonly unknown[], defaultId: string | undefined) => async (input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url.endsWith('/run-agent/settings')) {
+      return response(defaultId === undefined
+        ? { schemaVersion: 'RunAgentSettings.v2', unset: true, providers: [] }
+        : { schemaVersion: 'RunAgentSettings.v2', unset: false, providerConnectionId: defaultId, providers: [] });
+    }
+    return (await workspaceConnections(connections)(input)) as Response;
+  };
+
+  it('initializes the visible selection from the workspace default model when no local choice exists', async () => {
+    const storage = new FakeStorage();
+    const tree = await mount(storage, vi.fn(await withDefault([conn], 'conn-ws')) as unknown as typeof fetch);
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
+    expect(tree.root.findByProps({ 'aria-label': 'Chat runtime' }).props.value).toBe('ws:conn-ws');
+    // 默认初始化不写回 browser-local storage：后续默认模型变化仍可生效。
+    expect(storage.getItem(CHAT_RUNTIME_STORAGE_KEY)).toBe(null);
+    await act(async () => tree.unmount());
+  });
+
+  it('keeps an explicit browser-local selection over the workspace default model', async () => {
+    const storage = new FakeStorage();
+    storage.setItem(CHAT_RUNTIME_STORAGE_KEY, 'ws:conn-other');
+    const tree = await mount(storage, vi.fn(await withDefault([conn, connOther], 'conn-ws')) as unknown as typeof fetch);
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
+    expect(tree.root.findByProps({ 'aria-label': 'Chat runtime' }).props.value).toBe('ws:conn-other');
+    await act(async () => tree.unmount());
+  });
+
+  it('stays unselected and blocks sending when the default model entry is not usable', async () => {
+    const posts: string[] = [];
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/messages')) posts.push(url);
+      return (await withDefault([], 'conn-ws')(input)) as Response;
+    }) as unknown as typeof fetch;
+    const tree = await mount(new FakeStorage(), fetcher);
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
+    expect(tree.root.findByProps({ 'aria-label': 'Chat runtime' }).props.value).toBe('');
+    await act(async () => { tree.root.findByProps({ 'aria-label': 'Message' }).props.onChange({ target: { value: '你好' } }); });
+    await act(async () => { tree.root.findByType('form').props.onSubmit({ preventDefault: () => undefined }); await flush(); });
+    expect(posts).toEqual([]);
+    await act(async () => tree.unmount());
   });
 });
 

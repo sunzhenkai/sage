@@ -198,19 +198,40 @@ export function ChatApp({ sessionId, apiBase = '', fetcher = fetch }: ChatAppPro
   const submitGuard = useRef(false); const composition = useRef(false); const terminal = useMemo(() => terminalRun(events.flatMap((event) => event.payload.kind === 'run' ? [{ status: event.payload.status, attempt: event.payload.attempt } as ChatRun] : [])), [events]); const hasTask = useMemo(() => events.some((event) => event.payload.kind === 'task' && event.payload.taskId !== undefined), [events]); const sessionWritable = sessionStatus === 'open' && !archived;
   const [runtimeId, setRuntimeId] = useState<string>(() => browserLocalStorage()?.getItem(CHAT_RUNTIME_STORAGE_KEY) ?? '');
   const [workspaceConnections, setWorkspaceConnections] = useState<readonly WorkspaceProviderView[]>([]);
+  const [connectionsLoaded, setConnectionsLoaded] = useState(false);
+  const [defaultConnectionId, setDefaultConnectionId] = useState<string | undefined>();
+  const defaultModelApplied = useRef(false);
   useEffect(() => {
     const controller = new AbortController();
     void fetcher('/v1/provider-connections', { credentials: 'include', signal: controller.signal }).then(async (response) => {
       if (!response.ok) return;
       const body = await response.json() as { connections: readonly WorkspaceProviderView[] };
       setWorkspaceConnections(body.connections.filter((connection) => connection.enabled && connection.credentialPresent));
+    }).catch(() => undefined).finally(() => setConnectionsLoaded(true));
+    return () => controller.abort();
+  }, [fetcher]);
+  // 工作区默认模型（run-agent 设置）：仅在浏览器无既有选择时作为可见初始选中（不写回 storage、不静默改写显式选择）。
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetcher('/v1/run-agent/settings', { credentials: 'include', signal: controller.signal }).then(async (response) => {
+      if (!response.ok) return;
+      const body = await response.json() as { unset?: boolean; providerConnectionId?: string };
+      if (body.unset !== true && typeof body.providerConnectionId === 'string') setDefaultConnectionId(body.providerConnectionId);
     }).catch(() => undefined);
     return () => controller.abort();
   }, [fetcher]);
   useEffect(() => {
+    if (!connectionsLoaded || defaultModelApplied.current) return;
+    if (runtimeId !== '' || browserLocalStorage()?.getItem(CHAT_RUNTIME_STORAGE_KEY) != null) { defaultModelApplied.current = true; return; }
+    if (defaultConnectionId === undefined) return;
+    defaultModelApplied.current = true;
+    if (workspaceConnections.some((connection) => connection.id === defaultConnectionId)) setRuntimeId(`${WS_RUNTIME_PREFIX}${defaultConnectionId}`);
+  }, [connectionsLoaded, defaultConnectionId, runtimeId, workspaceConnections]);
+  useEffect(() => {
+    if (!connectionsLoaded) return;
     const inWorkspace = workspaceConnections.some((connection) => runtimeId === `${WS_RUNTIME_PREFIX}${connection.id}`);
     if (!inWorkspace && runtimeId !== '') setRuntimeId('');
-  }, [runtimeId, workspaceConnections]);
+  }, [connectionsLoaded, runtimeId, workspaceConnections]);
   const selectRuntime = (id: string) => {
     setRuntimeId(id);
     const storage = browserLocalStorage();
