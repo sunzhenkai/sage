@@ -1,8 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import type { ProviderConnectionRecord, ProviderConnectionStore, ProviderCredentialSealed } from '@sage/task-domain';
 import type { ChatStore } from '@sage/chat-domain';
 import {
-  ChatTaskInputResolver, CompositeTaskInputResolver, PackageTaskInputResolver, workerPollersReady
+  ChatTaskInputResolver, CompositeTaskInputResolver, createWorkerRuntime, PackageTaskInputResolver, workerPollersReady
 } from './runtime.js';
 import { resolveConnectionLiveClient } from './activities.js';
 import type { LiveProviderRoute } from '@sage/local-runtime';
@@ -48,6 +48,26 @@ describe('ChatTaskInputResolver', () => {
     await expect(resolver.resolve('file:///etc/passwd' as `task-input://${string}`, 'tenant-local')).rejects.toThrow('TASK_INPUT_REF_UNSUPPORTED');
     await expect(resolver.resolve('task-input://chat/other-tenant/message-1', 'tenant-local')).rejects.toThrow('TASK_INPUT_REF_TENANT_MISMATCH');
     await expect(new ChatTaskInputResolver(fakeChat(undefined)).resolve('task-input://chat/tenant-local/missing', 'tenant-local')).rejects.toThrow('TASK_INPUT_REF_NOT_FOUND');
+  });
+});
+
+describe('worker runtime secret master key fail-fast', () => {
+  const original = { ...process.env };
+  afterEach(() => {
+    for (const key of Object.keys(process.env)) if (!(key in original)) delete process.env[key];
+    for (const [key, value] of Object.entries(original)) process.env[key] = value;
+  });
+
+  it('refuses to start without SAGE_SECRET_MASTER_KEY before connecting stores or temporal', async () => {
+    process.env.SAGE_DEPLOYMENT_MODE = 'local';
+    delete process.env.SAGE_SECRET_MASTER_KEY;
+    await expect(createWorkerRuntime()).rejects.toThrow('LOCAL_RUNTIME_REQUIRES_SAGE_SECRET_MASTER_KEY');
+  });
+
+  it('refuses to start when SAGE_SECRET_MASTER_KEY is not base64 of 32 bytes', async () => {
+    process.env.SAGE_DEPLOYMENT_MODE = 'local';
+    process.env.SAGE_SECRET_MASTER_KEY = 'not-base64-of-32-bytes';
+    await expect(createWorkerRuntime()).rejects.toThrow('LOCAL_RUNTIME_REQUIRES_SAGE_SECRET_MASTER_KEY');
   });
 });
 

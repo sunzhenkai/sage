@@ -38,6 +38,23 @@ describe('models.dev payload validation and projection', () => {
     expect(() => validateCatalogPayload(bytes({ alpha: { id: 'alpha', name: 'Alpha', models: { x: { id: 'x', name: 'X', status: 1 } } } }))).toThrow(/model.status is invalid/);
   });
 
+  it('projects valid release_date as releaseDate, omits when absent, and rejects invalid values in batch', () => {
+    const result = validateCatalogPayload(bytes({
+      alpha: { id: 'alpha', name: 'Alpha', models: {
+        dated: { id: 'dated', name: 'Dated', release_date: '2026-04-14' },
+        monthly: { id: 'monthly', name: 'Monthly', release_date: '2026-01' },
+        undated: { id: 'undated', name: 'Undated' }
+      } }
+    }));
+    expect(result.projection.models.find((model) => model.modelId === 'dated')?.releaseDate).toBe('2026-04-14');
+    expect(result.projection.models.find((model) => model.modelId === 'monthly')?.releaseDate).toBe('2026-01');
+    expect(result.projection.models.find((model) => model.modelId === 'undated')).not.toHaveProperty('releaseDate');
+    expect(() => validateCatalogPayload(bytes({ alpha: { id: 'alpha', name: 'Alpha', models: { x: { id: 'x', name: 'X', release_date: '2026-04-14T00:00:00Z' } } } }))).toThrow(/release_date/);
+    expect(() => validateCatalogPayload(bytes({ alpha: { id: 'alpha', name: 'Alpha', models: { x: { id: 'x', name: 'X', release_date: 20260414 } } } }))).toThrow(/release_date/);
+    expect(() => validateCatalogPayload(bytes({ alpha: { id: 'alpha', name: 'Alpha', models: { x: { id: 'x', name: 'X', release_date: '2026-13-40' } } } }))).toThrow(/release_date/);
+    expect(() => validateCatalogPayload(bytes({ alpha: { id: 'alpha', name: 'Alpha', models: { x: { id: 'x', name: 'X', release_date: '2026-13' } } } }))).toThrow(/release_date/);
+  });
+
   it('rejects missing/mismatched critical fields and invalid used types', () => {
     expect(() => validateCatalogPayload(bytes({ alpha: { id: 'other', name: 'Alpha', models: {} } }))).toThrow(CatalogPayloadError);
     expect(() => validateCatalogPayload(bytes({ alpha: { id: 'alpha', name: '', models: {} } }))).toThrow(/non-empty/);

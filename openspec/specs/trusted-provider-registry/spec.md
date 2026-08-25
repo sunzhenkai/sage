@@ -33,14 +33,18 @@
 - **THEN** 返回元数据与「凭据在场」布尔状态，不返回任何密文或密钥材料
 
 ### Requirement: 凭据只写不读
-provider 条目凭据 SHALL 经 `SecretBackend` 密封后存入独立凭据表（含 key version），明文 SHALL NOT 出现在任何表列、事件、Temporal payload、日志、trace 或 API 响应中。凭据 SHALL 仅通过创建/更新的写通道提交（字段提交后即不可读取）；解密 SHALL 只发生在执行边界或显式连接探测的服务端代码内。主密钥缺失或后端不可用时，凭据写入与依赖凭据的解析 SHALL fail-closed，SHALL NOT 降级为明文存储。密封 SHALL 记录所用的 key version；`open` SHALL 按记录的版本选取密钥，版本对应的密钥不在配置中时 SHALL fail-closed（不尝试猜测或降级）。
+provider 条目凭据 SHALL 经 `SecretBackend` 密封后存入独立凭据表（含 key version），明文 SHALL NOT 出现在任何表列、事件、Temporal payload、日志、trace 或 API 响应中。凭据 SHALL 仅通过创建/更新的写通道提交（字段提交后即不可读取）；解密 SHALL 只发生在执行边界或显式连接探测的服务端代码内。主密钥（`SAGE_SECRET_MASTER_KEY`）缺失、为空或非法（非 base64 的 32 字节）时，agent-api 与 agent-worker SHALL 在启动早期以稳定错误拒绝启动（fail-fast：不打开监听、不连接依赖）；运行期后端不可用时，凭据写入与依赖凭据的解析 SHALL 仍以稳定错误 fail-closed（纵深防御），SHALL NOT 降级为明文存储。密封 SHALL 记录所用的 key version；`open` SHALL 按记录的版本选取密钥，版本对应的密钥不在配置中时 SHALL fail-closed（不尝试猜测或降级）。
 
 #### Scenario: 创建条目提交 key
 - **WHEN** 已认证主体 POST 条目携带 apiKey
 - **THEN** 条目与密封凭据落库，响应只含元数据与凭据在场状态，不含 key
 
-#### Scenario: 主密钥缺失时拒绝写入
-- **WHEN** 服务端未配置 `SAGE_SECRET_MASTER_KEY`，主体尝试创建携带 apiKey 的条目
+#### Scenario: 主密钥缺失或非法时拒绝启动
+- **WHEN** agent-api 或 agent-worker 在 `SAGE_SECRET_MASTER_KEY` 缺失、为空或非 base64 的 32 字节时启动
+- **THEN** 启动以稳定错误 `LOCAL_RUNTIME_REQUIRES_SAGE_SECRET_MASTER_KEY` 立即失败（不打开监听、不连接存储/Temporal、不落任何明文）
+
+#### Scenario: 后端缺席时写入仍被拒（纵深防御）
+- **WHEN** 条目 API 被装配为无可用 `secretBackend`，主体尝试创建携带 apiKey 的条目
 - **THEN** 请求以稳定错误拒绝（不落任何明文），既有条目不受影响
 
 #### Scenario: 密文泄露面
@@ -56,11 +60,11 @@ provider 条目凭据 SHALL 经 `SecretBackend` 密封后存入独立凭据表�
 - **THEN** 以稳定错误 `PROVIDER_DEPENDENCY_MISSING` 失败，不猜测密钥、不降级明文
 
 ### Requirement: SecretBackend 治理与可观测
-SecretBackend SHALL 是可替换接口：本地后端（AES-256-GCM keyring）与生产 Secret Manager 实现 SHALL 可在不改调用方契约的情况下互换；替换与轮换 SHALL NOT 使明文进入持久化或观测面。agent-api 与 agent-worker SHALL 在 `/readyz` 暴露非敏感 `secretBackend` 状态（后端模式标识，如 `local-aes-gcm` 或 `unavailable`，不含任何密钥材料或指纹），后端不可用 SHALL fail-closed 相关能力并在启动日志输出 WARN。
+SecretBackend SHALL 是可替换接口：本地后端（AES-256-GCM keyring）与生产 Secret Manager 实现 SHALL 可在不改调用方契约的情况下互换；替换与轮换 SHALL NOT 使明文进入持久化或观测面。agent-api 与 agent-worker SHALL 在 `/readyz` 暴露非敏感 `secretBackend` 状态（后端模式标识，如 `local-aes-gcm`，不含任何密钥材料或指纹）；主密钥缺失或非法时进程 SHALL 在启动早期以稳定错误退出（fail-fast），SHALL NOT 以降级状态进入可服务运行。
 
 #### Scenario: 后端状态可观测
 - **WHEN** 查询 agent-api 或 agent-worker `/readyz`（无论 ready 与否）
-- **THEN** 响应携带 `secretBackend.mode` 非敏感标识；后端不可用时为 `unavailable` 且启动日志含 WARN
+- **THEN** 响应携带 `secretBackend.mode` 非敏感标识（如 `local-aes-gcm`）；缺主密钥的进程在启动早期即失败，不会出现在可服务状态中
 
 #### Scenario: 后端不可用时不降级
 - **WHEN** SecretBackend 不可用（缺主密钥/配置错误），发生凭据写入、执行边界解析或引用形态对话解析

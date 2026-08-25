@@ -11,7 +11,7 @@ import { createLiveProviderAgentClient, createLocalKernelComposition, type LiveP
 import { createFakeLiveInvoker } from '@sage/harness-pi';
 import { LegacyAgentRunSpecV1Adapter, parseAgentExecutionFeatureConfig, runShadowEngine, selectAgentExecutionMode, type AgentExecutionMode, type AgentLifecycleOwner, type LegacyAdapterResult } from '@sage/agent-client';
 import { PostgresTaskStore } from '@sage/task-store-postgres';
-import { createLocalSecretBackendFromEnv, type SecretBackend } from '@sage/secret-vault';
+import { createLocalSecretBackendFromEnv } from '@sage/secret-vault';
 import { CatalogServiceError, CatalogSyncManager, ProviderCatalogService, ProviderCatalogStore } from '@sage/provider-catalog';
 import { TASK_NAMESPACE, TASK_QUEUE } from '@sage/task-domain';
 import { createDevRegistryBundle, publishDevRegistry } from '@sage/temporal-registry';
@@ -131,6 +131,11 @@ export interface ApiRuntime {
 }
 
 export async function createApiRuntime(config = readApiRuntimeConfig()): Promise<ApiRuntime> {
+  // 凭据密封主密钥是必选配置：缺失或非法（非 base64 的 32 字节）直接拒绝启动，不进入无凭据能力的降级运行。
+  const secretBackend = createLocalSecretBackendFromEnv(config.secretEnv);
+  if (secretBackend === undefined) {
+    throw new Error('LOCAL_RUNTIME_REQUIRES_SAGE_SECRET_MASTER_KEY: set SAGE_SECRET_MASTER_KEY to base64 of 32 bytes (e.g. openssl rand -base64 32), shared by agent-api and agent-worker; credential sealing has no plaintext fallback');
+  }
   const chat = new ChatStore({ connectionString: config.postgresUrl, connectionTimeoutMillis: 2_000 });
   const tasks = new PostgresTaskStore({ connectionString: config.postgresUrl });
   const catalog = new ProviderCatalogStore({ connectionString: config.postgresUrl, connectionTimeoutMillis: 2_000 });
@@ -178,7 +183,6 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
   };
     const authenticate = (authenticationId?: string): AuthenticatedPrincipal | undefined =>
       authenticationId === undefined || authenticationId === config.principal.authenticationId ? config.principal : undefined;
-    const chatSecretBackend = createLocalSecretBackendFromEnv(config.secretEnv);
     // 受信测试开关：显式配置时 chat 的 live client 以进程内确定性 invoker 替换最终模型 HTTP 调用，
     // 设置→注册表解析→harness 路由链路保真；未配置时走真实 provider。
     const fakeLiveProvider = (config.secretEnv ?? process.env).SAGE_FAKE_LIVE_PROVIDER === 'true';
@@ -189,7 +193,7 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
             createLiveProviderAgentClient({ route: input.route, transcript: input.transcript, invoker: createFakeLiveInvoker() }) }
         : {}),
       providerConnections: tasks,
-      ...(chatSecretBackend === undefined ? {} : { secretBackend: chatSecretBackend }),
+      secretBackend,
       ...(canonicalCompatibility === undefined ? {} : { canonicalCompatibility }),
       promotion: {
         controller,
@@ -236,12 +240,8 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
       authenticator,
       deploymentMode: 'local'
     });
-    const secretBackend: SecretBackend | undefined = createLocalSecretBackendFromEnv(config.secretEnv);
-    if (secretBackend === undefined) {
-      process.stdout.write('WARN: SAGE_SECRET_MASTER_KEY not set — provider connection credential writes are unavailable (fail-closed)\n');
-    }
+    const bootstrapEnv = config.secretEnv ?? process.env;
     try {
-      const bootstrapEnv = config.secretEnv ?? process.env;
       const bootstrap = await bootstrapDeploymentEnvProviderConnection(tasks, secretBackend, bootstrapEnv, config.tenantId);
       if (bootstrap === 'skipped' && (bootstrapEnv.SAGE_BOOTSTRAP_PROVIDER_API_KEY ?? '').trim().length > 0) {
         process.stdout.write('WARN: deployment-env provider bootstrap skipped — SAGE_BOOTSTRAP_PROVIDER_BASE_URL/SAGE_BOOTSTRAP_PROVIDER_MODEL are required (baseUrl must be a public HTTPS URL) alongside SAGE_BOOTSTRAP_PROVIDER_API_KEY\n');
@@ -250,11 +250,11 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
       process.stdout.write(`WARN: deployment-env provider bootstrap skipped (${cause instanceof Error ? cause.message : 'unknown cause'})\n`);
     }
     registerRunAgentSettingsRoutes(app, { tenantId: config.tenantId, settingsStore: tasks, providerConnections: tasks, authenticator });
-    registerProviderConnectionRoutes(app, { tenantId: config.tenantId, store: tasks, ...(secretBackend === undefined ? {} : { secretBackend }), authenticator });
+    registerProviderConnectionRoutes(app, { tenantId: config.tenantId, store: tasks, secretBackend, authenticator });
     registerProviderCatalogRoutes(app, { service: catalogService, store: catalog, manager: catalogManager, authenticator });
     await catalogManager.start();
     app.get('/livez', async () => ({ status: 'alive' }));
-    const secretBackendMode = secretBackend?.describe().mode ?? 'unavailable';
+    const secretBackendMode = secretBackend.describe().mode;
     app.get('/readyz', async (_request, reply) => {
       try {
         await Promise.all([

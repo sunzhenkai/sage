@@ -47,7 +47,7 @@ Chat 消息提交与重试 SHALL 携带引用形态 provider route：`{ connecti
 - **WHEN** 提交携带内联形态（adapterKind/baseUrl/modelId/apiKey）或其他不合法形态的 route
 - **THEN** 请求以稳定错误拒绝且不启动 Run，不发生任何模型调用
 
-#### Scenario: 无 route 时默认本地运行时
+#### Scenario: 无 route 时稳定拒绝并引导配置
 - **WHEN** 提交不携带 provider route
 - **THEN** 请求以稳定错误拒绝且不启动 Run（不存在任何本地运行时回退），错误信息引导配置工作区 provider
 

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { readApiRuntimeConfig } from './runtime.js';
+import { createApiRuntime, readApiRuntimeConfig } from './runtime.js';
 
 const original = { ...process.env };
 afterEach(() => {
@@ -20,6 +20,20 @@ describe('agent-api local runtime config', () => {
   it('rejects non-local deployment mode before opening listeners', () => {
     process.env.SAGE_DEPLOYMENT_MODE = 'development';
     expect(() => readApiRuntimeConfig()).toThrow('LOCAL_RUNTIME_REQUIRES_SAGE_DEPLOYMENT_MODE_LOCAL');
+  });
+});
+
+describe('agent-api secret master key fail-fast', () => {
+  it('refuses to start without SAGE_SECRET_MASTER_KEY before opening listeners or stores', async () => {
+    process.env.SAGE_DEPLOYMENT_MODE = 'local';
+    delete process.env.SAGE_SECRET_MASTER_KEY;
+    await expect(createApiRuntime()).rejects.toThrow('LOCAL_RUNTIME_REQUIRES_SAGE_SECRET_MASTER_KEY');
+  });
+
+  it('refuses to start when SAGE_SECRET_MASTER_KEY is not base64 of 32 bytes', async () => {
+    process.env.SAGE_DEPLOYMENT_MODE = 'local';
+    process.env.SAGE_SECRET_MASTER_KEY = 'not-base64-of-32-bytes';
+    await expect(createApiRuntime()).rejects.toThrow('LOCAL_RUNTIME_REQUIRES_SAGE_SECRET_MASTER_KEY');
   });
 });
 

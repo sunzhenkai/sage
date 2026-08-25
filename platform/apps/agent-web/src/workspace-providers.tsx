@@ -165,8 +165,12 @@ function WorkspaceProviderDialog({ fetcher, draft, saving, onDraftChange, onSubm
   const [modelLoading, setModelLoading] = useState(false);
   const [modelReloadToken, setModelReloadToken] = useState(0);
   const nameDirty = useRef(draft.id !== undefined);
+  const adapterDirty = useRef(draft.id !== undefined);
+  const baseUrlDirty = useRef(draft.id !== undefined);
   const providerToken = useRef(0);
   const modelToken = useRef(0);
+  const [syncing, setSyncing] = useState(false);
+  const [refreshNotice, setRefreshNotice] = useState<string | undefined>();
 
   const patch = (changes: Partial<WorkspaceProviderDraft>) => onDraftChange({ ...draft, ...changes });
 
@@ -174,7 +178,7 @@ function WorkspaceProviderDialog({ fetcher, draft, saving, onDraftChange, onSubm
     setSelectedProviderId(provider.providerId);
     setModels([]); setModelNextCursor(undefined); setModelQuery(''); setModelIndex(0);
     patch({
-      adapterKind: defaultAdapterKind(provider.providerId),
+      ...(adapterDirty.current ? {} : { adapterKind: defaultAdapterKind(provider.providerId) }),
       providerName: provider.name,
       ...(nameDirty.current ? {} : { name: provider.name })
     });
@@ -187,11 +191,48 @@ function WorkspaceProviderDialog({ fetcher, draft, saving, onDraftChange, onSubm
     patch({
       modelId: model.modelId,
       modelName: model.name,
-      baseUrl: model.effectiveBaseUrl ?? '',
+      ...(baseUrlDirty.current ? {} : { baseUrl: model.effectiveBaseUrl ?? '' }),
       ...(nameDirty.current ? {} : { name: provider === undefined ? model.modelId : `${provider.name} · ${model.name}` })
     });
     setModelQuery(model.name);
     setModelOpen(false);
+  };
+
+  /** 手动刷新目录：触发 manual sync，轮询 attempt 至终态后从最新快照重载列表第一页；限流/授权/失败以稳定文案提示，不自动重试。 */
+  const refreshCatalog = async () => {
+    if (syncing) return;
+    setSyncing(true);
+    setRefreshNotice(undefined);
+    try {
+      const response = await fetcher('/v1/provider-catalog/sync', { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: '{}' });
+      const body = await response.json().catch(() => undefined) as { attemptId?: string; error?: { code?: string; message?: string; retryAfterSeconds?: number } } | undefined;
+      if (response.status === 429) {
+        setRefreshNotice(t('catalogSyncRateLimited', { seconds: body?.error?.retryAfterSeconds ?? 60 }));
+        return;
+      }
+      if (response.status === 403) {
+        setRefreshNotice(t('catalogSyncForbidden'));
+        return;
+      }
+      if (!response.ok) throw new Error(body?.error?.message ?? `Catalog sync ${response.status}`);
+      const attemptId = body?.attemptId;
+      if (typeof attemptId === 'string' && attemptId.length > 0) {
+        for (let attempt = 0; attempt < 10; attempt += 1) {
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          const attemptResponse = await fetcher(`/v1/provider-catalog/sync/${encodeURIComponent(attemptId)}`, { credentials: 'include' }).catch(() => undefined);
+          if (attemptResponse === undefined || !attemptResponse.ok) break;
+          const attemptBody = await attemptResponse.json().catch(() => undefined) as { status?: string } | undefined;
+          if (attemptBody?.status === 'succeeded' || attemptBody?.status === 'not_modified' || attemptBody?.status === 'failed' || attemptBody?.status === 'cancelled') break;
+        }
+      }
+      setRefreshNotice(t('catalogSyncReloaded'));
+      setProviderReloadToken((value) => value + 1);
+      if (selectedProviderId !== undefined) setModelReloadToken((value) => value + 1);
+    } catch {
+      setRefreshNotice(t('catalogSyncFailed'));
+    } finally {
+      setSyncing(false);
+    }
   };
 
   useEffect(() => {
@@ -286,12 +327,16 @@ function WorkspaceProviderDialog({ fetcher, draft, saving, onDraftChange, onSubm
         </div>
         <div className="form-grid">
           {snapshotChanged && <div className="field-wide inline-notice" role="status">{t('catalogUpdatedNotice')}</div>}
+          {refreshNotice && <div className="field-wide inline-notice" role="status">{refreshNotice}</div>}
           {catalog === 'unavailable' && <div className="field-wide inline-notice" role="status">{t('catalogUnavailableManual')}</div>}
           {catalog !== 'unavailable' && <>
             <div className="field field-wide combobox-field">
-              <span>{t('providers')}</span>
+              <div className="catalog-refresh-row">
+                <span>{t('providers')}</span>
+                <button className="button button-secondary catalog-refresh-button" type="button" disabled={syncing} onClick={() => void refreshCatalog()}>{syncing ? t('catalogSyncing') : t('refreshCatalog')}</button>
+              </div>
               <div className="combobox-control">
-                <input ref={(node) => { if (node !== null && draft.id === undefined) node.focus(); }} role="combobox" aria-label={t('providerSearch')} aria-controls="provider-options" aria-expanded={providerOpen} aria-autocomplete="list" value={providerQuery} onChange={(event) => { setProviderQuery(event.target.value); setProviderOpen(true); }} onFocus={() => setProviderOpen(true)} onBlur={() => setProviderOpen(false)} onKeyDown={(event) => keyboard(event, providers, providerIndex, setProviderIndex, selectProvider, () => { if (!providerOpen) return false; setProviderOpen(false); return true; })} placeholder={t('searchProvidersPlaceholder')} />
+                <input role="combobox" aria-label={t('providerSearch')} aria-controls="provider-options" aria-expanded={providerOpen} aria-autocomplete="list" value={providerQuery} onChange={(event) => { setProviderQuery(event.target.value); setProviderOpen(true); }} onFocus={() => setProviderOpen(true)} onBlur={() => setProviderOpen(false)} onKeyDown={(event) => keyboard(event, providers, providerIndex, setProviderIndex, selectProvider, () => { if (!providerOpen) return false; setProviderOpen(false); return true; })} placeholder={t('searchProvidersPlaceholder')} />
                 <span className="combobox-chevron" aria-hidden="true">▾</span>
               </div>
               <div id="provider-options" role="listbox" className="catalog-options" hidden={!providerOpen} onMouseDown={(event) => event.preventDefault()}>
@@ -318,12 +363,12 @@ function WorkspaceProviderDialog({ fetcher, draft, saving, onDraftChange, onSubm
           <label className="field field-wide"><span>{t('displayName')}</span>
             <input value={draft.name} onChange={(event) => { nameDirty.current = true; patch({ name: event.target.value }); }} /></label>
           <label className="field"><span>{t('adapterKind')}</span>
-            <select value={draft.adapterKind} onChange={(event) => patch({ adapterKind: event.target.value as WorkspaceProviderDraft['adapterKind'] })}>
+            <select value={draft.adapterKind} onChange={(event) => { adapterDirty.current = true; patch({ adapterKind: event.target.value as WorkspaceProviderDraft['adapterKind'] }); }}>
               <option value="anthropic">{t('anthropic')}</option>
               <option value="openai-compatible">{t('openAiCompatible')}</option>
             </select></label>
           <label className="field"><span>{t('baseUrl')}</span>
-            <input value={draft.baseUrl} placeholder="https://api.example.com" onChange={(event) => patch({ baseUrl: event.target.value })} /></label>
+            <input value={draft.baseUrl} placeholder="https://api.example.com" onChange={(event) => { baseUrlDirty.current = true; patch({ baseUrl: event.target.value }); }} /></label>
           <label className="field"><span>{t('model')}</span>
             <input value={draft.modelId} onChange={(event) => {
               const value = event.target.value;

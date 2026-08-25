@@ -42,6 +42,8 @@ const compareKeys = (left: readonly string[], right: readonly string[]) => {
   }
   return 0;
 };
+/** releaseDate 新到旧排序段：数字字符 9-补映射（`-` 不变）后，字典序升序恰为日期降序；月份精度 `YYYY-MM` 的 key 是同月日精度 key 的前缀，同月内视为最新；缺失映射为同形态最大补 `9999-99-99` 排在同 rank 最后（不可用非同形态哨兵——默认 locale 的 `localeCompare` 会把标点排在数字前）。 */
+const releaseDescKey = (value: string | undefined): string => value === undefined ? '9999-99-99' : value.replace(/\d/g, (digit) => String(9 - Number(digit)));
 const limitOf = (value?: string) => {
   const limit = value === undefined ? 30 : Number(value);
   if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new CatalogServiceError('CATALOG_INVALID_REQUEST', 'limit must be between 1 and 100', 400);
@@ -102,7 +104,7 @@ export class ProviderCatalogService {
     const filterHash = hash(filters);
     const cursor = query.cursor === undefined ? undefined : decodeCursor(query.cursor, active.snapshotId, filterHash);
     const rank: Record<ModelCatalogItem['status'], string> = { active: '0', deprecated: '1', legacy: '2' };
-    const key = (item: ModelCatalogItem) => [rank[item.status], normalized(item.name), normalized(item.modelId), normalized(item.providerId)];
+    const key = (item: ModelCatalogItem) => [rank[item.status], releaseDescKey(item.releaseDate), normalized(item.name), normalized(item.modelId), normalized(item.providerId)];
     const matching = active.models.filter((item) =>
       (filters.providerId === '' || item.providerId === filters.providerId)
       && (filters.status === 'all' || item.status === filters.status)
@@ -128,7 +130,7 @@ export class ProviderCatalogService {
         providers: Object.freeze([...rebuilt.providers].sort((a, b) => compareKeys([normalized(a.name), normalized(a.providerId)], [normalized(b.name), normalized(b.providerId)]))),
         models: Object.freeze([...rebuilt.models].sort((a, b) => {
           const rank: Record<ModelCatalogItem['status'], string> = { active: '0', deprecated: '1', legacy: '2' };
-          return compareKeys([rank[a.status], normalized(a.name), normalized(a.modelId), normalized(a.providerId)], [rank[b.status], normalized(b.name), normalized(b.modelId), normalized(b.providerId)]);
+          return compareKeys([rank[a.status], releaseDescKey(a.releaseDate), normalized(a.name), normalized(a.modelId), normalized(a.providerId)], [rank[b.status], releaseDescKey(b.releaseDate), normalized(b.name), normalized(b.modelId), normalized(b.providerId)]);
         }))
       });
       this.#cache = cache;

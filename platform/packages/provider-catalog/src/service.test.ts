@@ -18,6 +18,29 @@ class FakeStore {
 }
 
 describe('active-only Provider Catalog service', () => {
+  it('orders models by release date newest-first within a status rank, undated last, with a stable cursor order', async () => {
+    const dated = () => ({ alpha: { id: 'alpha', name: 'Alpha', models: {
+      old: { id: 'old', name: 'Old', status: 'active', release_date: '2025-01-01' },
+      undated: { id: 'undated', name: 'Undated', status: 'active' },
+      newest: { id: 'newest', name: 'Newest', status: 'active', release_date: '2026-05-01' },
+      newer: { id: 'newer', name: 'Newer', status: 'active', release_date: '2026-04-30' },
+      mayOnly: { id: 'mayOnly', name: 'May Only', status: 'active', release_date: '2026-05' }
+    } } });
+    const store = new FakeStore();
+    store.current = { ...store.current, snapshot: { ...store.current.snapshot, rawPayload: dated(), modelCount: 5 } };
+    const service = new ProviderCatalogService(store as unknown as ProviderCatalogStore);
+    const models = await service.listModels(principal, { status: 'all' });
+    // 月份精度 key 是同月日精度 key 的前缀：2026-05 视为该月最新，排在 2026-05-01 之前。
+    expect(models.items.map((item) => item.modelId)).toEqual(['mayOnly', 'newest', 'newer', 'old', 'undated']);
+    expect(models.items.map((item) => item.releaseDate)).toEqual(['2026-05', '2026-05-01', '2026-04-30', '2025-01-01', undefined]);
+    // 跨页 cursor 在同一全序上单调推进：新到旧逐页翻完，无跳漏。
+    const pageOne = await service.listModels(principal, { status: 'all', limit: '3' });
+    expect(pageOne.items.map((item) => item.modelId)).toEqual(['mayOnly', 'newest', 'newer']);
+    const pageTwo = await service.listModels(principal, { status: 'all', limit: '3', cursor: pageOne.nextCursor! });
+    expect(pageTwo.items.map((item) => item.modelId)).toEqual(['old', 'undated']);
+    expect(pageTwo.nextCursor).toBeUndefined();
+  });
+
   it('requires authentication and sorts/filters bounded pages', async () => {
     const service = new ProviderCatalogService(new FakeStore() as unknown as ProviderCatalogStore);
     await expect(service.listProviders(undefined, {})).rejects.toMatchObject({ code: 'CATALOG_AUTHENTICATION_REQUIRED' });

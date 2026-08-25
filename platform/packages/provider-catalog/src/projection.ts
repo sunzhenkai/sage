@@ -30,6 +30,14 @@ const httpsUrl = (value: unknown): string | undefined => {
   catch { return undefined; }
 };
 const optionalString = (value: unknown, field: string, maxLength: number): string | undefined => value === undefined ? undefined : bounded(value, field, maxLength);
+/** models.dev `release_date`：合法 `YYYY-MM-DD` 或月份精度 `YYYY-MM`（实测上游 218/7285 为后者）进入 projection 为 `releaseDate`；缺失不产生字段；存在但非法整批拒绝。 */
+const releaseDateOf = (value: unknown): string | undefined => {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}(-\d{2})?$/.test(value) || Number.isNaN(Date.parse(value))) {
+    throw new CatalogPayloadError('SOURCE_SCHEMA_INVALID', 'model.release_date must be a valid YYYY-MM-DD or YYYY-MM date string');
+  }
+  return value;
+};
 const modelStatus = (value: unknown): ModelCatalogItem['status'] => {
   if (value === undefined) return 'active';
   if (value === 'active' || value === 'deprecated' || value === 'legacy') return value;
@@ -85,8 +93,10 @@ export function validateCatalogPayload(bytes: Uint8Array): ValidatedCatalogPaylo
       if (providerOverride !== undefined && !record(providerOverride)) throw new CatalogPayloadError('SOURCE_SCHEMA_INVALID', `model ${modelKey}.provider must be an object`);
       const modelApi = httpsUrl(providerOverride?.api);
       const effectiveBaseUrl = modelApi ?? api;
+      const releaseDate = releaseDateOf(rawModel.release_date);
       models.push(deepFreeze({
         modelId, providerId, name: modelName, status: modelStatus(rawModel.status), capabilities: capabilitiesOf(rawModel),
+        ...(releaseDate === undefined ? {} : { releaseDate }),
         ...(api ? { providerApi: api } : {}), ...(modelApi ? { modelApi } : {}), ...(effectiveBaseUrl ? { effectiveBaseUrl } : {})
       }));
     }

@@ -147,9 +147,15 @@ export const ChatProviderSelectionSchema = Type.Object({
 }, { $id: 'ChatProviderSelection.v2', additionalProperties: false });
 export type ChatProviderSelection = Static<typeof ChatProviderSelectionSchema>;
 
+/**
+ * `provider` 语义上必需，但 schema 保持 optional：route 缺失/形态由 Chat 提交边界
+ * （`resolveProviderSelection`）统一裁决为 `CHAT_INVALID_REQUEST` 并携带引导用户配置
+ * 工作区 provider 的文案（persistent-short-chat spec）；ajv 必填拦截会把 route 缺失
+ * 与其他 body 字段缺失混成同一种无指引错误。
+ */
 export const SubmitMessageRequestSchema = Type.Object({
   parts: Type.Array(MessagePartSchema, { minItems: 1, maxItems: 32 }),
-  provider: ChatProviderSelectionSchema
+  provider: Type.Optional(ChatProviderSelectionSchema)
 }, { additionalProperties: false });
 export type SubmitMessageRequest = Static<typeof SubmitMessageRequestSchema>;
 
@@ -256,6 +262,7 @@ export const ModelCatalogItemSchema = Type.Object({
   name: Type.String({ minLength: 1, maxLength: 300 }),
   status: ModelCatalogStatusSchema,
   capabilities: Type.Array(Type.String({ minLength: 1, maxLength: 100 }), { maxItems: 64 }),
+  releaseDate: Type.Optional(Type.String({ pattern: '^\\d{4}-\\d{2}(-\\d{2})?$', maxLength: 10 })),
   providerApi: Type.Optional(Type.String({ format: 'uri', maxLength: 2048 })),
   modelApi: Type.Optional(Type.String({ format: 'uri', maxLength: 2048 })),
   effectiveBaseUrl: Type.Optional(Type.String({ format: 'uri', maxLength: 2048 }))

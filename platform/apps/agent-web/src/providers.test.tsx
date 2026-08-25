@@ -262,6 +262,186 @@ describe('unified provider page', () => {
     await act(async () => tree.unmount());
   });
 
+  it('keeps a manually rewritten adapter across provider/model re-selection without clearing the selection', async () => {
+    const localStorage = new MemoryStorage(); vi.stubGlobal('window', { localStorage, sessionStorage: new MemoryStorage() });
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/provider-catalog/providers')) return response(catalogProviderPage([{ providerId: 'anthropic', name: 'Anthropic' }]));
+      if (url.includes('/provider-catalog/models')) return response(catalogModelPage([{ modelId: 'claude-sonnet-4-5', providerId: 'anthropic', name: 'Claude Sonnet 4.5', effectiveBaseUrl: 'https://api.anthropic.com' }]));
+      if (url.endsWith('/provider-connections')) return response({ schemaVersion: 'ProviderConnections.v1', connections: [] });
+      if (url.endsWith('/run-agent/settings')) return response(runAgentSettings(undefined));
+      throw new Error(url);
+    }) as typeof fetch;
+    let tree!: ReturnType<typeof create>; await act(async () => { tree = create(<ProvidersApp fetcher={fetcher} />); await wait(); });
+    await act(async () => { tree.root.findByProps({ children: '+ Add workspace provider' }).props.onClick(); });
+    await act(async () => { await waitDebounce(); });
+    await act(async () => { tree.root.findByProps({ id: 'provider-options' }).findByProps({ role: 'option' }).props.onClick(); });
+    await act(async () => { await waitDebounce(); });
+    await act(async () => { tree.root.findByProps({ id: 'model-options' }).findByProps({ role: 'option' }).props.onClick(); await wait(); });
+    const form = tree.root.findByProps({ className: 'workspace-provider-form provider-editor panel' });
+    // 选定后 adapter 为缺省 anthropic；用户改写为 openai-compatible。
+    expect(form.findAllByType('select')[0]!.props.value).toBe('anthropic');
+    await act(async () => { form.findAllByType('select')[0]!.props.onChange({ target: { value: 'openai-compatible' } }); await wait(); });
+    // 改写 adapter 不清已选 provider/model，也不重开服务商 combobox。
+    expect(form.findAllByProps({ value: 'claude-sonnet-4-5' })).toHaveLength(1);
+    expect(tree.root.findByProps({ 'aria-label': 'Provider search' }).props['aria-expanded']).toBe(false);
+    expect(tree.root.findByProps({ 'aria-label': 'Provider search' }).props.value).toBe('Anthropic');
+    // 重新选择同一 provider：adapter 保持用户改写值，不被缺省启发覆盖。
+    await act(async () => { tree.root.findByProps({ id: 'provider-options' }).findByProps({ role: 'option' }).props.onClick(); });
+    await act(async () => { await wait(); });
+    expect(tree.root.findByProps({ className: 'workspace-provider-form provider-editor panel' }).findAllByType('select')[0]!.props.value).toBe('openai-compatible');
+    await act(async () => tree.unmount());
+  });
+
+  it('keeps a manually rewritten base URL across provider/model re-selection without clearing the selection', async () => {
+    const localStorage = new MemoryStorage(); vi.stubGlobal('window', { localStorage, sessionStorage: new MemoryStorage() });
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/provider-catalog/providers')) return response(catalogProviderPage([{ providerId: 'anthropic', name: 'Anthropic' }]));
+      if (url.includes('/provider-catalog/models')) return response(catalogModelPage([
+        { modelId: 'claude-sonnet-4-5', providerId: 'anthropic', name: 'Claude Sonnet 4.5', effectiveBaseUrl: 'https://api.anthropic.com' },
+        { modelId: 'claude-opus-5', providerId: 'anthropic', name: 'Claude Opus 5', effectiveBaseUrl: 'https://opus.anthropic.com' }
+      ]));
+      if (url.endsWith('/provider-connections')) return response({ schemaVersion: 'ProviderConnections.v1', connections: [] });
+      if (url.endsWith('/run-agent/settings')) return response(runAgentSettings(undefined));
+      throw new Error(url);
+    }) as typeof fetch;
+    let tree!: ReturnType<typeof create>; await act(async () => { tree = create(<ProvidersApp fetcher={fetcher} />); await wait(); });
+    await act(async () => { tree.root.findByProps({ children: '+ Add workspace provider' }).props.onClick(); });
+    await act(async () => { await waitDebounce(); });
+    await act(async () => { tree.root.findByProps({ id: 'provider-options' }).findByProps({ role: 'option' }).props.onClick(); });
+    await act(async () => { await waitDebounce(); });
+    const modelOptions = () => tree.root.findByProps({ id: 'model-options' }).findAllByProps({ role: 'option' });
+    await act(async () => { modelOptions()[0]!.props.onClick(); await wait(); });
+    const baseUrlInput = () => tree.root.findByProps({ placeholder: 'https://api.example.com' });
+    // 选定后 baseUrl 预填为该 model 的 effectiveBaseUrl。
+    expect(baseUrlInput().props.value).toBe('https://api.anthropic.com');
+    // 未手改前，改选另一 model 仍按目录预填。
+    await act(async () => { modelOptions()[1]!.props.onClick(); await wait(); });
+    expect(baseUrlInput().props.value).toBe('https://opus.anthropic.com');
+    // 用户手工改写 baseUrl。
+    await act(async () => { baseUrlInput().props.onChange({ target: { value: 'https://proxy.example.com' } }); await wait(); });
+    // 改写 baseUrl 不清已选 provider/model。
+    expect(tree.root.findByProps({ 'aria-label': 'Provider search' }).props.value).toBe('Anthropic');
+    expect(tree.root.findByProps({ 'aria-label': 'Model search' }).props.value).toBe('Claude Opus 5');
+    expect(tree.root.findAllByProps({ value: 'claude-opus-5' })).toHaveLength(1);
+    expect(tree.root.findByProps({ 'aria-label': 'Provider search' }).props['aria-expanded']).toBe(false);
+    // 重新选择 provider 与 model：baseUrl 保持用户改写值，不被目录预填覆盖。
+    await act(async () => { tree.root.findByProps({ id: 'provider-options' }).findByProps({ role: 'option' }).props.onClick(); });
+    await act(async () => { await waitDebounce(); });
+    await act(async () => { modelOptions()[0]!.props.onClick(); await wait(); });
+    expect(baseUrlInput().props.value).toBe('https://proxy.example.com');
+    await act(async () => tree.unmount());
+  });
+
+  it('does not autofocus the provider combobox on open or when adapter or base URL is edited', async () => {
+    const localStorage = new MemoryStorage(); vi.stubGlobal('window', { localStorage, sessionStorage: new MemoryStorage() });
+    const focus = vi.fn();
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/provider-catalog/providers')) return response(catalogProviderPage([{ providerId: 'anthropic', name: 'Anthropic' }]));
+      if (url.includes('/provider-catalog/models')) return response(catalogModelPage([{ modelId: 'claude-sonnet-4-5', providerId: 'anthropic', name: 'Claude Sonnet 4.5', effectiveBaseUrl: 'https://api.anthropic.com' }]));
+      if (url.endsWith('/provider-connections')) return response({ schemaVersion: 'ProviderConnections.v1', connections: [] });
+      if (url.endsWith('/run-agent/settings')) return response(runAgentSettings(undefined));
+      throw new Error(url);
+    }) as typeof fetch;
+    let tree!: ReturnType<typeof create>; await act(async () => {
+      tree = create(<ProvidersApp fetcher={fetcher} />, { createNodeMock: (element) => element.type === 'input' ? { focus } : {} });
+      await wait();
+    });
+    await act(async () => { tree.root.findByProps({ children: '+ Add workspace provider' }).props.onClick(); });
+    await act(async () => { await waitDebounce(); });
+    const providerSearch = () => tree.root.findByProps({ 'aria-label': 'Provider search' });
+    expect(providerSearch().props.autoFocus).toBeUndefined();
+    expect(providerSearch().props['aria-expanded']).toBe(false);
+    expect(focus.mock.calls).toHaveLength(0);
+    await act(async () => { tree.root.findByProps({ id: 'provider-options' }).findByProps({ role: 'option' }).props.onClick(); });
+    await act(async () => { await waitDebounce(); });
+    await act(async () => { tree.root.findByProps({ id: 'model-options' }).findByProps({ role: 'option' }).props.onClick(); await wait(); });
+    expect(focus.mock.calls).toHaveLength(0);
+    const form = tree.root.findByProps({ className: 'workspace-provider-form provider-editor panel' });
+    await act(async () => { form.findAllByType('select')[0]!.props.onChange({ target: { value: 'openai-compatible' } }); await wait(); });
+    expect(focus.mock.calls).toHaveLength(0);
+    expect(providerSearch().props['aria-expanded']).toBe(false);
+    expect(providerSearch().props.value).toBe('Anthropic');
+    await act(async () => { tree.root.findByProps({ placeholder: 'https://api.example.com' }).props.onChange({ target: { value: 'https://proxy.example.com' } }); await wait(); });
+    expect(focus.mock.calls).toHaveLength(0);
+    expect(providerSearch().props['aria-expanded']).toBe(false);
+    expect(providerSearch().props.value).toBe('Anthropic');
+    await act(async () => tree.unmount());
+  });
+
+  it('presents models in the order returned by the read API (newest first)', async () => {
+    const localStorage = new MemoryStorage(); vi.stubGlobal('window', { localStorage, sessionStorage: new MemoryStorage() });
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/provider-catalog/providers')) return response(catalogProviderPage([{ providerId: 'anthropic', name: 'Anthropic' }]));
+      // 服务端已按 releaseDate 新到旧排序：newest 在前。
+      if (url.includes('/provider-catalog/models')) return response(catalogModelPage([
+        { modelId: 'claude-opus-5', providerId: 'anthropic', name: 'Claude Opus 5' },
+        { modelId: 'claude-sonnet-4-5', providerId: 'anthropic', name: 'Claude Sonnet 4.5' }
+      ]));
+      if (url.endsWith('/provider-connections')) return response({ schemaVersion: 'ProviderConnections.v1', connections: [] });
+      if (url.endsWith('/run-agent/settings')) return response(runAgentSettings(undefined));
+      throw new Error(url);
+    }) as typeof fetch;
+    let tree!: ReturnType<typeof create>; await act(async () => { tree = create(<ProvidersApp fetcher={fetcher} />); await wait(); });
+    await act(async () => { tree.root.findByProps({ children: '+ Add workspace provider' }).props.onClick(); });
+    await act(async () => { await waitDebounce(); });
+    await act(async () => { tree.root.findByProps({ id: 'provider-options' }).findByProps({ role: 'option' }).props.onClick(); });
+    await act(async () => { await waitDebounce(); });
+    const options = tree.root.findByProps({ id: 'model-options' }).findAllByProps({ role: 'option' });
+    expect(options.map((node) => node.props.children[1]?.props?.children ?? node.props.children[1])).toBeDefined();
+    expect(options[0]!.props.children[0]).toBe('Claude Opus 5');
+    expect(options[1]!.props.children[0]).toBe('Claude Sonnet 4.5');
+    await act(async () => tree.unmount());
+  });
+
+  it('refreshes the catalog via manual sync and reloads the first page', async () => {
+    const localStorage = new MemoryStorage(); vi.stubGlobal('window', { localStorage, sessionStorage: new MemoryStorage() });
+    let providerLoads = 0;
+    const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes('/provider-catalog/providers')) { providerLoads += 1; return response(catalogProviderPage([{ providerId: 'anthropic', name: 'Anthropic' }])); }
+      if (url.includes('/provider-catalog/models')) return response(catalogModelPage([{ modelId: 'claude-opus-5', providerId: 'anthropic', name: 'Claude Opus 5' }]));
+      if (url.includes('/provider-catalog/sync') && init?.method === 'POST') return response({ attemptId: 'attempt-1', status: 'queued' }, 202);
+      if (url.includes('/provider-catalog/sync/attempt-1')) return response({ attemptId: 'attempt-1', trigger: 'manual', status: 'succeeded' });
+      if (url.endsWith('/provider-connections')) return response({ schemaVersion: 'ProviderConnections.v1', connections: [] });
+      if (url.endsWith('/run-agent/settings')) return response(runAgentSettings(undefined));
+      throw new Error(url);
+    }) as typeof fetch;
+    let tree!: ReturnType<typeof create>; await act(async () => { tree = create(<ProvidersApp fetcher={fetcher} />); await wait(); });
+    await act(async () => { tree.root.findByProps({ children: '+ Add workspace provider' }).props.onClick(); });
+    await act(async () => { await waitDebounce(); });
+    expect(providerLoads).toBe(1);
+    await act(async () => { tree.root.findByProps({ children: 'Refresh catalog' }).props.onClick(); });
+    // 第一段：POST + 1s attempt 轮询 + token bump；第二段：effect flush + 防抖后重载第一页。
+    await act(async () => { await wait(1400); });
+    await act(async () => { await waitDebounce(); });
+    expect(providerLoads).toBeGreaterThanOrEqual(2);
+    expect(tree.root.findByProps({ children: 'Catalog refreshed; the lists were reloaded from the latest snapshot.' })).toBeTruthy();
+    expect(tree.root.findAllByProps({ children: 'Refresh catalog' })).toHaveLength(1);
+    await act(async () => tree.unmount());
+  });
+
+  it('surfaces the manual-sync rate limit with the server-provided retry window', async () => {
+    const localStorage = new MemoryStorage(); vi.stubGlobal('window', { localStorage, sessionStorage: new MemoryStorage() });
+    const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes('/provider-catalog/providers')) return response(catalogProviderPage([{ providerId: 'anthropic', name: 'Anthropic' }]));
+      if (url.includes('/provider-catalog/sync') && init?.method === 'POST') return response({ error: { code: 'CATALOG_SYNC_RATE_LIMITED', message: 'rate limited', retryable: true, retryAfterSeconds: 30 } }, 429);
+      if (url.endsWith('/provider-connections')) return response({ schemaVersion: 'ProviderConnections.v1', connections: [] });
+      if (url.endsWith('/run-agent/settings')) return response(runAgentSettings(undefined));
+      throw new Error(url);
+    }) as typeof fetch;
+    let tree!: ReturnType<typeof create>; await act(async () => { tree = create(<ProvidersApp fetcher={fetcher} />); await wait(); });
+    await act(async () => { tree.root.findByProps({ children: '+ Add workspace provider' }).props.onClick(); });
+    await act(async () => { await waitDebounce(); });
+    await act(async () => { tree.root.findByProps({ children: 'Refresh catalog' }).props.onClick(); await wait(); });
+    expect(tree.root.findByProps({ children: 'The catalog was synced recently; retry in 30s.' })).toBeTruthy();
+    await act(async () => tree.unmount());
+  });
+
   it('allows adding the same provider twice as independent entries', async () => {
     const localStorage = new MemoryStorage(); vi.stubGlobal('window', { localStorage, sessionStorage: new MemoryStorage() });
     const posts: { body?: unknown }[] = [];

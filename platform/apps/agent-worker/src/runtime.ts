@@ -118,6 +118,11 @@ export interface WorkerRuntime {
 }
 
 export async function createWorkerRuntime(config = readWorkerRuntimeConfig()): Promise<WorkerRuntime> {
+  // 凭据密封主密钥是必选配置：缺失或非法（非 base64 的 32 字节）直接拒绝启动；执行边界解密没有绕过路径。
+  const secretBackend = createLocalSecretBackendFromEnv();
+  if (secretBackend === undefined) {
+    throw new Error('LOCAL_RUNTIME_REQUIRES_SAGE_SECRET_MASTER_KEY: set SAGE_SECRET_MASTER_KEY to base64 of 32 bytes (e.g. openssl rand -base64 32), shared by agent-api and agent-worker; credential sealing has no plaintext fallback');
+  }
   const chat = new ChatStore({ connectionString: config.postgresUrl, connectionTimeoutMillis: 2_000 });
   const tasks = new PostgresTaskStore({ connectionString: config.postgresUrl });
   let native: NativeConnection | undefined;
@@ -153,15 +158,15 @@ export async function createWorkerRuntime(config = readWorkerRuntimeConfig()): P
         ...(context?.signal === undefined ? {} : { signal: context.signal })
       })
     };
-    const secretBackend = createLocalSecretBackendFromEnv();
     const fakeInvoker: LiveProviderInvoker | undefined = process.env.SAGE_FAKE_LIVE_PROVIDER === 'true' ? createFakeLiveInvoker() : undefined;
     native = await NativeConnection.connect({ address: config.temporalAddress });
-    const secretBackendMode = secretBackend?.describe().mode ?? 'unavailable';
+    const secretBackendMode = secretBackend.describe().mode;
     worker = await Worker.create({
       connection: native, namespace: TASK_NAMESPACE, taskQueue: TASK_QUEUE, workflowBundle,
       activities: createAgentTaskActivities({
         settingsStore: tasks,
         providerConnections: tasks,
+        secretBackend,
         // 受信测试开关由 fakeInvoker 捕获：显式配置时以进程内确定性 invoker 替换最终模型 HTTP 调用，
         // 设置→注册表解析→harness 路由链路保真；未配置时走真实 provider。
         liveClientFactory: (route: LiveProviderRoute, mode: 'package' | 'chat') => createLivePackageAgentClient({

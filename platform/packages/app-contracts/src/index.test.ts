@@ -73,6 +73,9 @@ describe('Provider Catalog public contracts', () => {
   it('accepts only bounded provider/model whitelist pages and strict queries', () => {
     expect(Value.Check(ProviderCatalogPageSchema, { ...pageBase, items: [{ providerId: 'openai', name: 'OpenAI', api: 'https://api.openai.com/v1' }] })).toBe(true);
     expect(Value.Check(ModelCatalogPageSchema, { ...pageBase, items: [{ modelId: 'gpt-5', providerId: 'openai', name: 'GPT-5', status: 'active', capabilities: ['text'], effectiveBaseUrl: 'https://api.openai.com/v1' }] })).toBe(true);
+    expect(Value.Check(ModelCatalogPageSchema, { ...pageBase, items: [{ modelId: 'month-precision', providerId: 'openai', name: 'Month', status: 'active', capabilities: ['text'], releaseDate: '2026-01' }] })).toBe(true);
+    expect(Value.Check(ModelCatalogPageSchema, { ...pageBase, items: [{ modelId: 'drifted-date', providerId: 'openai', name: 'Drifted', status: 'active', capabilities: ['text'], releaseDate: '2026-04-14T00:00:00Z' }] })).toBe(false);
+    expect(Value.Check(ModelCatalogPageSchema, { ...pageBase, items: [{ modelId: 'year-only', providerId: 'openai', name: 'Year', status: 'active', capabilities: ['text'], releaseDate: '2026' }] })).toBe(false);
     expect(Value.Check(ProviderCatalogPageSchema, { ...pageBase, items: [], rawPayload: {} })).toBe(false);
     expect(Value.Check(ListProvidersQuerySchema, { limit: '30', q: 'open', cursor: 'opaque_1' })).toBe(true);
     expect(Value.Check(ListModelsQuerySchema, { providerId: 'openai', status: 'deprecated', capability: 'text' })).toBe(true);
@@ -118,9 +121,11 @@ describe('workspace payload boundaries and promotion eligibility', () => {
     }
   });
 
-  it('accepts either an inline provider route or a workspace connection reference, but not both', () => {
+  it('accepts only the workspace connection reference form, never an inline route', () => {
+    // provider 语义必需但 schema optional：缺失由提交边界裁决（含引导配置工作区 provider 的文案），勿再收紧为 ajv 必填。
+    expect(Value.Check(SubmitMessageRequestSchema, { parts: [{ kind: 'text', text: 'hi' }] })).toBe(true);
     expect(Value.Check(SubmitMessageRequestSchema, { parts: [{ kind: 'text', text: 'hi' }], provider: { connectionId: 'conn-1' } })).toBe(true);
-    expect(Value.Check(SubmitMessageRequestSchema, { parts: [{ kind: 'text', text: 'hi' }], provider: { adapterKind: 'anthropic', baseUrl: 'https://api.example.com', modelId: 'm', apiKey: 'k' } })).toBe(true);
+    expect(Value.Check(SubmitMessageRequestSchema, { parts: [{ kind: 'text', text: 'hi' }], provider: { adapterKind: 'anthropic', baseUrl: 'https://api.example.com', modelId: 'm', apiKey: 'k' } })).toBe(false);
     expect(Value.Check(SubmitMessageRequestSchema, { parts: [{ kind: 'text', text: 'hi' }], provider: { connectionId: 'conn-1', apiKey: 'leak' } })).toBe(false);
     expect(Value.Check(SubmitMessageRequestSchema, { parts: [{ kind: 'text', text: 'hi' }], provider: { connectionId: '' } })).toBe(false);
     expect(Value.Check(SubmitMessageRequestSchema, { parts: [{ kind: 'text', text: 'hi' }], provider: { adapterKind: 'anthropic', baseUrl: 'https://api.example.com', modelId: 'm', apiKey: 'k', connectionId: 'conn-1' } })).toBe(false);
