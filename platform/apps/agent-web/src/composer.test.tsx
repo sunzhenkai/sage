@@ -11,6 +11,12 @@ function key(key: string, options: { shiftKey?: boolean; isComposing?: boolean }
   return { key, shiftKey: options.shiftKey ?? false, nativeEvent: { isComposing: options.isComposing ?? false }, preventDefault: vi.fn() };
 }
 
+const connections = () => response({ schemaVersion: 'ProviderConnections.v1', connections: [{ id: 'conn-ime', name: '测试 provider', source: 'user', adapterKind: 'anthropic', baseUrl: 'https://api.example.com', modelId: 'm1', enabled: true, credentialPresent: true }] });
+
+const selectWorkspaceRuntime = async (tree: ReturnType<typeof create>) => {
+  await act(async () => { tree.root.findByProps({ 'aria-label': 'Chat runtime' }).props.onChange({ target: { value: 'ws:conn-ime' } }); });
+};
+
 describe('IME-safe Chat Composer', () => {
   afterEach(() => vi.unstubAllGlobals());
 
@@ -21,6 +27,7 @@ describe('IME-safe Chat Composer', () => {
     const calls: { url: string; init?: RequestInit }[] = [];
     const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input); calls.push({ url, ...(init ? { init } : {}) });
+      if (url.endsWith('/provider-connections')) return connections();
       if (url.endsWith('/v1/chat/sessions/session-ime')) return response({ session: { status: 'open' } });
       if (url.includes('/events?')) return response({ events: [] });
       if (url.endsWith('/messages')) return pending;
@@ -28,6 +35,7 @@ describe('IME-safe Chat Composer', () => {
     }) as typeof fetch;
     let tree!: ReturnType<typeof create>;
     await act(async () => { tree = create(<ChatApp sessionId="session-ime" fetcher={fetcher} />); await flush(); await flush(); });
+    await selectWorkspaceRuntime(tree);
     let textarea = tree.root.findByProps({ 'aria-label': 'Message' });
     await act(async () => { textarea.props.onChange({ target: { value: '你好' } }); });
     textarea = tree.root.findByProps({ 'aria-label': 'Message' });
@@ -51,6 +59,7 @@ describe('IME-safe Chat Composer', () => {
     const calls: string[] = [];
     const fetcher = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input); calls.push(url);
+      if (url.endsWith('/provider-connections')) return connections();
       if (url.endsWith('/v1/chat/sessions/session-fail')) return response({ session: { status: 'open' } });
       if (url.includes('/events?')) return response({ events: [] });
       if (url.endsWith('/messages')) return response({ error: { code: 'CHAT_STORE_UNAVAILABLE', message: 'try again' } }, 503);
@@ -58,6 +67,7 @@ describe('IME-safe Chat Composer', () => {
     }) as typeof fetch;
     let tree!: ReturnType<typeof create>;
     await act(async () => { tree = create(<ChatApp sessionId="session-fail" fetcher={fetcher} />); await flush(); await flush(); });
+    await selectWorkspaceRuntime(tree);
     const textarea = tree.root.findByProps({ 'aria-label': 'Message' });
     await act(async () => { textarea.props.onChange({ target: { value: '   ' } }); });
     tree.root.findByProps({ 'aria-label': 'Message' }).props.onKeyDown(key('Enter'));

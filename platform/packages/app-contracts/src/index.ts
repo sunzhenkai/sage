@@ -57,7 +57,8 @@ export const ChatErrorCodeSchema = Type.Union([
   Type.Literal('CHAT_RUN_NOT_RETRYABLE'),
   Type.Literal('CHAT_API_RESTARTED'),
   Type.Literal('CHAT_AGENT_FAILED'),
-  Type.Literal('CHAT_STORE_UNAVAILABLE')
+  Type.Literal('CHAT_STORE_UNAVAILABLE'),
+  Type.Literal('CHAT_PROVIDER_DEPENDENCY_MISSING')
 ], { $id: 'ChatErrorCode.v1' });
 export type ChatErrorCode = Static<typeof ChatErrorCodeSchema>;
 
@@ -138,24 +139,22 @@ export const ChatProviderRouteSchema = Type.Object({
 export type ChatProviderRoute = Static<typeof ChatProviderRouteSchema>;
 
 /**
- * Provider 选择双形态：内联 route（浏览器本地 profile 的会话 key）或
- * 工作区 provider 引用（connectionId，凭据在服务端密封，浏览器不带 key）。
- * 两形态互斥，引用形态只在 Chat 服务端提交边界解析。
+ * Provider 引用形态（唯一合法形态）：connectionId 指向受信 provider 注册表条目，
+ * 凭据在服务端密封，浏览器不带 key；只在 Chat 服务端提交边界解析。
  */
-export const ChatProviderSelectionSchema = Type.Union([
-  ChatProviderRouteSchema,
-  Type.Object({ connectionId: Type.String({ minLength: 1, maxLength: 128 }) }, { additionalProperties: false })
-], { $id: 'ChatProviderSelection.v1' });
+export const ChatProviderSelectionSchema = Type.Object({
+  connectionId: Type.String({ minLength: 1, maxLength: 128 })
+}, { $id: 'ChatProviderSelection.v2', additionalProperties: false });
 export type ChatProviderSelection = Static<typeof ChatProviderSelectionSchema>;
 
 export const SubmitMessageRequestSchema = Type.Object({
   parts: Type.Array(MessagePartSchema, { minItems: 1, maxItems: 32 }),
-  provider: Type.Optional(ChatProviderSelectionSchema)
+  provider: ChatProviderSelectionSchema
 }, { additionalProperties: false });
 export type SubmitMessageRequest = Static<typeof SubmitMessageRequestSchema>;
 
 export const RetryRunRequestSchema = Type.Object({
-  provider: Type.Optional(ChatProviderSelectionSchema)
+  provider: ChatProviderSelectionSchema
 }, { additionalProperties: false });
 export type RetryRunRequest = Static<typeof RetryRunRequestSchema>;
 

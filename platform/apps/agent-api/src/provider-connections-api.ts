@@ -205,7 +205,7 @@ export function registerProviderConnectionRoutes(app: FastifyInstance, options: 
       return sendError(reply, 409, 'PROVIDER_CONNECTION_PROTECTED', 'Deployment-env connections are maintained by the trusted bootstrap and cannot be deleted via the API', false);
     }
     const settings = await options.store.getRunAgentSettings(options.tenantId);
-    if (settings?.defaultProvider === 'connection' && settings.providerConnectionId === request.params.id) {
+    if (settings?.providerConnectionId === request.params.id) {
       return sendError(reply, 409, 'PROVIDER_CONNECTION_IN_USE', 'Provider connection is referenced by run agent settings; clear the reference before deleting', false);
     }
     const deleted = await options.store.deleteProviderConnection(options.tenantId, request.params.id);

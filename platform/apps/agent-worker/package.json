@@ -21,17 +21,18 @@
     "@sage/agent-contracts": "workspace:*",
     "@sage/agent-lib": "workspace:*",
     "@sage/chat-domain": "workspace:*",
+    "@sage/harness-pi": "workspace:*",
     "@sage/local-runtime": "workspace:*",
     "@sage/observability": "workspace:*",
     "@sage/platform-ports": "workspace:*",
     "@sage/production-governance": "workspace:*",
+    "@sage/secret-vault": "workspace:*",
     "@sage/task-domain": "workspace:*",
     "@sage/task-store-postgres": "workspace:*",
     "@sage/temporal-workflows": "workspace:*",
     "@temporalio/activity": "1.22.0",
     "@temporalio/worker": "1.22.0",
-    "pg": "8.23.0",
-    "@sage/secret-vault": "workspace:*"
+    "pg": "8.23.0"
   },
   "devDependencies": {
     "@types/pg": "8.21.0"

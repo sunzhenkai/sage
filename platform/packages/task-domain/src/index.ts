@@ -289,19 +289,10 @@ export interface TaskRunOutputStore {
   getRunOutput(tenantId: string, taskId: string): Promise<TaskRunOutputRecord | undefined>;
 }
 
-/** 运行 agent 默认 provider：echo=显式本地确定性 harness（离线模式，缺省），connection=指向受信 provider 注册表条目。legacy 取值（auto/minimax）在读取时归一为 echo。 */
-export type RunAgentDefaultProvider = 'echo' | 'connection';
-
-/** legacy 存储值归一：connection 保留，其余（含已删除的 auto/minimax 与未知值）一律按 echo 处理。 */
-export function normalizeRunAgentDefaultProvider(raw: string): RunAgentDefaultProvider {
-  return raw === 'connection' ? 'connection' : 'echo';
-}
-
-/** 运行 agent 设置记录：per-tenant 单例、非密钥；无行等效 echo（离线模式）。connection 模式下 providerConnectionId 必填。 */
+/** 运行 agent 设置记录：per-tenant 单例、非密钥；providerConnectionId 必填且指向受信 provider 注册表条目。无行 = unset。 */
 export interface RunAgentSettingsRecord {
   readonly tenantId: string;
-  readonly defaultProvider: RunAgentDefaultProvider;
-  readonly providerConnectionId?: string;
+  readonly providerConnectionId: string;
   readonly updatedAt: string;
   readonly updatedBy: string;
 }

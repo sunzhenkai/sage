@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import type { LocalAgentClient } from '@sage/agent-client';
 import { ChatStoreError, type ChatStore } from '@sage/chat-domain';
 import { createChatApi } from './index.js';
 
@@ -47,12 +46,10 @@ function missingSessionStore(): ChatStore {
   } as unknown as ChatStore;
 }
 
-const unusedAgentClient = {} as LocalAgentClient;
-
 describe('Chat session history API', () => {
   it('uses strict defaults and returns the bounded history shape', async () => {
     const { state, store } = fakeStore();
-    const app = await createChatApi({ store, agentClient: unusedAgentClient });
+    const app = await createChatApi({ store });
     const response = await app.inject({ method: 'GET', url: '/v1/chat/sessions' });
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ schemaVersion: '1', items: [] });
@@ -62,7 +59,7 @@ describe('Chat session history API', () => {
 
   it('maps invalid and additional query fields to CHAT_INVALID_REQUEST', async () => {
     const { store } = fakeStore();
-    const app = await createChatApi({ store, agentClient: unusedAgentClient });
+    const app = await createChatApi({ store });
     for (const url of ['/v1/chat/sessions?limit=101', '/v1/chat/sessions?status=active', '/v1/chat/sessions?provider=forbidden', '/v1/chat/sessions?archived=yes']) {
       const response = await app.inject({ method: 'GET', url });
       expect(response.statusCode).toBe(400);
@@ -73,7 +70,7 @@ describe('Chat session history API', () => {
 
   it('forwards the archived view filter to the store', async () => {
     const { state, store } = fakeStore();
-    const app = await createChatApi({ store, agentClient: unusedAgentClient });
+    const app = await createChatApi({ store });
     const archived = await app.inject({ method: 'GET', url: '/v1/chat/sessions?archived=true' });
     expect(archived.statusCode).toBe(200);
     expect(state.listed).toEqual({ limit: 30, archived: true });
@@ -85,7 +82,7 @@ describe('Chat session history API', () => {
 
   it('archives, unarchives, and permanently deletes sessions through dedicated routes', async () => {
     const { state, store } = fakeStore();
-    const app = await createChatApi({ store, agentClient: unusedAgentClient });
+    const app = await createChatApi({ store });
     const archived = await app.inject({ method: 'POST', url: '/v1/chat/sessions/session-1/archive' });
     expect(archived.statusCode).toBe(200);
     expect(archived.json()).toMatchObject({ sessionId: 'session-1', archivedAt: state.archived?.now });
@@ -101,7 +98,7 @@ describe('Chat session history API', () => {
   });
 
   it('maps missing sessions on archive, unarchive, and delete to 404', async () => {
-    const app = await createChatApi({ store: missingSessionStore(), agentClient: unusedAgentClient });
+    const app = await createChatApi({ store: missingSessionStore() });
     for (const [method, url] of [
       ['POST', '/v1/chat/sessions/missing/archive'],
       ['POST', '/v1/chat/sessions/missing/unarchive'],
@@ -116,7 +113,7 @@ describe('Chat session history API', () => {
 
   it('passes omitted title as undefined so the store inserts SQL NULL', async () => {
     const { state, store } = fakeStore();
-    const app = await createChatApi({ store, agentClient: unusedAgentClient });
+    const app = await createChatApi({ store });
     const response = await app.inject({ method: 'POST', url: '/v1/chat/sessions', payload: {} });
     expect(response.statusCode).toBe(201);
     expect(state.createdTitle).toBeUndefined();

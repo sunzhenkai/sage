@@ -176,14 +176,14 @@ describe('Provider connections API', () => {
     const created = await app.inject({ method: 'POST', url: '/v1/provider-connections', payload: createPayload() });
     const id = created.json().connection.id;
     await store.upsertRunAgentSettings({
-      tenantId: 'tenant-local', defaultProvider: 'connection', providerConnectionId: id,
+      tenantId: 'tenant-local', providerConnectionId: id,
       updatedAt: '2026-08-25T00:00:00.000Z', updatedBy: 'principal://op'
     });
     const inUse = await app.inject({ method: 'DELETE', url: `/v1/provider-connections/${id}` });
     expect(inUse.statusCode).toBe(409);
     expect(inUse.json().error.code).toBe('PROVIDER_CONNECTION_IN_USE');
     await store.upsertRunAgentSettings({
-      tenantId: 'tenant-local', defaultProvider: 'echo', updatedAt: '2026-08-25T01:00:00.000Z', updatedBy: 'principal://op'
+      tenantId: 'tenant-local', providerConnectionId: 'conn-other', updatedAt: '2026-08-25T01:00:00.000Z', updatedBy: 'principal://op'
     });
     const deleted = await app.inject({ method: 'DELETE', url: `/v1/provider-connections/${id}` });
     expect(deleted.statusCode).toBe(200);

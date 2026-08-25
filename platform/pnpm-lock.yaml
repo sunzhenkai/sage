@@ -89,6 +89,9 @@ importers:
       '@sage/chat-domain':
         specifier: workspace:*
         version: link:../../packages/chat-domain
+      '@sage/harness-pi':
+        specifier: workspace:*
+        version: link:../../packages/harness-pi
       '@sage/local-fakes':
         specifier: workspace:*
         version: link:../../packages/local-fakes
@@ -184,6 +187,9 @@ importers:
       '@sage/chat-domain':
         specifier: workspace:*
         version: link:../../packages/chat-domain
+      '@sage/harness-pi':
+        specifier: workspace:*
+        version: link:../../packages/harness-pi
       '@sage/local-runtime':
         specifier: workspace:*
         version: link:../../packages/local-runtime
@@ -417,6 +423,9 @@ importers:
       '@sage/platform-ports':
         specifier: workspace:*
         version: link:../../packages/platform-ports
+      '@sage/secret-vault':
+        specifier: workspace:*
+        version: link:../../packages/secret-vault
       '@sage/task-domain':
         specifier: workspace:*
         version: link:../../packages/task-domain

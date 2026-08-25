@@ -36,6 +36,10 @@ async function waitFor(label, fn, timeoutMs = 60_000) {
   throw new Error(`Timed out waiting for ${label}${lastError ? `: ${lastError.message}` : ''}`);
 }
 
+// smoke 环境：显式启用受信 fake live provider（进程内确定性模型替身，路由链路保真）与固定 dev 主密钥。
+process.env.SAGE_FAKE_LIVE_PROVIDER = 'true';
+process.env.SAGE_SECRET_MASTER_KEY = 'c2FnZS1sb2NhbC1kZXYtc2VjcmV0LW1hc3Rlci1reSE=';
+
 let failure;
 try {
   compose(['config', '--quiet']);
@@ -49,11 +53,22 @@ try {
   await request(`${api}/readyz`);
   const workerReady = await request(`${worker}/readyz`);
   if (workerReady.namespace !== 'sage-dev' || workerReady.taskQueue !== 'sage-agent-task-v1') throw new Error('Worker readiness contract mismatch');
+  if (workerReady.providerExecution?.mode !== 'fake') throw new Error('Smoke requires SAGE_FAKE_LIVE_PROVIDER=true on the worker');
   await request(`${web}/`);
+
+  // seed 工作区 provider + 运行 agent 设置：chat 与包运行均硬要求 provider（引用形态，服务端解析）。
+  const connection = await request(`${api}/v1/provider-connections`, {
+    method: 'POST', headers: { 'content-type': 'application/json', 'x-authentication-id': 'local-dev-auth' },
+    body: JSON.stringify({ name: 'smoke provider', adapterKind: 'anthropic', baseUrl: 'https://api.minimaxi.com/anthropic', modelId: 'MiniMax-M3', apiKey: 'smoke-seeded-key' })
+  });
+  await request(`${api}/v1/run-agent/settings`, {
+    method: 'PUT', headers: { 'content-type': 'application/json', 'x-authentication-id': 'local-dev-auth' },
+    body: JSON.stringify({ providerConnectionId: connection.connection.id })
+  });
 
   const session = await request(`${api}/v1/chat/sessions`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ title: 'local smoke' }) });
   const accepted = await request(`${api}/v1/chat/sessions/${encodeURIComponent(session.sessionId)}/messages`, {
-    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ parts: [{ kind: 'text', text: 'local smoke message' }] })
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ parts: [{ kind: 'text', text: 'local smoke message' }], provider: { connectionId: connection.connection.id } })
   });
   const conversation = await waitFor('Chat Run succeeded', async () => {
     const value = await request(`${api}/v1/chat/sessions/${encodeURIComponent(session.sessionId)}`);

@@ -7,8 +7,8 @@ import type {
   HarnessTurnRequest,
   HarnessTurnResult
 } from '@sage/agent-contracts';
-import { createExplicitLegacyPiHarness, READ_PROJECT_METADATA_SKILL } from '@sage/harness-pi';
-import { runCanonicalNodeHostExample, runLegacyNodeHostExample } from './index.js';
+import { LiveProviderHarness, createFakeLiveInvoker } from '@sage/harness-pi';
+import { runCanonicalNodeHostExample, runLiveNodeHostExample } from './index.js';
 
 let nextRun = 0;
 const makeSpec = (input: string, overrides: Partial<AgentRunSpec['limits']> = {}): AgentRunSpec => ({
@@ -16,7 +16,7 @@ const makeSpec = (input: string, overrides: Partial<AgentRunSpec['limits']> = {}
   runId: `host-run-${++nextRun}`,
   input,
   skillRefs: [],
-  requiredCapabilities: ['events', 'cancellation', 'checkpoint'],
+  requiredCapabilities: ['events', 'cancellation'],
   limits: {
     maxTurns: 2,
     maxToolCalls: 2,
@@ -24,6 +24,16 @@ const makeSpec = (input: string, overrides: Partial<AgentRunSpec['limits']> = {}
     deadlineAt: new Date(Date.now() + 5_000).toISOString(),
     ...overrides
   }
+});
+
+/** 与产品路径同构的组装：LiveProviderHarness + fake invoker（只替换最终模型 HTTP 调用）。 */
+const liveClient = (tokensPerSecond = 5_000): LocalAgentClient => new LocalAgentClient({
+  harness: new LiveProviderHarness({
+    route: { adapterKind: 'openai-compatible', baseUrl: 'https://provider.example/v1', modelId: 'model-x', apiKey: 'example-key' },
+    transcript: [],
+    turnInput: true,
+    invoker: createFakeLiveInvoker({ tokensPerSecond })
+  })
 });
 
 const execute = async (client: LocalAgentClient, spec: AgentRunSpec, cancelAfterMs?: number) => {
@@ -76,12 +86,10 @@ describe('canonical Node.js Host example', () => {
   });
 });
 
-describe('explicit legacy Node.js Host compatibility', () => {
-  it('labels the old runner path and does not invent a canonical sealed Checkpoint', async () => {
-    const facade = createExplicitLegacyPiHarness();
-    expect(facade).toMatchObject({ compatibilityPath: 'explicit-old-runner' });
-    const result = await runLegacyNodeHostExample();
-    expect(result.executionPath).toBe('explicit-old-runner');
+describe('live provider Node.js Host example', () => {
+  it('runs through the live path with a deterministic fake invoker', async () => {
+    const result = await runLiveNodeHostExample();
+    expect(result.executionPath).toBe('live-provider');
     expect(result.outcome.status).toBe('succeeded');
     expect(result.outcome.checkpointRef).toBeUndefined();
     expect(result.events.some((event) => event.type === 'checkpoint.created')).toBe(false);
@@ -89,7 +97,7 @@ describe('explicit legacy Node.js Host compatibility', () => {
   });
 
   it('normalizes Harness failure into a stable terminal error', async () => {
-    const { outcome, events } = await execute(new LocalAgentClient({ harness: createExplicitLegacyPiHarness() }), makeSpec('[fail]'));
+    const { outcome, events } = await execute(liveClient(), makeSpec('[fail]'));
     expect(outcome.status).toBe('failed');
     expect(outcome.error?.code).toBe('HARNESS_FAILURE');
     expect(events.at(-1)?.type).toBe('run.failed');
@@ -97,7 +105,7 @@ describe('explicit legacy Node.js Host compatibility', () => {
   });
 
   it('propagates caller cancellation', async () => {
-    const { outcome, events } = await execute(new LocalAgentClient({ harness: createExplicitLegacyPiHarness() }), makeSpec('[slow]'), 10);
+    const { outcome, events } = await execute(liveClient(1), makeSpec('[slow]'), 10);
     expect(outcome.status).toBe('cancelled');
     expect(outcome.error?.code).toBe('CANCELLED');
     expect(events.some((event) => event.type === 'run.cancel.requested')).toBe(true);
@@ -106,31 +114,25 @@ describe('explicit legacy Node.js Host compatibility', () => {
 
   it('enforces deadline independently of the Host', async () => {
     const spec = makeSpec('[slow]', { deadlineAt: new Date(Date.now() + 20).toISOString() });
-    const { outcome, events } = await execute(new LocalAgentClient({ harness: createExplicitLegacyPiHarness() }), spec);
+    const { outcome, events } = await execute(liveClient(1), spec);
     expect(outcome.status).toBe('deadline_exceeded');
     expect(outcome.error?.code).toBe('DEADLINE_EXCEEDED');
     expectTimeline(events);
   });
 
   it('enforces token and turn budgets with stable errors', async () => {
-    const client = new LocalAgentClient({ harness: createExplicitLegacyPiHarness() });
+    const client = liveClient();
     const token = await execute(client, makeSpec('[tokens:100]', { maxTokens: 10 }));
     expect(token.outcome.status).toBe('budget_exhausted');
     expect(token.outcome.error?.code).toBe('TOKEN_BUDGET_EXHAUSTED');
     const turn = await execute(client, makeSpec('[continue]', { maxTurns: 1 }));
     expect(turn.outcome.error?.code).toBe('TURN_BUDGET_EXHAUSTED');
-    const toolSpec = makeSpec('metadata', { maxToolCalls: 0 });
-    toolSpec.skillRefs.push(READ_PROJECT_METADATA_SKILL);
-    toolSpec.requiredCapabilities.push('skills', 'tools');
-    const tool = await execute(client, toolSpec);
-    expect(tool.outcome.error?.code).toBe('TOOL_BUDGET_EXHAUSTED');
     expectTimeline(token.events);
     expectTimeline(turn.events);
-    expectTimeline(tool.events);
   });
 
   it('emits a paused outcome without claiming a sealed Checkpoint', async () => {
-    const { outcome, events } = await execute(new LocalAgentClient({ harness: createExplicitLegacyPiHarness() }), makeSpec('[pause]'));
+    const { outcome, events } = await execute(liveClient(), makeSpec('[pause]'));
     expect(outcome.status).toBe('paused');
     expect(outcome.checkpointRef).toBeUndefined();
     expect(events.some((event) => event.type === 'checkpoint.created')).toBe(false);

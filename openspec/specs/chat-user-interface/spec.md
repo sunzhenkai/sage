@@ -143,32 +143,27 @@ Chat 对话滚动区 SHALL 跟踪用户是否处于底部附近（阈值范围�
 - **THEN** 对话区立即滚动到底部，用户消息气泡可见
 
 ### Requirement: Chat 运行时快速选择器
-Chat 页 SHALL 提供运行时快速选择器，选项包含默认本地 Pi 运行时、browser-local 且 metadata 可执行（`executionAvailable`）的 external provider profiles（显示 profile 名与 model 名），以及「工作区 provider」分组：来自受信 provider 注册表、enabled 且凭据在场的条目（显示条目名与 model 名，标识凭据在服务端）。选择 SHALL 持久化到 browser-local storage，并在重新进入 Chat 时恢复。当所选 browser-local profile 在当前 tab 缺少 API key 时，UI SHALL 阻止发送并展示明确提示；所选工作区 provider 条目失效（被停用/删除/凭据移除）时，UI SHALL 在提交前给出明确错误或自动回退到默认本地运行时并提示，SHALL NOT 静默使用其他运行时。
+Chat 页 SHALL 提供运行时快速选择器，选项仅为「工作区 provider」分组：来自受信 provider 注册表、enabled 且凭据在场的条目（显示条目名与 model 名，标识凭据在服务端）。本地运行时选项与 browser-local profile 选项 SHALL NOT 出现。选择 SHALL 持久化到 browser-local storage（仅 UI 选择状态，不含任何凭据材料），并在重新进入 Chat 时恢复。无可条目、或所选条目失效（被停用/删除/凭据移除）时，UI SHALL 阻止发送并展示明确引导（添加或重选工作区 provider），SHALL NOT 静默使用其他运行时。
 
 #### Scenario: 列出可执行 profiles
-
-- **WHEN** localStorage 中存在 enabled 且 metadata/URL 完整的 URL-adapter profiles
-- **THEN** 选择器列出这些 profiles 与默认本地运行时，未达标的 profiles 不出现
+- **WHEN** Chat 页渲染运行时选择器
+- **THEN** 不存在任何 browser-local profile 选项（profile 体系已移除），选项只来自工作区 provider 条目
 
 #### Scenario: 列出工作区 provider 条目
-
-- **WHEN** 受信 provider 注册表存在 enabled 且凭据在场的条目
-- **THEN** 选择器以「工作区 provider」分组列出这些条目（凭据在服务端，无 per-tab secret 要求）
+- **WHEN** 注册表存在 enabled 且凭据在场的条目
+- **THEN** 选择器「工作区 provider」分组列出这些条目（条目名与 model 名，标识凭据在服务端），不存在本地运行时选项
 
 #### Scenario: 选择持久化与恢复
-
-- **WHEN** 用户选择某个 profile 或工作区条目后离开并重新进入 Chat 页
-- **THEN** 选择器恢复该选择
+- **WHEN** 用户选择某工作区 provider 条目后离开并重新进入 Chat
+- **THEN** 选择器恢复该选择，且存储中不含任何凭据材料
 
 #### Scenario: 缺少当前 tab secret 时阻止发送
-
-- **WHEN** 用户选择了 browser-local profile 但当前 tab 未配置该 profile 的 API key 并尝试发送
-- **THEN** 请求不发出，UI 展示需要在此 tab 输入 API key 的提示
+- **WHEN** 注册表无 enabled 且凭据在场的条目（浏览器不再持有任何秘钥概念），用户尝试发送消息
+- **THEN** 发送被阻止，UI 展示添加工作区 provider 的明确引导
 
 #### Scenario: 工作区条目失效的处理
-
-- **WHEN** 用户所选工作区条目在服务端被停用或删除后尝试发送
-- **THEN** UI 给出明确错误或回退默认本地运行时并提示，不静默选用其他运行时；工作区条目选项无 per-tab secret 要求
+- **WHEN** 所选条目被停用、删除或凭据移除后用户尝试发送
+- **THEN** 发送被阻止并展示明确错误，SHALL NOT 静默切换到其他运行时
 
 ### Requirement: 归档视图与对话行操作
 Chat landing SHALL 提供未归档与归档两个视图的切换入口（如「对话 / 归档」），以 `aria-pressed` 或等价可访问状态表达当前视图；切换 SHALL 以 history API 的 `archived` 参数重新加载列表，搜索与 status 过滤在两个视图均可用。历史行 SHALL 提供行内操作且不破坏行的主链接导航：未归档视图提供「归档」；归档视图提供「恢复」与「彻底删除」。彻底删除 SHALL 为两步显式确认：首次点击进入行内确认态并明示不可撤销，只有显式确认后才发出 `DELETE` 请求；取消 SHALL 不发请求并退出确认态。操作成功 SHALL 以行移除与成功反馈表达，失败 SHALL 复用既有错误横幅；归档视图 SHALL 提供区别于主列表的空态文案。
@@ -203,4 +198,3 @@ Chat 视图相关的所有站内导航（侧边栏 Chat 项、历史条目、任
 #### Scenario: 任务详情深链返回会话
 - **WHEN** 用户从任务详情点击「前往对话」深链
 - **THEN** 携带原 `session` query 以客户端路由切换回对应 Chat session，不整页重载，展示同一 timeline
-

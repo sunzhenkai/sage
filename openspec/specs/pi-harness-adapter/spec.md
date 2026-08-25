@@ -3,6 +3,7 @@
 ## Purpose
 TBD - created by archiving change sage-p1-agent-library-minimum-vertical-slice. Update Purpose after archive.
 ## Requirements
+
 ### Requirement: Isolated Pi Harness dependency
 Only the Pi Harness package SHALL directly depend on the Pi SDK, and public canonical contracts, conformance fixtures, Kernel callbacks, Receipts, Checkpoints, or other package dependency trees SHALL NOT expose Pi types. Pi SHALL operate as an Engine Adapter and SHALL NOT own `AgentTaskSpec`, authorization, hard-budget balance, Tool effect commit, Receipt commit, durable lifecycle, or Checkpoint seal authority.
 
@@ -87,13 +88,3 @@ Pi Harness 包 SHALL 提供 provider-backed harness 实现：仅使用单次请�
 
 - **WHEN** provider-backed Run 结束（成功或失败）
 - **THEN** route 与 key 不出现在任何持久化存储或日志中
-
-### Requirement: 本地 echo harness 人类可读输出
-
-Local Pi echo harness 的普通回执 SHALL 为人类可读纯文本（非 JSON 信封），使默认运行时的对话气泡仅显示 agent 文本输出；脚本化 skill/metadata 场景的输出契约保持不变。
-
-#### Scenario: 默认运行时对话气泡
-
-- **WHEN** 用户在未选择 external profile 时发送消息并收到 echo 回复
-- **THEN** 助手气泡显示纯文本回执，不出现 `{"answer": …}` 原始 JSON
-

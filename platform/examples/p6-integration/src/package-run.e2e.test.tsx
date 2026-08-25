@@ -11,6 +11,8 @@ import { InMemoryAgentTaskSpecStore } from '@sage/local-fakes';
 import { InMemoryAgentReleaseStore } from '@sage/agent-release-registry';
 import type { CredentialProvider } from '@sage/platform-ports';
 import { PostgresTaskStore } from '@sage/task-store-postgres';
+import { LocalAesGcmSecretBackend } from '@sage/secret-vault';
+import { randomBytes } from 'node:crypto';
 import { createDevRegistryBundle, publishDevRegistry } from '@sage/temporal-registry';
 import { DefaultTemporalClientConnector, TemporalClientFactory, TrustedMultiTargetTaskController, TrustedTemporalRouter } from '@sage/temporal-routing';
 import Fastify from 'fastify';
@@ -60,6 +62,19 @@ let tasks: PostgresTaskStore;
 let admin: Pool;
 let native: NativeConnection;
 let bundle: Awaited<ReturnType<typeof bundleWorkflowCode>>;
+const secretBackend = new LocalAesGcmSecretBackend([randomBytes(32)]);
+
+/** seed 工作区 provider + 运行 agent 设置：包运行准入与执行均硬要求 provider（无本地兜底路径）。 */
+async function seedProvider() {
+  const sealed = secretBackend.seal('pkg-e2e-provider-key');
+  await tasks.createProviderConnection(tenantId, 'conn-pkg-e2e', {
+    name: 'pkg-e2e provider', source: 'user', adapterKind: 'anthropic',
+    baseUrl: 'https://api.minimaxi.com/anthropic', modelId: 'MiniMax-M3', enabled: true,
+    updatedBy: 'principal://pkg-e2e',
+    credential: { ciphertext: sealed.ciphertext, keyVersion: sealed.keyVersion, updatedAt: '2026-08-25T00:00:00.000Z' }
+  }, '2026-08-25T00:00:00.000Z');
+  await tasks.upsertRunAgentSettings({ tenantId, providerConnectionId: 'conn-pkg-e2e', updatedAt: '2026-08-25T00:00:00.000Z', updatedBy: 'principal://pkg-e2e' });
+}
 
 function registry(address: string) {
   const value = createDevRegistryBundle('registry-pkg-e2e');
@@ -91,13 +106,17 @@ afterAll(async () => {
 integration.sequential('Package run e2e acceptance', () => {
   it('registers a package, starts a run, and the workflow succeeds with a queryable projection', async () => {
     const harness = new PackageE2EHarness();
+    await seedProvider();
     const worker = await Worker.create({
       connection: native,
       namespace: 'sage-dev',
       taskQueue: 'sage-agent-task-us-v1',
       workflowBundle: bundle,
       activities: createAgentTaskActivities({
-        agentClient: new LocalAgentClient({ harness }),
+        liveClientFactory: () => new LocalAgentClient({ harness }),
+        settingsStore: tasks,
+        providerConnections: tasks,
+        secretBackend,
         store: tasks,
         inputResolver: new PackageTaskInputResolver(tasks),
       }),
@@ -147,6 +166,8 @@ integration.sequential('Package run e2e acceptance', () => {
       },
       taskStore: tasks,
       specStore,
+      settingsStore: tasks,
+      providerConnections: tasks,
       authenticator,
       deploymentMode: 'local',
     });

@@ -2,7 +2,6 @@ import { readFile } from 'node:fs/promises';
 import { Pool, type PoolClient, type PoolConfig, type QueryResultRow } from 'pg';
 import {
   isAgentSliceResult, isRouteDecision, isTaskProjection, isTaskRoutingRecord,
-  normalizeRunAgentDefaultProvider,
   type AgentSliceResult, type ExecuteAgentSliceInput, type ProviderConnectionAdapterKind, type ProviderConnectionRecord, type ProviderConnectionSource,
   type ProviderConnectionWrite, type ProviderCredentialSealed, type RouteDecision,
   type RunAgentSettingsRecord,
@@ -56,7 +55,7 @@ interface RunOutputRow extends QueryResultRow {
 }
 
 interface RunAgentSettingsRow extends QueryResultRow {
-  /** 可能含 legacy 值（auto/minimax），读取时经 normalizeRunAgentDefaultProvider 归一。 */
+  /** 可能含 legacy 值（echo/auto/minimax），读取时归一为 unset（undefined）。 */
   tenant_id: string; default_provider: string;
   provider_connection_id: string | null;
   updated_at: Date | string; updated_by: string;
@@ -627,25 +626,21 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
       FROM run_agent_settings WHERE tenant_id=$1`, [tenantId]);
     const row = result.rows[0];
     if (row === undefined) return undefined;
-    // legacy 取值（auto/minimax）读取时归一为 echo，不写回；providerConnectionId 仅在 connection 模式下保留。
-    const defaultProvider = normalizeRunAgentDefaultProvider(row.default_provider);
+    // legacy 形态（default_provider 为 echo/auto/minimax，或 connection 缺 id）读取时归一为 unset（无默认 provider），不写回。
+    if (row.default_provider !== 'connection' || typeof row.provider_connection_id !== 'string' || row.provider_connection_id.length === 0) {
+      return undefined;
+    }
     return {
       tenantId: row.tenant_id,
-      defaultProvider,
-      ...(defaultProvider === 'connection' && row.provider_connection_id !== null ? { providerConnectionId: row.provider_connection_id } : {}),
+      providerConnectionId: row.provider_connection_id,
       updatedAt: iso(row.updated_at),
       updatedBy: row.updated_by
     };
   }
 
   async upsertRunAgentSettings(record: RunAgentSettingsRecord): Promise<{ readonly status: 'stored' | 'existing' }> {
-    const provider = record.defaultProvider;
-    const validProvider = provider === 'echo' || provider === 'connection';
-    const validConnection = provider === 'connection'
-      ? typeof record.providerConnectionId === 'string' && record.providerConnectionId.length > 0
-      : record.providerConnectionId === undefined;
     if (record === null || typeof record !== 'object' || typeof record.tenantId !== 'string'
-      || !validProvider || !validConnection
+      || typeof record.providerConnectionId !== 'string' || record.providerConnectionId.length === 0
       || typeof record.updatedAt !== 'string' || typeof record.updatedBy !== 'string') {
       throw new TaskStoreError('upsertRunAgentSettings.invalid');
     }
@@ -658,7 +653,7 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
         updated_at=EXCLUDED.updated_at,
         updated_by=EXCLUDED.updated_by
       RETURNING (xmax = 0) AS inserted`,
-    [record.tenantId, record.defaultProvider, record.providerConnectionId ?? null, iso(record.updatedAt), record.updatedBy]);
+    [record.tenantId, 'connection', record.providerConnectionId, iso(record.updatedAt), record.updatedBy]);
     // 单例 upsert：无并发写者场景下同值重写视为 existing，语义与 package input 幂等一致。
     return { status: upserted.rows[0]?.inserted === true ? 'stored' : 'existing' };
   }

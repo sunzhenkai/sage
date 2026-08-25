@@ -119,18 +119,31 @@ class FakeConnectionStore {
   }
 }
 
+const connectionRecord = (id: string, overrides: Partial<ProviderConnectionRecord> = {}): ProviderConnectionRecord => ({
+  tenantId: 'tenant-local', id, name: id, source: 'user', adapterKind: 'anthropic',
+  baseUrl: 'https://api.minimaxi.com/anthropic', modelId: 'MiniMax-M3', enabled: true, credentialPresent: true,
+  createdAt: '2026-08-25T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z', ...overrides
+});
+
 async function api(options: { readonly principal?: AuthenticatedPrincipal; readonly specStore?: AgentTaskSpecStorePort; readonly deploymentMode?: 'local' | 'production'; readonly controller?: FakeController; readonly taskStore?: FakeTaskStore; readonly settingsStore?: FakeSettingsStore; readonly connections?: FakeConnectionStore } = {}) {
   const app = Fastify({ logger: false, ajv: { customOptions: { removeAdditional: false } } });
   const controller = options.controller ?? new FakeController();
   const taskStore = options.taskStore ?? new FakeTaskStore();
+  // 缺省 seed 一个可用 provider + 设置：包运行准入现在硬要求 provider（unset 即 409）。
+  const settingsStore = options.settingsStore ?? new FakeSettingsStore();
+  const connections = options.connections ?? new FakeConnectionStore();
+  if (options.settingsStore === undefined && options.connections === undefined) {
+    connections.entries.set('tenant-local/conn-ok', connectionRecord('conn-ok'));
+    await settingsStore.upsertRunAgentSettings({ tenantId: 'tenant-local', providerConnectionId: 'conn-ok', updatedAt: '2026-08-25T00:00:00.000Z', updatedBy: 'principal://op' });
+  }
   registerPackageRunsRoutes(app, {
     tenantId: 'tenant-local',
     controller,
     releaseResolver: resolver,
     taskStore,
     specStore: options.specStore ?? new InMemoryAgentTaskSpecStore(),
-    ...(options.settingsStore === undefined ? {} : { settingsStore: options.settingsStore }),
-    ...(options.connections === undefined ? {} : { providerConnections: options.connections }),
+    settingsStore,
+    providerConnections: connections,
     authenticator: { authenticateRequest: () => options.principal },
     deploymentMode: options.deploymentMode ?? 'local',
     now: () => new Date('2026-08-17T00:00:00.000Z'),
@@ -202,22 +215,14 @@ describe('Package run API boundaries', () => {
     await app.close();
   });
 
-  it('admits normally for legacy minimax rows (normalized to echo) and for echo without any provider key', async () => {
-    // 存量 legacy 行（store 读取归一为 echo；此处 fake 原样返回）：准入不再做 env 检查，照常放行。
-    const legacy = new FakeSettingsStore();
-    await legacy.upsertRunAgentSettings({ tenantId: 'tenant-local', defaultProvider: 'minimax', updatedAt: '2026-08-25T00:00:00.000Z', updatedBy: 'principal://op' } as unknown as RunAgentSettingsRecord);
-    const legacyApp = await api({ principal: operator, settingsStore: legacy });
-    expect((await legacyApp.app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: { input: 'hi' } })).statusCode).toBe(202);
-    await legacyApp.app.close();
-
-    const echo = new FakeSettingsStore();
-    await echo.upsertRunAgentSettings({ tenantId: 'tenant-local', defaultProvider: 'echo', updatedAt: '2026-08-25T00:00:00.000Z', updatedBy: 'principal://op' });
-    const echoApp = await api({ principal: operator, settingsStore: echo });
-    expect((await echoApp.app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: { input: 'hi' } })).statusCode).toBe(202);
-    await echoApp.app.close();
-
-    const noSettings = await api({ principal: operator });
-    expect((await noSettings.app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: { input: 'hi' } })).statusCode).toBe(202);
+  it('rejects admission when settings are unset: no provider-less admission path exists', async () => {
+    // 无设置行（或存量 legacy 值在存储层归一为 unset）：包运行以 PROVIDER_DEPENDENCY_MISSING 拒绝。
+    const noSettings = await api({ principal: operator, settingsStore: new FakeSettingsStore(), connections: new FakeConnectionStore() });
+    const response = await noSettings.app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: { input: 'hi' } });
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error.code).toBe('PROVIDER_DEPENDENCY_MISSING');
+    expect(response.json().error.retryable).toBe(false);
+    expect(noSettings.controller.created).toHaveLength(0);
     await noSettings.app.close();
   });
 
@@ -241,7 +246,7 @@ describe('Package run API boundaries', () => {
     for (const id of ['missing-conn', 'conn-disabled', 'conn-nokey']) {
       const settings = new FakeSettingsStore();
       await settings.upsertRunAgentSettings({
-        tenantId: 'tenant-local', defaultProvider: 'connection', providerConnectionId: id,
+        tenantId: 'tenant-local', providerConnectionId: id,
         updatedAt: '2026-08-25T00:00:00.000Z', updatedBy: 'principal://op'
       });
       const { app, controller, taskStore } = await api({ principal: operator, settingsStore: settings, connections });
@@ -254,7 +259,7 @@ describe('Package run API boundaries', () => {
     }
     const settings = new FakeSettingsStore();
     await settings.upsertRunAgentSettings({
-      tenantId: 'tenant-local', defaultProvider: 'connection', providerConnectionId: 'conn-ok',
+      tenantId: 'tenant-local', providerConnectionId: 'conn-ok',
       updatedAt: '2026-08-25T00:00:00.000Z', updatedBy: 'principal://op'
     });
     const ok = await api({ principal: operator, settingsStore: settings, connections });

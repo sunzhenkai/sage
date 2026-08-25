@@ -4,7 +4,8 @@ import { fileURLToPath } from 'node:url';
 import { Pool } from 'pg';
 import { bundleWorkflowCode, NativeConnection, Worker, type WorkerStatus } from '@temporalio/worker';
 import { ChatStore } from '@sage/chat-domain';
-import { createLivePackageAgentClient, createLocalAgentClient, createLocalKernelComposition, PACKAGE_RUN_SYSTEM_PROMPT, type LiveProviderRoute } from '@sage/local-runtime';
+import { CHAT_SLICE_SYSTEM_PROMPT, createLivePackageAgentClient, createLocalKernelComposition, PACKAGE_RUN_SYSTEM_PROMPT, type LiveProviderRoute } from '@sage/local-runtime';
+import { createFakeLiveInvoker, type LiveProviderInvoker } from '@sage/harness-pi';
 import { createLocalSecretBackendFromEnv } from '@sage/secret-vault';
 import { LegacyAgentRunSpecV1Adapter, parseAgentExecutionFeatureConfig, selectAgentExecutionMode, type AgentExecutionMode, type AgentLifecycleOwner, type LegacyAdapterResult } from '@sage/agent-client';
 import { PostgresTaskStore } from '@sage/task-store-postgres';
@@ -153,17 +154,20 @@ export async function createWorkerRuntime(config = readWorkerRuntimeConfig()): P
       })
     };
     const secretBackend = createLocalSecretBackendFromEnv();
+    const fakeInvoker: LiveProviderInvoker | undefined = process.env.SAGE_FAKE_LIVE_PROVIDER === 'true' ? createFakeLiveInvoker() : undefined;
     native = await NativeConnection.connect({ address: config.temporalAddress });
     const secretBackendMode = secretBackend?.describe().mode ?? 'unavailable';
     worker = await Worker.create({
       connection: native, namespace: TASK_NAMESPACE, taskQueue: TASK_QUEUE, workflowBundle,
       activities: createAgentTaskActivities({
-        agentClient: createLocalAgentClient(),
         settingsStore: tasks,
         providerConnections: tasks,
-        ...(secretBackend === undefined ? {} : {
-          secretBackend,
-          liveClientFactory: (route: LiveProviderRoute) => createLivePackageAgentClient({ route, systemPrompt: PACKAGE_RUN_SYSTEM_PROMPT })
+        // 受信测试开关由 fakeInvoker 捕获：显式配置时以进程内确定性 invoker 替换最终模型 HTTP 调用，
+        // 设置→注册表解析→harness 路由链路保真；未配置时走真实 provider。
+        liveClientFactory: (route: LiveProviderRoute, mode: 'package' | 'chat') => createLivePackageAgentClient({
+          route,
+          systemPrompt: mode === 'package' ? PACKAGE_RUN_SYSTEM_PROMPT : CHAT_SLICE_SYSTEM_PROMPT,
+          ...(fakeInvoker === undefined ? {} : { invoker: fakeInvoker })
         }),
         ...(canonicalCompatibility === undefined ? {} : { canonicalCompatibility }),
         store: tasks, outputStore: tasks, inputResolver: new CompositeTaskInputResolver([
@@ -183,13 +187,14 @@ export async function createWorkerRuntime(config = readWorkerRuntimeConfig()): P
       };
       if (path === '/livez') return send(json(stopping ? 503 : 200, { status: stopping ? 'stopping' : 'alive' }));
       if (path !== '/readyz') { response.statusCode = 404; response.end(); return; }
-      if (stopping) return send(json(503, { status: 'not_ready', reason: 'shutting_down', secretBackend: { mode: secretBackendMode } }));
+      const providerExecution = { mode: fakeInvoker === undefined ? 'live' : 'fake' };
+      if (stopping) return send(json(503, { status: 'not_ready', reason: 'shutting_down', secretBackend: { mode: secretBackendMode }, providerExecution }));
       const status = subject.getStatus();
       if (!workerPollersReady(status)) {
-        return send(json(503, { status: 'not_ready', worker: { runState: status.runState, workflowPollerState: status.workflowPollerState, activityPollerState: status.activityPollerState }, secretBackend: { mode: secretBackendMode } }));
+        return send(json(503, { status: 'not_ready', worker: { runState: status.runState, workflowPollerState: status.workflowPollerState, activityPollerState: status.activityPollerState }, secretBackend: { mode: secretBackendMode }, providerExecution }));
       }
       void Promise.all([chat.getSession(config.tenantId, 'health-sentinel'), tasks.listTaskViews(config.tenantId, { limit: 1 })])
-        .then(() => send(json(200, { status: 'ready', namespace: TASK_NAMESPACE, taskQueue: TASK_QUEUE, secretBackend: { mode: secretBackendMode }, worker: { runState: status.runState, workflowPollerState: status.workflowPollerState, activityPollerState: status.activityPollerState } })))
+        .then(() => send(json(200, { status: 'ready', namespace: TASK_NAMESPACE, taskQueue: TASK_QUEUE, secretBackend: { mode: secretBackendMode }, providerExecution, worker: { runState: status.runState, workflowPollerState: status.workflowPollerState, activityPollerState: status.activityPollerState } })))
         .catch(() => send(json(503, { status: 'not_ready', dependencies: ['postgres'], secretBackend: { mode: secretBackendMode } })));
     });
     const runningPromise = subject.run();

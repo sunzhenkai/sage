@@ -1,16 +1,14 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
-import type { ChatProviderRoute, ChatRun, TimelineEvent, TimelinePayload } from '@sage/app-contracts';
+import type { ChatRun, TimelineEvent, TimelinePayload } from '@sage/app-contracts';
 import { ChatLanding, workspaceHref } from './workspace.js';
-import { loadProviderProfiles, profileCompletion, PROVIDER_SECRET_PREFIX } from './profiles.js';
 import type { WorkspaceProviderView } from './workspace-providers.js';
 import { Markdown } from './markdown.js';
 import { useLocale } from './locale.js';
 
-/** Browser-local Chat runtime selection: 'local' (Local Pi echo harness), 'ws:<connectionId>' (workspace provider), or a provider profile id. */
-export const CHAT_RUNTIME_STORAGE_KEY = 'sage.chat-runtime.v1';
+/** Browser-local Chat runtime selection（仅 UI 选择状态，不含任何凭据材料）：'ws:<connectionId>' 或 ''（未配置）。 */
+export const CHAT_RUNTIME_STORAGE_KEY = 'sage.chat-runtime.v2';
 const WS_RUNTIME_PREFIX = 'ws:';
 const browserLocalStorage = (): Storage | undefined => typeof window === 'undefined' ? undefined : window.localStorage;
-const browserSessionStorage = (): Storage | undefined => typeof window === 'undefined' ? undefined : window.sessionStorage;
 
 export interface ChatTimelineProps { readonly events: readonly TimelineEvent[]; readonly sessionId?: string; readonly onRetry?: (runId: string) => void; readonly onPromote?: (messageId: string) => void; }
 
@@ -198,11 +196,7 @@ export function ChatApp({ sessionId, apiBase = '', fetcher = fetch }: ChatAppPro
   const { t } = useLocale();
   const [events, setEvents] = useState<readonly TimelineEvent[]>([]); const [text, setText] = useState(''); const [submitting, setSubmitting] = useState(false); const [loading, setLoading] = useState(true); const [sessionStatus, setSessionStatus] = useState<'open' | 'closed'>(); const [archived, setArchived] = useState(false); const [recovery, setRecovery] = useState(false); const [connection, setConnection] = useState<'connecting' | 'live' | 'offline'>('connecting'); const [error, setError] = useState<string>(); const [notice, setNotice] = useState<string>(); const [streamOpen, setStreamOpen] = useState(false);
   const submitGuard = useRef(false); const composition = useRef(false); const terminal = useMemo(() => terminalRun(events.flatMap((event) => event.payload.kind === 'run' ? [{ status: event.payload.status, attempt: event.payload.attempt } as ChatRun] : [])), [events]); const hasTask = useMemo(() => events.some((event) => event.payload.kind === 'task' && event.payload.taskId !== undefined), [events]); const sessionWritable = sessionStatus === 'open' && !archived;
-  const executableProfiles = useMemo(() => {
-    const storage = browserLocalStorage();
-    return storage === undefined ? [] : loadProviderProfiles(storage).profiles.filter((profile) => profileCompletion(profile).executionAvailable);
-  }, []);
-  const [runtimeId, setRuntimeId] = useState<string>(() => browserLocalStorage()?.getItem(CHAT_RUNTIME_STORAGE_KEY) || 'local');
+  const [runtimeId, setRuntimeId] = useState<string>(() => browserLocalStorage()?.getItem(CHAT_RUNTIME_STORAGE_KEY) ?? '');
   const [workspaceConnections, setWorkspaceConnections] = useState<readonly WorkspaceProviderView[]>([]);
   useEffect(() => {
     const controller = new AbortController();
@@ -215,28 +209,21 @@ export function ChatApp({ sessionId, apiBase = '', fetcher = fetch }: ChatAppPro
   }, [fetcher]);
   useEffect(() => {
     const inWorkspace = workspaceConnections.some((connection) => runtimeId === `${WS_RUNTIME_PREFIX}${connection.id}`);
-    if (runtimeId !== 'local' && !inWorkspace && !executableProfiles.some((profile) => profile.id === runtimeId)) setRuntimeId('local');
-  }, [runtimeId, executableProfiles, workspaceConnections]);
+    if (!inWorkspace && runtimeId !== '') setRuntimeId('');
+  }, [runtimeId, workspaceConnections]);
   const selectRuntime = (id: string) => {
     setRuntimeId(id);
     const storage = browserLocalStorage();
     if (storage !== undefined) storage.setItem(CHAT_RUNTIME_STORAGE_KEY, id);
   };
-  /** 提交形态：内联 route（browser-local profile，key 只在当前 tab）或工作区引用（connectionId，key 在服务端）。 */
-  const resolveRoute = (): { readonly provider?: ChatProviderRoute | { readonly connectionId: string }; readonly error?: string } => {
-    if (runtimeId === 'local') return {};
-    if (runtimeId.startsWith(WS_RUNTIME_PREFIX)) {
-      const connectionId = runtimeId.slice(WS_RUNTIME_PREFIX.length);
-      if (connectionId.length === 0) return { error: t('runtimeUnavailable') };
-      return { provider: { connectionId } };
+  /** 提交形态（唯一）：工作区 provider 引用（connectionId，key 在服务端密封）。未选择或选择失效时阻止发送。 */
+  const resolveRoute = (): { readonly provider?: { readonly connectionId: string }; readonly error?: string } => {
+    if (!runtimeId.startsWith(WS_RUNTIME_PREFIX)) return { error: t('chatNeedsProvider') };
+    const connectionId = runtimeId.slice(WS_RUNTIME_PREFIX.length);
+    if (connectionId.length === 0 || !workspaceConnections.some((connection) => connection.id === connectionId)) {
+      return { error: t('chatNeedsProvider') };
     }
-    const profile = executableProfiles.find((candidate) => candidate.id === runtimeId);
-    if (profile === undefined || profile.adapterKind === 'unassigned' || profile.baseUrl === undefined || profile.modelId === undefined) {
-      return { error: t('runtimeUnavailable') };
-    }
-    const apiKey = browserSessionStorage()?.getItem(`${PROVIDER_SECRET_PREFIX}${profile.id}`) ?? '';
-    if (apiKey === '') return { error: t('runtimeKeyMissing') };
-    return { provider: { adapterKind: profile.adapterKind, baseUrl: profile.baseUrl, modelId: profile.modelId, apiKey } };
+    return { provider: { connectionId } };
   };
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const atBottomRef = useRef(true);
@@ -287,7 +274,7 @@ export function ChatApp({ sessionId, apiBase = '', fetcher = fetch }: ChatAppPro
         <a className="chat-back" href={workspaceHref({ view: 'chat' })} aria-label={t('backToConversations')} title={t('backToConversations')}>←</a>
         <div><p className="eyebrow">{t('liveConversation')}</p><h1>{t('chat')}</h1></div>
       </div>
-      <div className="chat-heading-meta"><div className="session-info-bar"><span><span className="overview-label">{t('session')}</span><code>{sessionId}</code></span><span><span className="overview-label">{t('events')}</span><strong>{events.length}</strong></span><span><span className="overview-label">{t('run')}</span><strong>{terminal?.status ?? t('ready')}</strong></span><a className="task-workspace-link" href={workspaceHref({ view: 'tasks', sessionId })}>{t('openTaskWorkspace')} <span aria-hidden="true">→</span></a></div><div className="chat-heading-actions"><span className={`connection-status connection-${connection}`}><span className="status-dot" />{connection === 'live' ? t('liveStreamConnected') : connection === 'connecting' ? t('connecting') : t('streamReconnecting')}</span><label className="runtime-picker"><span className="overview-label">{t('runtime')}</span><select aria-label={t('chatRuntime')} value={runtimeId} onChange={(event) => selectRuntime(event.target.value)}><option value="local">{t('localPiRuntime')}</option>{workspaceConnections.length > 0 && <optgroup label={t('workspaceProviders')}>{workspaceConnections.map((connection) => <option key={`${WS_RUNTIME_PREFIX}${connection.id}`} value={`${WS_RUNTIME_PREFIX}${connection.id}`}>{connection.name}{connection.modelName === undefined ? '' : ` · ${connection.modelName}`}</option>)}</optgroup>}{executableProfiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}{profile.modelName === undefined ? '' : ` · ${profile.modelName}`}</option>)}</select></label>{executableProfiles.length === 0 && <a className="task-workspace-link" href={workspaceHref({ view: 'providers', sessionId })}>+ {t('addProvider')}</a>}{events.length > 0 && !hasTask && <a className="button button-secondary task-card-link" href={workspaceHref({ view: 'tasks', sessionId })} title={t('taskCardBody')}><span aria-hidden="true">▣</span>{t('taskCardTitle')}</a>}<button className="button button-secondary stream-toggle" type="button" aria-expanded={streamOpen} aria-controls="chat-event-stream" onClick={() => setStreamOpen((open) => !open)}>{t('eventStream')}</button></div></div>
+      <div className="chat-heading-meta"><div className="session-info-bar"><span><span className="overview-label">{t('session')}</span><code>{sessionId}</code></span><span><span className="overview-label">{t('events')}</span><strong>{events.length}</strong></span><span><span className="overview-label">{t('run')}</span><strong>{terminal?.status ?? t('ready')}</strong></span><a className="task-workspace-link" href={workspaceHref({ view: 'tasks', sessionId })}>{t('openTaskWorkspace')} <span aria-hidden="true">→</span></a></div><div className="chat-heading-actions"><span className={`connection-status connection-${connection}`}><span className="status-dot" />{connection === 'live' ? t('liveStreamConnected') : connection === 'connecting' ? t('connecting') : t('streamReconnecting')}</span><label className="runtime-picker"><span className="overview-label">{t('runtime')}</span><select aria-label={t('chatRuntime')} value={runtimeId} onChange={(event) => selectRuntime(event.target.value)}><option value="">{t('runtimeUnconfigured')}</option>{workspaceConnections.length > 0 && <optgroup label={t('workspaceProviders')}>{workspaceConnections.map((connection) => <option key={`${WS_RUNTIME_PREFIX}${connection.id}`} value={`${WS_RUNTIME_PREFIX}${connection.id}`}>{connection.name}{connection.modelName === undefined ? '' : ` · ${connection.modelName}`}</option>)}</optgroup>}</select></label>{workspaceConnections.length === 0 && <a className="task-workspace-link" href={workspaceHref({ view: 'providers', sessionId })}>+ {t('addWorkspaceProvider')}</a>}{events.length > 0 && !hasTask && <a className="button button-secondary task-card-link" href={workspaceHref({ view: 'tasks', sessionId })} title={t('taskCardBody')}><span aria-hidden="true">▣</span>{t('taskCardTitle')}</a>}<button className="button button-secondary stream-toggle" type="button" aria-expanded={streamOpen} aria-controls="chat-event-stream" onClick={() => setStreamOpen((open) => !open)}>{t('eventStream')}</button></div></div>
     </header>
     {error && <div className="error-banner" role="alert"><span>!</span><div><strong>{t('somethingNeedsAttention')}</strong><p>{error}</p></div><button className="icon-button" type="button" aria-label={t('dismissError')} onClick={() => setError(undefined)}>×</button></div>}
     {notice && <div className="success-banner" role="status"><span>✓</span><p>{notice}</p><button className="icon-button" type="button" aria-label={t('dismissNotice')} onClick={() => setNotice(undefined)}>×</button></div>}
@@ -295,7 +282,7 @@ export function ChatApp({ sessionId, apiBase = '', fetcher = fetch }: ChatAppPro
       {streamOpen && <EventStreamPanel events={events} sessionId={sessionId} {...(terminal === undefined ? {} : { terminal })} onCopy={() => void copyEvents()} />}
       {loading ? <section className="loading-state"><span className="loading-spinner" /><strong>{t('recoveringConversation')}</strong><p>{t('loadingEvents')}</p></section> : <ChatTimeline events={events} sessionId={sessionId} {...(sessionWritable ? { onRetry: (runId: string) => void retry(runId), onPromote: (messageId: string) => void promote(messageId) } : {})} />}
     </div>
-    {sessionWritable ? <div className="composer-wrap chat-dock"><div className="quick-prompts"><span>{t('tryAsking')}</span><button type="button" onClick={() => quickPrompt('Summarize the current project context')}>{t('summarizeProject')}</button><button type="button" onClick={() => quickPrompt('Turn this idea into a durable Task')}>{t('createTask')}</button><button type="button" onClick={() => quickPrompt('Explore the riskiest open question')}>{t('exploreRisk')}</button></div><form className="composer" onSubmit={(event) => void submit(event)}><span className="composer-mark">✦</span><textarea aria-label={t('message')} value={text} onChange={(event) => setText(event.target.value)} onKeyDown={composerKeyDown} onCompositionStart={() => { composition.current = true; }} onCompositionEnd={() => { composition.current = false; }} disabled={submitting} placeholder={t('askAnything')} rows={2} /><div className="composer-footer"><span>{t('enterToSend')}</span><button className="button button-primary send-button" disabled={submitting || !text.trim()} type="submit">{submitting ? t('sending') : t('send')} <span>↗</span></button></div></form></div> : sessionStatus === 'closed' ? <div className="inline-notice chat-dock"><strong>{t('closedReadOnly')}</strong><p>{t('closedExplanation')}</p></div> : archived ? <div className="inline-notice chat-dock"><strong>{t('archivedReadOnly')}</strong><p>{t('archivedReadOnlyExplanation')}</p></div> : error ? <div className="inline-notice chat-dock"><strong>{t('composerReadOnly')}</strong><p>{t('composerReadOnlyExplanation')}</p></div> : null}
+    {sessionWritable ? <div className="composer-wrap chat-dock">{workspaceConnections.length === 0 && <div className="inline-notice composer-guard" role="status"><strong>{t('chatNeedsProviderTitle')}</strong><p>{t('chatNeedsProvider')}</p><a className="task-workspace-link" href={workspaceHref({ view: 'providers', sessionId })}>+ {t('addWorkspaceProvider')} →</a></div>}<div className="quick-prompts"><span>{t('tryAsking')}</span><button type="button" onClick={() => quickPrompt('Summarize the current project context')}>{t('summarizeProject')}</button><button type="button" onClick={() => quickPrompt('Turn this idea into a durable Task')}>{t('createTask')}</button><button type="button" onClick={() => quickPrompt('Explore the riskiest open question')}>{t('exploreRisk')}</button></div><form className="composer" onSubmit={(event) => void submit(event)}><span className="composer-mark">✦</span><textarea aria-label={t('message')} value={text} onChange={(event) => setText(event.target.value)} onKeyDown={composerKeyDown} onCompositionStart={() => { composition.current = true; }} onCompositionEnd={() => { composition.current = false; }} disabled={submitting} placeholder={t('askAnything')} rows={2} /><div className="composer-footer"><span>{t('enterToSend')}</span><button className="button button-primary send-button" disabled={submitting || !text.trim() || runtimeId === ''} type="submit">{submitting ? t('sending') : t('send')} <span>↗</span></button></div></form></div> : sessionStatus === 'closed' ? <div className="inline-notice chat-dock"><strong>{t('closedReadOnly')}</strong><p>{t('closedExplanation')}</p></div> : archived ? <div className="inline-notice chat-dock"><strong>{t('archivedReadOnly')}</strong><p>{t('archivedReadOnlyExplanation')}</p></div> : error ? <div className="inline-notice chat-dock"><strong>{t('composerReadOnly')}</strong><p>{t('composerReadOnlyExplanation')}</p></div> : null}
   </section>;
 }
 

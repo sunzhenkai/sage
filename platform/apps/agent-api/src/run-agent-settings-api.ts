@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { Type, type Static } from 'typebox';
-import type { ProviderConnectionStore, RunAgentDefaultProvider, RunAgentSettingsStore } from '@sage/task-domain';
+import type { ProviderConnectionStore, RunAgentSettingsStore } from '@sage/task-domain';
 
 export interface RunAgentSettingsPrincipalAuthenticator {
   authenticateRequest?(request: FastifyRequest): { readonly principalId: string; readonly tenantId: string } | undefined;
@@ -8,7 +8,7 @@ export interface RunAgentSettingsPrincipalAuthenticator {
 
 export interface RegisterRunAgentSettingsRoutesOptions {
   readonly tenantId: string;
-  /** 缺省时 GET/PUT 仍可用，defaultProvider 恒为 auto（内存降级，便于测试）。 */
+  /** 缺省时 GET/PUT 仍可用（内存降级，便于测试）。 */
   readonly settingsStore?: RunAgentSettingsStore;
   /** 可用性来源：注册表条目。 */
   readonly providerConnections?: ProviderConnectionStore;
@@ -16,13 +16,8 @@ export interface RegisterRunAgentSettingsRoutesOptions {
   readonly now?: () => Date;
 }
 
-export const RunAgentDefaultProviderSchema = Type.Union([
-  Type.Literal('echo'),
-  Type.Literal('connection')
-]);
 export const UpdateRunAgentSettingsRequestSchema = Type.Object({
-  defaultProvider: RunAgentDefaultProviderSchema,
-  providerConnectionId: Type.Optional(Type.String({ minLength: 1, maxLength: 128 }))
+  providerConnectionId: Type.String({ minLength: 1, maxLength: 128 })
 }, { additionalProperties: false });
 export type UpdateRunAgentSettingsRequest = Static<typeof UpdateRunAgentSettingsRequestSchema>;
 
@@ -34,8 +29,9 @@ export interface RunAgentProviderStatus {
 }
 
 export interface RunAgentSettingsResponse {
-  readonly schemaVersion: 'RunAgentSettings.v1';
-  readonly defaultProvider: RunAgentDefaultProvider;
+  readonly schemaVersion: 'RunAgentSettings.v2';
+  /** true = 无默认 provider（无设置行或 legacy 归一），包运行准入将以 PROVIDER_DEPENDENCY_MISSING 拒绝。 */
+  readonly unset: boolean;
   readonly providerConnectionId?: string;
   readonly updatedAt?: string;
   readonly updatedBy?: string;
@@ -45,7 +41,7 @@ export interface RunAgentSettingsResponse {
 const sendError = (reply: FastifyReply, status: number, code: string, message: string, retryable = false): FastifyReply =>
   reply.code(status).send({ error: { code, message, retryable } });
 
-/** 可用性解析：注册表 enabled 且凭据在场的条目列为 available；不再含基于进程 env 的检测条目。 */
+/** 可用性解析：注册表 enabled 且凭据在场的条目列为 available；不含基于进程 env 的检测条目。 */
 export const providerStatuses = async (
   connections?: ProviderConnectionStore,
   tenantId?: string
@@ -78,10 +74,9 @@ export function registerRunAgentSettingsRoutes(app: FastifyInstance, options: Re
   const settingsView = async (): Promise<RunAgentSettingsResponse> => {
     const record = settingsStore === undefined ? undefined : await settingsStore.getRunAgentSettings(options.tenantId);
     return {
-      schemaVersion: 'RunAgentSettings.v1',
-      defaultProvider: record?.defaultProvider ?? 'echo',
-      ...(record?.providerConnectionId === undefined ? {} : { providerConnectionId: record.providerConnectionId }),
-      ...(record === undefined ? {} : { updatedAt: record.updatedAt, updatedBy: record.updatedBy }),
+      schemaVersion: 'RunAgentSettings.v2',
+      unset: record === undefined,
+      ...(record === undefined ? {} : { providerConnectionId: record.providerConnectionId, updatedAt: record.updatedAt, updatedBy: record.updatedBy }),
       providers: await providerStatuses(options.providerConnections, options.tenantId)
     };
   };
@@ -105,29 +100,20 @@ export function registerRunAgentSettingsRoutes(app: FastifyInstance, options: Re
     const principal = principalFor(request);
     if (!principal) return sendError(reply, 401, 'RUN_AGENT_SETTINGS_AUTHENTICATION_REQUIRED', 'Run agent settings API requires authentication');
     const body = request.body as Partial<UpdateRunAgentSettingsRequest> | undefined;
-    if (body === null || typeof body !== 'object' || typeof body.defaultProvider !== 'string'
-      || !['echo', 'connection'].includes(body.defaultProvider)) {
-      return sendError(reply, 400, 'RUN_AGENT_SETTINGS_INVALID_PROVIDER', 'defaultProvider must be one of echo, connection');
+    if (body === null || typeof body !== 'object' || typeof body.providerConnectionId !== 'string' || body.providerConnectionId.length === 0) {
+      return sendError(reply, 400, 'RUN_AGENT_SETTINGS_INVALID_PROVIDER', 'providerConnectionId is required');
     }
-    if (body.defaultProvider === 'connection') {
-      if (typeof body.providerConnectionId !== 'string' || body.providerConnectionId.length === 0) {
-        return sendError(reply, 400, 'RUN_AGENT_SETTINGS_INVALID_PROVIDER', 'providerConnectionId is required when defaultProvider is connection');
-      }
-      const connection = options.providerConnections === undefined
-        ? undefined
-        : await options.providerConnections.getProviderConnection(options.tenantId, body.providerConnectionId);
-      if (connection === undefined || !connection.enabled) {
-        return sendError(reply, 400, 'RUN_AGENT_SETTINGS_INVALID_PROVIDER', 'providerConnectionId must reference an existing enabled provider connection');
-      }
-    } else if (body.providerConnectionId !== undefined) {
-      return sendError(reply, 400, 'RUN_AGENT_SETTINGS_INVALID_PROVIDER', 'providerConnectionId is only allowed when defaultProvider is connection');
+    const connection = options.providerConnections === undefined
+      ? undefined
+      : await options.providerConnections.getProviderConnection(options.tenantId, body.providerConnectionId);
+    if (connection === undefined || !connection.enabled || !connection.credentialPresent) {
+      return sendError(reply, 400, 'RUN_AGENT_SETTINGS_INVALID_PROVIDER', 'providerConnectionId must reference an existing enabled provider connection with a stored credential');
     }
     if (settingsStore === undefined) return sendError(reply, 503, 'RUN_AGENT_SETTINGS_UNAVAILABLE', 'Run agent settings store is unavailable', true);
     try {
       await settingsStore.upsertRunAgentSettings({
         tenantId: options.tenantId,
-        defaultProvider: body.defaultProvider,
-        ...(body.defaultProvider === 'connection' ? { providerConnectionId: body.providerConnectionId } : {}),
+        providerConnectionId: body.providerConnectionId,
         updatedAt: now().toISOString(),
         updatedBy: `principal://${principal.principalId}`
       });
@@ -138,7 +124,7 @@ export function registerRunAgentSettingsRoutes(app: FastifyInstance, options: Re
   });
 }
 
-const settingsFields = new Set(['defaultProvider', 'providerConnectionId']);
+const settingsFields = new Set(['providerConnectionId']);
 function rejectedSettingsFields(body: unknown): string[] {
   const rejected: string[] = [];
   if (body === null || typeof body !== 'object' || Array.isArray(body)) return ['body'];

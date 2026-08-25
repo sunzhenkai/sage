@@ -70,120 +70,36 @@ const settle = async (probe: () => boolean): Promise<void> => {
   for (let attempt = 0; attempt < 100 && !probe(); attempt += 1) await new Promise((resolve) => setTimeout(resolve, 5));
 };
 
-const route = { adapterKind: 'openai-compatible' as const, baseUrl: 'https://provider.example/v1', modelId: 'model-x', apiKey: 'key-1' };
+const backend = new LocalAesGcmSecretBackend([randomBytes(32)]);
 
-describe('provider-routed Chat execution', () => {
-  it('executes the run through the live client with the structured transcript when a route is supplied', async () => {
-    const { state, store } = fakeChatStore();
-    const echoLog: string[] = [];
-    const liveCalls: { route: LiveProviderRoute; transcript: readonly LiveProviderTurnMessage[] }[] = [];
-    const app = await createChatApi({
-      store, agentClient: fakeClient('已收到：你好', echoLog),
-      liveClientFactory: (input) => {
-        liveCalls.push({ route: input.route, transcript: [...input.transcript] });
-        return fakeClient('来自真实模型的回复');
-      }
-    });
-    const response = await app.inject({ method: 'POST', url: '/v1/chat/sessions/session-1/messages', payload: { parts: [{ kind: 'text', text: '你好' }], provider: route } });
-    expect(response.statusCode).toBe(202);
-    await settle(() => state.completed.length > 0);
-    expect(echoLog).toEqual([]);
-    expect(liveCalls).toHaveLength(1);
-    expect(liveCalls[0]!.route).toEqual(route);
-    expect(liveCalls[0]!.transcript).toEqual([{ role: 'user', text: '你好' }]);
-    expect(state.completed[0]?.part).toMatchObject({ kind: 'text', text: '来自真实模型的回复' });
-    await app.close();
-  });
-
-  it('keeps the default local client when no provider route is supplied', async () => {
-    const { state, store } = fakeChatStore();
-    const echoLog: string[] = [];
-    const app = await createChatApi({
-      store, agentClient: fakeClient('已收到：你好', echoLog),
-      liveClientFactory: () => { throw new Error('live path must not run'); }
-    });
-    const response = await app.inject({ method: 'POST', url: '/v1/chat/sessions/session-1/messages', payload: { parts: [{ kind: 'text', text: '你好' }] } });
-    expect(response.statusCode).toBe(202);
-    await settle(() => echoLog.length > 0);
-    expect(state.completed[0]?.part).toMatchObject({ kind: 'text', text: '已收到：你好' });
-    await app.close();
-  });
-
-  it('rejects invalid provider routes with CHAT_INVALID_REQUEST before any Run starts', async () => {
-    const { store } = fakeChatStore();
-    const app = await createChatApi({ store, agentClient: fakeClient('unused') });
-    const invalid = [
-      { adapterKind: 'unassigned', baseUrl: 'https://provider.example', modelId: 'm', apiKey: 'k' },
-      { adapterKind: 'openai-compatible', baseUrl: 'http://provider.example', modelId: 'm', apiKey: 'k' },
-      { adapterKind: 'openai-compatible', baseUrl: 'https://127.0.0.1/v1', modelId: 'm', apiKey: 'k' },
-      { adapterKind: 'openai-compatible', baseUrl: 'https://provider.example', modelId: '', apiKey: 'k' },
-      { adapterKind: 'openai-compatible', baseUrl: 'https://provider.example', modelId: 'm', apiKey: '' }
-    ];
-    for (const provider of invalid) {
-      const response = await app.inject({ method: 'POST', url: '/v1/chat/sessions/session-1/messages', payload: { parts: [{ kind: 'text', text: 'hi' }], provider } });
-      expect(response.statusCode).toBe(400);
-      expect(response.json().error.code).toBe('CHAT_INVALID_REQUEST');
-    }
-    await app.close();
-  });
-
-  it('forwards the retry request provider route to the retried run', async () => {
-    const { state, store } = fakeChatStore();
-    await store.acceptUserMessage({ sessionId: 'session-1', messageId: 'message-1', runId: 'run-1', parts: [{ kind: 'text', text: '你好' }], now: new Date().toISOString() } as never);
-    const failedRun = state.runs.get('run-1');
-    if (failedRun) state.runs.set('run-1', { ...failedRun, status: 'failed' });
-    const liveRoutes: LiveProviderRoute[] = [];
-    const app = await createChatApi({
-      store, agentClient: fakeClient('unused'),
-      liveClientFactory: ({ route: liveRoute }) => {
-        liveRoutes.push(liveRoute);
-        return fakeClient('retry reply');
-      }
-    });
-    const response = await app.inject({ method: 'POST', url: '/v1/chat/runs/run-1/retry', payload: { provider: { ...route, modelId: 'model-retry' } } });
-    expect(response.statusCode).toBe(202);
-    await settle(() => state.completed.length > 0);
-    expect(liveRoutes).toHaveLength(1);
-    expect(liveRoutes[0]).toMatchObject({ modelId: 'model-retry' });
-    await app.close();
-  });
-
-  it('still rejects unknown provider payloads on session creation', async () => {
-    const { store } = fakeChatStore();
-    const app = await createChatApi({ store, agentClient: fakeClient('unused') });
-    const response = await app.inject({ method: 'POST', url: '/v1/chat/sessions', payload: { provider: route } });
-    expect(response.statusCode).toBe(400);
-    await app.close();
-  });
-});
-
-
-describe('provider-routed Chat execution (workspace connection reference)', () => {
-  const backend = new LocalAesGcmSecretBackend([randomBytes(32)]);
-
-  const registryWith = (entries: readonly Partial<ProviderConnectionRecord>[], credentials: Record<string, ProviderCredentialSealed | undefined> = {}): ProviderConnectionStore => {
-    const records = new Map(entries.map((entry) => [`tenant-local/${entry.id ?? 'conn-1'}`, {
-      tenantId: 'tenant-local', id: 'conn-1', name: 'MiniMax 个人', source: 'user', adapterKind: 'anthropic',
-      baseUrl: 'https://api.minimaxi.com/anthropic', modelId: 'MiniMax-M3', enabled: true, credentialPresent: true,
-      createdAt: '2026-08-25T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z', ...entry
-    } as ProviderConnectionRecord]));
-    return {
-      async listProviderConnections() { return [...records.values()]; },
-      async getProviderConnection(_tenantId: string, id: string) { return records.get(`tenant-local/${id}`); },
-      async createProviderConnection() { throw new Error('unused'); },
-      async updateProviderConnection() { throw new Error('unused'); },
-      async getProviderCredential(_tenantId: string, id: string) { return credentials[id]; },
-      async deleteProviderConnection() { throw new Error('unused'); }
-    };
+const registryWith = (entries: readonly Partial<ProviderConnectionRecord>[], credentials: Record<string, ProviderCredentialSealed | undefined> = {}): ProviderConnectionStore => {
+  const records = new Map(entries.map((entry) => [`tenant-local/${entry.id ?? 'conn-1'}`, {
+    tenantId: 'tenant-local', id: 'conn-1', name: '工作区 provider', source: 'user', adapterKind: 'anthropic',
+    baseUrl: 'https://api.minimaxi.com/anthropic', modelId: 'MiniMax-M3', enabled: true, credentialPresent: true,
+    createdAt: '2026-08-25T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z', ...entry
+  } as ProviderConnectionRecord]));
+  return {
+    async listProviderConnections() { return [...records.values()]; },
+    async getProviderConnection(_tenantId: string, id: string) { return records.get(`tenant-local/${id}`); },
+    async createProviderConnection() { throw new Error('unused'); },
+    async updateProviderConnection() { throw new Error('unused'); },
+    async getProviderCredential(_tenantId: string, id: string) { return credentials[id]; },
+    async deleteProviderConnection() { throw new Error('unused'); }
   };
+};
 
+const sealedFor = (key: string) => {
+  const sealed = backend.seal(key);
+  return { ciphertext: sealed.ciphertext, keyVersion: sealed.keyVersion, updatedAt: '2026-08-25T00:00:00.000Z' };
+};
+
+describe('provider-routed Chat execution (reference-only, required)', () => {
   it('resolves a connectionId reference server-side and executes through the live client without echoing the key', async () => {
     const { store, state } = fakeChatStore();
     const routes: LiveProviderRoute[] = [];
-    const sealed = backend.seal('conn-secret-key');
     const app = await createChatApi({
-      store, agentClient: fakeClient('unused'),
-      providerConnections: registryWith([{ id: 'conn-live', credentialPresent: true }], { 'conn-live': { ciphertext: sealed.ciphertext, keyVersion: sealed.keyVersion, updatedAt: '2026-08-25T00:00:00.000Z' } }),
+      store,
+      providerConnections: registryWith([{ id: 'conn-live', credentialPresent: true }], { 'conn-live': sealedFor('conn-secret-key') }),
       secretBackend: backend,
       liveClientFactory: ({ route }) => { routes.push(route); return fakeClient('live-output'); }
     });
@@ -193,29 +109,59 @@ describe('provider-routed Chat execution (workspace connection reference)', () =
     await settle(() => state.completed.length > 0);
     expect(routes).toHaveLength(1);
     expect(routes[0]).toMatchObject({ adapterKind: 'anthropic', baseUrl: 'https://api.minimaxi.com/anthropic', modelId: 'MiniMax-M3', apiKey: 'conn-secret-key' });
+    expect(state.completed[0]?.part).toMatchObject({ kind: 'text', text: 'live-output' });
     await app.close();
   });
 
-  it('rejects a connectionId reference with a stable error when the entry is unusable', async () => {
+  it('rejects a missing provider route before any Run starts (no local fallback)', async () => {
     const { store, state } = fakeChatStore();
-    const sealed = backend.seal('conn-secret-key');
-    const registry = registryWith(
-      [{ id: 'conn-off', enabled: false }, { id: 'conn-ok' }],
-      { 'conn-ok': { ciphertext: sealed.ciphertext, keyVersion: sealed.keyVersion, updatedAt: '2026-08-25T00:00:00.000Z' } }
-    );
-    const app = await createChatApi({ store, agentClient: fakeClient('unused'), providerConnections: registry, secretBackend: backend });
-    const cases: unknown[] = [
-      { connectionId: 'missing' },
-      { connectionId: 'conn-off' },
-      { connectionId: 'conn-nokey' },
-      { connectionId: 'conn-ok', apiKey: 'must-be-exclusive' },
+    const app = await createChatApi({
+      store,
+      providerConnections: registryWith([{ id: 'conn-live' }], { 'conn-live': sealedFor('k') }),
+      secretBackend: backend,
+      liveClientFactory: () => { throw new Error('must not run'); }
+    });
+    const response = await app.inject({ method: 'POST', url: '/v1/chat/sessions/session-1/messages', payload: { parts: [{ kind: 'text', text: '你好' }] } });
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe('CHAT_INVALID_REQUEST');
+    expect(response.json().error.message).toContain('workspace provider');
+    expect(state.runs.size).toBe(0);
+    expect(state.messages.length).toBe(0);
+    await app.close();
+  });
+
+  it('rejects inline provider routes with a stable error', async () => {
+    const { store, state } = fakeChatStore();
+    const app = await createChatApi({
+      store,
+      providerConnections: registryWith([{ id: 'conn-live' }], { 'conn-live': sealedFor('k') }),
+      secretBackend: backend
+    });
+    const inline = [
+      { adapterKind: 'openai-compatible', baseUrl: 'https://provider.example', modelId: 'm', apiKey: 'k' },
+      { connectionId: 'conn-live', apiKey: 'must-be-exclusive' },
       { connectionId: '' }
     ];
-    for (const provider of cases) {
+    for (const provider of inline) {
       const response = await app.inject({ method: 'POST', url: '/v1/chat/sessions/session-1/messages', payload: { parts: [{ kind: 'text', text: 'hi' }], provider } });
-      expect(response.statusCode).toBeGreaterThanOrEqual(400);
-      const body = response.json();
-      expect(body.error?.code ?? body.code).toBeDefined();
+      expect(response.statusCode).toBe(400);
+      expect(response.json().error.code).toBe('CHAT_INVALID_REQUEST');
+    }
+    expect(state.runs.size).toBe(0);
+    await app.close();
+  });
+
+  it('rejects unusable references with CHAT_PROVIDER_DEPENDENCY_MISSING, distinguishable from malformed routes', async () => {
+    const { store, state } = fakeChatStore();
+    const registry = registryWith(
+      [{ id: 'conn-off', enabled: false }, { id: 'conn-ok' }],
+      { 'conn-ok': sealedFor('conn-secret-key') }
+    );
+    const app = await createChatApi({ store, providerConnections: registry, secretBackend: backend });
+    for (const connectionId of ['missing', 'conn-off', 'conn-nokey']) {
+      const response = await app.inject({ method: 'POST', url: '/v1/chat/sessions/session-1/messages', payload: { parts: [{ kind: 'text', text: 'hi' }], provider: { connectionId } } });
+      expect(response.statusCode).toBe(409);
+      expect(response.json().error.code).toBe('CHAT_PROVIDER_DEPENDENCY_MISSING');
     }
     expect(state.runs.size).toBe(0);
     await app.close();
@@ -223,11 +169,42 @@ describe('provider-routed Chat execution (workspace connection reference)', () =
 
   it('fails closed when the secret backend is unavailable for a reference', async () => {
     const { store } = fakeChatStore();
-    const sealed = backend.seal('conn-secret-key');
-    const registry = registryWith([{ id: 'conn-ok' }], { 'conn-ok': { ciphertext: sealed.ciphertext, keyVersion: sealed.keyVersion, updatedAt: '2026-08-25T00:00:00.000Z' } });
-    const app = await createChatApi({ store, agentClient: fakeClient('unused'), providerConnections: registry });
+    const registry = registryWith([{ id: 'conn-ok' }], { 'conn-ok': sealedFor('conn-secret-key') });
+    const app = await createChatApi({ store, providerConnections: registry });
     const response = await app.inject({ method: 'POST', url: '/v1/chat/sessions/session-1/messages', payload: { parts: [{ kind: 'text', text: 'hi' }], provider: { connectionId: 'conn-ok' } } });
-    expect(response.statusCode).toBeGreaterThanOrEqual(400);
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error.code).toBe('CHAT_PROVIDER_DEPENDENCY_MISSING');
+    await app.close();
+  });
+
+  it('forwards the retry request provider reference to the retried run', async () => {
+    const { store, state } = fakeChatStore();
+    await store.acceptUserMessage({ sessionId: 'session-1', messageId: 'message-1', runId: 'run-1', parts: [{ kind: 'text', text: '你好' }], now: new Date().toISOString() } as never);
+    const failedRun = state.runs.get('run-1');
+    if (failedRun) state.runs.set('run-1', { ...failedRun, status: 'failed' });
+    const liveRoutes: LiveProviderRoute[] = [];
+    const app = await createChatApi({
+      store,
+      providerConnections: registryWith([{ id: 'conn-live' }], { 'conn-live': sealedFor('retry-key') }),
+      secretBackend: backend,
+      liveClientFactory: ({ route }) => {
+        liveRoutes.push(route);
+        return fakeClient('retry reply');
+      }
+    });
+    const response = await app.inject({ method: 'POST', url: '/v1/chat/runs/run-1/retry', payload: { provider: { connectionId: 'conn-live' } } });
+    expect(response.statusCode).toBe(202);
+    await settle(() => state.completed.length > 0);
+    expect(liveRoutes).toHaveLength(1);
+    expect(liveRoutes[0]).toMatchObject({ apiKey: 'retry-key' });
+    await app.close();
+  });
+
+  it('still rejects unknown provider payloads on session creation', async () => {
+    const { store } = fakeChatStore();
+    const app = await createChatApi({ store });
+    const response = await app.inject({ method: 'POST', url: '/v1/chat/sessions', payload: { provider: { connectionId: 'conn-live' } } });
+    expect(response.statusCode).toBe(400);
     await app.close();
   });
 });

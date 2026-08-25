@@ -108,9 +108,11 @@ curl -sS http://127.0.0.1:9610/v1/packages/ops-analyst -H 'x-authentication-id: 
 
 ## 真实 provider 执行（local 专属）
 
-默认情况下包运行为离线模式（`defaultProvider=echo`，本地确定性 harness，输出「已收到：…」）。真实模型执行只经受信 provider 注册表：在 Providers 页添加「工作区 provider」（凭据服务端密封，只写不读），并把运行 Agent 设置的默认 provider 切到该条目；worker 在执行边界解密凭据，进程 env 不再持有任何 provider key。
+包运行与 Chat 统一经受信 provider 注册表执行，不存在离线/回声模式：未配置 provider 时，Chat 阻止发送并引导配置，包运行准入直接 `409 PROVIDER_DEPENDENCY_MISSING`。在 Providers 页添加「工作区 provider」（凭据服务端密封，只写不读），并在「运行 Agent」设置中选择该条目；worker 在执行边界解密凭据，进程 env 不持有任何 provider key。
 
 前置：`SAGE_SECRET_MASTER_KEY`（base64 编码 32 字节）必须同时注入 agent-api 与 agent-worker，否则凭据写入与解析 fail-closed。
+
+测试/CI 可启用受信开关 `SAGE_FAKE_LIVE_PROVIDER=true`（agent-api 与 agent-worker 同时注入）：模型调用被进程内确定性替身替换（设置→注册表解析→harness 路由全链路保真），无需真实外部模型服务；`/readyz` 会暴露非敏感的 `providerExecution.mode=fake` 标识。
 
 自动化部署可改用 env 引导（agent-api 启动时幂等注册 `deployment-env` 条目）：
 

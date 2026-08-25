@@ -25,7 +25,7 @@ describe('LocalAesGcmSecretBackend', () => {
     const backend = new LocalAesGcmSecretBackend([Buffer.from(key(), 'base64')]);
     const sealed = backend.seal('secret');
     const tampered = Buffer.from(sealed.ciphertext);
-    tampered[tampered.length - 1] ^= 0xff;
+    tampered[tampered.length - 1] = tampered[tampered.length - 1]! ^ 0xff;
     expect(() => backend.open({ ciphertext: tampered, keyVersion: sealed.keyVersion })).toThrow(SecretBackendUnavailableError);
   });
 

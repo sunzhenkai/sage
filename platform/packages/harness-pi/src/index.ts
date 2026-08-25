@@ -1,10 +1,8 @@
-import { Agent } from '@mariozechner/pi-agent-core';
-import { complete as piComplete, fauxAssistantMessage, registerFauxProvider, type AssistantMessage, type Context, type Message as PiMessage, type Model, type UserMessage } from '@mariozechner/pi-ai';
+import { complete as piComplete, type AssistantMessage, type Context, type Message as PiMessage, type Model, type UserMessage } from '@mariozechner/pi-ai';
 import {
   sha256Digest,
   type CheckpointCandidate,
   type HarnessCapabilities,
-  type HarnessCapability,
   type HarnessPort,
   type HarnessTurnRequest,
   type HarnessTurnResult
@@ -15,91 +13,6 @@ import {
   type EngineAdapterRunInput,
   type KernelCallbackPayload,
 } from '@sage/agent-lib';
-
-export const READ_PROJECT_METADATA_SKILL = 'skill://read-project-metadata/v1';
-
-export interface PiHarnessOptions {
-  /** Required marker: this façade enters the isolated pre-canonical runner only. */
-  readonly legacyMode: 'explicit-old-runner';
-  readonly supportedCapabilities?: readonly HarnessCapability[];
-}
-
-const readProjectMetadata = (): Readonly<Record<string, string>> => ({
-  name: 'sage-mvp',
-  runtime: 'node-24',
-  access: 'read-only'
-});
-
-const latestUserInput = (input: string): string => {
-  const line = [...input.split(/\r?\n/u)].reverse().find((candidate) => /^user:\s*/u.test(candidate));
-  return (line === undefined ? input : line.replace(/^user:\s*/u, '')).trim().slice(0, 2_000);
-};
-
-const assistantText = (agent: Agent): string => {
-  const message = agent.state.messages.at(-1);
-  if (message?.role !== 'assistant') throw new Error('Pi did not produce an assistant message');
-  if (message.stopReason === 'error') throw new Error(message.errorMessage ?? 'Pi provider failed');
-  if (message.stopReason === 'aborted') throw new Error('Pi execution aborted');
-  return message.content
-    .filter((part) => part.type === 'text')
-    .map((part) => part.text)
-    .join('');
-};
-
-export class LegacyPiHarness implements HarnessPort {
-  readonly compatibilityPath = 'explicit-old-runner' as const;
-  readonly capabilities: HarnessCapabilities;
-
-  constructor(options: PiHarnessOptions) {
-    this.capabilities = {
-      harness: 'pi',
-      version: '0.73.1',
-      supported: [...(options.supportedCapabilities ?? ['events', 'cancellation', 'checkpoint', 'skills', 'tools'])]
-    };
-  }
-
-  async executeTurn(request: HarnessTurnRequest, signal: AbortSignal): Promise<HarnessTurnResult> {
-    if (request.input.includes('[fail]')) throw new Error('Scripted Pi Harness failure');
-    const unsupportedSkill = request.skillRefs.find((skill) => skill !== READ_PROJECT_METADATA_SKILL);
-    if (unsupportedSkill) throw new Error(`Skill is not allowlisted: ${unsupportedSkill}`);
-
-    const metadata = request.skillRefs.includes(READ_PROJECT_METADATA_SKILL) ? readProjectMetadata() : undefined;
-    const slow = request.input.includes('[slow]');
-    const continuation = request.input.includes('[continue]');
-    const pause = request.input.includes('[pause]');
-    const requestedTokens = Number(request.input.match(/\[tokens:(\d+)\]/)?.[1] ?? 8);
-    const input = latestUserInput(request.input);
-    // Human-readable acknowledgement for the default local runtime; the scripted
-    // skill flow below still emits its JSON envelope for the conformance contract.
-    const output = metadata === undefined
-      ? `已收到：${input}`
-      : JSON.stringify({ answer: `已收到：${input}`, metadata });
-    const provider = registerFauxProvider(slow ? { tokensPerSecond: 20 } : {});
-    provider.setResponses([fauxAssistantMessage(slow ? `${output}${'.'.repeat(200)}` : output)]);
-    const agent = new Agent({
-      initialState: {
-        model: provider.getModel(),
-        systemPrompt: metadata === undefined ? 'No skills loaded.' : `Loaded ${READ_PROJECT_METADATA_SKILL} as read-only.`
-      }
-    });
-    const abort = (): void => agent.abort();
-    signal.addEventListener('abort', abort, { once: true });
-    try {
-      await agent.prompt(request.input);
-      const text = assistantText(agent);
-      return {
-        output: continuation && request.turn === 1 ? '[continue] next' : text,
-        done: !(continuation && request.turn === 1) && !pause,
-        toolCalls: metadata === undefined ? 0 : 1,
-        tokens: requestedTokens,
-        ...(pause ? { pause: true } : {})
-      };
-    } finally {
-      signal.removeEventListener('abort', abort);
-      provider.unregister();
-    }
-  }
-}
 
 
 /** Ephemeral model route for one Chat Run; never persisted anywhere by this harness. */
@@ -118,6 +31,10 @@ export interface LiveProviderTurnMessage {
 export interface LiveProviderCompletion {
   readonly text: string;
   readonly tokens: number;
+  /** 默认 true；测试替身可用 false 驱动多轮/续跑语义。 */
+  readonly done?: boolean;
+  /** 可选暂停标记（配合 done:false），由 Runner 归一为 paused 终态。 */
+  readonly pause?: boolean;
 }
 
 /** Injectable completion boundary so the pi-ai mapping stays unit-testable. */
@@ -192,7 +109,7 @@ export class LiveProviderHarness implements HarnessPort {
       maxTokens: Math.max(1, Math.min(this.#maxOutputTokens, request.remaining.tokens)),
       signal
     });
-    return { output: completion.text, done: true, toolCalls: 0, tokens: completion.tokens };
+    return { output: completion.text, done: completion.done ?? true, toolCalls: 0, tokens: completion.tokens, ...(completion.pause === true ? { pause: true } : {}) };
   }
 }
 
@@ -219,6 +136,43 @@ export const defaultLiveInvoker: LiveProviderInvoker = async ({ route, systemPro
     .join('');
   if (text.trim().length === 0) throw new Error('Live provider returned an empty response');
   return { text, tokens: message.usage.totalTokens };
+};
+
+export interface FakeLiveInvokerOptions {
+  /** [slow] 标记的模拟速率（token/秒）；缺省 5_000（近乎瞬时）。 */
+  readonly tokensPerSecond?: number;
+}
+
+/**
+ * 确定性进程内测试替身：只替换最终的模型 HTTP 调用，路由（settings → 注册表解析 →
+ * LiveProviderHarness）全链路保真。识别输入中的脚本标记：
+ * - `[fail]`：抛出稳定错误（模拟 provider 故障）；
+ * - `[slow]`：按 tokensPerSecond 模拟推理时延；
+ * - `[tokens:N]`：返回 N 作为 token 用量；
+ * - `[continue]`：首个 turn 返回 `done:false` 驱动续跑（per-invoker 实例状态）。
+ */
+export const createFakeLiveInvoker = (options: FakeLiveInvokerOptions = {}): LiveProviderInvoker => {
+  const tokensPerSecond = options.tokensPerSecond ?? 5_000;
+  let turn = 0;
+  return async ({ messages, maxTokens, signal }) => {
+    turn += 1;
+    const lastUser = [...messages].reverse().find((message) => message.role === 'user');
+    const input = (lastUser?.text ?? '').trim().slice(0, 2_000);
+    if (input.includes('[fail]')) throw new Error('Scripted fake live provider failure');
+    const continuation = input.includes('[continue]');
+    const requestedTokens = Number(input.match(/\[tokens:(\d+)\]/u)?.[1] ?? 8);
+    const output = continuation && turn === 1 ? '[continue] next' : `已收到：${input}`;
+    const tokens = Math.max(1, Math.min(requestedTokens, maxTokens));
+    if (input.includes('[pause]')) return { text: output, tokens, done: false, pause: true };
+    if (input.includes('[slow]')) {
+      const delayMs = (tokens / tokensPerSecond) * 1_000;
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(resolve, delayMs);
+        signal.addEventListener('abort', () => { clearTimeout(timer); reject(new Error('Live provider call aborted')); }, { once: true });
+      });
+    }
+    return { text: output, tokens, ...(continuation && turn === 1 ? { done: false } : {}) };
+  };
 };
 
 export interface PiEngineResult {
@@ -332,17 +286,6 @@ export class PiHarness implements EngineAdapter<PiEngineResult> {
 
 /** Backwards-compatible canonical class name retained for existing imports. */
 export class PiEngineAdapter extends PiHarness {}
-
-
-/**
- * Compatibility factory for callers not yet migrated to AgentTaskSpec + EngineAdapter.
- * This can only enter the isolated old AgentRunner and never the canonical path.
- */
-export function createExplicitLegacyPiHarness(
-  options: Omit<PiHarnessOptions, 'legacyMode'> = {}
-): HarnessPort {
-  return new LegacyPiHarness({ ...options, legacyMode: 'explicit-old-runner' });
-}
 
 /** Public factory consumed by framework-neutral conformance runners. */
 export const piEngineAdapterFactory = {

@@ -28,7 +28,7 @@ TBD - defines local API, Worker, and Web runtime entrypoints and their shutdown 
 
 ### Requirement: Local Web runtime entrypoint
 
-本地 Web SHALL 提供 Vite `dev` 和 `preview` 启动脚本，使用可配置的 `/v1` API proxy，并在没有 `session` 参数时展示 Chat landing 与 session history且不得调用 `POST /v1/chat/sessions`。只有用户显式执行 New Chat 时 Web SHALL 创建 session；该修改 SHALL NOT 改变生产部署、API/Worker composition、Temporal、Local PiHarness 或其他 runtime 边界。
+本地 Web SHALL 提供 Vite `dev` 和 `preview` 启动脚本，使用可配置的 `/v1` API proxy，并在没有 `session` 参数时展示 Chat landing 与 session history且不得调用 `POST /v1/chat/sessions`。只有用户显式执行 New Chat 时 Web SHALL 创建 session；该修改 SHALL NOT 改变生产部署、API/Worker composition、Temporal、provider 路由或其他 runtime 边界。
 
 #### Scenario: Web serves the built application
 - **WHEN** Web 执行 preview 并绑定 `0.0.0.0:4173`

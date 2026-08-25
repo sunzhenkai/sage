@@ -1,0 +1,18 @@
+# local-stack-smoke-verification Delta
+
+## MODIFIED Requirements
+
+### Requirement: Repeatable local stack smoke test
+仓库 SHALL 提供一个可从 `platform/` 调用的整栈 smoke test，启动并清理本地 Compose 服务，验证六项服务健康和 Chat→Task→Worker→Web 纵向链路。smoke 环境 SHALL 以受信测试开关启用进程内 fake live provider（在模型调用接缝注入确定性补全，设置→注册表解析→harness 路由链路保真），并在验证开始前 seed 一条凭据在场的工作区 provider 条目与运行 agent 设置，使 Chat 与包运行无需真实外部模型服务即可端到端成功；fake 开关在未显式配置时 SHALL 不生效。
+
+#### Scenario: Smoke test validates the complete local stack
+- **WHEN** 执行 `corepack pnpm smoke:local`
+- **THEN** 脚本校验 Compose 配置，执行 `up -d --build --wait`，验证 API `/livez`/`/readyz`、Worker `/readyz`、Web `/`，seed 工作区 provider 与运行 agent 设置后创建 Chat session/message 得到模型回复，promotion 后等待 Task succeeded，并验证 Web API proxy
+
+#### Scenario: Fake live provider 只在测试开关下生效
+- **WHEN** smoke 环境未启用受信 fake 开关（如常规本地部署）
+- **THEN** 模型调用走真实 provider 路由，不出现任何确定性回声或本地兜底输出
+
+#### Scenario: Smoke test cleans up safely
+- **WHEN** smoke test 成功或失败
+- **THEN** finally 执行 `docker compose down --remove-orphans`，不删除 PostgreSQL/Artifact named volumes，失败输出服务状态和有限日志且不输出凭据

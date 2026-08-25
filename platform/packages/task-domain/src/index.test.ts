@@ -2,8 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ProviderConnectionRecord, RunAgentSettingsRecord } from './index.js';
 import { Value } from 'typebox/value';
 import {
-  AgentTaskWorkflowInputSchema, CreateTaskRequestSchema, TASK_NAMESPACE, TASK_QUEUE, TASK_TARGET, TASK_TYPE, WorkflowTargetSnapshotSchema,
-  normalizeRunAgentDefaultProvider
+  AgentTaskWorkflowInputSchema, CreateTaskRequestSchema, TASK_NAMESPACE, TASK_QUEUE, TASK_TARGET, TASK_TYPE, WorkflowTargetSnapshotSchema
 } from './index.js';
 
 describe('task-domain v1 contracts', () => {
@@ -41,16 +40,11 @@ describe('task-domain v1 contracts', () => {
     expect(Value.Check(WorkflowTargetSnapshotSchema, { ...snapshot, credentialValue: 'must-not-exist' })).toBe(false);
   });
 
-  it('keeps run agent settings on echo/connection and normalizes legacy providers at read', () => {
-    const offline: RunAgentSettingsRecord = { tenantId: 't1', defaultProvider: 'echo', updatedAt: '2026-08-25T00:00:00.000Z', updatedBy: 'p' };
-    const connected: RunAgentSettingsRecord = { ...offline, defaultProvider: 'connection', providerConnectionId: 'conn-1' };
-    expect(offline.defaultProvider).toBe('echo');
-    expect(connected.providerConnectionId).toBe('conn-1');
-    // legacy 存储值（auto/minimax）与未知值一律归一为 echo；仅 connection 保留。
-    expect(normalizeRunAgentDefaultProvider('auto')).toBe('echo');
-    expect(normalizeRunAgentDefaultProvider('minimax')).toBe('echo');
-    expect(normalizeRunAgentDefaultProvider('connection')).toBe('connection');
-    expect(normalizeRunAgentDefaultProvider('something-else')).toBe('echo');
+  it('keeps run agent settings as a required providerConnectionId record', () => {
+    const settings: RunAgentSettingsRecord = { tenantId: 't1', providerConnectionId: 'conn-1', updatedAt: '2026-08-25T00:00:00.000Z', updatedBy: 'p' };
+    expect(settings.providerConnectionId).toBe('conn-1');
+    // 无 defaultProvider 概念：设置要么指向注册表条目，要么整行缺席（unset 由存储层归一）。
+    expect('defaultProvider' in settings).toBe(false);
     // 注册表条目记录不含任何凭据字段：credentialPresent 是派生布尔。
     const entry: ProviderConnectionRecord = {
       tenantId: 't1', id: 'conn-1', name: 'MiniMax', source: 'user', adapterKind: 'anthropic',

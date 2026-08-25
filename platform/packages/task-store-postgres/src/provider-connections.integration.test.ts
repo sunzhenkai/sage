@@ -82,22 +82,21 @@ integration.sequential('PostgreSQL provider connections', () => {
       .rejects.toThrow(/createProviderConnection\.invalid/u);
   });
 
-  it('persists connection-mode run agent settings', async () => {
+  it('persists run agent settings pointing at a registry entry', async () => {
     const tenantId = `tenant-conn-settings-${randomUUID()}`;
     const connectionId = `conn-${randomUUID()}`;
     await store.createProviderConnection(tenantId, connectionId, writeFor(), '2026-08-25T00:00:00.000Z');
     await store.upsertRunAgentSettings({
-      tenantId, defaultProvider: 'connection', providerConnectionId: connectionId,
+      tenantId, providerConnectionId: connectionId,
       updatedAt: '2026-08-25T00:00:00.000Z', updatedBy: 'principal://tester'
     });
-    expect(await store.getRunAgentSettings(tenantId)).toMatchObject({ defaultProvider: 'connection', providerConnectionId: connectionId });
+    expect(await store.getRunAgentSettings(tenantId)).toMatchObject({ providerConnectionId: connectionId });
     await store.upsertRunAgentSettings({
-      tenantId, defaultProvider: 'echo', updatedAt: '2026-08-25T01:00:00.000Z', updatedBy: 'principal://tester'
+      tenantId, providerConnectionId: `conn-${randomUUID()}`, updatedAt: '2026-08-25T01:00:00.000Z', updatedBy: 'principal://tester'
     });
-    expect((await store.getRunAgentSettings(tenantId))?.defaultProvider).toBe('echo');
-    expect((await store.getRunAgentSettings(tenantId))?.providerConnectionId).toBeUndefined();
+    expect((await store.getRunAgentSettings(tenantId))?.providerConnectionId).not.toBe(connectionId);
     await expect(store.upsertRunAgentSettings({
-      tenantId, defaultProvider: 'connection', updatedAt: '2026-08-25T02:00:00.000Z', updatedBy: 'principal://tester'
+      tenantId, updatedAt: '2026-08-25T02:00:00.000Z', updatedBy: 'principal://tester'
     } as never)).rejects.toThrow(/upsertRunAgentSettings\.invalid/u);
   });
 });

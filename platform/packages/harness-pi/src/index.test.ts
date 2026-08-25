@@ -2,30 +2,40 @@ import { describe, expect, it, vi } from 'vitest';
 import type { AgentExecutionEnvelope, AgentTaskSpec, CheckpointCandidate } from '@sage/agent-contracts';
 import type { EngineAdapterConformanceFactory, EngineConformanceErrorCode } from '@sage/agent-runtime-conformance';
 import type { KernelEngineCallbacks } from '@sage/agent-lib';
-import { createExplicitLegacyPiHarness, LegacyPiHarness, LiveProviderHarness, PiEngineAdapter, PiHarness, READ_PROJECT_METADATA_SKILL } from './index.js';
+import { createFakeLiveInvoker, LiveProviderHarness, PiEngineAdapter, PiHarness } from './index.js';
 
-describe('PiHarness local deterministic response', () => {
-  it('acknowledges the latest user input with human-readable text, not a JSON envelope', async () => {
-    const result = await new LegacyPiHarness({ legacyMode: 'explicit-old-runner' }).executeTurn({
-      runId: 'run-test', input: 'user: 你好', turn: 1, skillRefs: [], remaining: { toolCalls: 16, tokens: 32_000 }
-    }, new AbortController().signal);
+describe('fake live provider invoker（确定性测试替身）', () => {
+  const route = { adapterKind: 'openai-compatible' as const, baseUrl: 'https://provider.example/v1', modelId: 'model-x', apiKey: 'key-1' };
+  const turn = (input: string) => ({
+    runId: 'run-test', input, turn: 1, skillRefs: [], remaining: { toolCalls: 16, tokens: 32_000 }
+  });
+
+  it('acknowledges the latest user input with human-readable text', async () => {
+    const harness = new LiveProviderHarness({ route, transcript: [], turnInput: true, invoker: createFakeLiveInvoker() });
+    const result = await harness.executeTurn(turn('你好'), new AbortController().signal);
     expect(result.done).toBe(true);
     expect(result.output).toBe('已收到：你好');
   });
 
-  it('keeps the scripted skill metadata envelope for the conformance contract', async () => {
-    const result = await new LegacyPiHarness({ legacyMode: 'explicit-old-runner' }).executeTurn({
-      runId: 'run-skill', input: 'user: 你好', turn: 1, skillRefs: [READ_PROJECT_METADATA_SKILL], remaining: { toolCalls: 16, tokens: 32_000 }
-    }, new AbortController().signal);
-    expect(JSON.parse(result.output)).toEqual({ answer: '已收到：你好', metadata: { name: 'sage-mvp', runtime: 'node-24', access: 'read-only' } });
+  it('maps scripted failure markers to stable errors', async () => {
+    const harness = new LiveProviderHarness({ route, transcript: [], turnInput: true, invoker: createFakeLiveInvoker() });
+    await expect(harness.executeTurn(turn('[fail]'), new AbortController().signal)).rejects.toThrow('Scripted fake live provider failure');
   });
 
   it('keeps continuation control input deterministic', async () => {
-    const result = await new LegacyPiHarness({ legacyMode: 'explicit-old-runner' }).executeTurn({
-      runId: 'run-continuation', input: 'user: [continue]', turn: 1, skillRefs: [], remaining: { toolCalls: 16, tokens: 32_000 }
-    }, new AbortController().signal);
+    const harness = new LiveProviderHarness({ route, transcript: [], turnInput: true, invoker: createFakeLiveInvoker() });
+    const result = await harness.executeTurn(turn('[continue]'), new AbortController().signal);
     expect(result.output).toBe('[continue] next');
     expect(result.done).toBe(false);
+  });
+
+  it('emits a paused completion for [pause] and caps tokens to the requested budget', async () => {
+    const harness = new LiveProviderHarness({ route, transcript: [], turnInput: true, invoker: createFakeLiveInvoker() });
+    const paused = await harness.executeTurn(turn('[pause]'), new AbortController().signal);
+    expect(paused.done).toBe(false);
+    expect(paused.pause).toBe(true);
+    const budgeted = await harness.executeTurn(turn('[tokens:100]'), new AbortController().signal);
+    expect(budgeted.tokens).toBe(100);
   });
 });
 
@@ -90,12 +100,11 @@ describe('LiveProviderHarness', () => {
 });
 
 describe('PiHarness canonical adapter identity', () => {
-  it('is callback-only and does not expose the legacy HarnessPort implementation', () => {
+  it('is callback-only and does not expose any HarnessPort implementation', () => {
     const adapter = new PiHarness();
     expect(adapter.engineId).toBe('pi');
     expect(adapter.engineCodec).toBe('pi@0.73.1');
     expect(adapter.requiredCallbacks).toContain('model');
-    expect(adapter).not.toBeInstanceOf(LegacyPiHarness);
     expect('executeTurn' in adapter).toBe(false);
   });
 });
@@ -161,16 +170,6 @@ describe('PiEngineAdapter canonical boundary', () => {
     await expect(adapter.run({ envelope: canonicalEnvelope, spec: { ...canonicalSpec, skillRefs: ['skill://undeclared-runtime'] }, callbacks }))
       .rejects.toThrow('PI_SKILL_CALLBACK_UNAVAILABLE');
     expect(modelCalls).toEqual([]);
-  });
-});
-
-
-describe('legacy HarnessPort compatibility façade', () => {
-  it('has no implicit constructor path and the factory is observably old-runner only', () => {
-    const facade = createExplicitLegacyPiHarness();
-    expect(facade).toBeInstanceOf(LegacyPiHarness);
-    expect(facade).toMatchObject({ compatibilityPath: 'explicit-old-runner' });
-    expect(facade).not.toBeInstanceOf(PiEngineAdapter);
   });
 });
 

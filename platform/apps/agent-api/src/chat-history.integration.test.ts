@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { LocalAgentClient } from '@sage/agent-client';
 import { ChatStore } from '@sage/chat-domain';
 import { createChatApi } from './index.js';
 
@@ -25,7 +24,7 @@ integration('Chat history API PostgreSQL integration', () => {
   it('creates NULL title through API then lists atomically derived title/preview', async () => {
     const suffix = randomUUID();
     const tenantId = `tenant-api-history-${suffix}`;
-    const app = await createChatApi({ store, tenantId, agentClient: {} as LocalAgentClient });
+    const app = await createChatApi({ store, tenantId });
     const created = await app.inject({ method: 'POST', url: '/v1/chat/sessions', payload: {} });
     expect(created.statusCode).toBe(201);
     const sessionId = created.json().sessionId as string;

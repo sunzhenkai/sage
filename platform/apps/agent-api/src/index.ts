@@ -19,7 +19,6 @@ import { AgentObservability } from '@sage/observability';
 import { ChatStoreError, outputAsReferenceOnly, type ChatStore } from '@sage/chat-domain';
 import type { ProviderConnectionStore } from '@sage/task-domain';
 import type { SecretBackend } from '@sage/secret-vault';
-import { isPublicHttpsUrl } from './provider-connection.js';
 import { registerChatPromotionRoute, type RegisterPromotionOptions } from './promotion.js';
 import { runChatAgentPath, type ChatCanonicalCompatibilityOptions } from './chat-compatibility.js';
 
@@ -46,7 +45,6 @@ export interface SequencingEvidence { readonly step: SequencingStep; readonly me
 
 export interface CreateChatApiOptions {
   readonly store: ChatStore;
-  readonly agentClient: LocalAgentClient;
   /** Test seam: replaces the default live provider client construction for provider-routed runs. */
   readonly liveClientFactory?: (input: { readonly route: LiveProviderRoute; readonly transcript: readonly LiveProviderTurnMessage[] }) => Pick<LocalAgentClient, 'run'>;
   readonly canonicalCompatibility?: ChatCanonicalCompatibilityOptions;
@@ -65,60 +63,39 @@ const errorOf = (code: ChatError['code'], message: string, retryable: boolean): 
 const textOf = (parts: readonly MessagePart[]): string => parts.map((part) => part.kind === 'text' ? part.text : `[Artifact ${part.artifact.artifactRef}]`).join('\n');
 
 /**
- * Chat-only, request-scoped model route. It is validated against the same public
- * HTTPS endpoint policy as the provider connection check and never persisted:
- * the object lives in memory for exactly one Run.
- */
-const parseProviderRoute = (value: unknown): ChatProviderRoute | undefined => {
-  if (value === undefined) return undefined;
-  const route = value as ChatProviderRoute;
-  const invalid = (detail: string): ChatStoreError => new ChatStoreError('CHAT_INVALID_REQUEST', `provider route rejected: ${detail}`, false);
-  if (route === null || typeof route !== 'object' || (route.adapterKind !== 'openai-compatible' && route.adapterKind !== 'anthropic')) throw invalid('adapterKind must be openai-compatible or anthropic');
-  if (typeof route.baseUrl !== 'string' || !isPublicHttpsUrl(route.baseUrl)) throw invalid('baseUrl must be a public HTTPS endpoint');
-  if (typeof route.modelId !== 'string' || route.modelId.trim().length === 0 || route.modelId.length > 300) throw invalid('modelId must be a non-empty model id');
-  if (typeof route.apiKey !== 'string' || route.apiKey.length === 0 || route.apiKey.length > 4_096) throw invalid('apiKey must be a non-empty secret');
-  return { adapterKind: route.adapterKind, baseUrl: route.baseUrl, modelId: route.modelId, apiKey: route.apiKey };
-};
-
-/**
- * Provider 参数双形态判别（提交边界一次性解析，随 Run 携带）：
- * - 内联形态 { adapterKind, baseUrl, modelId, apiKey }：沿用既有公共 HTTPS 校验；
- * - 引用形态 { connectionId }：从受信 provider 注册表解析（enabled + 凭据在场 → 服务端解密），
- *   明文 key 只进入本次 Run 的内存路由，不落任何持久化；解析失败以稳定错误拒绝，不回退本地运行时。
+ * Provider route（必需，仅引用形态）：`{ connectionId }` 从受信 provider 注册表解析
+ * （enabled + 凭据在场 → 服务端解密）。明文 key 只进入本次 Run 的内存路由，不落任何持久化。
+ * - route 缺失 / 非引用形态：CHAT_INVALID_REQUEST（含修复指引）；
+ * - 引用解析失败（条目缺失、停用、无凭据、后端不可用）：CHAT_PROVIDER_DEPENDENCY_MISSING。
  */
 const resolveProviderSelection = async (
   value: unknown,
   providerConnections: ProviderConnectionStore | undefined,
   secretBackend: SecretBackend | undefined,
   tenantId: string
-): Promise<ChatProviderRoute | undefined> => {
-  if (value === undefined) return undefined;
-  if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
-    const record = value as Record<string, unknown>;
-    if (typeof record.connectionId === 'string') {
-      const invalid = (detail: string): ChatStoreError => new ChatStoreError('CHAT_INVALID_REQUEST', `provider route rejected: ${detail}`, false);
-      if (Object.keys(record).some((key) => key !== 'connectionId')) throw invalid('connectionId cannot be combined with inline route fields');
-      const connectionId = record.connectionId;
-      if (connectionId.length === 0 || connectionId.length > 128) throw invalid('connectionId must be 1-128 characters');
-      const unavailable = (): ChatStoreError => new ChatStoreError('CHAT_INVALID_REQUEST', `provider connection ${connectionId} is missing, disabled, or has no stored credential`, false);
-      if (providerConnections === undefined || secretBackend === undefined) throw unavailable();
-      const connection = await providerConnections.getProviderConnection(tenantId, connectionId);
-      if (connection === undefined || !connection.enabled) throw unavailable();
-      const sealed = await providerConnections.getProviderCredential(tenantId, connectionId);
-      if (sealed === undefined) throw unavailable();
-      let apiKey: string;
-      try { apiKey = secretBackend.open({ ciphertext: sealed.ciphertext, keyVersion: sealed.keyVersion }); }
-      catch { throw unavailable(); }
-      return { adapterKind: connection.adapterKind, baseUrl: connection.baseUrl, modelId: connection.modelId, apiKey };
-    }
-  }
-  return parseProviderRoute(value);
+): Promise<ChatProviderRoute> => {
+  const invalid = (detail: string): ChatStoreError => new ChatStoreError('CHAT_INVALID_REQUEST', `provider route rejected: ${detail}`, false);
+  if (value === undefined) throw invalid('a workspace provider reference ({ connectionId }) is required; add a workspace provider and select it before sending');
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) throw invalid('provider route must be an object with connectionId');
+  const record = value as Record<string, unknown>;
+  if (typeof record.connectionId !== 'string') throw invalid('inline provider routes are no longer accepted; use a workspace provider reference ({ connectionId })');
+  if (Object.keys(record).some((key) => key !== 'connectionId')) throw invalid('connectionId cannot be combined with other route fields');
+  const connectionId = record.connectionId;
+  if (connectionId.length === 0 || connectionId.length > 128) throw invalid('connectionId must be 1-128 characters');
+  const unavailable = (): ChatStoreError => new ChatStoreError('CHAT_PROVIDER_DEPENDENCY_MISSING', `provider connection ${connectionId} is missing, disabled, or has no stored credential`, false);
+  if (providerConnections === undefined || secretBackend === undefined) throw unavailable();
+  const connection = await providerConnections.getProviderConnection(tenantId, connectionId);
+  if (connection === undefined || !connection.enabled) throw unavailable();
+  const sealed = await providerConnections.getProviderCredential(tenantId, connectionId);
+  if (sealed === undefined) throw unavailable();
+  let apiKey: string;
+  try { apiKey = secretBackend.open({ ciphertext: sealed.ciphertext, keyVersion: sealed.keyVersion }); }
+  catch { throw unavailable(); }
+  return { adapterKind: connection.adapterKind, baseUrl: connection.baseUrl, modelId: connection.modelId, apiKey };
 };
 
-const routeClient = (route: LiveProviderRoute | undefined, transcript: readonly LiveProviderTurnMessage[], fallback: LocalAgentClient, liveClientFactory: CreateChatApiOptions['liveClientFactory']): Pick<LocalAgentClient, 'run'> =>
-  route === undefined ? fallback : (liveClientFactory !== undefined
-    ? liveClientFactory({ route, transcript })
-    : createLiveProviderAgentClient({ route, transcript }));
+const liveClient = (route: LiveProviderRoute, transcript: readonly LiveProviderTurnMessage[], liveClientFactory: CreateChatApiOptions['liveClientFactory']): Pick<LocalAgentClient, 'run'> =>
+  liveClientFactory !== undefined ? liveClientFactory({ route, transcript }) : createLiveProviderAgentClient({ route, transcript });
 
 export async function createChatApi(options: CreateChatApiOptions): Promise<FastifyInstance> {
   const app = Fastify({ logger: false, ajv: { customOptions: { removeAdditional: false } } });
@@ -143,7 +120,7 @@ export async function createChatApi(options: CreateChatApiOptions): Promise<Fast
     recordMetric('chat.completion_ms', Math.max(0, restartTime.getTime() - Date.parse(run.startedAt)), { ...metricContext, first_token_recorded: false });
   }
 
-  const invokeRun = async (runId: string, route?: LiveProviderRoute): Promise<void> => {
+  const invokeRun = async (runId: string, route: LiveProviderRoute): Promise<void> => {
     const run = await options.store.getRun(tenantId, runId);
     if (!run || run.status !== 'active') return;
     const started = now().getTime();
@@ -169,7 +146,7 @@ export async function createChatApi(options: CreateChatApiOptions): Promise<Fast
       execution = await runChatAgentPath({
         tenantId, sessionId: run.sessionId, runId: run.runId, attempt: run.attempt,
         userMessageId: userMessage.messageId, legacySpec: spec,
-        legacyClient: routeClient(route, transcript, options.agentClient, options.liveClientFactory),
+        legacyClient: liveClient(route, transcript, options.liveClientFactory),
         signal: invocationController.signal,
         deadlineAt: started + 60_000,
         ...(options.canonicalCompatibility === undefined ? {} : { canonical: options.canonicalCompatibility }),
@@ -353,7 +330,7 @@ export async function createChatApi(options: CreateChatApiOptions): Promise<Fast
       ? errorOf(cause.code, cause.message, cause.retryable)
       : errorOf('CHAT_INVALID_REQUEST', cause instanceof Error ? cause.message : 'Invalid Chat request', false);
     const status = error.code === 'CHAT_SESSION_NOT_FOUND' || error.code === 'CHAT_RUN_NOT_FOUND' ? 404
-      : error.code === 'CHAT_RUN_NOT_RETRYABLE' ? 409 : error.code === 'CHAT_STORE_UNAVAILABLE' ? 503 : 400;
+      : error.code === 'CHAT_RUN_NOT_RETRYABLE' || error.code === 'CHAT_PROVIDER_DEPENDENCY_MISSING' ? 409 : error.code === 'CHAT_STORE_UNAVAILABLE' ? 503 : 400;
     void reply.code(status).send({ error });
   });
 

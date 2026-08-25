@@ -4,7 +4,7 @@ import type { ChatStore } from '@sage/chat-domain';
 import {
   ChatTaskInputResolver, CompositeTaskInputResolver, PackageTaskInputResolver, workerPollersReady
 } from './runtime.js';
-import { decidePackageRunClientChoice, resolveConnectionLiveClient } from './activities.js';
+import { resolveConnectionLiveClient } from './activities.js';
 import type { LiveProviderRoute } from '@sage/local-runtime';
 import type { PostgresTaskStore } from '@sage/task-store-postgres';
 
@@ -65,24 +65,24 @@ describe('ChatTaskInputResolver', () => {
     expect(createLocalSecretBackendFromEnv({})?.describe().mode ?? 'unavailable').toBe('unavailable');
   });
 
-  it('resolves the execution harness from run agent settings: echo offline, connection fail-closed', () => {
-    // echo（含缺省与 legacy 归一）：本地确定性 harness，与 live 可用性无关。
-    expect(decidePackageRunClientChoice(true, 'echo', true)).toBe('echo');
-    expect(decidePackageRunClientChoice(true, 'echo', false)).toBe('echo');
-    // 非 package 输入（chat 路径）不受设置影响。
-    expect(decidePackageRunClientChoice(false, 'connection', false)).toBe('echo');
-    // connection：fail-closed——解析出 live client 才走 live，否则 unavailable，绝不回退 echo。
-    expect(decidePackageRunClientChoice(true, 'connection', true)).toBe('live');
-    expect(decidePackageRunClientChoice(true, 'connection', false)).toBe('unavailable');
+  it('fails closed for unset settings: no local fallback path exists', async () => {
+    const { LocalAesGcmSecretBackend } = await import('@sage/secret-vault');
+    const { randomBytes } = await import('node:crypto');
+    const backend = new LocalAesGcmSecretBackend([randomBytes(32)]);
+    const registry = new FakeConnectionRegistry([], {});
+    const factory = (): never => undefined as never;
+    // 设置 unset（无 providerConnectionId）即稳定失败，不回退任何本地确定性 harness。
+    await expect(resolveConnectionLiveClient(registry, backend, factory, 'tenant-a', undefined, 'package')).rejects.toThrow('PROVIDER_DEPENDENCY_MISSING');
+    await expect(resolveConnectionLiveClient(registry, backend, factory, 'tenant-a', undefined, 'chat')).rejects.toThrow('PROVIDER_DEPENDENCY_MISSING');
   });
 
-  it('resolves connection-mode live clients at the execution boundary and fails closed', async () => {
+  it('resolves live clients at the execution boundary for package and chat slices and fails closed', async () => {
     const { LocalAesGcmSecretBackend } = await import('@sage/secret-vault');
     const { randomBytes } = await import('node:crypto');
     const backend = new LocalAesGcmSecretBackend([randomBytes(32)]);
     const sealed = backend.seal('connection-api-key');
-    const routes: LiveProviderRoute[] = [];
-    const factory = (route: LiveProviderRoute): never => { routes.push(route); return undefined as never; };
+    const routes: { route: LiveProviderRoute; mode: 'package' | 'chat' }[] = [];
+    const factory = (route: LiveProviderRoute, mode: 'package' | 'chat'): never => { routes.push({ route, mode }); return undefined as never; };
     const store = new FakeConnectionRegistry([
       {
         tenantId: 'tenant-a', id: 'conn-ok', name: 'ok', source: 'user', adapterKind: 'anthropic',
@@ -95,16 +95,18 @@ describe('ChatTaskInputResolver', () => {
         createdAt: '2026-08-25T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z'
       }
     ], { 'conn-ok': { ciphertext: sealed.ciphertext, keyVersion: sealed.keyVersion, updatedAt: '2026-08-25T00:00:00.000Z' } });
-    // 成功路径：路由来自条目 + 解密 key，且 key 不出现在 store/registry 面。
-    await resolveConnectionLiveClient(store, backend, factory, 'tenant-a', 'conn-ok');
-    expect(routes[0]).toMatchObject({ adapterKind: 'anthropic', baseUrl: 'https://api.minimaxi.com/anthropic', modelId: 'MiniMax-M3', apiKey: 'connection-api-key' });
+    // 成功路径：路由来自条目 + 解密 key，且 key 不出现在 store/registry 面；package 与 chat slice 同构解析。
+    await resolveConnectionLiveClient(store, backend, factory, 'tenant-a', 'conn-ok', 'package');
+    await resolveConnectionLiveClient(store, backend, factory, 'tenant-a', 'conn-ok', 'chat');
+    expect(routes[0]?.route).toMatchObject({ adapterKind: 'anthropic', baseUrl: 'https://api.minimaxi.com/anthropic', modelId: 'MiniMax-M3', apiKey: 'connection-api-key' });
+    expect(routes.map((call) => call.mode)).toEqual(['package', 'chat']);
     // fail-closed：条目缺失、停用、无凭据、后端缺失。
     for (const id of ['missing', 'conn-off', 'conn-nokey']) {
       if (id === 'conn-nokey') store.entries.set('tenant-a/conn-nokey', { ...store.entries.get('tenant-a/conn-ok')!, id: 'conn-nokey' });
-      await expect(resolveConnectionLiveClient(store, backend, factory, 'tenant-a', id)).rejects.toThrow(/PROVIDER_DEPENDENCY_MISSING.*conn-(?:ok|off|nokey)|PROVIDER_DEPENDENCY_MISSING.*missing/u);
+      await expect(resolveConnectionLiveClient(store, backend, factory, 'tenant-a', id, 'package')).rejects.toThrow(/PROVIDER_DEPENDENCY_MISSING.*conn-(?:ok|off|nokey)|PROVIDER_DEPENDENCY_MISSING.*missing/u);
     }
-    await expect(resolveConnectionLiveClient(store, undefined, factory, 'tenant-a', 'conn-ok')).rejects.toThrow('PROVIDER_DEPENDENCY_MISSING');
-    expect(routes).toHaveLength(1);
+    await expect(resolveConnectionLiveClient(store, undefined, factory, 'tenant-a', 'conn-ok', 'package')).rejects.toThrow('PROVIDER_DEPENDENCY_MISSING');
+    expect(routes).toHaveLength(2);
   });
 
   it('selects the canonical lifecycle owner before task execution wiring when kernel is allowlisted', async () => {

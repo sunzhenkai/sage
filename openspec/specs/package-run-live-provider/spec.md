@@ -2,20 +2,20 @@
 
 ## Purpose
 
-本地部署模式（`SAGE_DEPLOYMENT_MODE=local`）下 ai app 包运行的真实模型 provider 执行契约：注册表驱动的 provider 路由、单轮执行语义、run 输出的持久化与取回，以及未配置时的离线模式行为。production 部署不在本能力范围内（fail closed 由既有包运行 admission 约束）。
+本地部署模式（`SAGE_DEPLOYMENT_MODE=local`）下 ai app 包运行的真实模型 provider 执行契约：注册表驱动的 provider 路由、单轮执行语义、run 输出的持久化与取回，以及未配置（unset）时准入与执行的 fail-closed 拒绝行为。production 部署不在本能力范围内（fail closed 由既有包运行 admission 约束）。
 
 ## Requirements
 
 ### Requirement: 注册表驱动的包运行 provider 路由
-agent-worker 的 live provider 执行路由 SHALL 仅由运行 agent 设置分派：设置为 `connection` 时 SHALL 在执行边界从受信 provider 注册表解析条目并解密凭据（reference-only，fail-closed，见 `trusted-provider-registry` 能力）；设置为 `echo`（含缺省与 legacy 归一）时 SHALL 使用本地确定性 harness。worker SHALL NOT 从进程 env 读取 provider key、baseUrl 或 model 来决定执行路由。API key（任何来源）SHALL NOT 出现在日志、事件、task spec、projection 或任何 API 响应中。worker SHALL 在 `/readyz` 以非敏感方式暴露 SecretBackend 状态；SHALL NOT 再暴露基于 env 的 live/echo provider 模式标识（该标识随 env 路由一并移除，实际路由按设置在执行边界逐 slice 解析）。
+agent-worker 的 live provider 执行路由 SHALL 仅由运行 agent 设置分派：设置有效时 SHALL 在执行边界从受信 provider 注册表解析条目并解密凭据（reference-only，fail-closed，见 `trusted-provider-registry` 能力）；设置 unset 或条目不可用时 SHALL 以稳定错误 `PROVIDER_DEPENDENCY_MISSING` 失败。系统 SHALL NOT 提供任何本地确定性/回声执行路径。worker SHALL NOT 从进程 env 读取 provider key、baseUrl 或 model 来决定执行路由。API key（任何来源）SHALL NOT 出现在日志、事件、task spec、projection 或任何 API 响应中。worker SHALL 在 `/readyz` 以非敏感方式暴露 SecretBackend 状态，实际路由按设置在执行边界逐 slice 解析。
 
 #### Scenario: connection 模式经注册表执行
-- **WHEN** 运行 agent 设置为 `connection` 且指向凭据在场的启用条目
+- **WHEN** 运行 agent 设置指向凭据在场的启用条目
 - **THEN** 包运行以该条目的 adapter/baseUrl/model 执行真实模型调用，凭据只在执行边界解密且不出现在任何持久化或响应中
 
 #### Scenario: echo 模式与 env 无关
-- **WHEN** 运行 agent 设置为 `echo`（或缺省），worker 进程 env 存在任意 provider key
-- **THEN** 包运行执行本地确定性 harness（echo），不发起模型调用，启动日志不含 env key 相关 WARN
+- **WHEN** 存量设置为 legacy 值 `echo`（读取时归一为 unset），worker 进程 env 存在任意 provider key
+- **THEN** 包运行以 `PROVIDER_DEPENDENCY_MISSING` 失败，不发起模型调用、不执行任何本地兜底
 
 #### Scenario: key 不泄露
 - **WHEN** live provider 执行完成或失败

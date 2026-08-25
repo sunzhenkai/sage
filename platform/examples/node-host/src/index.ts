@@ -10,7 +10,7 @@ import type {
   CheckpointCandidate,
   SealedCheckpointRef
 } from '@sage/agent-contracts';
-import { createExplicitLegacyPiHarness, PiEngineAdapter, READ_PROJECT_METADATA_SKILL } from '@sage/harness-pi';
+import { LiveProviderHarness, PiEngineAdapter, createFakeLiveInvoker } from '@sage/harness-pi';
 import { InMemoryAgentTaskSpecStore, InMemoryCheckpointStore } from '@sage/local-fakes';
 
 const digest = (character: string): string => `sha256:${character.repeat(64)}`;
@@ -135,20 +135,14 @@ export const runCanonicalNodeHostExample = async (): Promise<CanonicalNodeHostEx
   };
 };
 
-export interface LegacyNodeHostExampleResult {
-  readonly executionPath: 'explicit-old-runner';
-  readonly outcome: AgentRunOutcome;
-  readonly events: readonly AgentEvent[];
-}
-
-/** Explicit compatibility example; it never masquerades as the canonical Engine path. */
-export const runLegacyNodeHostExample = async (): Promise<LegacyNodeHostExampleResult> => {
-  const legacySpec: AgentRunSpec = {
+/** Live-provider example：进程内 fake invoker 模拟最终模型调用（无本地确定性 harness 路径）。 */
+export const runLiveNodeHostExample = async (): Promise<{ readonly executionPath: 'live-provider'; readonly outcome: AgentRunOutcome; readonly events: readonly AgentEvent[] }> => {
+  const spec: AgentRunSpec = {
     schemaVersion: '1',
     runId: randomUUID(),
     input: 'Read project metadata',
-    skillRefs: [READ_PROJECT_METADATA_SKILL],
-    requiredCapabilities: ['events', 'cancellation', 'checkpoint', 'skills', 'tools'],
+    skillRefs: [],
+    requiredCapabilities: ['events', 'cancellation'],
     limits: {
       maxTurns: 2,
       maxToolCalls: 1,
@@ -156,18 +150,22 @@ export const runLegacyNodeHostExample = async (): Promise<LegacyNodeHostExampleR
       deadlineAt: new Date(Date.now() + 10_000).toISOString()
     }
   };
-  const execution = new LocalAgentClient({ harness: createExplicitLegacyPiHarness() }).run(legacySpec);
+  const route = { adapterKind: 'openai-compatible', baseUrl: 'https://provider.example/v1', modelId: 'model-x', apiKey: 'example-key' } as const;
+  const client = new LocalAgentClient({
+    harness: new LiveProviderHarness({ route, transcript: [{ role: 'user', text: 'Read project metadata' }], invoker: createFakeLiveInvoker() })
+  });
+  const execution = client.run(spec);
   const events: AgentEvent[] = [];
   const collect = (async () => { for await (const event of execution.events) events.push(event); })();
   const outcome = await execution.result;
   await collect;
-  return { executionPath: 'explicit-old-runner', outcome, events };
+  return { executionPath: 'live-provider', outcome, events };
 };
 
 const isMain = process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (isMain) {
   const canonical = await runCanonicalNodeHostExample();
-  const legacy = await runLegacyNodeHostExample();
+  const live = await runLiveNodeHostExample();
   console.log(JSON.stringify({
     canonical: {
       executionPath: canonical.executionPath,
@@ -176,6 +174,6 @@ if (isMain) {
       candidateDigest: canonical.checkpointCandidate.candidateDigest,
       sealedCheckpointRef: canonical.sealedCheckpoint.checkpointRef
     },
-    legacy
+    live
   }, null, 2));
 }

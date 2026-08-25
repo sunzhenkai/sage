@@ -9,10 +9,8 @@ class FakeSettingsStore implements RunAgentSettingsStore {
     return this.records.get(tenantId);
   }
   async upsertRunAgentSettings(record: RunAgentSettingsRecord): Promise<{ readonly status: 'stored' | 'existing' }> {
-    const key = `${record.tenantId}\u0000${record.defaultProvider}`;
     const status = this.records.has(record.tenantId) ? 'existing' : 'stored';
     this.records.set(record.tenantId, record);
-    void key;
     return { status };
   }
 }
@@ -53,12 +51,13 @@ async function api(options: { readonly authenticated?: boolean; readonly store?:
 }
 
 describe('Run agent settings API', () => {
-  it('GET returns echo defaults with registry-only provider availability', async () => {
+  it('GET returns unset defaults with registry-only provider availability', async () => {
     const { app } = await api();
     const response = await app.inject({ method: 'GET', url: '/v1/run-agent/settings' });
     expect(response.statusCode).toBe(200);
     const body = response.json();
-    expect(body).toMatchObject({ schemaVersion: 'RunAgentSettings.v1', defaultProvider: 'echo' });
+    expect(body).toMatchObject({ schemaVersion: 'RunAgentSettings.v2', unset: true });
+    expect(body.providerConnectionId).toBeUndefined();
     expect(body.providers).toEqual([]);
     expect(JSON.stringify(body)).not.toContain('sk-');
     await app.close();
@@ -78,39 +77,43 @@ describe('Run agent settings API', () => {
     }
   });
 
-  it('PUT persists the default provider and reflects it on GET', async () => {
-    const { app, store } = await api();
-    const put = await app.inject({ method: 'PUT', url: '/v1/run-agent/settings', payload: { defaultProvider: 'echo' } });
+  it('PUT persists the provider connection and reflects it on GET', async () => {
+    const connections = new FakeConnectionStore();
+    connections.entries.set('tenant-local/conn-1', connectionRecord());
+    const { app, store } = await api({ connections });
+    const put = await app.inject({ method: 'PUT', url: '/v1/run-agent/settings', payload: { providerConnectionId: 'conn-1' } });
     expect(put.statusCode).toBe(200);
-    expect(put.json().defaultProvider).toBe('echo');
+    expect(put.json()).toMatchObject({ unset: false, providerConnectionId: 'conn-1' });
     expect(put.json().updatedAt).toBe('2026-08-25T00:00:00.000Z');
     const stored = await store.getRunAgentSettings('tenant-local');
-    expect(stored).toMatchObject({ defaultProvider: 'echo', updatedBy: 'principal://op' });
+    expect(stored).toMatchObject({ providerConnectionId: 'conn-1', updatedBy: 'principal://op' });
     const get = await app.inject({ method: 'GET', url: '/v1/run-agent/settings' });
-    expect(get.json().defaultProvider).toBe('echo');
+    expect(get.json()).toMatchObject({ unset: false, providerConnectionId: 'conn-1' });
     await app.close();
   });
 
   it('rejects unauthenticated requests, unknown fields and invalid values', async () => {
     const unauth = await api({ authenticated: false });
     expect((await unauth.app.inject({ method: 'GET', url: '/v1/run-agent/settings' })).statusCode).toBe(401);
-    expect((await unauth.app.inject({ method: 'PUT', url: '/v1/run-agent/settings', payload: { defaultProvider: 'echo' } })).statusCode).toBe(401);
+    expect((await unauth.app.inject({ method: 'PUT', url: '/v1/run-agent/settings', payload: { providerConnectionId: 'conn-1' } })).statusCode).toBe(401);
     await unauth.app.close();
-    const { app, store } = await api();
-    const untrusted = await app.inject({ method: 'PUT', url: '/v1/run-agent/settings', payload: { defaultProvider: 'echo', apiKey: 'leak' } });
+    const connections = new FakeConnectionStore();
+    connections.entries.set('tenant-local/conn-1', connectionRecord());
+    const { app, store } = await api({ connections });
+    const untrusted = await app.inject({ method: 'PUT', url: '/v1/run-agent/settings', payload: { providerConnectionId: 'conn-1', defaultProvider: 'echo' } });
     expect(untrusted.statusCode).toBe(400);
     expect(untrusted.json().error.code).toBe('RUN_AGENT_SETTINGS_UNTRUSTED_FIELD');
-    const invalid = await app.inject({ method: 'PUT', url: '/v1/run-agent/settings', payload: { defaultProvider: 'openai' } });
-    expect(invalid.statusCode).toBe(400);
-    expect(invalid.json().error.code).toBe('RUN_AGENT_SETTINGS_INVALID_PROVIDER');
-    for (const legacy of ['auto', 'minimax']) {
-      const rejected = await app.inject({ method: 'PUT', url: '/v1/run-agent/settings', payload: { defaultProvider: legacy } });
+    const missingId = await app.inject({ method: 'PUT', url: '/v1/run-agent/settings', payload: {} });
+    expect(missingId.statusCode).toBe(400);
+    expect(missingId.json().error.code).toBe('RUN_AGENT_SETTINGS_INVALID_PROVIDER');
+    for (const legacy of [{ defaultProvider: 'echo' }, { defaultProvider: 'minimax' }]) {
+      const rejected = await app.inject({ method: 'PUT', url: '/v1/run-agent/settings', payload: legacy });
       expect(rejected.statusCode).toBe(400);
-      expect(rejected.json().error.code).toBe('RUN_AGENT_SETTINGS_INVALID_PROVIDER');
     }
     expect(await store.getRunAgentSettings('tenant-local')).toBeUndefined();
     await app.close();
   });
+
   it('GET derives availability from the registry only', async () => {
     const connections = new FakeConnectionStore();
     connections.entries.set('tenant-local/conn-1', connectionRecord());
@@ -127,25 +130,22 @@ describe('Run agent settings API', () => {
     await app.close();
   });
 
-  it('PUT accepts connection mode only with a usable connection id', async () => {
+  it('PUT accepts only a usable (enabled, credentialed) connection id', async () => {
     const connections = new FakeConnectionStore();
     connections.entries.set('tenant-local/conn-1', connectionRecord());
     connections.entries.set('tenant-local/conn-disabled', connectionRecord({ id: 'conn-disabled', enabled: false }));
+    connections.entries.set('tenant-local/conn-nokey', connectionRecord({ id: 'conn-nokey', credentialPresent: false }));
     const { app, store } = await api({ connections });
-    const ok = await app.inject({ method: 'PUT', url: '/v1/run-agent/settings', payload: { defaultProvider: 'connection', providerConnectionId: 'conn-1' } });
+    const ok = await app.inject({ method: 'PUT', url: '/v1/run-agent/settings', payload: { providerConnectionId: 'conn-1' } });
     expect(ok.statusCode).toBe(200);
-    expect(ok.json()).toMatchObject({ defaultProvider: 'connection', providerConnectionId: 'conn-1' });
-    expect(await store.getRunAgentSettings('tenant-local')).toMatchObject({ defaultProvider: 'connection', providerConnectionId: 'conn-1' });
+    expect(await store.getRunAgentSettings('tenant-local')).toMatchObject({ providerConnectionId: 'conn-1' });
 
-    const missing = await app.inject({ method: 'PUT', url: '/v1/run-agent/settings', payload: { defaultProvider: 'connection', providerConnectionId: 'nope' } });
-    expect(missing.statusCode).toBe(400);
-    const disabled = await app.inject({ method: 'PUT', url: '/v1/run-agent/settings', payload: { defaultProvider: 'connection', providerConnectionId: 'conn-disabled' } });
-    expect(disabled.statusCode).toBe(400);
-    const withoutId = await app.inject({ method: 'PUT', url: '/v1/run-agent/settings', payload: { defaultProvider: 'connection' } });
-    expect(withoutId.statusCode).toBe(400);
-    const idWithoutMode = await app.inject({ method: 'PUT', url: '/v1/run-agent/settings', payload: { defaultProvider: 'echo', providerConnectionId: 'conn-1' } });
-    expect(idWithoutMode.statusCode).toBe(400);
-    expect(await store.getRunAgentSettings('tenant-local')).toMatchObject({ defaultProvider: 'connection' });
+    for (const id of ['nope', 'conn-disabled', 'conn-nokey']) {
+      const rejected = await app.inject({ method: 'PUT', url: '/v1/run-agent/settings', payload: { providerConnectionId: id } });
+      expect(rejected.statusCode).toBe(400);
+      expect(rejected.json().error.code).toBe('RUN_AGENT_SETTINGS_INVALID_PROVIDER');
+    }
+    expect(await store.getRunAgentSettings('tenant-local')).toMatchObject({ providerConnectionId: 'conn-1' });
     await app.close();
   });
 });

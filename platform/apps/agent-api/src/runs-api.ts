@@ -132,16 +132,17 @@ export function registerPackageRunsRoutes(app: FastifyInstance, options: Registe
       }
       const principal = await principalFor(request, options);
       if (!principal) return sendError(reply, 401, 'PACKAGE_RUN_AUTHENTICATION_REQUIRED', 'Package run API requires authentication');
-      // 运行前依赖检查：connection 指向的条目不可用时显式拒绝，不创建任务、不物化输入；echo（含缺省与 legacy 归一）照常准入。
-      if (options.settingsStore !== undefined) {
-        const settings = await options.settingsStore.getRunAgentSettings(options.tenantId);
-        if (settings?.defaultProvider === 'connection') {
-          const connectionId = settings.providerConnectionId ?? '';
-          const connection = options.providerConnections === undefined ? undefined : await options.providerConnections.getProviderConnection(options.tenantId, connectionId);
-          if (connection === undefined || !connection.enabled || !connection.credentialPresent) {
-            return sendError(reply, 409, 'PROVIDER_DEPENDENCY_MISSING',
-              `Run agent default provider is pinned to provider connection ${connectionId} which is missing, disabled, or has no stored credential. Fix or re-select the connection in run agent settings.`, false);
-          }
+      // 运行前依赖检查：设置 unset（无行或 legacy 归一）或指向的条目不可用时显式拒绝，不创建任务、不物化输入。
+      // 不存在任何无 provider 的照常准入路径。
+      {
+        const settings = options.settingsStore === undefined ? undefined : await options.settingsStore.getRunAgentSettings(options.tenantId);
+        const connectionId = settings?.providerConnectionId ?? '';
+        const connection = settings === undefined || options.providerConnections === undefined
+          ? undefined
+          : await options.providerConnections.getProviderConnection(options.tenantId, connectionId);
+        if (connection === undefined || !connection.enabled || !connection.credentialPresent) {
+          return sendError(reply, 409, 'PROVIDER_DEPENDENCY_MISSING',
+            `Package runs require a workspace provider. Run agent settings ${connectionId === '' ? 'have no default provider connection' : `are pinned to provider connection ${connectionId} which is missing, disabled, or has no stored credential`}. Add a workspace provider and select it in run agent settings.`, false);
         }
       }
       try {
