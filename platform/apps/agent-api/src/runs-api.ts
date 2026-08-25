@@ -14,7 +14,7 @@ import {
 import type { AgentTaskSpecStorePort } from '@sage/platform-ports';
 import type { ReleasePayload } from '@sage/agent-release-registry';
 import type { AuthenticatedPrincipal } from '@sage/app-contracts';
-import type { TaskPackageInputStore, TaskPackageInputRecord } from '@sage/task-domain';
+import type { ProviderConnectionStore, RunAgentSettingsStore, TaskPackageInputStore, TaskPackageInputRecord } from '@sage/task-domain';
 import type { TaskControllerPort } from './task-api.js';
 
 export interface RunsPrincipalAuthenticator {
@@ -41,6 +41,9 @@ export interface RegisterPackageRunsRoutesOptions {
   readonly specStore: AgentTaskSpecStorePort;
   readonly authenticator: RunsPrincipalAuthenticator;
   readonly deploymentMode?: 'local' | 'pilot' | 'production';
+  readonly settingsStore?: Pick<RunAgentSettingsStore, 'getRunAgentSettings'>;
+  /** 注册表访问：connection 模式的准入依赖检查（条目存在、启用且凭据在场）。 */
+  readonly providerConnections?: Pick<ProviderConnectionStore, 'getProviderConnection'>;
   readonly idempotencyStore?: AdmissionIdempotencyStoreV1;
   readonly auditOutbox?: AdmissionAuditOutboxPortV1;
   readonly now?: () => Date;
@@ -129,6 +132,18 @@ export function registerPackageRunsRoutes(app: FastifyInstance, options: Registe
       }
       const principal = await principalFor(request, options);
       if (!principal) return sendError(reply, 401, 'PACKAGE_RUN_AUTHENTICATION_REQUIRED', 'Package run API requires authentication');
+      // 运行前依赖检查：connection 指向的条目不可用时显式拒绝，不创建任务、不物化输入；echo（含缺省与 legacy 归一）照常准入。
+      if (options.settingsStore !== undefined) {
+        const settings = await options.settingsStore.getRunAgentSettings(options.tenantId);
+        if (settings?.defaultProvider === 'connection') {
+          const connectionId = settings.providerConnectionId ?? '';
+          const connection = options.providerConnections === undefined ? undefined : await options.providerConnections.getProviderConnection(options.tenantId, connectionId);
+          if (connection === undefined || !connection.enabled || !connection.credentialPresent) {
+            return sendError(reply, 409, 'PROVIDER_DEPENDENCY_MISSING',
+              `Run agent default provider is pinned to provider connection ${connectionId} which is missing, disabled, or has no stored credential. Fix or re-select the connection in run agent settings.`, false);
+          }
+        }
+      }
       try {
         const resolved = await options.releaseResolver.resolveRelease(options.tenantId, request.params.releaseId);
         if (resolved === undefined) return sendError(reply, 404, 'RELEASE_NOT_FOUND', 'Release not found');
@@ -188,7 +203,8 @@ export function registerPackageRunsRoutes(app: FastifyInstance, options: Registe
 
         // 幂等命中时不重复创建/启动 workflow；既有运行已由首次请求启动。
         if (admitted.status === 'admitted') {
-          await options.controller.create({ taskId, inputRef }, principal);
+          const slice = packageRunSliceLimits(manifest.budgets);
+          await options.controller.create({ taskId, inputRef, ...(slice === undefined ? {} : { slice }) }, principal);
         }
 
         return reply.code(admitted.status === 'admitted' ? 202 : 200).send({
@@ -229,4 +245,16 @@ function rejectedRunFields(body: unknown): string[] {
     if (!runFields.has(key)) rejected.push(key);
   }
   return rejected;
+}
+
+/** 包运行 slice 预算来自 manifest budgets；缺省回退 controller 默认，超时上限对齐活动 startToClose（5 分钟）。 */
+const PACKAGE_SLICE_TIMEOUT_CAP_MS = 300_000;
+function packageRunSliceLimits(budgets?: PackageRunManifestSummary['budgets']) {
+  if (budgets === undefined) return undefined;
+  return {
+    maxTurns: 1,
+    maxToolCalls: Math.min(budgets.maxToolCalls ?? 4, 16),
+    maxTokens: Math.min(budgets.maxTokens ?? 8_000, 32_000),
+    timeoutMs: Math.min(budgets.maxDurationMs ?? 10_000, PACKAGE_SLICE_TIMEOUT_CAP_MS)
+  };
 }

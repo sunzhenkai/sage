@@ -102,6 +102,50 @@ describe('chat runtime quick selector', () => {
     expect(markup).toContain('The selected provider has no API key in this tab');
     await act(async () => { tree.unmount(); });
   });
+
+  it('sends a workspace connection reference without any key in the request body', async () => {
+    const localStorage = new FakeStorage();
+    const bodies: { url: string; body?: unknown }[] = [];
+    const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes('/messages')) bodies.push({ url, body: init?.body === undefined ? undefined : JSON.parse(String(init.body)) });
+      if (url.endsWith('/provider-connections')) return response({
+        schemaVersion: 'ProviderConnections.v1',
+        connections: [{ id: 'conn-ws', name: 'MiniMax 工作区', source: 'user', adapterKind: 'anthropic', baseUrl: 'https://api.minimaxi.com/anthropic', modelId: 'MiniMax-M3', enabled: true, credentialPresent: true }]
+      });
+      if (url.includes('/events?')) return response({ events: [] });
+      if (url.endsWith('/v1/chat/sessions/session-rt')) return response({ session: { status: 'open' } });
+      return response({}, 202);
+    }) as unknown as typeof fetch;
+    const tree = await mount(localStorage, new FakeStorage(), fetcher);
+    await act(async () => { tree.root.findByProps({ 'aria-label': 'Chat runtime' }).props.onChange({ target: { value: 'ws:conn-ws' } }); });
+    await act(async () => { tree.root.findByProps({ 'aria-label': 'Message' }).props.onChange({ target: { value: '你好' } }); });
+    await act(async () => { tree.root.findByType('form').props.onSubmit({ preventDefault: () => undefined }); await flush(); });
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0]!.body).toEqual({ parts: [{ kind: 'text', text: '你好' }], provider: { connectionId: 'conn-ws' } });
+    const markup = JSON.stringify(bodies[0]!.body);
+    expect(markup).not.toContain('apiKey');
+    expect(markup).not.toContain('sk-');
+    await act(async () => { tree.unmount(); });
+  });
+
+  it('falls back to the local runtime with a notice when a selected workspace entry is gone', async () => {
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/provider-connections')) return response({ schemaVersion: 'ProviderConnections.v1', connections: [] });
+      if (url.includes('/events?')) return response({ events: [] });
+      return response({ session: { status: 'open' } });
+    }) as unknown as typeof fetch;
+    const tree = await mount(new FakeStorage(), new FakeStorage(), fetcher);
+    // 选择器里无 ws 条目；人为持久化一个失效 ws 选择后挂载 → 回退 local。
+    const storage = new FakeStorage();
+    storage.setItem('sage.chat-runtime.v1', 'ws:conn-gone');
+    const fallen = await mount(storage, new FakeStorage(), fetcher);
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
+    expect(fallen.root.findByProps({ 'aria-label': 'Chat runtime' }).props.value).toBe('local');
+    await act(async () => { fallen.unmount(); });
+    await act(async () => { tree.unmount(); });
+  });
 });
 
 describe('chat session back navigation', () => {

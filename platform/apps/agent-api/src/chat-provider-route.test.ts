@@ -3,6 +3,9 @@ import type { AgentEvent, AgentRunOutcome, AgentRunSpec } from '@sage/agent-cont
 import type { LocalAgentClient } from '@sage/agent-client';
 import type { LiveProviderRoute, LiveProviderTurnMessage } from '@sage/local-runtime';
 import type { ChatStore } from '@sage/chat-domain';
+import type { ProviderConnectionRecord, ProviderConnectionStore, ProviderCredentialSealed } from '@sage/task-domain';
+import { LocalAesGcmSecretBackend } from '@sage/secret-vault';
+import { randomBytes } from 'node:crypto';
 import { createChatApi } from './index.js';
 
 interface StoredRun { readonly runId: string; readonly sessionId: string; readonly status: string; readonly attempt: number; readonly userMessageId: string; readonly startedAt: string }
@@ -150,6 +153,81 @@ describe('provider-routed Chat execution', () => {
     const app = await createChatApi({ store, agentClient: fakeClient('unused') });
     const response = await app.inject({ method: 'POST', url: '/v1/chat/sessions', payload: { provider: route } });
     expect(response.statusCode).toBe(400);
+    await app.close();
+  });
+});
+
+
+describe('provider-routed Chat execution (workspace connection reference)', () => {
+  const backend = new LocalAesGcmSecretBackend([randomBytes(32)]);
+
+  const registryWith = (entries: readonly Partial<ProviderConnectionRecord>[], credentials: Record<string, ProviderCredentialSealed | undefined> = {}): ProviderConnectionStore => {
+    const records = new Map(entries.map((entry) => [`tenant-local/${entry.id ?? 'conn-1'}`, {
+      tenantId: 'tenant-local', id: 'conn-1', name: 'MiniMax 个人', source: 'user', adapterKind: 'anthropic',
+      baseUrl: 'https://api.minimaxi.com/anthropic', modelId: 'MiniMax-M3', enabled: true, credentialPresent: true,
+      createdAt: '2026-08-25T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z', ...entry
+    } as ProviderConnectionRecord]));
+    return {
+      async listProviderConnections() { return [...records.values()]; },
+      async getProviderConnection(_tenantId: string, id: string) { return records.get(`tenant-local/${id}`); },
+      async createProviderConnection() { throw new Error('unused'); },
+      async updateProviderConnection() { throw new Error('unused'); },
+      async getProviderCredential(_tenantId: string, id: string) { return credentials[id]; },
+      async deleteProviderConnection() { throw new Error('unused'); }
+    };
+  };
+
+  it('resolves a connectionId reference server-side and executes through the live client without echoing the key', async () => {
+    const { store, state } = fakeChatStore();
+    const routes: LiveProviderRoute[] = [];
+    const sealed = backend.seal('conn-secret-key');
+    const app = await createChatApi({
+      store, agentClient: fakeClient('unused'),
+      providerConnections: registryWith([{ id: 'conn-live', credentialPresent: true }], { 'conn-live': { ciphertext: sealed.ciphertext, keyVersion: sealed.keyVersion, updatedAt: '2026-08-25T00:00:00.000Z' } }),
+      secretBackend: backend,
+      liveClientFactory: ({ route }) => { routes.push(route); return fakeClient('live-output'); }
+    });
+    const response = await app.inject({ method: 'POST', url: '/v1/chat/sessions/session-1/messages', payload: { parts: [{ kind: 'text', text: '你好' }], provider: { connectionId: 'conn-live' } } });
+    expect(response.statusCode).toBe(202);
+    expect(JSON.stringify(response.body)).not.toContain('conn-secret-key');
+    await settle(() => state.completed.length > 0);
+    expect(routes).toHaveLength(1);
+    expect(routes[0]).toMatchObject({ adapterKind: 'anthropic', baseUrl: 'https://api.minimaxi.com/anthropic', modelId: 'MiniMax-M3', apiKey: 'conn-secret-key' });
+    await app.close();
+  });
+
+  it('rejects a connectionId reference with a stable error when the entry is unusable', async () => {
+    const { store, state } = fakeChatStore();
+    const sealed = backend.seal('conn-secret-key');
+    const registry = registryWith(
+      [{ id: 'conn-off', enabled: false }, { id: 'conn-ok' }],
+      { 'conn-ok': { ciphertext: sealed.ciphertext, keyVersion: sealed.keyVersion, updatedAt: '2026-08-25T00:00:00.000Z' } }
+    );
+    const app = await createChatApi({ store, agentClient: fakeClient('unused'), providerConnections: registry, secretBackend: backend });
+    const cases: unknown[] = [
+      { connectionId: 'missing' },
+      { connectionId: 'conn-off' },
+      { connectionId: 'conn-nokey' },
+      { connectionId: 'conn-ok', apiKey: 'must-be-exclusive' },
+      { connectionId: '' }
+    ];
+    for (const provider of cases) {
+      const response = await app.inject({ method: 'POST', url: '/v1/chat/sessions/session-1/messages', payload: { parts: [{ kind: 'text', text: 'hi' }], provider } });
+      expect(response.statusCode).toBeGreaterThanOrEqual(400);
+      const body = response.json();
+      expect(body.error?.code ?? body.code).toBeDefined();
+    }
+    expect(state.runs.size).toBe(0);
+    await app.close();
+  });
+
+  it('fails closed when the secret backend is unavailable for a reference', async () => {
+    const { store } = fakeChatStore();
+    const sealed = backend.seal('conn-secret-key');
+    const registry = registryWith([{ id: 'conn-ok' }], { 'conn-ok': { ciphertext: sealed.ciphertext, keyVersion: sealed.keyVersion, updatedAt: '2026-08-25T00:00:00.000Z' } });
+    const app = await createChatApi({ store, agentClient: fakeClient('unused'), providerConnections: registry });
+    const response = await app.inject({ method: 'POST', url: '/v1/chat/sessions/session-1/messages', payload: { parts: [{ kind: 'text', text: 'hi' }], provider: { connectionId: 'conn-ok' } } });
+    expect(response.statusCode).toBeGreaterThanOrEqual(400);
     await app.close();
   });
 });

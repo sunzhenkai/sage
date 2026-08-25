@@ -152,6 +152,10 @@ const piMessages = (messages: readonly LiveProviderTurnMessage[]): PiMessage[] =
  * Run through pi-ai using the request-scoped route; the AgentRunner keeps owning
  * events, cancellation and budget semantics. The route and API key exist only
  * for the lifetime of the in-memory Run.
+ *
+ * `turnInput: true` switches the harness from the constructor transcript (Chat)
+ * to the per-run assembled input (package runs): request.input becomes the single
+ * user message, so entry prompt and references reach the model verbatim.
  */
 export class LiveProviderHarness implements HarnessPort {
   readonly capabilities: HarnessCapabilities;
@@ -159,26 +163,32 @@ export class LiveProviderHarness implements HarnessPort {
   readonly #transcript: readonly LiveProviderTurnMessage[];
   readonly #invoker: LiveProviderInvoker;
   readonly #maxOutputTokens: number;
+  readonly #systemPrompt: string;
+  readonly #turnInput: boolean;
 
   constructor(options: {
     readonly route: LiveProviderRoute;
     readonly transcript: readonly LiveProviderTurnMessage[];
     readonly invoker?: LiveProviderInvoker;
     readonly maxOutputTokens?: number;
+    readonly systemPrompt?: string;
+    readonly turnInput?: boolean;
   }) {
     this.capabilities = { harness: 'pi-live', version: '0.73.1', supported: ['events', 'cancellation'] };
     this.#route = options.route;
     this.#transcript = options.transcript;
     this.#invoker = options.invoker ?? defaultLiveInvoker;
     this.#maxOutputTokens = options.maxOutputTokens ?? 4_096;
+    this.#systemPrompt = options.systemPrompt ?? SYSTEM_PROMPT;
+    this.#turnInput = options.turnInput ?? false;
   }
 
   async executeTurn(request: HarnessTurnRequest, signal: AbortSignal): Promise<HarnessTurnResult> {
     if (request.skillRefs.length > 0) throw new Error('Live provider harness does not support skills');
     const completion = await this.#invoker({
       route: this.#route,
-      systemPrompt: SYSTEM_PROMPT,
-      messages: this.#transcript,
+      systemPrompt: this.#systemPrompt,
+      messages: this.#turnInput ? [{ role: 'user', text: request.input }] : this.#transcript,
       maxTokens: Math.max(1, Math.min(this.#maxOutputTokens, request.remaining.tokens)),
       signal
     });

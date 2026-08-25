@@ -6,7 +6,8 @@ import type { AgentSliceResult, AgentTaskWorkflowInput, ExecuteAgentSliceInput, 
 
 interface AgentTaskActivities { executeAgentSlice(input: ExecuteAgentSliceInput): Promise<AgentSliceResult> }
 const { executeAgentSlice } = proxyActivities<AgentTaskActivities>({
-  startToCloseTimeout: '35 seconds', scheduleToCloseTimeout: '2 minutes', heartbeatTimeout: '1 second',
+  // startToClose 放宽以容纳 live provider 真实推理（单轮可分钟级）；echo 执行毫秒级完成不受影响。
+  startToCloseTimeout: '5 minutes', scheduleToCloseTimeout: '6 minutes', heartbeatTimeout: '1 second',
   cancellationType: ActivityCancellationType.WAIT_CANCELLATION_COMPLETED,
   retry: { initialInterval: '100 milliseconds', backoffCoefficient: 2, maximumInterval: '2 seconds', maximumAttempts: 5 }
 });

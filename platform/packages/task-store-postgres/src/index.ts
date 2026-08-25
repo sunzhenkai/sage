@@ -2,8 +2,12 @@ import { readFile } from 'node:fs/promises';
 import { Pool, type PoolClient, type PoolConfig, type QueryResultRow } from 'pg';
 import {
   isAgentSliceResult, isRouteDecision, isTaskProjection, isTaskRoutingRecord,
-  type AgentSliceResult, type ExecuteAgentSliceInput, type RouteDecision,
+  normalizeRunAgentDefaultProvider,
+  type AgentSliceResult, type ExecuteAgentSliceInput, type ProviderConnectionAdapterKind, type ProviderConnectionRecord, type ProviderConnectionSource,
+  type ProviderConnectionWrite, type ProviderCredentialSealed, type RouteDecision,
+  type RunAgentSettingsRecord,
   type SliceClaim, type TaskArtifactReference, type TaskListFilter, type TaskPackageInputRecord, type TaskProjection, type TaskProjectionEvent,
+  type TaskRunOutputRecord,
   type TaskProjectionView, type ProjectionRepairAudit, type ReconciliationCandidate, type TaskRoutingRecord,
   type TaskStorePort, type TaskReconciliationStore, type TaskLifecyclePath, type TaskStartClaim
 } from '@sage/task-domain';
@@ -44,6 +48,29 @@ interface RoutingRow extends QueryResultRow {
 interface PackageInputRow extends QueryResultRow {
   tenant_id: string; task_id: string; release_id: string; release_digest: string;
   assembled_input: string; asset_digests: unknown; created_at: Date | string;
+}
+
+interface RunOutputRow extends QueryResultRow {
+  tenant_id: string; task_id: string; artifact_ref: string; output: string;
+  media_type: string; created_at: Date | string;
+}
+
+interface RunAgentSettingsRow extends QueryResultRow {
+  /** 可能含 legacy 值（auto/minimax），读取时经 normalizeRunAgentDefaultProvider 归一。 */
+  tenant_id: string; default_provider: string;
+  provider_connection_id: string | null;
+  updated_at: Date | string; updated_by: string;
+}
+
+interface ProviderConnectionRow extends QueryResultRow {
+  tenant_id: string; id: string; name: string; source: ProviderConnectionSource;
+  adapter_kind: ProviderConnectionAdapterKind; base_url: string; model_id: string;
+  provider_name: string | null; model_name: string | null; enabled: boolean;
+  credential_present: boolean; created_at: Date | string; updated_at: Date | string; updated_by: string | null;
+}
+
+interface ProviderCredentialRow extends QueryResultRow {
+  ciphertext: Buffer; key_version: number; updated_at: Date | string;
 }
 const iso = (value: Date | string): string => value instanceof Date ? value.toISOString() : new Date(value).toISOString();
 
@@ -87,7 +114,10 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
     const migrationUrls = [
       new URL('../../task-domain/migrations/001_task_store.sql', import.meta.url),
       new URL('../../task-domain/migrations/002_durable_coordinator_task_persistence.sql', import.meta.url),
-      new URL('../../task-domain/migrations/003_task_package_input.sql', import.meta.url)
+      new URL('../../task-domain/migrations/003_task_package_input.sql', import.meta.url),
+      new URL('../../task-domain/migrations/004_task_run_output.sql', import.meta.url),
+      new URL('../../task-domain/migrations/005_run_agent_settings.sql', import.meta.url),
+      new URL('../../task-domain/migrations/006_provider_connections.sql', import.meta.url)
     ];
     const migrations = (await Promise.all(migrationUrls.map((url) => readFile(url, 'utf8'))))
       .map((sql) => sql.replace(/^\s*BEGIN;\s*/, '').replace(/\s*COMMIT;\s*$/, '').trim());
@@ -542,5 +572,245 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
       createdAt: iso(row.created_at)
     };
     return record;
+  }
+
+  async writeRunOutput(record: TaskRunOutputRecord): Promise<{ readonly status: 'stored' | 'existing' }> {
+    if (record === null || typeof record !== 'object' || typeof record.tenantId !== 'string' || typeof record.taskId !== 'string'
+      || typeof record.artifactRef !== 'string' || !record.artifactRef.startsWith('artifact://')
+      || typeof record.output !== 'string' || record.output.length === 0 || typeof record.mediaType !== 'string') {
+      throw new TaskStoreError('writeRunOutput.invalid');
+    }
+    const inserted = await this.#query('writeRunOutput.insert', `INSERT INTO task_run_output
+      (tenant_id, task_id, artifact_ref, output, media_type, created_at)
+      VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (tenant_id, task_id) DO NOTHING RETURNING tenant_id`,
+      [record.tenantId, record.taskId, record.artifactRef, record.output, record.mediaType, iso(record.createdAt)]);
+    // 本地栈没有常驻 reconciler 派生引用行；随输出一并幂等登记，使 artifact 列表/详情可用。
+    const artifactId = `artifact-${record.artifactRef.split('/').slice(-2).join('-')}`;
+    await this.#query('writeRunOutput.artifactRef', `INSERT INTO task_artifact_reference
+      (tenant_id, task_id, artifact_id, artifact_ref, attempt, name, media_type) VALUES ($1,$2,$3,$4,1,'task-output',$5)
+      ON CONFLICT (tenant_id, task_id, artifact_ref) DO NOTHING`,
+      [record.tenantId, record.taskId, artifactId, record.artifactRef, record.mediaType]);
+    if (inserted.rowCount === 1) return { status: 'stored' };
+    const existing = await this.#query<RunOutputRow>('writeRunOutput.get', `SELECT
+      tenant_id, task_id, artifact_ref, output, media_type, created_at
+      FROM task_run_output WHERE tenant_id=$1 AND task_id=$2`, [record.tenantId, record.taskId]);
+    const row = existing.rows[0];
+    if (row === undefined) throw new TaskStoreError('writeRunOutput.missing');
+    if (row.artifact_ref !== record.artifactRef || row.output !== record.output) {
+      throw new TaskStoreError('writeRunOutput.conflict');
+    }
+    return { status: 'existing' };
+  }
+
+  async getRunOutput(tenantId: string, taskId: string): Promise<TaskRunOutputRecord | undefined> {
+    if (typeof tenantId !== 'string' || typeof taskId !== 'string') throw new TaskStoreError('getRunOutput.invalid');
+    const result = await this.#query<RunOutputRow>('getRunOutput', `SELECT
+      tenant_id, task_id, artifact_ref, output, media_type, created_at
+      FROM task_run_output WHERE tenant_id=$1 AND task_id=$2`, [tenantId, taskId]);
+    const row = result.rows[0];
+    if (row === undefined) return undefined;
+    const record: TaskRunOutputRecord = {
+      tenantId: row.tenant_id,
+      taskId: row.task_id,
+      artifactRef: row.artifact_ref as TaskRunOutputRecord['artifactRef'],
+      output: row.output,
+      mediaType: row.media_type,
+      createdAt: iso(row.created_at)
+    };
+    return record;
+  }
+
+  async getRunAgentSettings(tenantId: string): Promise<RunAgentSettingsRecord | undefined> {
+    if (typeof tenantId !== 'string') throw new TaskStoreError('getRunAgentSettings.invalid');
+    const result = await this.#query<RunAgentSettingsRow>('getRunAgentSettings', `SELECT
+      tenant_id, default_provider, provider_connection_id, updated_at, updated_by
+      FROM run_agent_settings WHERE tenant_id=$1`, [tenantId]);
+    const row = result.rows[0];
+    if (row === undefined) return undefined;
+    // legacy 取值（auto/minimax）读取时归一为 echo，不写回；providerConnectionId 仅在 connection 模式下保留。
+    const defaultProvider = normalizeRunAgentDefaultProvider(row.default_provider);
+    return {
+      tenantId: row.tenant_id,
+      defaultProvider,
+      ...(defaultProvider === 'connection' && row.provider_connection_id !== null ? { providerConnectionId: row.provider_connection_id } : {}),
+      updatedAt: iso(row.updated_at),
+      updatedBy: row.updated_by
+    };
+  }
+
+  async upsertRunAgentSettings(record: RunAgentSettingsRecord): Promise<{ readonly status: 'stored' | 'existing' }> {
+    const provider = record.defaultProvider;
+    const validProvider = provider === 'echo' || provider === 'connection';
+    const validConnection = provider === 'connection'
+      ? typeof record.providerConnectionId === 'string' && record.providerConnectionId.length > 0
+      : record.providerConnectionId === undefined;
+    if (record === null || typeof record !== 'object' || typeof record.tenantId !== 'string'
+      || !validProvider || !validConnection
+      || typeof record.updatedAt !== 'string' || typeof record.updatedBy !== 'string') {
+      throw new TaskStoreError('upsertRunAgentSettings.invalid');
+    }
+    const upserted = await this.#query('upsertRunAgentSettings', `INSERT INTO run_agent_settings
+      (tenant_id, default_provider, provider_connection_id, updated_at, updated_by)
+      VALUES ($1,$2,$3,$4,$5)
+      ON CONFLICT (tenant_id) DO UPDATE SET
+        default_provider=EXCLUDED.default_provider,
+        provider_connection_id=EXCLUDED.provider_connection_id,
+        updated_at=EXCLUDED.updated_at,
+        updated_by=EXCLUDED.updated_by
+      RETURNING (xmax = 0) AS inserted`,
+    [record.tenantId, record.defaultProvider, record.providerConnectionId ?? null, iso(record.updatedAt), record.updatedBy]);
+    // 单例 upsert：无并发写者场景下同值重写视为 existing，语义与 package input 幂等一致。
+    return { status: upserted.rows[0]?.inserted === true ? 'stored' : 'existing' };
+  }
+
+  #connectionOf(row: ProviderConnectionRow): ProviderConnectionRecord {
+    return {
+      tenantId: row.tenant_id,
+      id: row.id,
+      name: row.name,
+      source: row.source,
+      adapterKind: row.adapter_kind,
+      baseUrl: row.base_url,
+      modelId: row.model_id,
+      ...(row.provider_name === null ? {} : { providerName: row.provider_name }),
+      ...(row.model_name === null ? {} : { modelName: row.model_name }),
+      enabled: row.enabled,
+      credentialPresent: row.credential_present,
+      createdAt: iso(row.created_at),
+      updatedAt: iso(row.updated_at),
+      ...(row.updated_by === null ? {} : { updatedBy: row.updated_by })
+    };
+  }
+
+  async listProviderConnections(tenantId: string): Promise<readonly ProviderConnectionRecord[]> {
+    if (typeof tenantId !== 'string') throw new TaskStoreError('listProviderConnections.invalid');
+    const result = await this.#query<ProviderConnectionRow>('listProviderConnections', `SELECT
+      c.tenant_id, c.id, c.name, c.source, c.adapter_kind, c.base_url, c.model_id,
+      c.provider_name, c.model_name, c.enabled, c.created_at, c.updated_at, c.updated_by,
+      (k.connection_id IS NOT NULL) AS credential_present
+      FROM provider_connections c
+      LEFT JOIN provider_credentials k ON k.tenant_id = c.tenant_id AND k.connection_id = c.id
+      WHERE c.tenant_id=$1 ORDER BY c.created_at, c.id`, [tenantId]);
+    return result.rows.map((row) => this.#connectionOf(row));
+  }
+
+  async getProviderConnection(tenantId: string, id: string): Promise<ProviderConnectionRecord | undefined> {
+    if (typeof tenantId !== 'string' || typeof id !== 'string') throw new TaskStoreError('getProviderConnection.invalid');
+    const result = await this.#query<ProviderConnectionRow>('getProviderConnection', `SELECT
+      c.tenant_id, c.id, c.name, c.source, c.adapter_kind, c.base_url, c.model_id,
+      c.provider_name, c.model_name, c.enabled, c.created_at, c.updated_at, c.updated_by,
+      (k.connection_id IS NOT NULL) AS credential_present
+      FROM provider_connections c
+      LEFT JOIN provider_credentials k ON k.tenant_id = c.tenant_id AND k.connection_id = c.id
+      WHERE c.tenant_id=$1 AND c.id=$2`, [tenantId, id]);
+    const row = result.rows[0];
+    return row === undefined ? undefined : this.#connectionOf(row);
+  }
+
+  #validateConnectionWrite(write: ProviderConnectionWrite): boolean {
+    if (write === null || typeof write !== 'object') return false;
+    if (typeof write.name !== 'string' || write.name.trim().length === 0 || write.name.length > 128) return false;
+    if (write.source !== 'user' && write.source !== 'deployment-env') return false;
+    if (write.adapterKind !== 'openai-compatible' && write.adapterKind !== 'anthropic') return false;
+    // 存储层只挡明显非法（非 https 前缀）；完整公网端点校验在 API 层（isPublicHttpsUrl）。
+    if (typeof write.baseUrl !== 'string' || !write.baseUrl.startsWith('https://') || write.baseUrl.length > 2_048) return false;
+    if (typeof write.modelId !== 'string' || write.modelId.length === 0 || write.modelId.length > 256) return false;
+    if (typeof write.enabled !== 'boolean') return false;
+    if (write.providerName !== undefined && (typeof write.providerName !== 'string' || write.providerName.length > 128)) return false;
+    if (write.modelName !== undefined && (typeof write.modelName !== 'string' || write.modelName.length > 256)) return false;
+    if (write.updatedBy !== undefined && (typeof write.updatedBy !== 'string' || write.updatedBy.length > 256)) return false;
+    if (write.credential !== undefined) {
+      const credential = write.credential;
+      if (!Buffer.isBuffer(credential.ciphertext) || credential.ciphertext.length === 0) return false;
+      if (!Number.isInteger(credential.keyVersion) || credential.keyVersion < 0) return false;
+      if (typeof credential.updatedAt !== 'string') return false;
+    }
+    return true;
+  }
+
+  async createProviderConnection(tenantId: string, id: string, write: ProviderConnectionWrite, createdAt: string): Promise<ProviderConnectionRecord> {
+    if (typeof tenantId !== 'string' || typeof id !== 'string' || id.length === 0 || id.length > 128
+      || typeof createdAt !== 'string' || !this.#validateConnectionWrite(write)) {
+      throw new TaskStoreError('createProviderConnection.invalid');
+    }
+    const client = await this.#pool.connect();
+    try {
+      await client.query('BEGIN');
+      const inserted = await client.query<ProviderConnectionRow>(`INSERT INTO provider_connections
+        (tenant_id, id, name, source, adapter_kind, base_url, model_id, provider_name, model_name, enabled, created_at, updated_at, updated_by)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$11,$12)
+        ON CONFLICT (tenant_id, id) DO NOTHING RETURNING
+        tenant_id, id, name, source, adapter_kind, base_url, model_id, provider_name, model_name, enabled, created_at, updated_at, updated_by`,
+      [tenantId, id, write.name.trim(), write.source, write.adapterKind, write.baseUrl, write.modelId,
+        write.providerName ?? null, write.modelName ?? null, write.enabled, iso(createdAt), write.updatedBy ?? null]);
+      if (inserted.rows[0] === undefined) throw new TaskStoreError('createProviderConnection.conflict');
+      if (write.credential !== undefined) {
+        await client.query(`INSERT INTO provider_credentials (tenant_id, connection_id, ciphertext, key_version, updated_at)
+          VALUES ($1,$2,$3,$4,$5) ON CONFLICT (tenant_id, connection_id) DO UPDATE SET
+          ciphertext=EXCLUDED.ciphertext, key_version=EXCLUDED.key_version, updated_at=EXCLUDED.updated_at`,
+        [tenantId, id, write.credential.ciphertext, write.credential.keyVersion, iso(write.credential.updatedAt)]);
+      }
+      await client.query('COMMIT');
+      return this.#connectionOf({ ...inserted.rows[0]!, credential_present: write.credential !== undefined });
+    } catch (cause) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      if (cause instanceof TaskStoreError) throw cause;
+      throw new TaskStoreError('createProviderConnection', { cause });
+    } finally {
+      client.release();
+    }
+  }
+
+  async updateProviderConnection(tenantId: string, id: string, write: ProviderConnectionWrite, updatedAt: string): Promise<ProviderConnectionRecord | undefined> {
+    if (typeof tenantId !== 'string' || typeof id !== 'string' || typeof updatedAt !== 'string' || !this.#validateConnectionWrite(write)) {
+      throw new TaskStoreError('updateProviderConnection.invalid');
+    }
+    const client = await this.#pool.connect();
+    try {
+      await client.query('BEGIN');
+      const updated = await client.query<ProviderConnectionRow>(`UPDATE provider_connections SET
+        name=$3, source=$4, adapter_kind=$5, base_url=$6, model_id=$7, provider_name=$8, model_name=$9,
+        enabled=$10, updated_at=$11, updated_by=$12
+        WHERE tenant_id=$1 AND id=$2 RETURNING
+        tenant_id, id, name, source, adapter_kind, base_url, model_id, provider_name, model_name, enabled, created_at, updated_at, updated_by`,
+      [tenantId, id, write.name.trim(), write.source, write.adapterKind, write.baseUrl, write.modelId,
+        write.providerName ?? null, write.modelName ?? null, write.enabled, iso(updatedAt), write.updatedBy ?? null]);
+      const row = updated.rows[0];
+      if (row === undefined) { await client.query('COMMIT'); return undefined; }
+      let credentialPresent = false;
+      if (write.credential !== undefined) {
+        await client.query(`INSERT INTO provider_credentials (tenant_id, connection_id, ciphertext, key_version, updated_at)
+          VALUES ($1,$2,$3,$4,$5) ON CONFLICT (tenant_id, connection_id) DO UPDATE SET
+          ciphertext=EXCLUDED.ciphertext, key_version=EXCLUDED.key_version, updated_at=EXCLUDED.updated_at`,
+        [tenantId, id, write.credential.ciphertext, write.credential.keyVersion, iso(write.credential.updatedAt)]);
+        credentialPresent = true;
+      } else {
+        const existing = await client.query('SELECT connection_id FROM provider_credentials WHERE tenant_id=$1 AND connection_id=$2', [tenantId, id]);
+        credentialPresent = existing.rows[0] !== undefined;
+      }
+      await client.query('COMMIT');
+      return this.#connectionOf({ ...row, credential_present: credentialPresent });
+    } catch (cause) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw new TaskStoreError('updateProviderConnection', { cause });
+    } finally {
+      client.release();
+    }
+  }
+
+  async getProviderCredential(tenantId: string, id: string): Promise<ProviderCredentialSealed | undefined> {
+    if (typeof tenantId !== 'string' || typeof id !== 'string') throw new TaskStoreError('getProviderCredential.invalid');
+    const result = await this.#query<ProviderCredentialRow>('getProviderCredential', `SELECT
+      ciphertext, key_version, updated_at FROM provider_credentials WHERE tenant_id=$1 AND connection_id=$2`, [tenantId, id]);
+    const row = result.rows[0];
+    if (row === undefined) return undefined;
+    return { ciphertext: row.ciphertext, keyVersion: row.key_version, updatedAt: iso(row.updated_at) };
+  }
+
+  async deleteProviderConnection(tenantId: string, id: string): Promise<boolean> {
+    if (typeof tenantId !== 'string' || typeof id !== 'string') throw new TaskStoreError('deleteProviderConnection.invalid');
+    const deleted = await this.#query('deleteProviderConnection', `DELETE FROM provider_connections
+      WHERE tenant_id=$1 AND id=$2 RETURNING id`, [tenantId, id]);
+    return deleted.rowCount === 1;
   }
 }
