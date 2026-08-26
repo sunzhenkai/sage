@@ -15,10 +15,10 @@ web 界面 SHALL 提供包列表页（id、最新版本、描述、最近 releas
 - **THEN** 展示 manifest 摘要、资产预览与 release 历史（含 digest）
 
 ### Requirement: 从包发起运行并追踪
-详情页 SHALL 提供发起运行表单（必填用户输入文本）；提交成功后 SHALL 跳转到该运行的 task 视图并持续展示状态直至终态，终态后可查看 artifact。
+详情页 SHALL 提供发起运行表单（用户输入文本可选，app 自身即可完成特定任务时无需输入）；提交成功后 SHALL 跳转到该运行的 task 视图并持续展示状态直至终态，终态后可查看 artifact。
 
 #### Scenario: 发起运行
-- **WHEN** 用户填写输入并提交发起运行
+- **WHEN** 用户填写输入（或留空）并提交发起运行
 - **THEN** 界面创建运行并导航到运行详情，展示运行中状态
 
 #### Scenario: 追踪至终态与查看产物

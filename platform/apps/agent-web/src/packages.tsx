@@ -127,7 +127,6 @@ export function PackageDetailView({ detail, loading, starting, error, runStarted
 }) {
   const { t, formatDateTime } = useLocale();
   const [input, setInput] = useState('');
-  const [inputError, setInputError] = useState<string>();
   const [uploadText, setUploadText] = useState('');
   const [uploadError, setUploadError] = useState<string>();
   const [showUpload, setShowUpload] = useState(false);
@@ -181,9 +180,8 @@ export function PackageDetailView({ detail, loading, starting, error, runStarted
         {manifest.description ? <p className="muted-copy">{manifest.description}</p> : null}
       </section>
       <section className="detail-card"><span className="eyebrow">{t('startRun')}</span><p className="muted-copy">{t('startRunHint')}</p>
-        <form className="form-grid" onSubmit={(event) => { event.preventDefault(); if (input.trim().length === 0) { setInputError(t('runInputRequired')); return; } setInputError(undefined); onStartRun(input.trim()); }}>
+        <form className="form-grid" onSubmit={(event) => { event.preventDefault(); onStartRun(input.trim()); }}>
           <label className="field field-wide"><span>{t('runInput')}</span><textarea aria-label={t('runInput')} value={input} rows={4} maxLength={100_000} onChange={(event) => setInput(event.target.value)} placeholder={t('runInputPlaceholder')} /></label>
-          {inputError ? <p className="inline-notice -error" role="alert">{inputError}</p> : null}
           <div className="form-actions"><button className="button button-primary" type="submit" disabled={starting}>{starting ? t('startingRun') : t('startRunAction')}</button></div>
         </form>
       </section></div> : null}

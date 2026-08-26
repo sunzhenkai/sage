@@ -1,7 +1,7 @@
 import { sha256Digest, type ContentDigest } from '@sage/agent-contracts';
 
 /**
- * 包运行输入拼装：entry prompt 正文 + references 清单 + 用户输入 + 资产 digest 清单。
+ * 包运行输入拼装：entry prompt 正文 + references 清单 + 用户输入（可选）+ 资产 digest 清单。
  * v1 无模板引擎：纯文本拼接，输出即物化进 task_package_input 表；asset_digests
  * 供 Release 更新后审计重建。
  */
@@ -33,8 +33,12 @@ export function assemblePackageInput(input: AssemblePackageInputInput): Assemble
       sections.push(reference.content.trim());
     }
   }
-  sections.push('--- user input ---');
-  sections.push(userInput.trim());
+  // 用户输入可选：app 自身即可完成特定任务时无需输入，空输入不追加该段。
+  const trimmedUserInput = userInput.trim();
+  if (trimmedUserInput.length > 0) {
+    sections.push('--- user input ---');
+    sections.push(trimmedUserInput);
+  }
   const text = sections.join('\n\n');
   const assetDigests: Record<string, string> = {};
   for (const reference of references) {

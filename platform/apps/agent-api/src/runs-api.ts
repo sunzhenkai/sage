@@ -50,7 +50,7 @@ export interface RegisterPackageRunsRoutesOptions {
 }
 
 export const CreatePackageRunRequestSchema = Type.Object({
-  input: Type.String({ minLength: 1, maxLength: 100_000 }),
+  input: Type.Optional(Type.String({ maxLength: 100_000 })),
   taskId: Type.Optional(Type.String({ minLength: 1, maxLength: 128, pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]*$' }))
 }, { additionalProperties: false });
 export type CreatePackageRunRequest = Static<typeof CreatePackageRunRequestSchema>;
@@ -156,12 +156,13 @@ export function registerPackageRunsRoutes(app: FastifyInstance, options: Registe
         const references = assets.filter((asset) => asset.kind === 'reference');
         if (entry === undefined) return sendError(reply, 409, 'PACKAGE_RUN_ENTRY_MISSING', 'Release has no entry prompt content');
 
+        const userInput = request.body.input ?? '';
         const assembled = assemblePackageInput({
           entryPrompt: entry.content,
           references: references.map((reference) => ({ relativePath: reference.relativePath, content: reference.content })),
-          userInput: request.body.input,
+          userInput,
         });
-        const inputDigest = packageRunInputDigest(request.body.input, release.contentDigest, assembled.assetDigests);
+        const inputDigest = packageRunInputDigest(userInput, release.contentDigest, assembled.assetDigests);
         const taskId = request.body.taskId ?? `pkg-${randomUUID()}`;
         const runId = `run-${taskId}`;
         const attemptId = `attempt-${taskId}-1`;
@@ -200,25 +201,31 @@ export function registerPackageRunsRoutes(app: FastifyInstance, options: Registe
           assetDigests: assembled.assetDigests,
           createdAt: now().toISOString(),
         };
-        await options.taskStore.writePackageInput(record);
 
-        // 幂等命中时不重复创建/启动 workflow；既有运行已由首次请求启动。
+        // 幂等命中时不重复创建/启动 workflow，也不重写包输入；响应必须回填首次准入的
+        // taskId/runId/attemptId（存于已提交的 spec），否则调用方拿到的是不存在的幻影 id。
         if (admitted.status === 'admitted') {
+          await options.taskStore.writePackageInput(record);
           const slice = packageRunSliceLimits(manifest.budgets);
           await options.controller.create({ taskId, inputRef, ...(slice === undefined ? {} : { slice }) }, principal);
         }
+        const effectiveTaskId = admitted.status === 'admitted' ? taskId : admitted.spec.taskId;
+        const effectiveRunId = admitted.status === 'admitted' ? runId : admitted.spec.runId;
+        const effectiveAttemptId = admitted.status === 'admitted' ? attemptId : admitted.spec.attemptId;
+        const effectiveInputRef = admitted.status === 'admitted' ? inputRef
+          : `task-input://package/${encodeURIComponent(options.tenantId)}/${encodeURIComponent(effectiveTaskId)}` as const;
 
         return reply.code(admitted.status === 'admitted' ? 202 : 200).send({
           schemaVersion: 'PackageRunResult.v1',
           status: admitted.status,
-          taskId,
-          runId,
-          attemptId,
+          taskId: effectiveTaskId,
+          runId: effectiveRunId,
+          attemptId: effectiveAttemptId,
           releaseRef: release.releaseRef,
           releaseId: release.releaseId,
           specRef: admitted.spec.specRef,
           specDigest: admitted.spec.specDigest,
-          inputRef,
+          inputRef: effectiveInputRef,
         });
       } catch (cause) {
         return mapped(reply, cause);

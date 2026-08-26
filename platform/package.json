@@ -38,6 +38,7 @@
     "check:agent-platform-final": "tsx scripts/agent-platform-final/run-conformance-evidence.ts && node scripts/agent-platform-final/generate-evidence.mjs && pnpm test:agent-platform-final:unit && pnpm test:agent-platform-final:temporal && node scripts/agent-platform-final/regenerate-derived-assets.mjs && pnpm scan:agent-platform-final && pnpm typecheck && pnpm lint && pnpm build && pnpm check:deps && openspec validate agent-platform-generalization-validation --strict && node scripts/agent-platform-final/finalize-evidence.mjs",
     "test:p7:exercises": "node scripts/p7/run-exercises.mjs",
     "smoke:local": "node scripts/smoke-local-stack.mjs",
+    "test:ai-app-e2e": "SAGE_AI_APP_E2E=1 vitest run apps/agent-api/src/ai-app-lifecycle.e2e.test.ts",
     "smoke:models-dev-live": "SAGE_MODELS_DEV_LIVE_SMOKE=1 vitest run packages/provider-catalog/src/source.live.test.ts",
     "check": "pnpm lint && pnpm check:deps && pnpm typecheck && pnpm test && pnpm build",
     "spike:pi": "vitest run spikes/pi-capabilities.test.ts",

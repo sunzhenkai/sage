@@ -6,6 +6,7 @@
 |--------|------|------|
 | `ops-analyst/` | 通用运维分析 | 解读监控指标、定位告警、生成排查建议 |
 | `github-trending/` | GitHub 热门项目解读 | 分析 trending 项目快照，产出排名解读、亮点与趋势 digest（展示页见 `docs/showcase/github-trending.html`） |
+| `lifecycle-probe/` | 生命周期探针 | 无 references、无 output.schema.json 的最小包，输出确定性，专用于「创建 → 提交 → 运行 → 产物管理」全链路端到端验证（见下文「全链路端到端验证」） |
 
 ## 目录结构（以 ops-analyst 为例）
 
@@ -125,3 +126,21 @@ curl -sS http://127.0.0.1:9610/v1/packages/ops-analyst -H 'x-authentication-id: 
 | `SAGE_BOOTSTRAP_PROVIDER_ADAPTER` | 否 | 适配器类型（缺省 `anthropic`，可选 `openai-compatible`） |
 
 运行成功后，输出文本物化在 `task_run_output`，可经 `GET /v1/tasks/<taskId>/artifacts/<artifactId>` 取回（响应含 `content` 字段）。
+
+## 全链路端到端验证（lifecycle-probe）
+
+`lifecycle-probe/` 配套一条自动化端到端验证（`platform/apps/agent-api/src/ai-app-lifecycle.e2e.test.ts`），以真实 HTTP 入口依次走通：创建 App 主体 → 提交源包编译登记 Release → 发起运行并等待成功终态 → 查询产物列表与详情并断言确定性内容（fake provider 回放 `已收到：<组装输入>`）。
+
+前置条件：
+
+- 本地栈已启动（postgres/temporal/agent-api/agent-worker），且 **agent-api 与 agent-worker 均注入了 `SAGE_FAKE_LIVE_PROVIDER=true`**（`/readyz` 的 `providerExecution.mode` 为 `fake`）。
+- `packages/*` 已构建（`corepack pnpm exec tsc -b`）。
+
+执行：
+
+```bash
+cd platform
+corepack pnpm test:ai-app-e2e   # 等价于 SAGE_AI_APP_E2E=1 vitest run apps/agent-api/src/ai-app-lifecycle.e2e.test.ts
+```
+
+默认不设置 `SAGE_AI_APP_E2E=1` 时该套件自动 skip，不影响常规 `pnpm test`。可选环境变量 `SAGE_E2E_API_URL` / `SAGE_E2E_WORKER_URL` 覆盖目标栈地址（默认 9610/9611）。验证会 seed 一个名为 `ai-app-e2e provider` 的工作区 provider 并将其设为运行 agent 设置（fake 模式下凭据不会被真实使用）。

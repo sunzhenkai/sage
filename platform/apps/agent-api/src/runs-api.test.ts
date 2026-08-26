@@ -187,6 +187,18 @@ describe('Package run API boundaries', () => {
     await app.close();
   });
 
+  it('admits a run without user input and omits the user input section', async () => {
+    const { app, controller, taskStore } = await api({ principal: operator });
+    const response = await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: {} });
+    expect(response.statusCode).toBe(202);
+    const body = response.json();
+    expect(controller.created).toHaveLength(1);
+    const stored = await taskStore.getPackageInput('tenant-local', body.taskId);
+    expect(stored?.assembledInput).toContain('你是演示助手。');
+    expect(stored?.assembledInput).not.toContain('--- user input ---');
+    await app.close();
+  });
+
   it('is idempotent for the same release and input', async () => {
     const { app, controller } = await api({ principal: operator });
     const first = await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: { input: 'hi', taskId: 'pkg-fixed' } });
@@ -195,6 +207,22 @@ describe('Package run API boundaries', () => {
     expect(second.statusCode).toBe(200);
     expect(second.json().status).toBe('existing');
     expect(second.json().taskId).toBe('pkg-fixed');
+    expect(controller.created).toHaveLength(1);
+    await app.close();
+  });
+
+  it('returns the original run ids on idempotent replay with auto-generated taskId', async () => {
+    const { app, controller } = await api({ principal: operator });
+    // 不传 taskId：首次请求生成随机 id；重放必须回填首次准入的 id，而不是新生成的幻影 id。
+    const first = await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: { input: 'hi' } });
+    const second = await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: { input: 'hi' } });
+    expect(first.statusCode).toBe(202);
+    expect(second.statusCode).toBe(200);
+    expect(second.json().status).toBe('existing');
+    expect(second.json().taskId).toBe(first.json().taskId);
+    expect(second.json().runId).toBe(first.json().runId);
+    expect(second.json().attemptId).toBe(first.json().attemptId);
+    expect(second.json().inputRef).toBe(first.json().inputRef);
     expect(controller.created).toHaveLength(1);
     await app.close();
   });
