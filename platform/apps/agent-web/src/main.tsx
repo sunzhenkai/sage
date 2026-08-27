@@ -33,7 +33,7 @@ export function WorkspaceShell({ view, sessionId, children }: { readonly view: W
   return <div className="app-frame">
     <aside className={`sidebar${collapsed ? ' is-collapsed' : ''}`}>
       <div className="sidebar-head">
-        <a className="brand" href={workspaceHref({ view: 'chat', ...(sessionId ? { sessionId } : {}) })} aria-label={`${t('brandName')} ${t('home')}`}><span className="brand-mark">S</span><span className="brand-copy"><strong>{t('brandName')}</strong><small>{t('brandSubtitle')}</small></span></a>
+        <a className="brand" href={workspaceHref({ view: 'chat', ...(sessionId ? { sessionId } : {}) })} aria-label={`${t('brandName')} ${t('home')}`}><span className="brand-mark">思</span><span className="brand-copy"><strong>{t('brandName')}</strong><small>{t('brandSubtitle')}</small></span></a>
         <button className="sidebar-collapse" type="button" aria-expanded={!collapsed} aria-label={toggleLabel} title={toggleLabel} onClick={toggleCollapsed}><span aria-hidden="true">{collapsed ? '»' : '«'}</span></button>
       </div>
       <div className="workspace-switcher"><span className="workspace-avatar">SL</span><span><strong>{t('localWorkspace')}</strong><small>tenant-local</small></span><span className="chevron">⌄</span></div>

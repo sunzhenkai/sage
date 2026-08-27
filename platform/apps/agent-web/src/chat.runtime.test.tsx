@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, afterEach } from 'vitest';
+import { StrictMode } from 'react';
 import { act, create } from 'react-test-renderer';
 import { ChatApp, CHAT_RUNTIME_STORAGE_KEY } from './chat.js';
 
@@ -92,6 +93,31 @@ describe('chat runtime quick selector', () => {
     const tree = await mount(storage, fetcher);
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
     expect(tree.root.findByProps({ 'aria-label': 'Chat runtime' }).props.value).toBe('');
+    await act(async () => tree.unmount());
+  });
+
+  it('keeps the persisted selection across a StrictMode remounted load', async () => {
+    // StrictMode（dev 默认）会把首个 effect 立即 cleanup 再重挂：被中止的那次
+    // provider-connections 加载不得翻转 connectionsLoaded，否则空列表会清空显式选择。
+    const storage = new FakeStorage();
+    storage.setItem(CHAT_RUNTIME_STORAGE_KEY, 'ws:conn-ws');
+    let tree!: ReturnType<typeof create>;
+    vi.stubGlobal('window', { localStorage: storage, sessionStorage: new FakeStorage() });
+    vi.stubGlobal('EventSource', FakeEventSource);
+    await act(async () => { tree = create(<StrictMode><ChatApp sessionId="session-rt" fetcher={vi.fn(await workspaceConnections([conn])) as unknown as typeof fetch} /></StrictMode>); });
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
+    expect(tree.root.findByProps({ 'aria-label': 'Chat runtime' }).props.value).toBe('ws:conn-ws');
+    await act(async () => tree.unmount());
+  });
+
+  it('keeps the persisted selection when the workspace provider list fails to load', async () => {
+    const storage = new FakeStorage();
+    storage.setItem(CHAT_RUNTIME_STORAGE_KEY, 'ws:conn-ws');
+    const tree = await mount(storage, vi.fn(async (input: RequestInfo | URL) =>
+      String(input).endsWith('/provider-connections') ? response({ error: { code: 'PROVIDER_CONNECTIONS_UNAVAILABLE' } }, 503)
+        : (await workspaceConnections([])(input)) as Response) as unknown as typeof fetch);
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
+    expect(tree.root.findByProps({ 'aria-label': 'Chat runtime' }).props.value).toBe('ws:conn-ws');
     await act(async () => tree.unmount());
   });
 });
