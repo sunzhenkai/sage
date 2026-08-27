@@ -186,9 +186,10 @@ describe('unified provider page', () => {
     await act(async () => { modelOptions.findByProps({ role: 'option' }).props.onClick(); await wait(); });
     // 预填：baseUrl ← effectiveBaseUrl、modelId、显示名建议 {provider} · {model}、adapter 缺省 anthropic。
     const form = tree.root.findByProps({ className: 'workspace-provider-form provider-editor panel' });
-    expect(form.findAllByProps({ value: 'https://api.anthropic.com' })).toHaveLength(1);
-    expect(form.findAllByProps({ value: 'claude-sonnet-4' })).toHaveLength(1);
-    expect(form.findAllByProps({ value: 'Anthropic · Claude Sonnet 4' })).toHaveLength(1);
+    const hostInputsWithValue = (value: string) => form.findAllByType('input').filter((node) => node.props.value === value);
+    expect(hostInputsWithValue('https://api.anthropic.com')).toHaveLength(1);
+    expect(hostInputsWithValue('claude-sonnet-4')).toHaveLength(1);
+    expect(hostInputsWithValue('Anthropic · Claude Sonnet 4')).toHaveLength(1);
     expect(form.findAllByType('select')[0]!.props.value).toBe('anthropic');
     const keyField = form.findAllByType('input').find((node) => node.props.type === 'password')!;
     await act(async () => { keyField.props.onChange({ target: { value: 'sk-server-side-key' } }); await wait(); });
@@ -283,7 +284,7 @@ describe('unified provider page', () => {
     expect(form.findAllByType('select')[0]!.props.value).toBe('anthropic');
     await act(async () => { form.findAllByType('select')[0]!.props.onChange({ target: { value: 'openai-compatible' } }); await wait(); });
     // 改写 adapter 不清已选 provider/model，也不重开服务商 combobox。
-    expect(form.findAllByProps({ value: 'claude-sonnet-4-5' })).toHaveLength(1);
+    expect(form.findAllByType('input').filter((node) => node.props.value === 'claude-sonnet-4-5')).toHaveLength(1);
     expect(tree.root.findByProps({ 'aria-label': 'Provider search' }).props['aria-expanded']).toBe(false);
     expect(tree.root.findByProps({ 'aria-label': 'Provider search' }).props.value).toBe('Anthropic');
     // 重新选择同一 provider：adapter 保持用户改写值，不被缺省启发覆盖。
@@ -313,7 +314,7 @@ describe('unified provider page', () => {
     await act(async () => { await waitDebounce(); });
     const modelOptions = () => tree.root.findByProps({ id: 'model-options' }).findAllByProps({ role: 'option' });
     await act(async () => { modelOptions()[0]!.props.onClick(); await wait(); });
-    const baseUrlInput = () => tree.root.findByProps({ placeholder: 'https://api.example.com' });
+    const baseUrlInput = () => tree.root.findAllByType('input').find((node) => node.props.placeholder === 'https://api.example.com')!;
     // 选定后 baseUrl 预填为该 model 的 effectiveBaseUrl。
     expect(baseUrlInput().props.value).toBe('https://api.anthropic.com');
     // 未手改前，改选另一 model 仍按目录预填。
@@ -324,7 +325,7 @@ describe('unified provider page', () => {
     // 改写 baseUrl 不清已选 provider/model。
     expect(tree.root.findByProps({ 'aria-label': 'Provider search' }).props.value).toBe('Anthropic');
     expect(tree.root.findByProps({ 'aria-label': 'Model search' }).props.value).toBe('Claude Opus 5');
-    expect(tree.root.findAllByProps({ value: 'claude-opus-5' })).toHaveLength(1);
+    expect(tree.root.findAllByType('input').filter((node) => node.props.value === 'claude-opus-5')).toHaveLength(1);
     expect(tree.root.findByProps({ 'aria-label': 'Provider search' }).props['aria-expanded']).toBe(false);
     // 重新选择 provider 与 model：baseUrl 保持用户改写值，不被目录预填覆盖。
     await act(async () => { tree.root.findByProps({ id: 'provider-options' }).findByProps({ role: 'option' }).props.onClick(); });
@@ -364,7 +365,7 @@ describe('unified provider page', () => {
     expect(focus.mock.calls).toHaveLength(0);
     expect(providerSearch().props['aria-expanded']).toBe(false);
     expect(providerSearch().props.value).toBe('Anthropic');
-    await act(async () => { tree.root.findByProps({ placeholder: 'https://api.example.com' }).props.onChange({ target: { value: 'https://proxy.example.com' } }); await wait(); });
+    await act(async () => { tree.root.findAllByType('input').find((node) => node.props.placeholder === 'https://api.example.com')!.props.onChange({ target: { value: 'https://proxy.example.com' } }); await wait(); });
     expect(focus.mock.calls).toHaveLength(0);
     expect(providerSearch().props['aria-expanded']).toBe(false);
     expect(providerSearch().props.value).toBe('Anthropic');

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { workspaceHref } from './workspace.js';
 import { useLocale } from './locale.js';
+import { TextAreaField, TextField } from './fields.js';
+import { Banner, EmptyPanel, InlineNotice, LoadingState } from './feedback.js';
 
 export interface PackageSummaryView {
   readonly packageId: string;
@@ -89,19 +91,19 @@ export function PackageList({ packages, loading, creating, error, onCreateApp }:
   return <section className="package-list-section" aria-label={t('packages')}>
     <div className="task-list-heading"><div><p className="eyebrow">{t('durableExecution')}</p><h2>{packages.length} {packages.length === 1 ? t('asset') : t('packages')}</h2></div>
       <div className="task-list-heading-actions"><span className="muted-copy">{t('mostRecentFirst')}</span><button className="button button-primary" type="button" onClick={() => { setShowForm((value) => !value); setFormError(undefined); }}>{t('newApp')}</button></div></div>
-    {error ? <div className="error-banner" role="alert"><span>!</span><div><strong>{t('packageDataUnavailable')}</strong><p>{error}</p></div></div> : null}
+    {error ? <Banner kind="error" title={t('packageDataUnavailable')}>{error}</Banner> : null}
     {showForm ? <section className="detail-card app-create-card" aria-label={t('createApp')}>
       <div className="section-heading"><div><span className="eyebrow">{t('newApp')}</span><h3>{t('createApp')}</h3></div></div>
       <form className="form-grid" onSubmit={(event) => { event.preventDefault(); submit(); }}>
-        <label className="field"><span>{t('appId')}</span><input aria-label={t('appId')} value={appId} maxLength={128} onChange={(event) => setAppId(event.target.value)} placeholder="my-app" /><small className="muted-copy">{t('appIdHint')}</small></label>
-        <label className="field"><span>{t('appName')}</span><input aria-label={t('appName')} value={name} maxLength={128} onChange={(event) => setName(event.target.value)} /></label>
-        <label className="field field-wide"><span>{t('appDescription')}</span><textarea aria-label={t('appDescription')} value={description} rows={2} maxLength={2048} onChange={(event) => setDescription(event.target.value)} /></label>
-        {formError ? <p className="inline-notice -error" role="alert">{formError}</p> : null}
+        <TextField label={t('appId')} value={appId} maxLength={128} onChange={setAppId} placeholder="my-app" hint={t('appIdHint')} />
+        <TextField label={t('appName')} value={name} maxLength={128} onChange={setName} />
+        <TextAreaField label={t('appDescription')} value={description} rows={2} maxLength={2048} onChange={setDescription} />
+        {formError ? <InlineNotice error>{formError}</InlineNotice> : null}
         <div className="form-actions"><button className="button button-secondary" type="button" onClick={() => setShowForm(false)}>{t('cancelAction')}</button><button className="button button-primary" type="submit" disabled={creating}>{creating ? t('creatingApp') : t('createApp')}</button></div>
       </form>
     </section> : null}
-    {loading && packages.length === 0 ? <div className="loading-state"><span className="loading-spinner" /><strong>{t('loadingTaskProjections')}</strong></div>
-      : packages.length === 0 ? <div className="empty-panel"><span className="empty-orb">▤</span><h3>{t('noPackages')}</h3><p>{t('noPackagesHint')}</p><button className="button button-primary" type="button" onClick={() => { setShowForm(true); setFormError(undefined); }}>{t('newApp')}</button></div>
+    {loading && packages.length === 0 ? <LoadingState label={t('loadingTaskProjections')} />
+      : packages.length === 0 ? <EmptyPanel icon="▤" title={t('noPackages')} hint={t('noPackagesHint')} action={<button className="button button-primary" type="button" onClick={() => { setShowForm(true); setFormError(undefined); }}>{t('newApp')}</button>} />
       : <div className="task-table">{packages.map((item) => <a className="task-row" key={item.packageId} href={workspaceHref({ view: 'packages', packageId: item.packageId })}>
         <span className="task-row-icon">▤</span><span className="task-row-main"><strong className="task-id-link">{item.name ?? item.packageId}</strong><small>{item.name ? <>{item.packageId} · </> : null}{t('latestVersion')} · {item.latestVersion} · {t('releaseCount', { count: item.releaseCount })}</small></span>
         <span className="status-badge status-neutral">{item.latestVersion}</span><span className="task-row-target"><time dateTime={item.updatedAt}>{formatDateTime(item.updatedAt)}</time></span><span className="task-row-chevron">→</span>
@@ -154,18 +156,17 @@ export function PackageDetailView({ detail, loading, starting, error, runStarted
         <button className="button button-danger" type="button" disabled={deleting} onClick={onRequestDelete}>{t('deleteApp')}</button>
       </> : null}
     </div></header>
-    {error ? <div className="error-banner" role="alert"><span>!</span><div><strong>{t('packageDataUnavailable')}</strong><p>{error}</p></div></div> : null}
-    {runStartedTaskId ? <div className="success-banner" role="status"><span>✓</span><p>{t('runStarted')}</p><a className="button button-primary" href={workspaceHref({ view: 'tasks', taskId: runStartedTaskId })}>{t('viewRun')} <span>→</span></a></div> : null}
-    {uploadMessage ? <div className={uploadMessage.kind === 'success' ? 'success-banner' : 'error-banner'} role="status"><span>{uploadMessage.kind === 'success' ? '✓' : '!'}</span><p>{uploadMessage.text}</p></div> : null}
-    {deleteConfirm ? <div className="error-banner" role="alert"><span>!</span><div><strong>{t('deleteApp')}</strong><p>{t('deleteAppConfirm')}</p></div>
-      <div className="form-actions"><button className="button button-secondary" type="button" onClick={onCancelDelete}>{t('cancelAction')}</button><button className="button button-danger" type="button" disabled={deleting} onClick={() => onConfirmDelete()}>{deleting ? t('deletingApp') : t('deleteAppConfirmAction')}</button></div></div> : null}
-    {loading && !detail ? <div className="loading-state"><span className="loading-spinner" /><strong>{t('loadingTaskProjections')}</strong></div> : detail === undefined ? null : <>
+    {error ? <Banner kind="error" title={t('packageDataUnavailable')}>{error}</Banner> : null}
+    {runStartedTaskId ? <Banner kind="success" action={<a className="button button-primary" href={workspaceHref({ view: 'tasks', taskId: runStartedTaskId })}>{t('viewRun')} <span>→</span></a>}>{t('runStarted')}</Banner> : null}
+    {uploadMessage ? <Banner kind={uploadMessage.kind === 'success' ? 'success' : 'error'}>{uploadMessage.text}</Banner> : null}
+    {deleteConfirm ? <Banner kind="error" title={t('deleteApp')} action={<div className="form-actions"><button className="button button-secondary" type="button" onClick={onCancelDelete}>{t('cancelAction')}</button><button className="button button-danger" type="button" disabled={deleting} onClick={() => onConfirmDelete()}>{deleting ? t('deletingApp') : t('deleteAppConfirmAction')}</button></div>}>{t('deleteAppConfirm')}</Banner> : null}
+    {loading && !detail ? <LoadingState label={t('loadingTaskProjections')} /> : detail === undefined ? null : <>
       {showUpload ? <section className="detail-card" aria-label={t('uploadNewVersion')}>
         <div className="section-heading"><div><span className="eyebrow">{t('uploadNewVersion')}</span><h3>{t('uploadVersion')}</h3></div></div>
         <p className="muted-copy">{t('uploadHint')}</p>
         <form className="form-grid" onSubmit={(event) => { event.preventDefault(); submitUpload(); }}>
-          <label className="field field-wide"><span>{t('uploadFiles')}</span><textarea aria-label={t('uploadFiles')} value={uploadText} rows={8} maxLength={600_000} onChange={(event) => setUploadText(event.target.value)} placeholder={t('uploadFilesPlaceholder')} /></label>
-          {uploadError ? <p className="inline-notice -error" role="alert">{uploadError}</p> : null}
+          <TextAreaField label={t('uploadFiles')} value={uploadText} rows={8} maxLength={600_000} onChange={setUploadText} placeholder={t('uploadFilesPlaceholder')} />
+          {uploadError ? <InlineNotice error>{uploadError}</InlineNotice> : null}
           <div className="form-actions"><button className="button button-secondary" type="button" onClick={() => setShowUpload(false)}>{t('cancelAction')}</button><button className="button button-primary" type="submit" disabled={uploading}>{uploading ? t('uploadingVersion') : t('uploadVersion')}</button></div>
         </form>
       </section> : null}
@@ -181,7 +182,7 @@ export function PackageDetailView({ detail, loading, starting, error, runStarted
       </section>
       <section className="detail-card"><span className="eyebrow">{t('startRun')}</span><p className="muted-copy">{t('startRunHint')}</p>
         <form className="form-grid" onSubmit={(event) => { event.preventDefault(); onStartRun(input.trim()); }}>
-          <label className="field field-wide"><span>{t('runInput')}</span><textarea aria-label={t('runInput')} value={input} rows={4} maxLength={100_000} onChange={(event) => setInput(event.target.value)} placeholder={t('runInputPlaceholder')} /></label>
+          <TextAreaField label={t('runInput')} value={input} rows={4} maxLength={100_000} onChange={setInput} placeholder={t('runInputPlaceholder')} />
           <div className="form-actions"><button className="button button-primary" type="submit" disabled={starting}>{starting ? t('startingRun') : t('startRunAction')}</button></div>
         </form>
       </section></div> : null}

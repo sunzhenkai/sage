@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale } from './locale.js';
+import { SelectField } from './fields.js';
+import { InlineNotice } from './feedback.js';
 import { WorkspaceProvidersCard, type WorkspaceProviderView } from './workspace-providers.js';
 
 /** GET/PUT /v1/run-agent/settings 的视图模型：默认模型（providerConnectionId 引用）+ 注册表条目可用性（不含任何密钥）。 */
@@ -64,15 +66,12 @@ export function ProvidersApp({ fetcher = fetch }: { readonly fetcher?: typeof fe
         <p className="eyebrow">{t('workspaceSettings')}</p>
         <h2>{t('runAgent')}</h2>
         <small>{t('runAgentSubtitle')}</small>
-        <label className="field" style={{ maxWidth: 420, marginTop: 12 }}>
-          <span>{t('defaultModelLabel')}</span>
-          <select aria-label={t('defaultModelLabel')} value={runAgent?.providerConnectionId ?? ''} disabled={runAgentSaving || runAgent === undefined} onChange={(event) => void saveRunAgent(event.target.value)}>
-            <option value="">{t('runAgentUnset')}</option>
-            {(runAgent?.providers ?? []).map((provider) => (
-              <option key={provider.id} value={provider.id}>{`${modelLabel(provider.id, provider.name)}${provider.available ? '' : ` · ${t('workspaceProviderUnavailableOption')}`}`}</option>
-            ))}
-          </select>
-        </label>
+        <SelectField className="field-standalone" label={t('defaultModelLabel')} value={runAgent?.providerConnectionId ?? ''} disabled={runAgentSaving || runAgent === undefined} onChange={(value) => void saveRunAgent(value)}>
+          <option value="">{t('runAgentUnset')}</option>
+          {(runAgent?.providers ?? []).map((provider) => (
+            <option key={provider.id} value={provider.id}>{`${modelLabel(provider.id, provider.name)}${provider.available ? '' : ` · ${t('workspaceProviderUnavailableOption')}`}`}</option>
+          ))}
+        </SelectField>
       </div>
       {(() => {
         if (runAgent === undefined || runAgent.unset) {
@@ -86,6 +85,6 @@ export function ProvidersApp({ fetcher = fetch }: { readonly fetcher?: typeof fe
       })()}
     </section>
     <WorkspaceProvidersCard fetcher={fetcher} connections={connections} connectionsLoaded={connectionsLoaded} onConnectionsChanged={() => void reloadConnections()} onNotice={setNotice} />
-    {notice && <div className="inline-notice" role="status">{notice}</div>}
+    {notice && <InlineNotice>{notice}</InlineNotice>}
   </section>;
 }

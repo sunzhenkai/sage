@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import type { ModelCatalogItem, ModelCatalogPage, ProviderCatalogItem, ProviderCatalogPage } from '@sage/app-contracts';
 import { useLocale } from './locale.js';
+import { SelectField, TextField } from './fields.js';
+import { InlineNotice } from './feedback.js';
 
 /** GET/POST/PUT/DELETE /v1/provider-connections 的视图模型：元数据 + 凭据在场布尔，永不携带密文或 key。 */
 export interface WorkspaceProviderView {
@@ -124,7 +126,7 @@ export function WorkspaceProvidersCard({ fetcher, connections, connectionsLoaded
         </div>)}
       </div>
       {connectionsLoaded && connections.length === 0 && <p className="muted-copy">{t('noWorkspaceProviders')}</p>}
-      <div style={{ marginTop: 12 }}>
+      <div className="panel-actions">
         <button className="button button-secondary" type="button" onClick={startCreate}>{t('addWorkspaceProvider')}</button>
       </div>
       {draft !== undefined && <WorkspaceProviderDialog
@@ -326,9 +328,9 @@ function WorkspaceProviderDialog({ fetcher, draft, saving, onDraftChange, onSubm
           </div>
         </div>
         <div className="form-grid">
-          {snapshotChanged && <div className="field-wide inline-notice" role="status">{t('catalogUpdatedNotice')}</div>}
-          {refreshNotice && <div className="field-wide inline-notice" role="status">{refreshNotice}</div>}
-          {catalog === 'unavailable' && <div className="field-wide inline-notice" role="status">{t('catalogUnavailableManual')}</div>}
+          {snapshotChanged && <InlineNotice className="field-wide">{t('catalogUpdatedNotice')}</InlineNotice>}
+          {refreshNotice && <InlineNotice className="field-wide">{refreshNotice}</InlineNotice>}
+          {catalog === 'unavailable' && <InlineNotice className="field-wide">{t('catalogUnavailableManual')}</InlineNotice>}
           {catalog !== 'unavailable' && <>
             <div className="field field-wide combobox-field">
               <div className="catalog-refresh-row">
@@ -360,24 +362,18 @@ function WorkspaceProviderDialog({ fetcher, draft, saving, onDraftChange, onSubm
               </div>
             </div>
           </>}
-          <label className="field field-wide"><span>{t('displayName')}</span>
-            <input value={draft.name} onChange={(event) => { nameDirty.current = true; patch({ name: event.target.value }); }} /></label>
-          <label className="field"><span>{t('adapterKind')}</span>
-            <select value={draft.adapterKind} onChange={(event) => { adapterDirty.current = true; patch({ adapterKind: event.target.value as WorkspaceProviderDraft['adapterKind'] }); }}>
-              <option value="anthropic">{t('anthropic')}</option>
-              <option value="openai-compatible">{t('openAiCompatible')}</option>
-            </select></label>
-          <label className="field"><span>{t('baseUrl')}</span>
-            <input value={draft.baseUrl} placeholder="https://api.example.com" onChange={(event) => { baseUrlDirty.current = true; patch({ baseUrl: event.target.value }); }} /></label>
-          <label className="field"><span>{t('model')}</span>
-            <input value={draft.modelId} onChange={(event) => {
-              const value = event.target.value;
-              if (value === draft.modelId) { patch({}); return; }
-              const { modelName: _stale, ...rest } = draft; void _stale;
-              onDraftChange({ ...rest, modelId: value });
-            }} /></label>
-          <label className="field field-wide"><span>{t('apiKeyServer')}</span>
-            <input type="password" value={draft.apiKey} placeholder={draft.id === undefined ? t('apiKeyRequiredPlaceholder') : t('apiKeyRotatePlaceholder')} onChange={(event) => patch({ apiKey: event.target.value })} /></label>
+          <TextField wide label={t('displayName')} value={draft.name} onChange={(value) => { nameDirty.current = true; patch({ name: value }); }} />
+          <SelectField label={t('adapterKind')} value={draft.adapterKind} onChange={(value) => { adapterDirty.current = true; patch({ adapterKind: value as WorkspaceProviderDraft['adapterKind'] }); }}>
+            <option value="anthropic">{t('anthropic')}</option>
+            <option value="openai-compatible">{t('openAiCompatible')}</option>
+          </SelectField>
+          <TextField label={t('baseUrl')} value={draft.baseUrl} placeholder="https://api.example.com" onChange={(value) => { baseUrlDirty.current = true; patch({ baseUrl: value }); }} />
+          <TextField label={t('model')} value={draft.modelId} onChange={(value) => {
+            if (value === draft.modelId) { patch({}); return; }
+            const { modelName: _stale, ...rest } = draft; void _stale;
+            onDraftChange({ ...rest, modelId: value });
+          }} />
+          <TextField wide type="password" label={t('apiKeyServer')} value={draft.apiKey} placeholder={draft.id === undefined ? t('apiKeyRequiredPlaceholder') : t('apiKeyRotatePlaceholder')} onChange={(value) => patch({ apiKey: value })} />
           <div className="form-actions field-wide">
             <button className="button" type="submit" disabled={saving}>{saving ? t('saving') : t('saveWorkspaceProvider')}</button>
             <button className="button button-secondary" type="button" onClick={onClose}>{t('cancel')}</button>
