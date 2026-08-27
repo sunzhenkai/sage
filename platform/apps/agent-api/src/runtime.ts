@@ -7,8 +7,7 @@ import type { AuthenticatedPrincipal } from '@sage/app-contracts';
 import { ChatStore } from '@sage/chat-domain';
 import { InMemoryAgentTaskSpecStore, InMemoryCredentialProvider } from '@sage/local-fakes';
 import { InMemoryAgentReleaseStore } from '@sage/agent-release-registry';
-import { createLiveProviderAgentClient, createLocalKernelComposition, type LiveProviderRoute, type LiveProviderTurnMessage } from '@sage/local-runtime';
-import { createFakeLiveInvoker } from '@sage/harness-pi';
+import { createLocalKernelComposition } from '@sage/local-runtime';
 import { LegacyAgentRunSpecV1Adapter, parseAgentExecutionFeatureConfig, runShadowEngine, selectAgentExecutionMode, type AgentExecutionMode, type AgentLifecycleOwner, type LegacyAdapterResult } from '@sage/agent-client';
 import { PostgresTaskStore } from '@sage/task-store-postgres';
 import { createLocalSecretBackendFromEnv } from '@sage/secret-vault';
@@ -183,15 +182,8 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
   };
     const authenticate = (authenticationId?: string): AuthenticatedPrincipal | undefined =>
       authenticationId === undefined || authenticationId === config.principal.authenticationId ? config.principal : undefined;
-    // 受信测试开关：显式配置时 chat 的 live client 以进程内确定性 invoker 替换最终模型 HTTP 调用，
-    // 设置→注册表解析→harness 路由链路保真；未配置时走真实 provider。
-    const fakeLiveProvider = (config.secretEnv ?? process.env).SAGE_FAKE_LIVE_PROVIDER === 'true';
     app = await createChatApi({
       store: chat, tenantId: config.tenantId,
-      ...(fakeLiveProvider
-        ? { liveClientFactory: (input: { route: LiveProviderRoute; transcript: readonly LiveProviderTurnMessage[] }) =>
-            createLiveProviderAgentClient({ route: input.route, transcript: input.transcript, invoker: createFakeLiveInvoker() }) }
-        : {}),
       providerConnections: tasks,
       secretBackend,
       ...(canonicalCompatibility === undefined ? {} : { canonicalCompatibility }),
@@ -262,9 +254,9 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
           tasks.listTaskViews(config.tenantId, { limit: 1 }),
           temporalReady(config.temporalAddress)
         ]);
-        return { status: 'ready', secretBackend: { mode: secretBackendMode }, providerExecution: { mode: fakeLiveProvider ? 'fake' : 'live' } };
+        return { status: 'ready', secretBackend: { mode: secretBackendMode } };
       } catch {
-        return reply.code(503).send({ status: 'not_ready', dependencies: ['postgres', 'temporal'], secretBackend: { mode: secretBackendMode }, providerExecution: { mode: fakeLiveProvider ? 'fake' : 'live' } });
+        return reply.code(503).send({ status: 'not_ready', dependencies: ['postgres', 'temporal'], secretBackend: { mode: secretBackendMode } });
       }
     });
     const close = async (): Promise<void> => {

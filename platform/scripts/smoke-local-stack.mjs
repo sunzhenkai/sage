@@ -36,9 +36,13 @@ async function waitFor(label, fn, timeoutMs = 60_000) {
   throw new Error(`Timed out waiting for ${label}${lastError ? `: ${lastError.message}` : ''}`);
 }
 
-// smoke 环境：显式启用受信 fake live provider（进程内确定性模型替身，路由链路保真）与固定 dev 主密钥。
-process.env.SAGE_FAKE_LIVE_PROVIDER = 'true';
+// 固定本地 dev 主密钥。不存在进程内确定性模型替身：Chat 与包运行一律走真实 provider 路由，
+// 模型调用垂直链路仅在操作者注入真实凭据（SAGE_BOOTSTRAP_PROVIDER_*）时执行。
 process.env.SAGE_SECRET_MASTER_KEY = 'c2FnZS1sb2NhbC1kZXYtc2VjcmV0LW1hc3Rlci1reSE=';
+
+// 三项齐备才视为提供了真实凭据；compose 将其透传给 agent-api，启动即幂等注册 deployment-env 条目。
+const hasBootstrapProvider = ['SAGE_BOOTSTRAP_PROVIDER_API_KEY', 'SAGE_BOOTSTRAP_PROVIDER_BASE_URL', 'SAGE_BOOTSTRAP_PROVIDER_MODEL']
+  .every((name) => (process.env[name] ?? '').trim().length > 0);
 
 let failure;
 try {
@@ -53,7 +57,6 @@ try {
   await request(`${api}/readyz`);
   const workerReady = await request(`${worker}/readyz`);
   if (workerReady.namespace !== 'sage-dev' || workerReady.taskQueue !== 'sage-agent-task-v1') throw new Error('Worker readiness contract mismatch');
-  if (workerReady.providerExecution?.mode !== 'fake') throw new Error('Smoke requires SAGE_FAKE_LIVE_PROVIDER=true on the worker');
   await request(`${web}/`);
 
   // seed 工作区 provider + 运行 agent 设置：chat 与包运行均硬要求 provider（引用形态，服务端解析）。
@@ -67,27 +70,40 @@ try {
   });
 
   const session = await request(`${api}/v1/chat/sessions`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ title: 'local smoke' }) });
-  const accepted = await request(`${api}/v1/chat/sessions/${encodeURIComponent(session.sessionId)}/messages`, {
-    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ parts: [{ kind: 'text', text: 'local smoke message' }], provider: { connectionId: connection.connection.id } })
-  });
-  const conversation = await waitFor('Chat Run succeeded', async () => {
-    const value = await request(`${api}/v1/chat/sessions/${encodeURIComponent(session.sessionId)}`);
-    return value.runs.some((run) => run.runId === accepted.run.runId && run.status === 'succeeded') ? value : undefined;
-  });
-  if (!conversation.messages.some((message) => message.role === 'assistant')) throw new Error('Chat assistant message missing');
 
-  const promoted = await request(`${api}/v1/chat/messages/${encodeURIComponent(accepted.message.messageId)}/promotions`, {
-    method: 'POST', headers: { 'content-type': 'application/json', 'x-authentication-id': 'local-dev-auth' }, body: JSON.stringify({ mode: 'explicit', taskType: 'sage.agent-task.v1' })
-  });
-  const taskId = promoted.association.taskId;
-  const task = await waitFor('Task succeeded', async () => {
-    const value = await request(`${api}/v1/tasks/${encodeURIComponent(taskId)}`, { headers: { 'x-authentication-id': 'local-dev-auth' } });
-    return value.status === 'succeeded' ? value : undefined;
-  });
-  if (task.targetSnapshot.taskQueue !== 'sage-agent-task-v1') throw new Error('Task queue contract mismatch');
+  if (!hasBootstrapProvider) {
+    process.stdout.write('local stack smoke: 未提供 SAGE_BOOTSTRAP_PROVIDER_API_KEY/BASE_URL/MODEL，跳过模型调用垂直链路（健康与 API 面已验证）\n');
+  } else {
+    // 模型调用走真实外部 provider：使用启动期注册的 deployment-env 条目。
+    const connections = await request(`${api}/v1/provider-connections`);
+    const bootstrapped = connections.connections.find((entry) => entry.source === 'deployment-env');
+    if (bootstrapped === undefined) throw new Error('SAGE_BOOTSTRAP_PROVIDER_* 已提供但 agent-api 未注册 deployment-env provider');
+    const accepted = await request(`${api}/v1/chat/sessions/${encodeURIComponent(session.sessionId)}/messages`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ parts: [{ kind: 'text', text: 'local smoke message' }], provider: { connectionId: bootstrapped.id } })
+    });
+    const conversation = await waitFor('Chat Run succeeded', async () => {
+      const value = await request(`${api}/v1/chat/sessions/${encodeURIComponent(session.sessionId)}`);
+      const run = value.runs.find((item) => item.runId === accepted.run.runId);
+      if (run && (run.status === 'failed' || run.status === 'cancelled')) throw new Error(`Chat Run 到达失败终态 ${run.status}`);
+      return run && run.status === 'succeeded' ? value : undefined;
+    });
+    if (!conversation.messages.some((message) => message.role === 'assistant')) throw new Error('Chat assistant message missing');
+
+    const promoted = await request(`${api}/v1/chat/messages/${encodeURIComponent(accepted.message.messageId)}/promotions`, {
+      method: 'POST', headers: { 'content-type': 'application/json', 'x-authentication-id': 'local-dev-auth' }, body: JSON.stringify({ mode: 'explicit', taskType: 'sage.agent-task.v1' })
+    });
+    const taskId = promoted.association.taskId;
+    const task = await waitFor('Task succeeded', async () => {
+      const value = await request(`${api}/v1/tasks/${encodeURIComponent(taskId)}`, { headers: { 'x-authentication-id': 'local-dev-auth' } });
+      if (value.status === 'failed' || value.status === 'cancelled') throw new Error(`Task 到达失败终态 ${value.status}: ${JSON.stringify(value).slice(0, 300)}`);
+      return value.status === 'succeeded' ? value : undefined;
+    });
+    if (task.targetSnapshot.taskQueue !== 'sage-agent-task-v1') throw new Error('Task queue contract mismatch');
+  }
+
   const proxied = await request(`${web}/v1/chat/sessions/${encodeURIComponent(session.sessionId)}/events?afterSequence=0`);
   if (!Array.isArray(proxied.events)) throw new Error('Web API proxy response missing events');
-  process.stdout.write(`local smoke passed: session=${session.sessionId} task=${taskId}\n`);
+  process.stdout.write(`local smoke passed: session=${session.sessionId}\n`);
 } catch (error) {
   failure = error;
   process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);

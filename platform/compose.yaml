@@ -59,9 +59,12 @@ services:
       SAGE_TENANT_ID: tenant-local
       SAGE_POSTGRES_URL: postgres://sage:sage-local-only@postgres:5432/sage
       SAGE_TEMPORAL_ADDRESS: temporal:7233
-      # 本地 dev 主密钥（仅 local compose）；fake 开关默认关闭，显式置 true 才启用进程内确定性模型替身。
+      # 本地 dev 主密钥（仅 local compose）。
       SAGE_SECRET_MASTER_KEY: ${SAGE_SECRET_MASTER_KEY:-c2FnZS1sb2NhbC1kZXYtc2VjcmV0LW1hc3Rlci1reSE=}
-      SAGE_FAKE_LIVE_PROVIDER: ${SAGE_FAKE_LIVE_PROVIDER:-false}
+      # 可选：提供三项完整值时，agent-api 启动即注册真实 deployment-env provider（冒烟垂直链路用）。
+      SAGE_BOOTSTRAP_PROVIDER_API_KEY: ${SAGE_BOOTSTRAP_PROVIDER_API_KEY:-}
+      SAGE_BOOTSTRAP_PROVIDER_BASE_URL: ${SAGE_BOOTSTRAP_PROVIDER_BASE_URL:-}
+      SAGE_BOOTSTRAP_PROVIDER_MODEL: ${SAGE_BOOTSTRAP_PROVIDER_MODEL:-}
       SAGE_HTTP_HOST: 0.0.0.0
       SAGE_HTTP_PORT: 9610
     depends_on:
@@ -86,9 +89,8 @@ services:
       SAGE_TENANT_ID: tenant-local
       SAGE_POSTGRES_URL: postgres://sage:sage-local-only@postgres:5432/sage
       SAGE_TEMPORAL_ADDRESS: temporal:7233
-      # 本地 dev 主密钥（仅 local compose）；fake 开关默认关闭，显式置 true 才启用进程内确定性模型替身。
+      # 本地 dev 主密钥（仅 local compose）。
       SAGE_SECRET_MASTER_KEY: ${SAGE_SECRET_MASTER_KEY:-c2FnZS1sb2NhbC1kZXYtc2VjcmV0LW1hc3Rlci1reSE=}
-      SAGE_FAKE_LIVE_PROVIDER: ${SAGE_FAKE_LIVE_PROVIDER:-false}
       SAGE_HEALTH_HOST: 0.0.0.0
       SAGE_HEALTH_PORT: 9611
     depends_on:
