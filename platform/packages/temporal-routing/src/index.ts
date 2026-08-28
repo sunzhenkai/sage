@@ -665,7 +665,9 @@ async function queryTask(workflow: WorkflowClient, store: TaskProjectionStore | 
   try { projection = await store?.getProjection(tenantId, taskId); } catch { /* History remains authoritative. */ }
   if (!projection) return { workflow: state, projectionFreshness: 'unavailable' };
   const ageMs = Math.max(0, now().getTime() - Date.parse(projection.projectionUpdatedAt));
-  const fresh = projection.revision === state.committedSlices && projection.status === state.status && ageMs <= freshnessThresholdMs;
+  // 终态投影已定稿、不会再被刷新，age 不代表漂移；只有非终态任务按新鲜度阈值判定。
+  const terminal = state.status === 'succeeded' || state.status === 'failed' || state.status === 'cancelled';
+  const fresh = projection.revision === state.committedSlices && projection.status === state.status && (terminal || ageMs <= freshnessThresholdMs);
   return { workflow: state, projection, projectionFreshness: fresh ? 'fresh' : 'stale' };
 }
 async function sendControl(workflow: WorkflowClient, workflowId: string, control: TaskControl, timeoutMs: number): Promise<TaskWorkflowState> {

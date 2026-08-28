@@ -1,7 +1,7 @@
 import {randomUUID} from 'node:crypto';
 import {Pool} from 'pg';
 import {afterAll,beforeAll,describe,expect,it} from 'vitest';
-import {TASK_TYPE,type ExecuteAgentSliceInput,type TaskProjection,type TaskProjectionEvent} from '@sage/task-domain';
+import {TASK_TYPE,type ExecuteAgentSliceInput,type TaskProjection,type TaskProjectionEvent,type TaskRoutingRecord} from '@sage/task-domain';
 import {PostgresTaskStore} from './index.js';
 
 const url=process.env.P6_POSTGRES_URL;const integration=describe.skipIf(!url);let store:PostgresTaskStore;let admin:Pool;
@@ -55,5 +55,35 @@ integration.sequential('P6 PostgreSQL monotonic History projection CAS',()=>{
     expect((await store.listTaskEvents('tenant-p6-cas',taskId))).toHaveLength(3);
     await store.writeProjection(rebuilt);
     expect(await store.getProjection('tenant-p6-cas',taskId)).toMatchObject({lifecyclePath:'DURABLE_COORDINATOR_V2',logicalCursor:'cursor://v2/3',authorityReceiptDigest:receiptDigest,status:'succeeded'});
+  });
+
+  it('keeps terminal projection views fresh regardless of age, while non-terminal views go stale by age',async()=>{
+    const routingFor=(taskId:string):TaskRoutingRecord=>{
+      const snapshot={schemaVersion:'1' as const,snapshotId:`snapshot-${taskId}`,routeDecisionId:`decision-${taskId}`,targetId:'target-persisted',
+        targetProfileVersion:'target-v1',clusterId:'cluster-p6',isolationKey:'tenant-isolation',endpoint:'target.example:1',
+        namespace:'namespace-p6',taskQueue:'queue-p6',credentialRef:'secret://target/p6' as `secret://${string}`,
+        taskType:TASK_TYPE,taskTypeVersion:'task-v1',policyVersion:'policy-v1',registryVersion:'registry-v1',
+        environment:'development' as const,region:'region-1',residency:'residency-1',selectedAt:'2026-08-12T00:00:00.000Z'};
+      const input={schemaVersion:'1' as const,taskType:TASK_TYPE,taskId,tenantId:'tenant-p6-cas',workflowId:`workflow-${taskId}`,
+        targetId:'target-persisted',inputRef:`task-input://tenant-p6-cas/${taskId}` as `task-input://${string}`,attempt:1,maxSlices:1,sliceDelayMs:1,
+        slice:{maxTurns:1,maxToolCalls:0,maxTokens:1,timeoutMs:100}};
+      return {schemaVersion:'1',tenantId:'tenant-p6-cas',taskId,workflowId:`workflow-${taskId}`,taskType:TASK_TYPE,status:'start_pending',
+        snapshot,decision:{schemaVersion:'1',decisionId:`decision-${taskId}`,taskId,taskType:TASK_TYPE,tenantId:'tenant-p6-cas',actorId:'actor-1',
+          contextId:'context-1',environment:'development',region:'region-1',residency:'residency-1',registryVersion:'registry-v1',
+          policyVersion:'policy-v1',candidates:[],explanation:'test',decidedAt:'2026-08-12T00:00:00.000Z'},
+        startEnvelope:{schemaVersion:'1',workflowType:'AgentTaskWorkflow',workflowId:`workflow-${taskId}`,taskQueue:'queue-p6',snapshotId:snapshot.snapshotId,input},
+        createdAt:'2026-08-12T00:00:00.000Z'};
+    };
+    const terminalTask=`freshness-terminal-${randomUUID()}`;
+    const runningTask=`freshness-running-${randomUUID()}`;
+    await store.reserveTaskStart(routingFor(terminalTask));
+    await store.reserveTaskStart(routingFor(runningTask));
+    await store.writeProjection(projection(terminalTask,{status:'succeeded'}));
+    await store.writeProjection(projection(runningTask));
+    const now=new Date('2026-08-12T00:10:00.000Z');
+    const terminalView=await store.getTaskView('tenant-p6-cas',terminalTask,now,30_000);
+    expect(terminalView).toMatchObject({status:'succeeded',freshness:'fresh'});
+    expect(terminalView?.staleReason).toBeUndefined();
+    expect(await store.getTaskView('tenant-p6-cas',runningTask,now,30_000)).toMatchObject({status:'running',freshness:'stale',staleReason:'age_threshold_exceeded'});
   });
 });

@@ -10,8 +10,10 @@
  * JSON 结构 POST 到 `/v1/packages/{packageId}/releases`；由服务端统一执行
  * 「校验 → 编译 → 登记」，保证与 API 契约一致。
  */
+import { existsSync } from 'node:fs';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const [, , sourceDirArg, ...flags] = process.argv;
 if (!sourceDirArg) {
@@ -24,7 +26,11 @@ function flagValue(name: string): string | undefined {
   return index >= 0 ? flags[index + 1] : undefined;
 }
 
-const sourceDir = resolve(sourceDirArg);
+// pnpm --filter 运行时 cwd 是 apps/agent-api，而文档里的路径相对 workspace 根（platform/）：
+// 先按 cwd 解析，不存在则回退到 workspace 根解析，两种调用方式都可用。
+const workspaceRoot = fileURLToPath(new URL('../../..', import.meta.url));
+const cwdCandidate = resolve(sourceDirArg);
+const sourceDir = existsSync(cwdCandidate) ? cwdCandidate : resolve(workspaceRoot, sourceDirArg);
 const apiUrl = (flagValue('--api-url') ?? process.env.SAGE_API_URL ?? 'http://127.0.0.1:9610').replace(/\/$/, '');
 const auth = flagValue('--auth') ?? process.env.SAGE_LOCAL_AUTHENTICATION_ID ?? 'local-dev-auth';
 const packageIdOverride = flagValue('--package-id');

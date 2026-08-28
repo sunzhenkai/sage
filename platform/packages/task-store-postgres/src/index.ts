@@ -486,9 +486,12 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
       ...(routing.startEnvelope.input.messageId?{messageId:routing.startEnvelope.input.messageId}:{})
     };
     const age = Math.max(0,now.getTime()-new Date(row.projection_updated_at).getTime());
-    const freshness = age > thresholdMs ? 'stale' as const : 'fresh' as const;
+    const status = row.projection_status ?? 'running';
+    // 终态投影已定稿、不会再被刷新，age 不代表漂移；只有非终态任务按新鲜度阈值判定。
+    const terminal = status==='succeeded'||status==='failed'||status==='cancelled';
+    const freshness = !terminal && age > thresholdMs ? 'stale' as const : 'fresh' as const;
     return {taskId:routing.taskId,taskType:routing.taskType,workflowId:routing.workflowId,targetId:routing.snapshot.targetId,attempt:row.attempt ?? 1,
-      status:row.projection_status ?? 'running',revision:row.revision ?? 0,projectionUpdatedAt:iso(row.projection_updated_at),freshness,
+      status,revision:row.revision ?? 0,projectionUpdatedAt:iso(row.projection_updated_at),freshness,
       ...(freshness==='stale'?{staleReason:'age_threshold_exceeded' as const}:{}),targetSnapshot:routing.snapshot,
       ...(routing.startEnvelope.input.sessionId?{sessionId:routing.startEnvelope.input.sessionId}:{}),
       ...(routing.startEnvelope.input.runId?{runId:routing.startEnvelope.input.runId}:{}),

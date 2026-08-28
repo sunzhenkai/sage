@@ -161,16 +161,19 @@ describe('PackageDetailView', () => {
     expect(markup).toContain('sha256:' + 'd'.repeat(64));
   });
 
-  it('starts a run without requiring user input', async () => {
+  it('warns before starting a run with empty input and starts on confirmation', async () => {
     const startRun = vi.fn(async () => undefined);
     let tree!: ReturnType<typeof create>;
     await act(async () => { tree = create(<PackageDetailView {...detailProps({ onStartRun: startRun })} />); await flush(); });
     const textarea = tree.root.findByProps({ 'aria-label': 'User input (optional)' });
     const form = tree.root.findAllByType('form').find((node) => node.findAllByProps({ 'aria-label': 'User input (optional)' }).length > 0)!;
-    // 空输入直接提交：app 自身即可完成特定任务，不阻塞运行。
+    // 空输入首次提交：只显示警示、不发起运行（防止误触产生无数据运行）。
+    await act(async () => { form.props.onSubmit({ preventDefault: () => undefined }); await flush(); });
+    expect(startRun).not.toHaveBeenCalled();
+    // 再次提交（确认）：空输入运行仍被允许（app 自身即可完成特定任务，不阻塞运行）。
     await act(async () => { form.props.onSubmit({ preventDefault: () => undefined }); await flush(); });
     expect(startRun).toHaveBeenCalledWith('');
-    // 输入后提交。
+    // 输入后提交：直接发起，无需确认。
     await act(async () => { textarea.props.onChange({ target: { value: 'hello' } }); await flush(); });
     await act(async () => { form.props.onSubmit({ preventDefault: () => undefined }); await flush(); });
     expect(startRun).toHaveBeenCalledWith('hello');

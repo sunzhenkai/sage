@@ -129,6 +129,7 @@ export function PackageDetailView({ detail, loading, starting, error, runStarted
 }) {
   const { t, formatDateTime } = useLocale();
   const [input, setInput] = useState('');
+  const [emptyRunConfirm, setEmptyRunConfirm] = useState(false);
   const [uploadText, setUploadText] = useState('');
   const [uploadError, setUploadError] = useState<string>();
   const [showUpload, setShowUpload] = useState(false);
@@ -181,9 +182,10 @@ export function PackageDetailView({ detail, loading, starting, error, runStarted
         {manifest.description ? <p className="muted-copy">{manifest.description}</p> : null}
       </section>
       <section className="detail-card"><span className="eyebrow">{t('startRun')}</span><p className="muted-copy">{t('startRunHint')}</p>
-        <form className="form-grid" onSubmit={(event) => { event.preventDefault(); onStartRun(input.trim()); }}>
-          <TextAreaField label={t('runInput')} value={input} rows={4} maxLength={100_000} onChange={setInput} placeholder={t('runInputPlaceholder')} />
-          <div className="form-actions"><button className="button button-primary" type="submit" disabled={starting}>{starting ? t('startingRun') : t('startRunAction')}</button></div>
+        <form className="form-grid" onSubmit={(event) => { event.preventDefault(); const trimmed = input.trim(); if (trimmed.length === 0 && !emptyRunConfirm) { setEmptyRunConfirm(true); return; } setEmptyRunConfirm(false); onStartRun(trimmed); }}>
+          <TextAreaField label={t('runInput')} value={input} rows={4} maxLength={100_000} onChange={(value) => { setInput(value); if (value.trim().length > 0) setEmptyRunConfirm(false); }} placeholder={t('runInputPlaceholder')} />
+          {emptyRunConfirm ? <InlineNotice error>{t('emptyRunWarning')}</InlineNotice> : null}
+          <div className="form-actions">{emptyRunConfirm ? <button className="button button-secondary" type="button" onClick={() => setEmptyRunConfirm(false)}>{t('cancelAction')}</button> : null}<button className="button button-primary" type="submit" disabled={starting}>{starting ? t('startingRun') : emptyRunConfirm ? t('emptyRunConfirmAction') : t('startRunAction')}</button></div>
         </form>
       </section></div> : null}
       <section className="detail-card"><div className="section-heading"><div><span className="eyebrow">{t('assets')}</span><h3>{t('assets')}</h3></div><span className="badge badge-neutral">{detail.assets?.length ?? 0}</span></div>

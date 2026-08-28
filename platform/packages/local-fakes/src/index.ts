@@ -556,4 +556,6 @@ export * from './runtime.js';
 
 export { InMemoryDurableCoordinatorFake } from './coordinator.js';
 
+export { InMemoryScheduleFake, ScheduleFakeError } from './schedule.js';
+
 export * from './production-governance.js';
