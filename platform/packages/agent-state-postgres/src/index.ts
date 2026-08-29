@@ -66,8 +66,10 @@ export class PostgresAgentStateAdapter extends PostgresPort implements AgentStat
   async migrate(): Promise<void> {
     const migrations = await Promise.all([
       '001_agent_state.sql', '002_canonical_agent_authority.sql', '003_runtime_kernel_broker.sql',
-      '004_agent_package_release_registry.sql', '005_production_governance_core.sql',
-      '006_production_rls_roles.sql', '007_artifact_checkpoint_lifecycle.sql', '008_supply_chain_governance.sql'
+      // RLS 引导（sage_security schema/函数/角色）先于 005：005 的表策略引用 sage_security.current_tenant_id()。
+      '004_agent_package_release_registry.sql', '004_production_rls_bootstrap.sql', '005_production_governance_core.sql',
+      '006_production_rls_roles.sql',
+      '007_artifact_checkpoint_lifecycle.sql', '008_supply_chain_governance.sql', '009_p8_schedule_plane.sql'
     ].map(async (name) => ({ name, sql: await readFile(new URL(`../migrations/${name}`, import.meta.url), 'utf8') })));
     const client = await this.pool.connect();
     try {
@@ -326,6 +328,7 @@ interface SealedLookupRow extends QueryResultRow { checkpoint: unknown; candidat
 export * from './governance-store.js';
 export * from './effect-ledger.js';
 export * from './consumption-ledger.js';
+export * from './schedule-store.js';
 export * from './artifact-checkpoint-store.js';
 export * from './audit-store.js';
 export * from './checkpoint-lifecycle.js';

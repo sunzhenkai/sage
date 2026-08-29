@@ -409,3 +409,126 @@ export interface QuiescePromotionSourceInput {
   readonly sourceRunId: string; readonly inputRef: `task-input://${string}`; readonly inputDigest: `sha256:${string}`;
   readonly checkpointRef?: `checkpoint://${string}`; readonly checkpointDigest?: `sha256:${string}`; readonly now: string;
 }
+
+// ===== P8 Schedule Plane HTTP 契约（/v1/schedules，/v1/effects/resolutions） =====
+// 自包含 wire schema：与 platform-ports 的 canonical 契约保持语义一致（由 agent-api 一致性测试锚定），
+// 本包依赖边界为空（package-ownership），不直接 import canonical schema。
+
+const ScheduleCronRule = Type.Object({ kind: Type.Literal('cron'), expression: Type.String({ minLength: 5, maxLength: 128 }), timezone: Type.String({ minLength: 1, maxLength: 64 }) }, { additionalProperties: false });
+const ScheduleIntervalRule = Type.Object({ kind: Type.Literal('interval'), everyMs: Type.Integer({ minimum: 60_000, maximum: 2_147_483_647 }) }, { additionalProperties: false });
+
+export const ApiScheduleTriggerRuleSchema = Type.Union([ScheduleCronRule, ScheduleIntervalRule], { $id: 'ApiScheduleTriggerRule.v1' });
+export type ApiScheduleTriggerRule = Static<typeof ApiScheduleTriggerRuleSchema>;
+export const ApiScheduleOverlapPolicySchema = Type.Union([Type.Literal('SKIP'), Type.Literal('ALLOW'), Type.Literal('BUFFER_ONE')], { $id: 'ApiScheduleOverlapPolicy.v1' });
+export type ApiScheduleOverlapPolicy = Static<typeof ApiScheduleOverlapPolicySchema>;
+export const ApiScheduleMisfirePolicySchema = Type.Union([Type.Literal('SKIP'), Type.Literal('CATCH_UP_ONE')], { $id: 'ApiScheduleMisfirePolicy.v1' });
+export type ApiScheduleMisfirePolicy = Static<typeof ApiScheduleMisfirePolicySchema>;
+export const ApiScheduleReleaseBindingSchema = Type.Union([
+  Type.Object({ strategy: Type.Literal('FIXED'), releaseId: Type.String({ minLength: 1, maxLength: 128 }), contentDigest: Type.String({ pattern: '^sha256:[a-f0-9]{64}$' }) }, { additionalProperties: false }),
+  Type.Object({ strategy: Type.Literal('FOLLOW') }, { additionalProperties: false })
+], { $id: 'ApiScheduleReleaseBinding.v1' });
+export type ApiScheduleReleaseBinding = Static<typeof ApiScheduleReleaseBindingSchema>;
+export const ApiScheduleBudgetSchema = Type.Object({
+  limits: Type.Array(Type.Object({ dimension: Type.Union([Type.Literal('runs'), Type.Literal('tokens'), Type.Literal('tool_calls'), Type.Literal('cost_minor_units')]), limit: Type.Integer({ minimum: 1 }) }, { additionalProperties: false }), { minItems: 1, maxItems: 8 }),
+  windowMs: Type.Optional(Type.Integer({ minimum: 60_000, maximum: 2_147_483_647 }))
+}, { additionalProperties: false, $id: 'ApiScheduleBudget.v1' });
+export type ApiScheduleBudget = Static<typeof ApiScheduleBudgetSchema>;
+export const ApiScheduleTargetConstraintsSchema = Type.Object({
+  allowedEnvironments: Type.Array(Type.String({ minLength: 1, maxLength: 64 }), { minItems: 1, maxItems: 8 }),
+  isolationLevel: Type.Optional(Type.String({ minLength: 1, maxLength: 64 })),
+  dataResidency: Type.Optional(Type.String({ minLength: 1, maxLength: 64 }))
+}, { additionalProperties: false, $id: 'ApiScheduleTargetConstraints.v1' });
+export type ApiScheduleTargetConstraints = Static<typeof ApiScheduleTargetConstraintsSchema>;
+export const ApiScheduleInvocationTemplateSchema = Type.Object({
+  task: Type.String({ minLength: 1, maxLength: 64, pattern: '^[a-z][a-z0-9-]{0,63}$' }),
+  params: Type.Optional(Type.Record(Type.String({ minLength: 1, maxLength: 64 }), Type.Union([Type.String({ maxLength: 2_048 }), Type.Number()]), { maxProperties: 16 }))
+}, { additionalProperties: false, $id: 'ApiScheduleInvocationTemplate.v1' });
+export type ApiScheduleInvocationTemplate = Static<typeof ApiScheduleInvocationTemplateSchema>;
+
+export const ApiScheduleDefinitionSchema = Type.Object({
+  schemaVersion: Type.Literal('1'),
+  scheduleId: Type.String({ minLength: 3, maxLength: 128, pattern: '^[a-z0-9][a-z0-9._-]*$' }),
+  tenantId: Type.String({ minLength: 1, maxLength: 128 }),
+  displayName: Type.Optional(Type.String({ minLength: 1, maxLength: 256 })),
+  trigger: ApiScheduleTriggerRuleSchema,
+  overlapPolicy: ApiScheduleOverlapPolicySchema,
+  misfirePolicy: ApiScheduleMisfirePolicySchema,
+  releaseBinding: ApiScheduleReleaseBindingSchema,
+  targetConstraints: ApiScheduleTargetConstraintsSchema,
+  budget: ApiScheduleBudgetSchema,
+  invocation: ApiScheduleInvocationTemplateSchema
+}, { additionalProperties: false, $id: 'ApiScheduleDefinition.v1' });
+export type ApiScheduleDefinition = Static<typeof ApiScheduleDefinitionSchema>;
+
+export const ApiScheduleStateSchema = Type.Union([Type.Literal('ACTIVE'), Type.Literal('PAUSED'), Type.Literal('DELETED')], { $id: 'ApiScheduleState.v1' });
+export type ApiScheduleState = Static<typeof ApiScheduleStateSchema>;
+
+export const ApiScheduleSnapshotSchema = Type.Object({
+  schemaVersion: Type.Literal('1'),
+  definition: ApiScheduleDefinitionSchema,
+  revision: Type.Integer({ minimum: 1 }),
+  state: ApiScheduleStateSchema,
+  contentDigest: Type.String({ pattern: '^sha256:[a-f0-9]{64}$' }),
+  createdAtMs: Type.Integer({ minimum: 0 }),
+  updatedAtMs: Type.Integer({ minimum: 0 }),
+  nextFireAtMs: Type.Optional(Type.Integer({ minimum: 0 }))
+}, { additionalProperties: false, $id: 'ApiScheduleSnapshot.v1' });
+export type ApiScheduleSnapshot = Static<typeof ApiScheduleSnapshotSchema>;
+
+export const ApiScheduleListResponseSchema = Type.Object({
+  schemaVersion: Type.Literal('ScheduleListResult.v1'),
+  schedules: Type.Array(ApiScheduleSnapshotSchema, { maxItems: 200 })
+}, { additionalProperties: false, $id: 'ScheduleListResult.v1' });
+export type ApiScheduleListResponse = Static<typeof ApiScheduleListResponseSchema>;
+
+export const ApiScheduleTriggerEventSchema = Type.Object({
+  schemaVersion: Type.Literal('1'),
+  scheduleId: Type.String({ minLength: 3, maxLength: 128 }),
+  occurrenceId: Type.String({ minLength: 1, maxLength: 128 }),
+  kind: Type.Union([Type.Literal('SUCCEEDED'), Type.Literal('FAILED'), Type.Literal('SKIPPED'), Type.Literal('MISSED')]),
+  occurredAtMs: Type.Integer({ minimum: 0 }),
+  taskId: Type.Optional(Type.String({ minLength: 1, maxLength: 128 })),
+  errorCode: Type.Optional(Type.String({ minLength: 1, maxLength: 128 })),
+  detail: Type.Optional(Type.String({ maxLength: 1_024 }))
+}, { additionalProperties: false, $id: 'ApiScheduleTriggerEvent.v1' });
+export type ApiScheduleTriggerEvent = Static<typeof ApiScheduleTriggerEventSchema>;
+
+export const ApiScheduleTriggerHistoryResponseSchema = Type.Object({
+  schemaVersion: Type.Literal('ScheduleTriggerHistory.v1'),
+  scheduleId: Type.String({ minLength: 3, maxLength: 128 }),
+  events: Type.Array(ApiScheduleTriggerEventSchema, { maxItems: 200 })
+}, { additionalProperties: false, $id: 'ScheduleTriggerHistory.v1' });
+export type ApiScheduleTriggerHistoryResponse = Static<typeof ApiScheduleTriggerHistoryResponseSchema>;
+
+export const ApiScheduleErrorSchema = Type.Object({
+  error: Type.Object({ code: Type.Union([
+    Type.Literal('SCHEDULE_ALREADY_EXISTS'), Type.Literal('SCHEDULE_NOT_FOUND'), Type.Literal('SCHEDULE_RULE_INVALID'),
+    Type.Literal('SCHEDULE_STATE_CONFLICT'), Type.Literal('SCHEDULE_REVISION_CONFLICT'), Type.Literal('SCHEDULE_UNAVAILABLE'),
+    Type.Literal('SCHEDULE_AUTHENTICATION_REQUIRED'), Type.Literal('SCHEDULE_FORBIDDEN'), Type.Literal('SCHEDULE_VALIDATION_FAILED')
+  ]), message: Type.String({ minLength: 1, maxLength: 1_024 }), retryable: Type.Boolean() }, { additionalProperties: false })
+}, { $id: 'ScheduleApiError.v1', additionalProperties: false });
+export type ApiScheduleError = Static<typeof ApiScheduleErrorSchema>;
+
+export const ApiEffectResolutionSubmitRequestSchema = Type.Object({
+  schemaVersion: Type.Literal('1'),
+  semanticActionId: Type.String({ pattern: '^sha256:[a-f0-9]{64}$' }),
+  originalExecutorRef: Type.String({ minLength: 1, maxLength: 256 }),
+  decision: Type.Union([Type.Literal('CONFIRMED_COMMITTED'), Type.Literal('CONFIRMED_NOT_COMMITTED'), Type.Literal('ABANDONED')]),
+  action: Type.Union([Type.Literal('CONTINUE_NEW_ATTEMPT'), Type.Literal('TERMINATE')]),
+  evidenceDigest: Type.String({ pattern: '^sha256:[a-f0-9]{64}$' }),
+  reason: Type.String({ minLength: 1, maxLength: 2_048 }),
+  policyVersion: Type.String({ minLength: 1, maxLength: 64 })
+}, { additionalProperties: false, $id: 'ApiEffectResolutionSubmit.v1' });
+export type ApiEffectResolutionSubmitRequest = Static<typeof ApiEffectResolutionSubmitRequestSchema>;
+
+export const ApiEffectResolutionOutcomeSchema = Type.Object({
+  schemaVersion: Type.Literal('EffectResolutionResult.v1'),
+  status: Type.Union([Type.Literal('resolved'), Type.Literal('existing')]),
+  resolutionRef: Type.String({ minLength: 1 }),
+  decision: Type.Union([Type.Literal('CONFIRMED_COMMITTED'), Type.Literal('CONFIRMED_NOT_COMMITTED'), Type.Literal('ABANDONED')]),
+  action: Type.Union([Type.Literal('CONTINUE_NEW_ATTEMPT'), Type.Literal('TERMINATE')]),
+  actionState: Type.Union([Type.Literal('ACCEPTED'), Type.Literal('COMPLETED')]),
+  taskId: Type.Optional(Type.String({ minLength: 1, maxLength: 128 })),
+  attemptId: Type.Optional(Type.String({ minLength: 1, maxLength: 128 }))
+}, { additionalProperties: false, $id: 'EffectResolutionResult.v1' });
+export type ApiEffectResolutionOutcome = Static<typeof ApiEffectResolutionOutcomeSchema>;

@@ -1177,6 +1177,24 @@ export function assertScheduleTriggerEvent(value: unknown): asserts value is Sch
 export const scheduleDefinitionDigest = (definition: ScheduleDefinition): string =>
   `sha256:${createHash('sha256').update(JSON.stringify(definition)).digest('hex')}`;
 
+export const SCHEDULE_TRIGGER_HISTORY_LIMIT_MAX = 200;
+
+/** Control-plane authority store for schedule snapshots and the append-only trigger event stream. */
+export interface ScheduleControlStore {
+  putRecord(snapshot: ScheduleSnapshot): Promise<'stored' | 'existing'>;
+  getRecord(ref: ScheduleRef): Promise<ScheduleSnapshot | undefined>;
+  listRecords(tenantId: string, input?: { readonly state?: ScheduleState; readonly limit?: number }): Promise<readonly ScheduleSnapshot[]>;
+  replaceRecord(snapshot: ScheduleSnapshot): Promise<void>;
+  appendTriggerEvent(event: ScheduleTriggerEvent): Promise<'stored' | 'existing'>;
+  listTriggerEvents(ref: ScheduleRef, input: { readonly limit: number }): Promise<readonly ScheduleTriggerEvent[]>;
+  health(): Promise<AdapterHealth>;
+}
+
+export function assertScheduleSnapshot(value: unknown): asserts value is ScheduleSnapshot {
+  if (!Value.Check(ScheduleSnapshotSchema, value)) throw new TypeError('SCHEDULE_RULE_INVALID');
+  assertNoSensitiveData(value);
+}
+
 export * from './runtime.js';
 
 export type TrustedPackageDependencyKind =

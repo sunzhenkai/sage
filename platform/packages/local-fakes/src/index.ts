@@ -558,4 +558,6 @@ export { InMemoryDurableCoordinatorFake } from './coordinator.js';
 
 export { InMemoryScheduleFake, ScheduleFakeError } from './schedule.js';
 
+export { InMemoryScheduleControlStore } from './schedule-store.js';
+
 export * from './production-governance.js';

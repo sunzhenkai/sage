@@ -23,6 +23,7 @@
         "task-store-postgres",
         "temporal-registry",
         "temporal-routing",
+        "temporal-schedules",
         "tool-runtime"
       ]
     },
@@ -101,15 +102,18 @@
         "agent-client",
         "agent-contracts",
         "agent-lib",
+        "agent-run-admission",
+        "agent-state-postgres",
         "chat-domain",
         "local-runtime",
         "observability",
         "platform-ports",
         "production-governance",
+        "secret-vault",
         "task-domain",
         "task-store-postgres",
-        "temporal-workflows",
-        "secret-vault"
+        "temporal-schedules",
+        "temporal-workflows"
       ]
     },
     "app-contracts": {
@@ -317,6 +321,12 @@
         "agent-contracts",
         "platform-ports",
         "local-fakes"
+      ]
+    },
+    "temporal-schedules": {
+      "owner": "Task Runtime",
+      "mayDependOn": [
+        "platform-ports"
       ]
     }
   },

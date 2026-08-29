@@ -2,10 +2,10 @@
 
 ## 1. 契约与存储基座
 
-- [ ] 1.1 `platform-ports` 新增 canonical Schedule 契约（`ScheduleDefinition`、`ScheduleOccurrence`、`ScheduleTriggerEvent`、`SchedulePort`、错误码），`local-fakes` 提供确定性 fake adapter；单测覆盖契约校验
-- [ ] 1.2 `app-contracts` 新增 `/v1/schedules`（创建/列表/详情/暂停/恢复/删除/触发历史）与 `/v1/effects/resolutions` 的 HTTP schema 与客户端；单测
-- [ ] 1.3 `postgres-migrations` 新增 `schedules`、`schedule_trigger_events`、`effect_resolutions`（append-only）表与索引，向前兼容；迁移测试
-- [ ] 1.4 `agent-state-postgres` Consumption Ledger 扩展 schedule 账户：聚合上限 + 可选窗口、reserve 前检查、与 invocation 结算同事务累加；单测 + 集成测试覆盖"余额不足拒止/跨 run 聚合/窗口滚动"（spec: consumption-ledger delta）
+- [x] 1.1 `platform-ports` 新增 canonical Schedule 契约（`ScheduleDefinition`、`ScheduleOccurrence`、`ScheduleTriggerEvent`、`SchedulePort`、错误码），`local-fakes` 提供确定性 fake adapter；单测覆盖契约校验
+- [x] 1.2 `app-contracts` 新增 `/v1/schedules`（创建/列表/详情/暂停/恢复/删除/触发历史）与 `/v1/effects/resolutions` 的 HTTP schema 与客户端；单测
+- [x] 1.3 `postgres-migrations` 新增 `schedules`、`schedule_trigger_events`、`effect_resolutions`（append-only）表与索引，向前兼容；迁移测试
+- [x] 1.4 `agent-state-postgres` Consumption Ledger 扩展 schedule 账户：聚合上限 + 可选窗口、reserve 前检查、与 invocation 结算同事务累加；单测 + 集成测试覆盖"余额不足拒止/跨 run 聚合/窗口滚动"（spec: consumption-ledger delta）
 
 ## 2. Schedule Plane 核心
 

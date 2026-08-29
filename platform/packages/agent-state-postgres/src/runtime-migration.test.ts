@@ -71,3 +71,36 @@ describe('runtime kernel broker migration', () => {
     expect(sql).not.toContain('DROP TABLE IF EXISTS sealed_agent_checkpoints');
   });
 });
+
+describe('P8 schedule plane migration', () => {
+  it('defines control-plane schedules, append-only trigger events, and ledger schedule budget accounts', async () => {
+    const sql = await readFile(new URL('../migrations/009_p8_schedule_plane.sql', import.meta.url), 'utf8');
+    expect(sql.startsWith('BEGIN;')).toBe(true);
+    expect(sql.endsWith('COMMIT;\n')).toBe(true);
+    expect(sql).toContain('CREATE TABLE IF NOT EXISTS agent_schedules');
+    expect(sql).toContain('PRIMARY KEY (tenant_id,schedule_id)');
+    expect(sql).toContain("state IN ('ACTIVE','PAUSED','DELETED')");
+    expect(sql).toContain('CREATE TABLE IF NOT EXISTS agent_schedule_trigger_events');
+    expect(sql).toContain("kind IN ('SUCCEEDED','FAILED','SKIPPED','MISSED')");
+    expect(sql).toContain('PRIMARY KEY (tenant_id,schedule_id,occurrence_id,kind)');
+    expect(sql).toContain('agent_schedule_trigger_events_immutable');
+    expect(sql).toContain('CREATE TABLE IF NOT EXISTS agent_schedule_budget_accounts');
+    expect(sql).toContain('CREATE TABLE IF NOT EXISTS agent_schedule_budget_accruals');
+    expect(sql).toContain('PRIMARY KEY (tenant_id,schedule_id,invocation_id)');
+    expect(sql).toContain('agent_schedule_budget_accruals_immutable');
+    expect(sql.match(/sage_tenant_isolation/g)?.length).toBeGreaterThanOrEqual(4);
+    expect(sql).not.toContain('DROP TABLE');
+    expect(checksum(sql)).toMatch(/^[a-f0-9]{64}$/);
+  });
+});
+
+describe('migration ordering', () => {
+  it('runs the RLS bootstrap before any migration whose table policies reference sage_security', async () => {
+    const source = await readFile(new URL('./index.ts', import.meta.url), 'utf8');
+    const list = source.match(/'(?:001|002|003|004|005|006|007|008|009)_[a-z0-9_]+\.sql'/g) ?? [];
+    expect(list.length).toBeGreaterThanOrEqual(10);
+    expect(list.indexOf("'004_production_rls_bootstrap.sql'")).toBeGreaterThan(-1);
+    expect(list.indexOf("'004_production_rls_bootstrap.sql'")).toBeLessThan(list.indexOf("'005_production_governance_core.sql'"));
+    expect(list.indexOf("'009_p8_schedule_plane.sql'")).toBe(list.length - 1);
+  });
+});

@@ -14,6 +14,11 @@ import {
   ListSessionsQuerySchema,
   ListSessionsResponseSchema,
   MessagePartSchema,
+  ApiEffectResolutionSubmitRequestSchema,
+  ApiScheduleDefinitionSchema,
+  ApiScheduleListResponseSchema,
+  ApiScheduleSnapshotSchema,
+  ApiScheduleTriggerHistoryResponseSchema,
   ModelCatalogPageSchema,
   PromoteChatMessageRequestSchema,
   ProviderCatalogPageSchema,
@@ -142,5 +147,47 @@ describe('Provider connection check contracts', () => {
     expect(Value.Check(ProviderConnectionCheckRequestSchema, { ...request, apiKey: 'x'.repeat(4097) })).toBe(false);
     expect(Value.Check(ProviderConnectionCheckRequestSchema, { ...request, ownerId: 'leak' })).toBe(false);
     expect(Value.Check(ProviderConnectionCheckResponseSchema, { status: 'connected', checkedAt: '2026-08-15T01:00:00.000Z', message: 'ok', apiKey: 'leak' })).toBe(false);
+  });
+});
+
+describe('P8 schedule plane HTTP contracts', () => {
+  const validDefinition = {
+    schemaVersion: '1' as const,
+    scheduleId: 'daily-brief',
+    tenantId: 'tenant-a',
+    trigger: { kind: 'cron', expression: '0 9 * * *', timezone: 'Asia/Shanghai' },
+    overlapPolicy: 'SKIP' as const,
+    misfirePolicy: 'SKIP' as const,
+    releaseBinding: { strategy: 'FIXED' as const, releaseId: 'release-1', contentDigest: `sha256:${'a'.repeat(64)}` },
+    targetConstraints: { allowedEnvironments: ['local'] },
+    budget: { limits: [{ dimension: 'runs', limit: 100 }] },
+    invocation: { task: 'daily', params: { window: 7 } }
+  };
+
+  it('accepts a canonical-shaped schedule definition and rejects extra fields', () => {
+    expect(Value.Check(ApiScheduleDefinitionSchema, validDefinition)).toBe(true);
+    expect(Value.Check(ApiScheduleDefinitionSchema, { ...validDefinition, humanInput: 'not-allowed' })).toBe(false);
+    expect(Value.Check(ApiScheduleDefinitionSchema, { ...validDefinition, invocation: { task: 'Bad Task' } })).toBe(false);
+    expect(Value.Check(ApiScheduleDefinitionSchema, { ...validDefinition, releaseBinding: { strategy: 'FOLLOW' } })).toBe(true);
+  });
+
+  it('accepts snapshots with optional next fire time and list/history envelopes', () => {
+    const snapshot = { schemaVersion: '1' as const, definition: validDefinition, revision: 3, state: 'ACTIVE' as const, contentDigest: `sha256:${'b'.repeat(64)}`, createdAtMs: 0, updatedAtMs: 1, nextFireAtMs: 2 };
+    expect(Value.Check(ApiScheduleSnapshotSchema, snapshot)).toBe(true);
+    expect(Value.Check(ApiScheduleSnapshotSchema, { ...snapshot, nextFireAtMs: -1 })).toBe(false);
+    expect(Value.Check(ApiScheduleListResponseSchema, { schemaVersion: 'ScheduleListResult.v1', schedules: [snapshot] })).toBe(true);
+    expect(Value.Check(ApiScheduleTriggerHistoryResponseSchema, {
+      schemaVersion: 'ScheduleTriggerHistory.v1', scheduleId: 'daily-brief',
+      events: [{ schemaVersion: '1', scheduleId: 'daily-brief', occurrenceId: '2026-08-29T09', kind: 'FAILED', occurredAtMs: 5, errorCode: 'LEDGER_INSUFFICIENT' }]
+    })).toBe(true);
+  });
+
+  it('rejects resolution submissions with malformed digests or conflicting actions', () => {
+    const valid = { schemaVersion: '1' as const, semanticActionId: `sha256:${'c'.repeat(64)}`, originalExecutorRef: 'principal://worker-1', decision: 'CONFIRMED_NOT_COMMITTED' as const, action: 'CONTINUE_NEW_ATTEMPT' as const, evidenceDigest: `sha256:${'d'.repeat(64)}`, reason: '外部未提交，重试', policyVersion: 'pilot-v1' };
+    expect(Value.Check(ApiEffectResolutionSubmitRequestSchema, valid)).toBe(true);
+    expect(Value.Check(ApiEffectResolutionSubmitRequestSchema, { ...valid, decision: 'CONFIRMED_COMMITTED', action: 'CONTINUE_NEW_ATTEMPT' })).toBe(true);
+    expect(Value.Check(ApiEffectResolutionSubmitRequestSchema, { ...valid, semanticActionId: 'sha256:short' })).toBe(false);
+    expect(Value.Check(ApiEffectResolutionSubmitRequestSchema, { ...valid, action: 'RETRY_NOW' })).toBe(false);
+    expect(Value.Check(ApiEffectResolutionSubmitRequestSchema, { ...valid, reason: '' })).toBe(false);
   });
 });
