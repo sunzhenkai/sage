@@ -159,7 +159,7 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .muted-copy { color: var(--muted); font-size: 11.5px; line-height: 1.65; }
 .badge, .status-badge, .metric-chip { display: inline-flex; align-items: center; white-space: nowrap; border-radius: 6px; font-size: 11px; font-weight: 600; letter-spacing: .01em; }
 .badge { padding: 3px 8px; }
-.badge-neutral { background: var(--neutral-soft); color: #5c645d; }
+.badge-neutral, .status-neutral { background: var(--neutral-soft); color: #5c645d; }
 .badge-success, .status-succeeded { background: var(--pine-soft); color: var(--pine-deep); }
 .badge-warning, .status-running, .status-paused { background: var(--amber-soft); color: var(--amber); }
 .badge-danger, .status-failed, .status-effect_unknown { background: var(--sealred-soft); color: #9a3a2d; }
