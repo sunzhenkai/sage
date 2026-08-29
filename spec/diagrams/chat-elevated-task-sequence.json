@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Chat 长请求提升为 Temporal Task 时序",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "viewBox": [1040, 820],
+    "views": [
+      { "id": "elevate", "label": "请求提升", "focus": ["browser", "agent-api", "task-domain", "agent-state"], "note": "长请求被判定后写入 TaskProjection 并启动 Workflow。" },
+      { "id": "worker-execution", "label": "Worker 执行", "focus": ["temporal", "agent-worker", "agent-client", "agent-lib"], "note": "Activity 经 LocalAgentClient 复用 Agent Library。" },
+      { "id": "projection-poll", "label": "状态投影", "focus": ["agent-worker", "temporal", "task-domain", "agent-state", "browser"], "note": "Signal 更新 TaskProjection，UI 轮询显示 Task Card。" }
+    ]
+  },
+  "participants": [
+    { "id": "browser", "type": "external", "label": "浏览器", "sublabel": "agent-web" },
+    { "id": "agent-api", "type": "backend", "label": "agent-api", "sublabel": "Fastify" },
+    { "id": "task-domain", "type": "backend", "label": "task-domain", "sublabel": "Router" },
+    { "id": "temporal", "type": "messagebus", "label": "Temporal", "sublabel": "Workflow" },
+    { "id": "agent-worker", "type": "backend", "label": "agent-worker", "sublabel": "Worker" },
+    { "id": "agent-client", "type": "backend", "label": "agent-client", "sublabel": "LocalClient" },
+    { "id": "agent-lib", "type": "backend", "label": "agent-lib", "sublabel": "kernel" },
+    { "id": "agent-state", "type": "database", "label": "agent-state", "sublabel": "Postgres" }
+  ],
+  "segments": [
+    { "from": 150, "to": 340, "label": "提升" },
+    { "from": 360, "to": 640, "label": "Worker 执行" },
+    { "from": 660, "to": 755, "label": "状态查询" }
+  ],
+  "messages": [
+    { "id": "post-chat-long", "from": "browser", "to": "agent-api", "y": 170, "label": "POST /v1/chat (long)", "variant": "emphasis" },
+    { "id": "create-projection", "from": "agent-api", "to": "task-domain", "y": 210, "label": "createTaskProjection(pending)" },
+    { "id": "insert-projection", "from": "task-domain", "to": "agent-state", "y": 250, "label": "INSERT task_projection" },
+    { "id": "route", "from": "agent-api", "to": "task-domain", "y": 290, "label": "route(spec)" },
+    { "id": "start-workflow", "from": "task-domain", "to": "temporal", "y": 370, "label": "startWorkflow", "variant": "emphasis" },
+    { "id": "deliver-activity", "from": "temporal", "to": "agent-worker", "y": 410, "label": "deliver activity" },
+    { "id": "run-agent-activity", "from": "agent-worker", "to": "agent-client", "y": 450, "label": "runAgentActivity", "variant": "emphasis" },
+    { "id": "run-loop", "from": "agent-client", "to": "agent-lib", "y": 490, "label": "runLoop" },
+    { "id": "record-effect", "from": "agent-lib", "to": "agent-state", "y": 530, "label": "recordEffect", "variant": "emphasis" },
+    { "id": "signal-progress", "from": "agent-worker", "to": "temporal", "y": 590, "label": "signal progress" },
+    { "id": "update-projection", "from": "temporal", "to": "task-domain", "y": 630, "label": "update projection" },
+    { "id": "update-db", "from": "task-domain", "to": "agent-state", "y": 670, "label": "UPDATE task_projection" },
+    { "id": "poll-task", "from": "browser", "to": "agent-api", "y": 700, "label": "GET /v1/tasks/:taskId" },
+    { "id": "get-task", "from": "agent-api", "to": "task-domain", "y": 720, "label": "getTask" },
+    { "id": "read-projection", "from": "task-domain", "to": "agent-state", "y": 735, "label": "SELECT task" }
+  ],
+  "activations": [
+    { "participant": "agent-api", "from": 160, "to": 340, "type": "backend" },
+    { "participant": "task-domain", "from": 200, "to": 330, "type": "backend" },
+    { "participant": "agent-state", "from": 240, "to": 270, "type": "database" },
+    { "participant": "temporal", "from": 360, "to": 650, "type": "messagebus" },
+    { "participant": "agent-worker", "from": 400, "to": 600, "type": "backend" },
+    { "participant": "agent-client", "from": 440, "to": 560, "type": "backend" },
+    { "participant": "agent-lib", "from": 480, "to": 550, "type": "backend" },
+    { "participant": "agent-state", "from": 520, "to": 550, "type": "database" },
+    { "participant": "task-domain", "from": 620, "to": 690, "type": "backend" },
+    { "participant": "agent-state", "from": 660, "to": 690, "type": "database" },
+    { "participant": "agent-api", "from": 700, "to": 780, "type": "backend" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "提升判定", "items": ["agent-api 按阈值判定长请求", "TaskProjection 先写 pending，给 UI 返回 Task Card", "Task Router 按 TaskType / 环境 / 能力 / 隔离 / 数据驻留选 Cluster"] },
+    { "dot": "emerald", "title": "双 Host 复用", "items": ["Worker Activity 与 Chat Service 共用 LocalAgentClient", "Agent Loop 不在调用侧复制", "Effect / Checkpoint 同一套机制"] },
+    { "dot": "amber", "title": "恢复与取消", "items": ["Workflow 自带重试 / 超时 / 取消策略", "Worker 崩溃后从 Temporal 历史 + Checkpoint 续跑", "用户取消 → Signal → Workflow 终止"] }
+  ]
+}

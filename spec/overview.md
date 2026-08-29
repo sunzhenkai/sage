@@ -54,4 +54,4 @@
 
 ## 图
 
-尚未生成 archify HTML。架构拓扑以 `docs/design/README.md` 中的目标态 ASCII 图为准;模块边界与切片主路径以本文表格为准。
+所有图已生成 archify HTML，列表与链接见 [diagrams/INDEX.md](diagrams/INDEX.md)。架构图（architecture）采用 `standard` 质量档，时序/工作流/数据流/状态机采用 `showcase` 质量档。

@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Sage 系统上下文与信任边界",
+    "locale": "zh-CN",
+    "quality_profile": "standard",
+    "viewBox": [1100, 720],
+    "views": [
+      { "id": "user-path", "label": "用户请求路径", "focus": ["users", "agent-web", "agent-api", "agent-worker", "model-provider"], "note": "从浏览器到 Agent Library 的完整请求链。" },
+      { "id": "data-plane", "label": "数据平面", "focus": ["postgres", "temporal", "minio", "agent-api", "agent-worker"], "note": "Postgres、Temporal、MinIO 构成 Sage 的持久化与编排底座。" },
+      { "id": "secret-boundary", "label": "密钥边界", "focus": ["secret-manager", "agent-api", "agent-worker", "model-provider"], "note": "所有密钥由 Secret Vault 注入，Spec 不记录密钥值。" }
+    ]
+  },
+  "components": [
+    { "id": "users", "type": "external", "label": "终端用户", "sublabel": "浏览器 / HTTP 客户端", "pos": [40, 320], "size": [120, 60] },
+    { "id": "agent-web", "type": "frontend", "label": "agent-web", "sublabel": "Vite + 反代 :4173", "pos": [220, 320], "size": [120, 60] },
+    { "id": "agent-api", "type": "backend", "label": "agent-api", "sublabel": "Fastify :9610", "pos": [420, 220], "size": [120, 60] },
+    { "id": "agent-worker", "type": "backend", "label": "agent-worker", "sublabel": "Temporal Worker :9611", "pos": [420, 420], "size": [120, 60] },
+    { "id": "secret-manager", "type": "security", "label": "Secret Vault", "sublabel": "密钥注入", "pos": [60, 120], "size": [120, 60] },
+    { "id": "postgres", "type": "database", "label": "PostgreSQL", "sublabel": "17.6 :5432", "pos": [720, 160], "size": [120, 60] },
+    { "id": "temporal", "type": "messagebus", "label": "Temporal", "sublabel": "gRPC :7233", "pos": [720, 300], "size": [120, 60] },
+    { "id": "minio", "type": "cloud", "label": "Artifact Store", "sublabel": "MinIO S3 :9000", "pos": [720, 440], "size": [120, 60] },
+    { "id": "model-provider", "type": "external", "label": "模型 Provider", "sublabel": "LLM API", "pos": [940, 420], "size": [120, 60] },
+    { "id": "mcp-tools", "type": "external", "label": "MCP 工具后端", "sublabel": "stdio / HTTP", "pos": [940, 560], "size": [120, 60] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "Sage 私有部署域", "wraps": ["agent-web", "agent-api", "agent-worker", "postgres", "temporal", "minio", "secret-manager"], "pad": 16 },
+    { "kind": "security-group", "label": "API 边界", "wraps": ["agent-web", "agent-api"], "pad": 10 }
+  ],
+  "connections": [
+    { "id": "users-to-web", "from": "users", "to": "agent-web", "label": "HTTPS", "fromSide": "right", "toSide": "top", "via": [[190, 350], [190, 40], [280, 40]], "labelAt": [235, 25] },
+    { "id": "web-to-api", "from": "agent-web", "to": "agent-api", "label": "HTTP/SSE", "fromSide": "right", "toSide": "top", "via": [[380, 350], [380, 80], [480, 80]], "labelAt": [430, 65] },
+    { "id": "api-to-postgres", "from": "agent-api", "to": "postgres", "label": "SQL", "fromSide": "top", "toSide": "left", "via": [[480, 190]], "labelAt": [600, 175] },
+    { "id": "api-to-temporal", "from": "agent-api", "to": "temporal", "label": "gRPC 7233", "fromSide": "right", "toSide": "left", "via": [[650, 250], [650, 330]], "labelAt": [640, 235] },
+    { "id": "worker-to-postgres", "from": "agent-worker", "to": "postgres", "label": "SQL", "fromSide": "bottom", "toSide": "left", "via": [[480, 540], [900, 540], [900, 100], [700, 100], [700, 190]], "labelAt": [720, 140] },
+    { "id": "worker-to-temporal", "from": "agent-worker", "to": "temporal", "label": "subscribe", "fromSide": "right", "toSide": "left", "via": [[630, 450], [630, 330]], "labelAt": [600, 400] },
+    { "id": "worker-to-minio", "from": "agent-worker", "to": "minio", "label": "S3", "fromSide": "right", "toSide": "left", "via": [[640, 450], [640, 470]], "labelAt": [670, 470] },
+    { "id": "worker-to-provider", "from": "agent-worker", "to": "model-provider", "label": "HTTPS", "fromSide": "right", "toSide": "left", "via": [[700, 450], [700, 410], [880, 410], [880, 450]], "labelAt": [790, 390] },
+    { "id": "worker-to-mcp", "from": "agent-worker", "to": "mcp-tools", "label": "Sandbox 出站", "variant": "security", "fromSide": "bottom", "toSide": "left", "via": [[480, 590]], "labelAt": [655, 575] },
+    { "id": "api-to-secret", "from": "agent-api", "to": "secret-manager", "label": "解封密钥", "fromSide": "top", "toSide": "right", "via": [[480, 60], [220, 60], [220, 150]], "labelAt": [350, 50] },
+    { "id": "worker-to-secret", "from": "agent-worker", "to": "secret-manager", "label": "解封密钥", "fromSide": "right", "toSide": "right", "via": [[560, 450], [560, 100], [240, 100], [240, 150]], "labelAt": [400, 90] }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "用户面", "items": ["浏览器经 agent-web 访问 agent-api", "短请求同步走 Agent Library，长请求提升为 Temporal Task", "SSE 流式返回消息 / Tool / Artifact 事件"] },
+    { "dot": "emerald", "title": "数据面", "items": ["PostgreSQL 承载 Chat、Task、Agent State、Ledger", "Temporal 负责 Workflow / Activity 编排与历史", "MinIO 存储 Checkpoint 与大对象 Artifact"] },
+    { "dot": "rose", "title": "信任边界", "items": ["模型 Key / Secret 由 Secret Vault 注入，不进入镜像", "MCP 工具执行在 Sandbox，受 egress 白名单约束", "Temporal Namespace 按租户切分，Workflow 启动后固定"] }
+  ]
+}

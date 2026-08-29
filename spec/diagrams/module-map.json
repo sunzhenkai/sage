@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Sage 模块依赖图",
+    "locale": "zh-CN",
+    "quality_profile": "standard",
+    "viewBox": [1100, 720],
+    "views": [
+      { "id": "app-layer", "label": "应用层", "focus": ["apps", "chat-domain", "task-domain"], "note": "agent-api / agent-worker / agent-web 与 Chat、Task 领域。" },
+      { "id": "kernel-layer", "label": "内核层", "focus": ["agent-lib-runtime", "state-persistence", "contracts-and-policy"], "note": "Agent Library 与持久化、契约、策略。" },
+      { "id": "supply-chain", "label": "供应链", "focus": ["release-and-admission", "contracts-and-policy", "state-persistence"], "note": "AgentPackageRelease 从打包到 Registry 的不可变链。" }
+    ]
+  },
+  "components": [
+    { "id": "apps", "type": "backend", "label": "apps", "sublabel": "三个部署单元", "pos": [60, 320], "size": [120, 60] },
+    { "id": "chat-domain", "type": "backend", "label": "chat-domain", "sublabel": "Chat 会话与流", "pos": [280, 220], "size": [140, 60] },
+    { "id": "task-domain", "type": "backend", "label": "task-domain", "sublabel": "Temporal 编排", "pos": [280, 420], "size": [140, 60] },
+    { "id": "agent-lib-runtime", "type": "backend", "label": "agent-lib-runtime", "sublabel": "Agent Loop 内核", "pos": [520, 320], "size": [160, 70], "tag": "双 Host 复用" },
+    { "id": "state-persistence", "type": "database", "label": "state-persistence", "sublabel": "Postgres / S3 适配", "pos": [760, 220], "size": [150, 60] },
+    { "id": "contracts-and-policy", "type": "security", "label": "contracts-and-policy", "sublabel": "TypeBox / Vault / 治理", "pos": [760, 340], "size": [150, 60] },
+    { "id": "release-and-admission", "type": "backend", "label": "release-and-admission", "sublabel": "Package / Registry / 准入", "pos": [760, 460], "size": [150, 60] },
+    { "id": "observability-and-local", "type": "cloud", "label": "observability-and-local", "sublabel": "指标 / 日志 / Local Fakes", "pos": [520, 520], "size": [160, 60] },
+    { "id": "examples-and-evidence", "type": "external", "label": "examples-and-evidence", "sublabel": "P2–P7 集成测试", "pos": [280, 560], "size": [150, 60] },
+    { "id": "design-and-changes", "type": "external", "label": "design-and-changes", "sublabel": "架构 / OpenSpec / 任务", "pos": [60, 560], "size": [140, 60] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "Agent Application", "wraps": ["apps", "chat-domain", "task-domain"], "pad": 14 },
+    { "kind": "region", "label": "Agent Library + 基础设施", "wraps": ["agent-lib-runtime", "state-persistence", "contracts-and-policy", "release-and-admission", "observability-and-local"], "pad": 14 }
+  ],
+  "connections": [
+    { "id": "apps-chat", "from": "apps", "to": "chat-domain", "label": "装配 Chat API/UI" },
+    { "id": "apps-task", "from": "apps", "to": "task-domain", "label": "装配 Task API/Worker" },
+    { "id": "apps-lib", "from": "apps", "to": "agent-lib-runtime", "label": "LocalAgentClient", "labelAt": [350, 340] },
+    { "id": "apps-state", "from": "apps", "to": "state-persistence", "label": "Store Port" },
+    { "id": "apps-contracts", "from": "apps", "to": "contracts-and-policy", "label": "Contracts", "fromSide": "top", "toSide": "left", "via": [[120, 150], [740, 150], [740, 370]], "labelAt": [430, 140] },
+    { "id": "chat-state", "from": "chat-domain", "to": "state-persistence", "label": "Chat Store", "labelAt": [590, 235] },
+    { "id": "chat-lib", "from": "chat-domain", "to": "agent-lib-runtime", "label": "StreamEvent 类型" },
+    { "id": "task-state", "from": "task-domain", "to": "state-persistence", "label": "Task Store", "labelAt": [590, 300] },
+    { "id": "task-lib", "from": "task-domain", "to": "agent-lib-runtime", "label": "Activity 调 Loop" },
+    { "id": "lib-state", "from": "agent-lib-runtime", "to": "state-persistence", "label": "Port 实现" },
+    { "id": "lib-contracts", "from": "agent-lib-runtime", "to": "contracts-and-policy", "label": "Contracts / Vault", "labelAt": [720, 310] },
+    { "id": "lib-release", "from": "agent-lib-runtime", "to": "release-and-admission", "label": "Release 校验" },
+    { "id": "release-state", "from": "release-and-admission", "to": "state-persistence", "label": "Registry 落库", "fromSide": "left", "toSide": "left", "via": [[720, 490], [720, 250]], "labelAt": [700, 300] },
+    { "id": "release-contracts", "from": "release-and-admission", "to": "contracts-and-policy", "label": "Governance" },
+    { "id": "evidence-lib", "from": "examples-and-evidence", "to": "agent-lib-runtime", "label": "集成验证", "variant": "dashed" },
+    { "id": "evidence-apps", "from": "examples-and-evidence", "to": "apps", "label": "集成验证", "variant": "dashed" },
+    { "id": "design-contracts", "from": "design-and-changes", "to": "contracts-and-policy", "label": "驱动契约", "variant": "dashed", "fromSide": "bottom", "toSide": "left", "via": [[130, 680], [740, 680], [740, 370]], "labelAt": [430, 670] }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "分层原则", "items": ["Agent Application -> Agent Library", "Agent Library -X-> UI / Task / Temporal / DB", "Chat Service 与 Temporal Activity 共用同一 Agent Loop"] },
+    { "dot": "emerald", "title": "核心依赖", "items": ["apps 装配 chat-domain、task-domain、agent-lib-runtime", "state-persistence 实现 platform-ports", "contracts-and-policy 提供 TypeBox Schema 与 Secret Vault"] },
+    { "dot": "amber", "title": "验证闭环", "items": ["examples-and-evidence 覆盖 P2–P7 集成测试", "release-and-admission 提供 Conformance Evidence", "design-and-changes 沉淀架构决策与 OpenSpec 演进"] }
+  ]
+}
