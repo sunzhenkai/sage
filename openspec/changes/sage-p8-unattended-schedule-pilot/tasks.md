@@ -35,9 +35,9 @@
 
 ## 6. Soak 与端到端验证
 
-- [ ] 6.1 soak runner（`platform/scripts/p8/`）：`soak.config.json`（窗口/频次/触发下限/成功率阈值/故障注入清单：provider 失效、worker 重启、投影延迟、预算耗尽、pause/resume），时钟源注入支持压缩时钟，机器证据输出 `platform/evidence/p8/`；runner 单测
-- [ ] 6.2 `test:p8:exercises` 接线：压缩时钟等效窗口含故障注入的自动化验证，输出各验收维度证据 JSON；本地可重复执行
-- [ ] 6.3 `ai-app-lifecycle-e2e` schedule 路径用例：注册 → Release → 创建 schedule → 触发 → admission → durable run → 投影/触发历史/预算账户一致；FIXED 不漂移与失败触发 fail closed 断言（spec: ai-app-lifecycle-e2e delta）
+- [x] 6.1 soak runner（`platform/scripts/p8/`）：`soak.config.json`（窗口/频次/触发下限/成功率阈值/故障注入清单：provider 失效、worker 重启、投影延迟、预算耗尽、pause/resume），时钟源注入支持压缩时钟，机器证据输出 `platform/evidence/p8/`；runner 单测
+- [x] 6.2 `test:p8:exercises` 接线：压缩时钟等效窗口含故障注入的自动化验证，输出各验收维度证据 JSON；本地可重复执行
+- [x] 6.3 `ai-app-lifecycle-e2e` schedule 路径用例：注册 → Release → 创建 schedule → 触发 → admission → durable run → 投影/触发历史/预算账户一致；FIXED 不漂移与失败触发 fail closed 断言（spec: ai-app-lifecycle-e2e delta）
 
 ## 7. 运行门与文档
 

@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "P8SoakConfig.v1",
+  "description": "压缩时钟等效 soak：以确定性 fakes 驱动 schedule dispatch 管道，注入故障清单并输出机器证据。真实 14 天 soak 由真实环境执行（运行门证据项，可 UNFILLED）。",
+  "window": { "durationMs": 3600000, "tickMs": 60000 },
+  "trigger": { "everyMs": 60000 },
+  "acceptance": { "minimumTriggers": 50, "successRateThreshold": 0.84, "maxSilentDuplicates": 0 },
+  "faultInjections": [
+    { "id": "provider-failure", "kind": "resolver-failure", "fromMs": 600000, "toMs": 780000 },
+    { "id": "worker-restart", "kind": "dispatch-failure", "fromMs": 1500000, "toMs": 1680000 },
+    { "id": "projection-delay", "kind": "event-write-delay", "fromMs": 2100000, "toMs": 2160000 },
+    { "id": "budget-exhaustion", "kind": "budget-drain", "fromMs": 2700000, "toMs": 2880000 },
+    { "id": "pause-resume", "kind": "pause-resume", "fromMs": 3000000, "toMs": 3060000 }
+  ],
+  "clockCompression": "1h 窗口以 tick=60s 逐步推进；故障以窗口内时间区间声明"
+}

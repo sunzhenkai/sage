@@ -1,0 +1,65 @@
+{
+  "schemaVersion": "P8SoakEvidence.v1",
+  "suite": "p8/soak-compressed-clock",
+  "window": {
+    "startMs": 0,
+    "endMs": 3600000,
+    "tickMs": 60000,
+    "compression": "simulated-fakes"
+  },
+  "schedule": {
+    "scheduleId": "soak-daily",
+    "trigger": {
+      "kind": "interval",
+      "everyMs": 60000
+    }
+  },
+  "triggers": {
+    "attempted": 59,
+    "succeeded": 51,
+    "failed": 8,
+    "skipped": 0
+  },
+  "successRate": 0.8644,
+  "silentDuplicateCount": 0,
+  "acceptance": {
+    "minimumTriggers": 50,
+    "successRateThreshold": 0.84,
+    "maxSilentDuplicates": 0,
+    "met": true
+  },
+  "faultDispositions": [
+    {
+      "id": "provider-failure",
+      "kind": "resolver-failure",
+      "outcome": "self-healed",
+      "evidenced": true
+    },
+    {
+      "id": "worker-restart",
+      "kind": "dispatch-failure",
+      "outcome": "self-healed",
+      "evidenced": true
+    },
+    {
+      "id": "projection-delay",
+      "kind": "event-write-delay",
+      "outcome": "self-healed",
+      "evidenced": true
+    },
+    {
+      "id": "budget-exhaustion",
+      "kind": "budget-drain",
+      "outcome": "stable-failed",
+      "evidenced": true
+    },
+    {
+      "id": "pause-resume",
+      "kind": "pause-resume",
+      "outcome": "self-healed",
+      "evidenced": true
+    }
+  ],
+  "productionEvidence": false,
+  "checkedAt": "2026-08-29T14:29:45.325Z"
+}
