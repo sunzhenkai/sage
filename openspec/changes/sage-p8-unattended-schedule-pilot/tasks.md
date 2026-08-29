@@ -41,11 +41,11 @@
 
 ## 7. 运行门与文档
 
-- [ ] 7.1 风险显式接受台账（单点 PostgreSQL、调度设施单副本等）：记录/检查机制，UNFILLED 阻断 GO；单测
-- [ ] 7.2 告警路由检查：每条无人值守告警须有响应主体与 runbook，占位 roster 记 UNFILLED；单测
-- [ ] 7.3 soak 证据 schema 与门校验：窗口起止、触发数、成功率、零静默重复、故障处置结论；短窗/缺证据不得通过
-- [ ] 7.4 pilot go/no-go 接线：门决议引用 soak 证据、风险台账、认证与告警检查，任一 UNFILLED 输出 NO-GO；证据可追溯；单测
-- [ ] 7.5 文档：`platform/docs/p8-*.md`（决策、告警/裁决 runbook、soak 执行说明）、README 状态更新
+- [x] 7.1 风险显式接受台账（单点 PostgreSQL、调度设施单副本等）：记录/检查机制，UNFILLED 阻断 GO；单测
+- [x] 7.2 告警路由检查：每条无人值守告警须有响应主体与 runbook，占位 roster 记 UNFILLED；单测
+- [x] 7.3 soak 证据 schema 与门校验：窗口起止、触发数、成功率、零静默重复、故障处置结论；短窗/缺证据不得通过
+- [x] 7.4 pilot go/no-go 接线：门决议引用 soak 证据、风险台账、认证与告警检查，任一 UNFILLED 输出 NO-GO；证据可追溯；单测
+- [x] 7.5 文档：`platform/docs/p8-*.md`（决策、告警/裁决 runbook、soak 执行说明）、README 状态更新
 - [ ] 7.6 【人类输入，不可伪造】真实 14 天 soak 证据与 oncall roster：保持 UNFILLED 并阻断 GO，直到真实环境执行与人员提供（P7 诚实证据纪律）
 
 ## 8. 收尾验证

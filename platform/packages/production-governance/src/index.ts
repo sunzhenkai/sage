@@ -5,3 +5,4 @@ export * from './authorization.js';
 export * from './readiness.js';
 export * from './resilience.js';
 export * from './failure-taxonomy.js';
+export * from './pilot-gate.js';
