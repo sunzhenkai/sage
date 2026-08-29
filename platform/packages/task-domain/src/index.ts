@@ -54,7 +54,8 @@ export type TaskControl = Static<typeof TaskControlSchema>;
 export const TaskSliceLimitsSchema = Type.Object({
   maxTurns: Type.Integer({ minimum: 1, maximum: 4 }),
   maxToolCalls: Type.Integer({ minimum: 0, maximum: 16 }),
-  maxTokens: Type.Integer({ minimum: 1, maximum: 32_000 }),
+  // 上限对齐包运行预算钳制（runs-api 200k：须覆盖 512 KiB 输入快照 ≈128k token + 输出，不静默削弱声明预算）。
+  maxTokens: Type.Integer({ minimum: 1, maximum: 200_000 }),
   // 上限对齐 live provider 真实推理（活动 startToClose 5 分钟 + 重试余量）；echo 执行毫秒级完成不受影响。
   timeoutMs: Type.Integer({ minimum: 100, maximum: 600_000 })
 }, { additionalProperties: false, $id: 'TaskSliceLimits.v1' });

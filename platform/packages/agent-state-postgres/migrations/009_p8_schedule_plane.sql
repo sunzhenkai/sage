@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS agent_schedules (
  revision bigint NOT NULL CHECK (revision>=1),
  state text NOT NULL CHECK (state IN ('ACTIVE','PAUSED','DELETED')),
  content_digest text NOT NULL CHECK (content_digest ~ '^sha256:[a-f0-9]{64}$'),
+ anchor_release_id text,
  created_at timestamptz NOT NULL, updated_at timestamptz NOT NULL,
  PRIMARY KEY (tenant_id,schedule_id));
 CREATE INDEX IF NOT EXISTS agent_schedules_state_idx ON agent_schedules (tenant_id,state);

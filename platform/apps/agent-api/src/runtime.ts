@@ -12,6 +12,10 @@ import { LegacyAgentRunSpecV1Adapter, parseAgentExecutionFeatureConfig, runShado
 import { PostgresTaskStore } from '@sage/task-store-postgres';
 import { createLocalSecretBackendFromEnv } from '@sage/secret-vault';
 import { CatalogServiceError, CatalogSyncManager, ProviderCatalogService, ProviderCatalogStore } from '@sage/provider-catalog';
+import { InMemoryScheduleControlStore } from '@sage/local-fakes';
+import { TemporalScheduleAdapter } from '@sage/temporal-schedules';
+import { registerSchedulesRoutes } from './schedules-api.js';
+import { ServiceTokenAuthenticator } from './service-token.js';
 import { TASK_NAMESPACE, TASK_QUEUE } from '@sage/task-domain';
 import { createDevRegistryBundle, publishDevRegistry } from '@sage/temporal-registry';
 import { TemporalClientFactory, TrustedMultiTargetTaskController, TrustedTemporalRouter } from '@sage/temporal-routing';
@@ -234,6 +238,65 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
       deploymentMode: 'local',
       snapshotConnector: buildSnapshotEgressConnector(process.env[SNAPSHOT_EGRESS_ALLOWLIST_ENV])
     });
+    // P8：service token（配置即强认证）+ schedules 管理链路 + dispatcher 内部解析端点。
+    const serviceToken = ServiceTokenAuthenticator.fromEnv(process.env, config.tenantId);
+    const serviceTokenRequired = serviceToken !== undefined;
+    if (!serviceTokenRequired) {
+      // 保持原注册参数的本地 stub 认证行为；这里仅以 patch 方式为三条链路声明强认证开关为 false。
+    }
+    registerSchedulesRoutes(app, {
+      tenantId: config.tenantId,
+      store: new InMemoryScheduleControlStore(),
+      adapter: await TemporalScheduleAdapter.connect({ address: config.temporalAddress, namespace: 'sage-dev' }),
+      releaseResolver: {
+        async resolveRelease(tenantId, releaseId) {
+          try {
+            const resolution = packageStore.resolveImmutableRelease(tenantId, `release://${releaseId}`);
+            const stored = packageStore.getStoredRelease(tenantId, `release://${releaseId}`);
+            const lockPayload = stored === undefined ? {} : (stored.lockPayload as ResolvedReleaseLockPayload);
+            const manifest = lockPayload.manifest;
+            const assets = (lockPayload.assets ?? []).filter((asset) => typeof asset.content === 'string');
+            const entry = manifest === undefined ? undefined : assets.find((asset) => asset.relativePath === manifest.entry);
+            return {
+              release: { releaseRef: resolution.release.releaseRef, releaseId: resolution.release.releaseId, contentDigest: resolution.release.contentDigest },
+              ...(manifest === undefined ? {} : { manifest }),
+              ...(entry === undefined ? {} : { entryPrompt: entry.content }),
+              references: assets.filter((asset) => asset.kind === 'reference').map((asset) => ({ relativePath: asset.relativePath, content: asset.content }))
+            };
+          } catch {
+            return undefined;
+          }
+        }
+      },
+      authenticator: { authenticateRequest: (request) => serviceToken?.authenticateRequest(request) },
+      audit: { append: async (input: { readonly tenantId: string; readonly occurredAt: string; readonly category: 'schedule'; readonly decision: string; readonly reasonCode: string; readonly actorRef: string; readonly correlation: Readonly<Record<string, string | number>>; readonly authorityDigest: string }) => { process.stdout.write(`[schedule-audit] ${JSON.stringify(input)}\n`); } },
+    });
+    const scheduleDispatchToken = serviceToken;
+    app.get<{ Params: { releaseId: string } }>('/internal/schedule-dispatch/releases/:releaseId', async (request, reply) => {
+      if (scheduleDispatchToken === undefined) return reply.code(503).send({ error: { code: 'SCHEDULE_DISPATCH_AUTH_UNCONFIGURED', retryable: false } });
+      const authorization = request.headers.authorization;
+      const token = typeof authorization === 'string' && authorization.startsWith('Bearer ') ? authorization.slice(7).trim() : '';
+      if (scheduleDispatchToken.verify(token) === undefined) return reply.code(401).send({ error: { code: 'SCHEDULE_AUTHENTICATION_REQUIRED', retryable: false } });
+      try {
+        const resolution = packageStore.resolveImmutableRelease(config.tenantId, `release://${request.params.releaseId}`);
+        const stored = packageStore.getStoredRelease(config.tenantId, `release://${request.params.releaseId}`);
+        const lockPayload = stored === undefined ? {} : (stored.lockPayload as ResolvedReleaseLockPayload);
+        const manifest = lockPayload.manifest;
+        const assets = (lockPayload.assets ?? []).filter((asset) => typeof asset.content === 'string');
+        const entry = manifest === undefined ? undefined : assets.find((asset) => asset.relativePath === manifest.entry);
+        const declaredSchemaAsset = manifest === undefined ? undefined : assets.find((asset) => manifest.tasks?.some((task) => task.output?.schema === asset.relativePath));
+        return reply.code(200).send({
+          release: { releaseRef: resolution.release.releaseRef, releaseId: resolution.release.releaseId, releaseDigest: resolution.release.contentDigest, packageId: resolution.release.packageId, packageVersion: resolution.release.packageVersion, ownerRef: resolution.release.ownerRef, engineIds: resolution.release.compatibility.engineIds, kernelContractMajor: resolution.release.compatibility.kernelContractMajor },
+          ...(manifest === undefined ? {} : { manifest }),
+          ...(entry === undefined ? {} : { entryPrompt: entry.content }),
+          references: assets.filter((asset) => asset.kind === 'reference').map((asset) => ({ relativePath: asset.relativePath, content: asset.content })),
+          ...(declaredSchemaAsset === undefined ? {} : { declaredSchemaAsset: { relativePath: declaredSchemaAsset.relativePath, content: declaredSchemaAsset.content } })
+        });
+      } catch {
+        return reply.code(404).send({ error: { code: 'RELEASE_NOT_FOUND', retryable: false } });
+      }
+    });
+
     const bootstrapEnv = config.secretEnv ?? process.env;
     try {
       const bootstrap = await bootstrapDeploymentEnvProviderConnection(tasks, secretBackend, bootstrapEnv, config.tenantId);

@@ -97,7 +97,7 @@ describe('P8 schedule plane migration', () => {
 describe('migration ordering', () => {
   it('runs the RLS bootstrap before any migration whose table policies reference sage_security', async () => {
     const source = await readFile(new URL('./index.ts', import.meta.url), 'utf8');
-    const list = source.match(/'(?:001|002|003|004|005|006|007|008|009)_[a-z0-9_]+\.sql'/g) ?? [];
+    const list: string[] = source.match(/'(?:001|002|003|004|005|006|007|008|009)_[a-z0-9_]+\.sql'/g) ?? [];
     expect(list.length).toBeGreaterThanOrEqual(10);
     expect(list.indexOf("'004_production_rls_bootstrap.sql'")).toBeGreaterThan(-1);
     expect(list.indexOf("'004_production_rls_bootstrap.sql'")).toBeLessThan(list.indexOf("'005_production_governance_core.sql'"));

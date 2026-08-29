@@ -11,6 +11,7 @@ import { PostgresTaskStore } from '@sage/task-store-postgres';
 import { TASK_NAMESPACE, TASK_QUEUE, type TaskInputRef } from '@sage/task-domain';
 import { createAgentTaskActivities, type TaskSliceInputResolver } from './activities.js';
 import { startTaskKernelExecution, type TaskCanonicalCompatibilityOptions } from './task-compatibility.js';
+import { createScheduleDispatcher, readScheduleDispatcherConfig, type ScheduleDispatcherRuntime } from './schedule-runtime.js';
 
 export interface WorkerRuntimeConfig {
   readonly deploymentMode: 'local';
@@ -165,9 +166,10 @@ export async function createWorkerRuntime(config = readWorkerRuntimeConfig()): P
         settingsStore: tasks,
         providerConnections: tasks,
         secretBackend,
-        liveClientFactory: (route: LiveProviderRoute, mode: 'package' | 'chat') => createLivePackageAgentClient({
+        liveClientFactory: (route: LiveProviderRoute, mode: 'package' | 'chat', maxOutputTokens?: number) => createLivePackageAgentClient({
           route,
-          systemPrompt: mode === 'package' ? PACKAGE_RUN_SYSTEM_PROMPT : CHAT_SLICE_SYSTEM_PROMPT
+          systemPrompt: mode === 'package' ? PACKAGE_RUN_SYSTEM_PROMPT : CHAT_SLICE_SYSTEM_PROMPT,
+          ...(maxOutputTokens === undefined ? {} : { maxOutputTokens })
         }),
         ...(canonicalCompatibility === undefined ? {} : { canonicalCompatibility }),
         store: tasks, outputStore: tasks, inputResolver: new CompositeTaskInputResolver([
@@ -178,6 +180,13 @@ export async function createWorkerRuntime(config = readWorkerRuntimeConfig()): P
       }),
       buildId: env('SAGE_WORKER_BUILD_ID', 'sage-local-worker-v1')
     });
+    // P8：dispatcher worker（SAGE_SCHEDULE_DISPATCH_ENABLED=1 启用），复用同一 Temporal 连接与任务存储。
+    const dispatcherConfig = readScheduleDispatcherConfig(process.env, { tenantId: config.tenantId, postgresUrl: config.postgresUrl, temporalAddress: config.temporalAddress });
+    let dispatcher: ScheduleDispatcherRuntime | undefined;
+    if (dispatcherConfig.enabled) {
+      dispatcher = await createScheduleDispatcher(dispatcherConfig, tasks, native);
+      process.stdout.write(`[schedule-dispatcher] enabled queue=sage-schedule-dispatcher-v1 api=${dispatcherConfig.apiBaseUrl}\n`);
+    }
     const subject = worker;
     const server = createServer((request, response) => {
       const path = new URL(request.url ?? '/', 'http://localhost').pathname;
@@ -190,8 +199,10 @@ export async function createWorkerRuntime(config = readWorkerRuntimeConfig()): P
       if (path !== '/readyz') { response.statusCode = 404; response.end(); return; }
       if (stopping) return send(json(503, { status: 'not_ready', reason: 'shutting_down', secretBackend: { mode: secretBackendMode } }));
       const status = subject.getStatus();
-      if (!workerPollersReady(status)) {
-        return send(json(503, { status: 'not_ready', worker: { runState: status.runState, workflowPollerState: status.workflowPollerState, activityPollerState: status.activityPollerState }, secretBackend: { mode: secretBackendMode } }));
+      const dispatcherStatus = dispatcher?.worker.getStatus();
+      const dispatcherReady = dispatcher === undefined || (dispatcherStatus !== undefined && dispatcher.ready(dispatcherStatus));
+      if (!workerPollersReady(status) || !dispatcherReady) {
+        return send(json(503, { status: 'not_ready', worker: { runState: status.runState, workflowPollerState: status.workflowPollerState, activityPollerState: status.activityPollerState }, ...(dispatcher === undefined ? {} : { dispatcher: { runState: dispatcherStatus!.runState, workflowPollerState: dispatcherStatus!.workflowPollerState, activityPollerState: dispatcherStatus!.activityPollerState } }), secretBackend: { mode: secretBackendMode } }));
       }
       void Promise.all([chat.getSession(config.tenantId, 'health-sentinel'), tasks.listTaskViews(config.tenantId, { limit: 1 })])
         .then(() => send(json(200, { status: 'ready', namespace: TASK_NAMESPACE, taskQueue: TASK_QUEUE, secretBackend: { mode: secretBackendMode }, worker: { runState: status.runState, workflowPollerState: status.workflowPollerState, activityPollerState: status.activityPollerState } })))
@@ -204,6 +215,7 @@ export async function createWorkerRuntime(config = readWorkerRuntimeConfig()): P
       stopping = true;
       await new Promise<void>((resolveClose) => server.close(() => resolveClose()));
       subject.shutdown();
+      dispatcher?.shutdown();
       await running?.catch(() => undefined);
       await Promise.allSettled([chat.close(), tasks.close()]);
       await native?.close();

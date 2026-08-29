@@ -23,13 +23,21 @@ export class PostgresScheduleStore implements ScheduleControlStore {
     finally { client.release(); }
   }
 
-  async putRecord(snapshot: ScheduleSnapshot): Promise<'stored' | 'existing'> {
+  async putRecord(input: { readonly snapshot: ScheduleSnapshot; readonly followAnchorReleaseId?: string }): Promise<'stored' | 'existing'> {
+    const snapshot = input.snapshot;
     assertScheduleSnapshot(snapshot);
     return this.#tx(snapshot.definition.tenantId, 'principal://schedule-control', async client => {
-      const inserted = await client.query(`INSERT INTO agent_schedules(tenant_id,schedule_id,snapshot,revision,state,content_digest,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT (tenant_id,schedule_id) DO NOTHING`, [
-        snapshot.definition.tenantId, snapshot.definition.scheduleId, JSON.stringify(snapshot), snapshot.revision, snapshot.state, snapshot.contentDigest, new Date(snapshot.createdAtMs), new Date(snapshot.updatedAtMs)
+      const inserted = await client.query(`INSERT INTO agent_schedules(tenant_id,schedule_id,snapshot,revision,state,content_digest,anchor_release_id,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT (tenant_id,schedule_id) DO NOTHING`, [
+        snapshot.definition.tenantId, snapshot.definition.scheduleId, JSON.stringify(snapshot), snapshot.revision, snapshot.state, snapshot.contentDigest, input.followAnchorReleaseId ?? null, new Date(snapshot.createdAtMs), new Date(snapshot.updatedAtMs)
       ]);
       return inserted.rowCount === 1 ? 'stored' as const : 'existing' as const;
+    });
+  }
+
+  async getFollowAnchor(ref: ScheduleRef): Promise<string | undefined> {
+    return this.#tx(ref.tenantId, 'principal://schedule-control', async client => {
+      const row = (await client.query<{ anchor_release_id: string | null }>('SELECT anchor_release_id FROM agent_schedules WHERE tenant_id=$1 AND schedule_id=$2', [ref.tenantId, ref.scheduleId])).rows[0];
+      return row?.anchor_release_id ?? undefined;
     });
   }
 

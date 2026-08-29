@@ -194,7 +194,7 @@ tasks:
 3. 只解读快照数据中存在的仓库，不虚构 repo 或指标；数据缺失的维度明确指出；
 4. 给出去同质化的总结：这批新项目反映了什么方向，哪些可能只是短期噪声。
 
-输出遵循 output.schema.json 的 digest JSON 结构（overview / repos / insights / missingData），保持简洁、结构化、可引用。
+输出规则（强制，违反即任务失败）：你的整个回复必须且只能是一个用 \`\`\`json 围栏包裹的 JSON 对象，结构符合 output.schema.json（overview / repos / insights / missingData）；围栏之外不得有任何文字，也不得输出第二个围栏。内容保持简洁、结构化、可引用。
 `,
   [`references/repo-evaluation.md`]: `# 项目评估维度
 

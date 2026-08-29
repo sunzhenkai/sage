@@ -26,6 +26,8 @@ export interface RegisterAppsRoutesOptions {
   readonly tenantId: string;
   readonly store: AgentReleaseStore;
   readonly ownerNamespace: string;
+  /** pilot 强认证（5.1）：true 时 stub 信任头停止提权，仅 service token 主体被认可。 */
+  readonly serviceTokenRequired?: boolean;
   readonly authenticator: AppsPrincipalAuthenticator;
   readonly engineIds?: readonly string[];
   readonly kernelContractMajor?: number;
@@ -54,6 +56,7 @@ function sendError(reply: FastifyReply, status: number, code: string, message: s
 
 async function principalFor(request: FastifyRequest, options: RegisterAppsRoutesOptions): Promise<AuthenticatedPrincipal | undefined> {
   if (options.authenticator.authenticateRequest) return options.authenticator.authenticateRequest(request);
+  if (options.serviceTokenRequired === true) return undefined;
   const auth = request.headers['x-authentication-id'];
   if (typeof auth === 'string' && auth.length > 0) {
     return { authenticationId: auth, principalId: auth, tenantId: options.tenantId, roles: ['package-registrar'] };

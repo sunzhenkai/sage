@@ -36,6 +36,7 @@
     "@sage/task-store-postgres": "workspace:*",
     "@sage/temporal-registry": "workspace:*",
     "@sage/temporal-routing": "workspace:*",
+    "@sage/temporal-schedules": "workspace:*",
     "@sage/tool-runtime": "workspace:*",
     "@temporalio/client": "1.22.0",
     "fastify": "5.11.3",

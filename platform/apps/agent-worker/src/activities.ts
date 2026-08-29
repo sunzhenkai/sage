@@ -34,8 +34,8 @@ export interface TaskSliceInputResolver {
   resolve(inputRef: TaskInputRef, tenantId: string): Promise<string>;
 }
 export interface AgentTaskActivityOptions {
-  /** live provider 客户端工厂：所有 slice（package 与 chat）在执行边界按解析路由构造。 */
-  readonly liveClientFactory: (route: LiveProviderRoute, mode: 'package' | 'chat') => LocalAgentClient;
+  /** live provider 客户端工厂：所有 slice（package 与 chat）在执行边界按解析路由构造；第三参为包运行声明的输出 token 预算（chat 不传，保持逐轮缺省）。 */
+  readonly liveClientFactory: (route: LiveProviderRoute, mode: 'package' | 'chat', maxOutputTokens?: number) => LocalAgentClient;
   /** 运行 agent 设置读取：缺省视 unset（无默认 provider，fail-closed）。 */
   readonly settingsStore?: Pick<RunAgentSettingsStore, 'getRunAgentSettings'>;
   /** 注册表访问：slice 执行边界解析条目与密封凭据。 */
@@ -63,10 +63,11 @@ export interface AgentTaskActivities { executeAgentSlice(input: ExecuteAgentSlic
 export async function resolveConnectionLiveClient(
   providerConnections: ProviderConnectionStore | undefined,
   secretBackend: SecretBackend | undefined,
-  liveClientFactory: ((route: LiveProviderRoute, mode: 'package' | 'chat') => LocalAgentClient) | undefined,
+  liveClientFactory: ((route: LiveProviderRoute, mode: 'package' | 'chat', maxOutputTokens?: number) => LocalAgentClient) | undefined,
   tenantId: string,
   connectionId: string | undefined,
-  mode: 'package' | 'chat'
+  mode: 'package' | 'chat',
+  maxOutputTokens?: number
 ): Promise<LocalAgentClient> {
   const failure = (): string =>
     connectionId === undefined
@@ -94,7 +95,7 @@ export async function resolveConnectionLiveClient(
     baseUrl: connection.baseUrl,
     modelId: connection.modelId,
     apiKey
-  }, mode);
+  }, mode, maxOutputTokens);
 }
 
 export function createAgentTaskActivities(options: AgentTaskActivityOptions): AgentTaskActivities {
@@ -131,7 +132,9 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
       }
       const sliceClient = await resolveConnectionLiveClient(
         options.providerConnections, options.secretBackend, options.liveClientFactory,
-        input.tenantId, resolvedConnection.connectionId, isPackageInput ? 'package' : 'chat'
+        input.tenantId, resolvedConnection.connectionId, isPackageInput ? 'package' : 'chat',
+        // 声明预算直通 provider 请求上限：4096 缺省会把大输出（如 digest JSON）静默截断成契约违约。
+        ...(isPackageInput ? [input.limits.maxTokens] as const : [] as const)
       );
       const idempotencyKey = `${input.workflowId}:attempt:${input.attempt}:slice:${input.sliceNumber}`;
       const ownerToken = `${info.activityId}:delivery:${info.attempt}`;
@@ -201,7 +204,10 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
           try {
             materializedOutput = enforceOutputContract(outcome.output, outputContract);
           } catch (cause) {
-            if (cause instanceof OutputContractViolation) throw new ApplicationFailure(cause.message, 'PACKAGE_OUTPUT_CONTRACT_VIOLATION');
+            if (cause instanceof OutputContractViolation) {
+              console.error(`[DEBUG contract violation raw output] len=${outcome.output.length} head=${JSON.stringify(outcome.output.slice(0, 400))} tail=${JSON.stringify(outcome.output.slice(-200))}`);
+              throw new ApplicationFailure(cause.message, 'PACKAGE_OUTPUT_CONTRACT_VIOLATION');
+            }
             throw cause;
           }
         }

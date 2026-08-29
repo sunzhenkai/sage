@@ -434,7 +434,7 @@ export const ApiScheduleBudgetSchema = Type.Object({
 }, { additionalProperties: false, $id: 'ApiScheduleBudget.v1' });
 export type ApiScheduleBudget = Static<typeof ApiScheduleBudgetSchema>;
 export const ApiScheduleTargetConstraintsSchema = Type.Object({
-  allowedEnvironments: Type.Array(Type.String({ minLength: 1, maxLength: 64 }), { minItems: 1, maxItems: 8 }),
+  allowedEnvironments: Type.Array(Type.Union([Type.Literal('local'), Type.Literal('development'), Type.Literal('staging'), Type.Literal('production')]), { minItems: 1, maxItems: 8 }),
   isolationLevel: Type.Optional(Type.String({ minLength: 1, maxLength: 64 })),
   dataResidency: Type.Optional(Type.String({ minLength: 1, maxLength: 64 }))
 }, { additionalProperties: false, $id: 'ApiScheduleTargetConstraints.v1' });

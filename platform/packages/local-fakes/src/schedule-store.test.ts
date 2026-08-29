@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import type { ScheduleSnapshot, ScheduleTriggerEvent } from '@sage/platform-ports';
+import type { ScheduleDefinition, ScheduleSnapshot, ScheduleTriggerEvent } from '@sage/platform-ports';
 import { InMemoryScheduleControlStore } from './schedule-store.js';
 
-const definition = {
+const definition: ScheduleDefinition = {
   schemaVersion: '1' as const,
   scheduleId: 'daily-brief',
   tenantId: 'tenant-a',
-  trigger: { kind: 'interval', everyMs: 60_000 } as const,
+  trigger: { kind: 'interval', everyMs: 60_000 },
   overlapPolicy: 'SKIP' as const,
   misfirePolicy: 'SKIP' as const,
-  releaseBinding: { strategy: 'FIXED', releaseId: 'release-1', contentDigest: `sha256:${'a'.repeat(64)}` } as const,
+  releaseBinding: { strategy: 'FIXED', releaseId: 'release-1', contentDigest: `sha256:${'a'.repeat(64)}` },
   targetConstraints: { allowedEnvironments: ['local'] },
   budget: { limits: [{ dimension: 'runs' as const, limit: 100 }] },
   invocation: { task: 'daily', params: { window: 7 } }
@@ -28,8 +28,8 @@ const event = (occurrenceId: string, kind: ScheduleTriggerEvent['kind']): Schedu
 describe('InMemoryScheduleControlStore', () => {
   it('is create-only for records and enforces optimistic revision replacement', async () => {
     const store = new InMemoryScheduleControlStore();
-    expect(await store.putRecord(snapshot(1, 'ACTIVE'))).toBe('stored');
-    expect(await store.putRecord(snapshot(1, 'PAUSED'))).toBe('existing');
+    expect(await store.putRecord({ snapshot: snapshot(1, 'ACTIVE') })).toBe('stored');
+    expect(await store.putRecord({ snapshot: snapshot(1, 'PAUSED') })).toBe('existing');
     await expect(store.replaceRecord(snapshot(3, 'ACTIVE'))).rejects.toThrow('SCHEDULE_REVISION_CONFLICT');
     await store.replaceRecord(snapshot(2, 'PAUSED'));
     expect((await store.getRecord({ tenantId: 'tenant-a', scheduleId: 'daily-brief' }))?.state).toBe('PAUSED');
@@ -48,7 +48,7 @@ describe('InMemoryScheduleControlStore', () => {
 
   it('filters record listing by state and isolates tenants', async () => {
     const store = new InMemoryScheduleControlStore();
-    await store.putRecord(snapshot(1, 'ACTIVE'));
+    await store.putRecord({ snapshot: snapshot(1, 'ACTIVE') });
     expect(await store.listRecords('tenant-a')).toHaveLength(1);
     expect(await store.listRecords('tenant-b')).toHaveLength(0);
     expect(await store.listRecords('tenant-a', { state: 'DELETED' })).toHaveLength(0);

@@ -1033,7 +1033,8 @@ export const ScheduleTargetConstraintsSchema = Type.Object({
 export type ScheduleTargetConstraints = Static<typeof ScheduleTargetConstraintsSchema>;
 
 export const ScheduleInvocationTemplateSchema = Type.Object({
-  task: Type.Optional(Type.String({ minLength: 1, maxLength: 64, pattern: '^[a-z][a-z0-9-]{0,63}$' })),
+  // task 必填：P8 绑定语义（schedule MUST 声明目标 task），legacy 空输入在 schema 层即拒绝。
+  task: Type.String({ minLength: 1, maxLength: 64, pattern: '^[a-z][a-z0-9-]{0,63}$' }),
   params: Type.Optional(Type.Record(
     Type.String({ minLength: 1, maxLength: 64 }),
     Type.Union([Type.String({ maxLength: 2_048 }), Type.Number()]),
@@ -1134,6 +1135,8 @@ export interface SchedulePort {
   resume(ref: ScheduleRef): Promise<ScheduleSnapshot>;
   remove(ref: ScheduleRef): Promise<void>;
   describe(ref: ScheduleRef): Promise<ScheduleSnapshot | undefined>;
+  /** 设施侧下次触发时间（P8 UI next fire 展示）；不支持或暂停时返回 undefined。 */
+  nextFireAtMs?(ref: ScheduleRef): Promise<number | undefined>;
   health(): Promise<AdapterHealth>;
 }
 
@@ -1181,10 +1184,12 @@ export const SCHEDULE_TRIGGER_HISTORY_LIMIT_MAX = 200;
 
 /** Control-plane authority store for schedule snapshots and the append-only trigger event stream. */
 export interface ScheduleControlStore {
-  putRecord(snapshot: ScheduleSnapshot): Promise<'stored' | 'existing'>;
+  /** 创建记录；FOLLOW 绑定必须携带锚点 Release（canonical 契约不含该字段，属控制面细节）。 */
+  putRecord(input: { readonly snapshot: ScheduleSnapshot; readonly followAnchorReleaseId?: string }): Promise<'stored' | 'existing'>;
   getRecord(ref: ScheduleRef): Promise<ScheduleSnapshot | undefined>;
   listRecords(tenantId: string, input?: { readonly state?: ScheduleState; readonly limit?: number }): Promise<readonly ScheduleSnapshot[]>;
   replaceRecord(snapshot: ScheduleSnapshot): Promise<void>;
+  getFollowAnchor(ref: ScheduleRef): Promise<string | undefined>;
   appendTriggerEvent(event: ScheduleTriggerEvent): Promise<'stored' | 'existing'>;
   listTriggerEvents(ref: ScheduleRef, input: { readonly limit: number }): Promise<readonly ScheduleTriggerEvent[]>;
   health(): Promise<AdapterHealth>;

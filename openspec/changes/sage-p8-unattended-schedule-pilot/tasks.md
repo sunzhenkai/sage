@@ -9,11 +9,11 @@
 
 ## 2. Schedule Plane 核心
 
-- [ ] 2.1 新建 `temporal-schedules` 包：`SchedulePort` adapter（create/pause/resume/delete/list），overlap 策略映射 SKIP/ALLOW_ALL/BUFFER_ONE，spec 声明式触发规则映射；单测（真实 Temporal 垂直链路可选 gate）
-- [ ] 2.2 `ScheduleTriggerDispatcher.v1` 确定性 workflow：仅 activity 调用 admission，workflow ID = `schedule:{scheduleId}:occ:{occurrenceId}` 幂等；replay 测试证明无 I/O、有界重试后稳定 failed trigger
-- [ ] 2.3 admission 集成：schedule trigger 来源身份、FIXED/FOLLOW Release 解析（FIXED 创建时固化 digest、FOLLOW 每次 admission 解析 active + rollout policy）、schedule 账户预检、依赖不可用 fail closed 记 failed trigger；单测 + 集成测试（spec: ai-app-schedule-plane 触发/绑定 requirement）
-- [ ] 2.4 状态对账 activity：按触发规则推算期望 occurrence 与已记录事件差集 → missed/skipped 事件与指标；边界（暂停窗口不补偿、设施不可用恢复后）测试
-- [ ] 2.5 schedule conformance：fake adapter 与 temporal adapter 过同一 conformance 用例（触发/overlap/misfire/pause-resume/幂等）；`check-p8-boundaries` 脚本：canonical 契约与公共 schema 无 Temporal Schedule 类型，dispatcher workflow 无 I/O
+- [x] 2.1 新建 `temporal-schedules` 包：`SchedulePort` adapter（create/pause/resume/delete/list），overlap 策略映射 SKIP/ALLOW_ALL/BUFFER_ONE，spec 声明式触发规则映射；单测（真实 Temporal 垂直链路可选 gate）
+- [x] 2.2 `ScheduleTriggerDispatcher.v1` 确定性 workflow：仅 activity 调用 admission，workflow ID = `schedule:{scheduleId}:occ:{occurrenceId}` 幂等；replay 测试证明无 I/O、有界重试后稳定 failed trigger
+- [x] 2.3 admission 集成：schedule trigger 来源身份、FIXED/FOLLOW Release 解析（FIXED 创建时固化 digest、FOLLOW 每次 admission 解析 active + rollout policy）、schedule 账户预检、依赖不可用 fail closed 记 failed trigger；单测 + 集成测试（spec: ai-app-schedule-plane 触发/绑定 requirement）
+- [x] 2.4 状态对账 activity：按触发规则推算期望 occurrence 与已记录事件差集 → missed/skipped 事件与指标；边界（暂停窗口不补偿、设施不可用恢复后）测试
+- [x] 2.5 schedule conformance：fake adapter 与 temporal adapter 过同一 conformance 用例（触发/overlap/misfire/pause-resume/幂等）；`check-p8-boundaries` 脚本：canonical 契约与公共 schema 无 Temporal Schedule 类型，dispatcher workflow 无 I/O
 
 ## 3. Schedule API / UI / 观测
 

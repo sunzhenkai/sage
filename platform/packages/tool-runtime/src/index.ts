@@ -735,3 +735,4 @@ const sameDescriptor = (left: Pick<CapabilityDescriptor, 'toolRef' | 'providerRe
 
 export * from './sandbox.js';
 export * from './egress.js';
+export * from './snapshot-egress.js';

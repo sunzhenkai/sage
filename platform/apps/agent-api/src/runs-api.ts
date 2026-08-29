@@ -43,6 +43,8 @@ export interface RegisterPackageRunsRoutesOptions {
   readonly releaseResolver: PackageReleaseResolver;
   readonly taskStore: TaskPackageInputStore;
   readonly specStore: AgentTaskSpecStorePort;
+  /** pilot 强认证（5.1）：true 时 stub 信任头停止提权，仅 service token 主体被认可。 */
+  readonly serviceTokenRequired?: boolean;
   readonly authenticator: RunsPrincipalAuthenticator;
   readonly deploymentMode?: 'local' | 'pilot' | 'production';
   readonly settingsStore?: Pick<RunAgentSettingsStore, 'getRunAgentSettings'>;
@@ -82,6 +84,7 @@ function sendError(reply: FastifyReply, status: number, code: string, message: s
 
 async function principalFor(request: FastifyRequest, options: RegisterPackageRunsRoutesOptions): Promise<AuthenticatedPrincipal | undefined> {
   if (options.authenticator.authenticateRequest) return options.authenticator.authenticateRequest(request);
+  if (options.serviceTokenRequired === true) return undefined;
   const auth = request.headers['x-authentication-id'];
   if (typeof auth === 'string' && auth.length > 0) {
     return { authenticationId: auth, principalId: auth, tenantId: options.tenantId, roles: ['task-operator'] };

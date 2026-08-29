@@ -9,12 +9,19 @@ export class InMemoryScheduleControlStore implements ScheduleControlStore {
   readonly #records = new Map<string, ScheduleSnapshot>();
   readonly #events = new Map<string, ScheduleTriggerEvent[]>();
 
-  async putRecord(snapshot: ScheduleSnapshot): Promise<'stored' | 'existing'> {
+  readonly #anchors = new Map<string, string>();
+  async putRecord(input: { readonly snapshot: ScheduleSnapshot; readonly followAnchorReleaseId?: string }): Promise<'stored' | 'existing'> {
+    const snapshot = input.snapshot;
     assertScheduleSnapshot(snapshot);
     const key = `${snapshot.definition.tenantId}\u0000${snapshot.definition.scheduleId}`;
     if (this.#records.has(key)) return 'existing';
     this.#records.set(key, structuredClone(snapshot));
+    if (input.followAnchorReleaseId !== undefined) this.#anchors.set(key, input.followAnchorReleaseId);
     return 'stored';
+  }
+
+  async getFollowAnchor(ref: ScheduleRef): Promise<string | undefined> {
+    return this.#anchors.get(`${ref.tenantId}\u0000${ref.scheduleId}`);
   }
 
   async getRecord(ref: ScheduleRef): Promise<ScheduleSnapshot | undefined> {

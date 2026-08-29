@@ -105,6 +105,7 @@
         "agent-run-admission",
         "agent-state-postgres",
         "chat-domain",
+        "local-fakes",
         "local-runtime",
         "observability",
         "platform-ports",
@@ -113,7 +114,8 @@
         "task-domain",
         "task-store-postgres",
         "temporal-schedules",
-        "temporal-workflows"
+        "temporal-workflows",
+        "tool-runtime"
       ]
     },
     "app-contracts": {
@@ -326,6 +328,7 @@
     "temporal-schedules": {
       "owner": "Task Runtime",
       "mayDependOn": [
+        "local-fakes",
         "platform-ports"
       ]
     }
