@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { AdapterHealth, AgentTaskSpec, AgentTaskSpecStorePort, ProductionConsumptionLedgerPort, ScheduleOccurrence, ScheduleSnapshot } from '@sage/platform-ports';
+import type { AgentTaskSpec } from '@sage/agent-contracts';
+import type { AdapterHealth, ProductionConsumptionLedgerPort, ScheduleDefinition, ScheduleOccurrence, ScheduleSnapshot } from '@sage/platform-ports';
 import { InMemoryScheduleControlStore } from '@sage/local-fakes';
 import type { ScheduleDispatchReleaseResolution } from '@sage/agent-run-admission';
 import { createScheduleDispatcherActivities, type DispatcherReleaseResolver } from './schedule-activities.js';
@@ -14,11 +15,11 @@ import type { ScheduleRef, ScheduleTriggerEvent } from '@sage/platform-ports';
  * （soak 压缩时钟等效窗口 + 故障注入在 scripts/p8/soak.exercise.test.ts，本用例聚焦单次全链路正确性。）
  */
 
-const definition = {
-  schemaVersion: '1' as const, scheduleId: 'lifecycle-daily', tenantId: 'tenant-a',
-  trigger: { kind: 'interval', everyMs: 60_000 } as const,
-  overlapPolicy: 'SKIP' as const, misfirePolicy: 'SKIP' as const,
-  releaseBinding: { strategy: 'FIXED', releaseId: 'release-1', contentDigest: `sha256:${'a'.repeat(64)}` } as const,
+const definition: ScheduleDefinition = {
+  schemaVersion: '1', scheduleId: 'lifecycle-daily', tenantId: 'tenant-a',
+  trigger: { kind: 'interval', everyMs: 60_000 },
+  overlapPolicy: 'SKIP', misfirePolicy: 'SKIP',
+  releaseBinding: { strategy: 'FIXED', releaseId: 'release-1', contentDigest: `sha256:${'a'.repeat(64)}` },
   targetConstraints: { allowedEnvironments: ['local'] },
   budget: { limits: [{ dimension: 'runs', limit: 10 }] },
   invocation: { task: 'daily', params: { window: 7 } }
@@ -50,7 +51,6 @@ class LifecycleHarness {
   readonly writtenInputs: string[] = [];
   readonly specs = new Map<string, AgentTaskSpec>();
   constructor() {
-    const ledgerSelf = this;
     this.ledger = {
       reserve: undefined as never, commit: undefined as never, release: undefined as never,
       getAuthoritativeBalance: async () => ({ available: { runs: 10 }, reserved: {}, revision: 1 }),
@@ -58,7 +58,6 @@ class LifecycleHarness {
       upsertScheduleAccount: async () => 'stored',
       checkScheduleBudget: async () => ({ ok: true, available: { runs: 10 }, windowStartMs: 0, usedInWindow: {} })
     };
-    void ledgerSelf;
   }
 
   activities(resolver: DispatcherReleaseResolver, nowMs = 10_000) {
@@ -164,11 +163,11 @@ describe('ai-app-lifecycle-e2e (schedule path)', () => {
 
 // schedule conformance（fake 全电池）锚定触发/overlap/pause-resume 语义——与 adapter 对账电池同源。
 describe('schedule conformance battery (ai-app-lifecycle-e2e anchor)', () => {
-  const baseDefinition = {
-    schemaVersion: '1' as const, scheduleId: 'lifecycle-conformance', tenantId: 'tenant-a',
-    trigger: { kind: 'interval', everyMs: 60_000 } as const,
-    overlapPolicy: 'SKIP' as const, misfirePolicy: 'SKIP' as const,
-    releaseBinding: { strategy: 'FIXED', releaseId: 'release-1', contentDigest: `sha256:${'a'.repeat(64)}` } as const,
+  const baseDefinition: ScheduleDefinition = {
+    schemaVersion: '1', scheduleId: 'lifecycle-conformance', tenantId: 'tenant-a',
+    trigger: { kind: 'interval', everyMs: 60_000 },
+    overlapPolicy: 'SKIP', misfirePolicy: 'SKIP',
+    releaseBinding: { strategy: 'FIXED', releaseId: 'release-1', contentDigest: `sha256:${'a'.repeat(64)}` },
     targetConstraints: { allowedEnvironments: ['local'] },
     budget: { limits: [{ dimension: 'runs', limit: 100 }] },
     invocation: { task: 'daily' }

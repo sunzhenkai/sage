@@ -35,7 +35,7 @@ describe('SchedulesApp', () => {
     await flush(); await flush();
     const list = tree.root.findByProps({ 'data-testid': 'schedule-list' });
     expect(list.findAllByProps({ 'data-testid': 'schedule-daily-brief' })).toHaveLength(1);
-    expect(list.findAllByProps({ className: 'task-row' })[0].props).toBeTruthy();
+    const row = list.findAllByProps({ className: 'task-row' })[0]; expect(row).toBeDefined();
     expect(tree.root.findByProps({ 'data-testid': 'schedule-daily-brief' }).props.children).toBe('daily-brief');
     await act(async () => { tree.root.findByProps({ 'data-testid': 'schedule-daily-brief' }).props.onClick(); });
     await flush(); await flush();

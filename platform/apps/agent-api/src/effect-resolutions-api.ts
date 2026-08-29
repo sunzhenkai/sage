@@ -1,8 +1,9 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { Value } from 'typebox/value';
-import { ApiEffectResolutionOutcomeSchema, ApiEffectResolutionSubmitRequestSchema, type ApiEffectResolutionOutcome } from '@sage/app-contracts';
+import { ApiEffectResolutionSubmitRequestSchema } from '@sage/app-contracts';
+import type { ApiEffectResolutionOutcome } from '@sage/app-contracts';
 import type { ToolEffectLedgerPort, TrustedPrincipal } from '@sage/platform-ports';
-import { EffectResolutionService } from './effect-resolution.js';
+import type { EffectResolutionService } from './effect-resolution.js';
 
 /**
  * P8 统一裁决端点（D6，spec: unattended-run-autonomy「EFFECT_UNKNOWN 人工裁决协议」）：
@@ -38,7 +39,7 @@ export function registerEffectResolutionsRoute(app: FastifyInstance, options: Re
       const body = request.body ?? {};
       if (!Value.Check(ApiEffectResolutionSubmitRequestSchema, body)) return sendError(reply, 400, 'EFFECT_RESOLUTION_INVALID');
       const submit = body as { readonly semanticActionId: string; readonly originalExecutorRef: string; readonly decision: 'CONFIRMED_COMMITTED' | 'CONFIRMED_NOT_COMMITTED' | 'ABANDONED'; readonly action: 'CONTINUE_NEW_ATTEMPT' | 'TERMINATE'; readonly evidenceDigest: string; readonly reason: string; readonly policyVersion: string };
-      const resolution = await options.service.resolve({
+      const resolved = await options.service.resolve({
         principal,
         originalExecutorRef: submit.originalExecutorRef,
         semanticActionId: submit.semanticActionId,
@@ -47,6 +48,7 @@ export function registerEffectResolutionsRoute(app: FastifyInstance, options: Re
         reason: submit.reason,
         policyVersion: submit.policyVersion
       });
+      const resolution: { readonly status: 'resolved' | 'existing'; readonly resolution: { readonly resolutionRef: string; readonly decision: typeof submit.decision } } = resolved as never;
       const claim = await options.ledger.getClaim?.({ tenantId: principal.tenantId, semanticActionId: submit.semanticActionId });
       const taskId = claim?.taskId;
       let actionState: 'ACCEPTED' | 'COMPLETED' = 'ACCEPTED';

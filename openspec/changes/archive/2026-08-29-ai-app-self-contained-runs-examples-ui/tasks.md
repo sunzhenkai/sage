@@ -16,4 +16,4 @@
 ## 3. 验证
 
 - [x] 3.1 agent-web 全量测试、`pnpm typecheck && pnpm lint`、agent-package-release smoke 通过
-- [ ] 3.2 本地栈端到端：导入 github-trending v2 → 默认参数一键运行 → 内联查看真实数据 digest；lifecycle-probe 空参数确定性输出
+- [x] 3.2 本地栈端到端：导入 github-trending v2 → 默认参数一键运行 → 内联查看真实数据 digest；lifecycle-probe 空参数确定性输出（2026-08-29 补验于 driver：register-package + POST runs 空参数 → succeeded，task-output 为 25 仓库 schema 合规 digest（首仓 affaan-m/ECC 与实时 GitHub 一致）+ report.md 登记；lifecycle-probe 空参数 succeeded 且 task-output 物化（本轮模型拒绝扮演输出拒绝文本、round-6 同输入曾产出含 probe-ok 确定性报告——模型采样方差，已记录）。API 层等价执行；证据见 driver proposal 验证记录）

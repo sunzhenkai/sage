@@ -1,7 +1,8 @@
 import Fastify from 'fastify';
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import type { EffectClaim, ToolEffectLedgerPort, TrustedPrincipal } from '@sage/platform-ports';
+import type { EffectClaim } from '@sage/agent-contracts';
+import type { ToolEffectLedgerPort, TrustedPrincipal } from '@sage/platform-ports';
 import { EffectResolutionService } from './effect-resolution.js';
 import { registerEffectResolutionsRoute } from './effect-resolutions-api.js';
 
@@ -17,11 +18,11 @@ const claim: EffectClaim = {
 class LedgerStub implements ToolEffectLedgerPort {
   claims = new Map<string, EffectClaim>([[claim.semanticActionId, claim]]);
   states = new Map<string, string>([[claim.semanticActionId, 'EFFECT_UNKNOWN']]);
-  resolutions: object[] = [];
-  async claim(input: EffectClaim) { this.claims.set(input.semanticActionId, input); return { status: 'claimed', fenceEpoch: 1, leaseExpiresAt: input.leaseExpiresAt }; }
+  resolutions: Parameters<ToolEffectLedgerPort['resolve']>[0]['resolution'][] = [];
+  async claim(input: EffectClaim): Promise<Awaited<ReturnType<ToolEffectLedgerPort['claim']>>> { this.claims.set(input.semanticActionId, input); return { status: 'claimed', fenceEpoch: 1, leaseExpiresAt: input.leaseExpiresAt }; }
   async commit() { return { status: 'conflict', code: 'EFFECT_CONFLICT' } as const; }
-  async markUnknown(input: { readonly claim: EffectClaim }) { this.states.set(input.claim.semanticActionId, 'EFFECT_UNKNOWN'); return { schemaVersion: '1', receiptRef: 'r', receiptDigest: digest('r'), tenantId: input.claim.tenantId, semanticActionId: input.claim.semanticActionId, state: 'EFFECT_UNKNOWN' as const, canonicalInputDigest: input.claim.canonicalInputDigest, toolVersion: input.claim.toolVersion, providerBuildDigest: input.claim.providerBuildDigest, fenceEpoch: 1, outcomeDigest: digest('o'), normalizedResult: {}, committedAt: new Date().toISOString() }; }
-  async resolve(input: { readonly resolution: { readonly tenantId: string; readonly semanticActionId: string; readonly decision: string; readonly resolverRef: string; readonly originalExecutorRef: string; readonly resolutionRef: string; readonly reason: string; readonly policyVersion: string; readonly evidenceDigest: string; readonly resolvedAt: string }; readonly resolverScopes: readonly string[] }) {
+  async markUnknown(input: { readonly claim: EffectClaim }): Promise<Awaited<ReturnType<ToolEffectLedgerPort['markUnknown']>>> { this.states.set(input.claim.semanticActionId, 'EFFECT_UNKNOWN'); return { schemaVersion: '1', receiptRef: 'r', receiptDigest: digest('r'), tenantId: input.claim.tenantId, semanticActionId: input.claim.semanticActionId, state: 'EFFECT_UNKNOWN' as const, canonicalInputDigest: input.claim.canonicalInputDigest, toolVersion: input.claim.toolVersion, providerBuildDigest: input.claim.providerBuildDigest, fenceEpoch: 1, outcomeDigest: digest('o'), normalizedResult: {}, committedAt: new Date().toISOString() }; }
+  async resolve(input: Parameters<ToolEffectLedgerPort['resolve']>[0]): Promise<Awaited<ReturnType<ToolEffectLedgerPort['resolve']>>> {
     if (!input.resolverScopes.includes('effect:resolve')) return { status: 'denied', code: 'EFFECT_RESOLUTION_DENIED' } as const;
     if (input.resolution.resolverRef === input.resolution.originalExecutorRef) return { status: 'denied', code: 'APPROVER_SEPARATION_REQUIRED' } as const;
     const state = this.states.get(input.resolution.semanticActionId);
@@ -52,7 +53,7 @@ const build = (scopes: readonly string[] = ['effect:resolve']) => {
   const retried: string[] = [];
   const cancelled: string[] = [];
   registerEffectResolutionsRoute(app, {
-    service: new EffectResolutionService(ledger, { append: async () => { return { auditRef: 'audit://1' }; } }),
+    service: new EffectResolutionService(ledger, { append: async () => ({ auditRef: 'audit://1' }), query: async () => ({ records: [] }), health: async () => ({ healthy: true, checkedAt: new Date().toISOString() }) } as never),
     ledger,
     authenticator: { authenticate: async (input) => {
       if (input.authorization !== 'Bearer sre-token') throw new Error('IDENTITY_INVALID');

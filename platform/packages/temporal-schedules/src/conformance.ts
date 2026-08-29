@@ -1,4 +1,4 @@
-import { assertScheduleDefinition, scheduleOccurrenceKey, type ScheduleDefinition, type ScheduleOccurrence, type SchedulePort, type ScheduleRef, type ScheduleSnapshot, type ScheduleTriggerEvent, type ScheduleTriggerEventKind } from '@sage/platform-ports';
+import { assertScheduleDefinition, scheduleOccurrenceKey, type ScheduleDefinition, type ScheduleOccurrence, type SchedulePort, type ScheduleRef, type ScheduleTriggerEvent, type ScheduleTriggerEventKind } from '@sage/platform-ports';
 
 /**
  * Adapter 中性 conformance（D2/spec：触发、overlap、misfire、pause/resume、幂等语义与契约一致，
@@ -6,7 +6,7 @@ import { assertScheduleDefinition, scheduleOccurrenceKey, type ScheduleDefinitio
  * - lifecycle：port 生命周期（create/describe/重复创建拒绝/pause/resume/幂等删除），两类 adapter 均须通过。
  * - dispatch：触发/幂等/overlap/misfire 语义（fake 全跑；temporal 走真实 backfill 集成用例另测）。
  */
-export interface ScheduleConformanceEvent extends ScheduleTriggerEvent {}
+export type ScheduleConformanceEvent = ScheduleTriggerEvent;
 
 export interface ScheduleConformanceDriver {
   readonly port: SchedulePort;

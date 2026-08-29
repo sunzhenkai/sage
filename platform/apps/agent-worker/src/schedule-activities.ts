@@ -1,5 +1,6 @@
 import type { ProductionConsumptionLedgerPort, ScheduleControlStore, ScheduleSnapshot, ScheduleTriggerEvent } from '@sage/platform-ports';
 import { admitScheduleTrigger, fetchScheduleInputSnapshots, PackageSnapshotError, type AdmissionAuditOutboxPortV1, type AdmissionIdempotencyStoreV1, type ScheduleDispatchReleaseResolution, type ScheduleSnapshotConnector } from '@sage/agent-run-admission';
+import type { AgentTaskSpecStorePort } from '@sage/platform-ports';
 import type { DispatchScheduleOccurrenceActivityInput, DispatchScheduleOccurrenceActivityResult, ReconcileScheduleOccurrencesActivityInput, ReconcileScheduleOccurrencesActivityResult, ScheduleDispatcherActivities } from '@sage/temporal-schedules';
 import { recordScheduleTriggerSignal, type AgentObservability } from '@sage/observability';
 
@@ -21,7 +22,7 @@ export interface CreateScheduleDispatcherActivitiesOptions {
   readonly ledger?: ProductionConsumptionLedgerPort;
   readonly releaseResolver: DispatcherReleaseResolver;
   readonly snapshotConnector?: ScheduleSnapshotConnector;
-  readonly specStore: import('@sage/platform-ports').AgentTaskSpecStorePort;
+  readonly specStore: AgentTaskSpecStorePort;
   readonly idempotencyStore: AdmissionIdempotencyStoreV1;
   readonly auditOutbox: AdmissionAuditOutboxPortV1;
   readonly writePackageInput: (record: Parameters<Parameters<typeof admitScheduleTrigger>[0]['writePackageInput']>[0]) => Promise<void>;

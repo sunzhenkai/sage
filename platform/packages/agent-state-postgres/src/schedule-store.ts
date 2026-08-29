@@ -1,6 +1,6 @@
 import { Pool, type PoolConfig, type PoolClient, type QueryResultRow } from 'pg';
 import { sha256Digest } from '@sage/agent-contracts';
-import { assertScheduleSnapshot, assertScheduleTriggerEvent, type ScheduleControlStore, type ScheduleRef, type ScheduleSnapshot, type ScheduleState, type ScheduleTriggerEvent } from '@sage/platform-ports';
+import { assertScheduleSnapshot, assertScheduleTriggerEvent, type AdapterHealth, type ScheduleControlStore, type ScheduleRef, type ScheduleSnapshot, type ScheduleState, type ScheduleTriggerEvent } from '@sage/platform-ports';
 
 interface ScheduleRow extends QueryResultRow { snapshot: ScheduleSnapshot; revision: string | number; state: ScheduleState; content_digest: string; created_at: Date | string; updated_at: Date | string }
 interface TriggerEventRow extends QueryResultRow { occurrence_id: string; kind: ScheduleTriggerEvent['kind']; occurred_at: Date | string; task_id: string | null; error_code: string | null; detail: string | null; event_digest: string }
@@ -93,7 +93,7 @@ export class PostgresScheduleStore implements ScheduleControlStore {
     });
   }
 
-  async health(): Promise<import('@sage/platform-ports').AdapterHealth> {
+  async health(): Promise<AdapterHealth> {
     try { await this.#pool.query('SELECT 1'); return { healthy: true, checkedAt: new Date().toISOString() }; }
     catch { return { healthy: false, checkedAt: new Date().toISOString(), detail: 'SCHEDULE_STORE_UNAVAILABLE' }; }
   }

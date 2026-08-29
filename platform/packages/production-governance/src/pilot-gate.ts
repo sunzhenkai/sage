@@ -19,7 +19,7 @@ export interface PilotGateEvidenceItem {
 
 export interface PilotGateInput {
   /** 真实窗口 soak 证据（默认 14 天 / ≥100 触发；压缩时钟等效证据不顶替本项）。 */
-  readonly soakEvidence?: { readonly windowDays: number; readonly triggerCount: number; readonly successRate: number; readonly silentDuplicates: number };
+  readonly soakEvidence?: { readonly windowDays: number; readonly triggerCount: number; readonly successRate: number; readonly silentDuplicates: number } | undefined;
   /** 风险显式接受台账条目（含复评期限）。 */
   readonly riskLedger: readonly { readonly id: string; readonly description: string; readonly mitigation: string; readonly acceptedBy?: string; readonly reviewBy?: string }[];
   /** 认证检查：service token 已接线（true）或 stub 仍可提权（false）。 */

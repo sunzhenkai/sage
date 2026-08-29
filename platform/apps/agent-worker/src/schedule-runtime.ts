@@ -1,4 +1,4 @@
-import { bundleWorkflowCode, NativeConnection, Worker, type WorkerStatus } from '@temporalio/worker';
+import { bundleWorkflowCode, Worker, type NativeConnection, type WorkerStatus } from '@temporalio/worker';
 import { WorkflowClient } from '@temporalio/client';
 import { PostgresAgentAuthorityStore, PostgresConsumptionLedger, PostgresScheduleStore } from '@sage/agent-state-postgres';
 import type { AgentTaskSpecStorePort } from '@sage/platform-ports';

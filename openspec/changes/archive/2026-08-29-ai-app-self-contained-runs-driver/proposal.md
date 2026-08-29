@@ -20,7 +20,7 @@
 | openspec/changes/package-run-input-snapshots | 建议 | 只读参考；其内容被 Phase B 子 change 吸收后归档 |
 
 ## 验收标准
-- [ ] github-trending 示例（v2 定义）空参数一键运行：无人工输入、快照自动注入、产出基于真实最新数据的 digest，任务 succeeded 且输出契约校验通过（环节已全验证：快照真实注入 141KB、模型真实执行；终态 succeeded 被 GitHub 未认证限额 403 与环境退化阻塞，补验路径见验证记录末条）
+- [x] github-trending 示例（v2 定义）空参数一键运行：无人工输入、快照自动注入、产出基于真实最新数据的 digest，任务 succeeded 且输出契约校验通过（2026-08-29 补验达成：admission 组装输入 139,923 字节含真实 GitHub 快照、MiniMax 真实执行、schema 校验通过、task-output + report.md 双产物；详见验证记录末条）
 - [x] 声明参数生效：不同参数值产生不同 inputDigest 与独立 Run；缺省参数取 App 默认值
 - [x] 输出契约强制：输出不符 manifest 声明的 schema/files 时任务稳定失败并返回可行动错误
 - [x] v1 包零行为变化：既有 Release（无 tasks/inputs/dataSources 声明）准入、组装输入与产物逐字节等价（golden 契约测试）
@@ -60,3 +60,15 @@
   ① 本地栈端到端（部分达成，环境与外部依赖阻塞终态）：干净重启 dev 栈（带 `SAGE_PACKAGE_SNAPSHOT_EGRESS_ALLOWLIST=api.github.com`）；迁移 007 落库（run_contract 列）。**lifecycle-probe v2 全链路 succeeded**（pkg-51586e80：无输入/无数据源准入→真实模型执行→task-output 物化取回→内容含 probe-ok；无 schema 声明故 think 不剥离，符合豁免契约）。github-trending v2 环节级验证：v2 登记（声明进 lock）、详情 API inputs/dataSources/tasks、`input` 字段 410、params 矩阵 400、**受控出口真实抓取 GitHub 数据并注入（组装输入 141KB 落库）**、模型经 MiniMax 条目真实执行、markMissing/fail 双语义、快照失败 502 稳定错误。终态 succeeded 未达成：GitHub 未认证限额（10 req/min 耗尽返回 403）+ 会话调试期反复重启导致的环境退化（内存注册表易失、admission 500 后内存幂等表残留幽灵 taskId）。过程中修复三个真实缺陷：AgentRunSpec.input 上限 100KB→512KiB（对齐快照平台上限；否则 141KB 输入即校验失败）、准入 token 钳制 32k→200k（同因）、effect-unknown 路径补原始异常 stderr 观测。示例预算 8k→60k。另记录两项平台观察：确定性失败（BUDGET_EXHAUSTED/schema 违约）被映射 effect_unknown 而非 failed（归 P8 失败分类）；内存幂等表在 admission 500 后可残留幽灵记录（原子性缺口）。
   ② fix-check-deps-rules 小变更（已归档）：ownership 补 secret-vault（api/worker/p6）与 tool-runtime（api）边、声明 secret-vault 包归属、platform-ports 注释去 Temporal 令牌、移除 agent-api 死依赖 harness-pi。`check-dependencies` 与全部 8 个边界脚本 findings 归零。
   ③ 收尾：B-3.2/C-2.3/E-2.3/E-2.2/D-2.1 补勾（治理绿 + model-route e2e 验证达成）；driver 2.2/2.4/2.5/3.1 勾。未勾留档：C-2.2/F-3.2/driver-2.3/2.6/3.2（同源：github-trending 终态阻塞）、driver-3.3 对应项。全量回归 412 测试、tsc/lint/check:deps 零错。补验 github-trending 终态的路径：待 GitHub 限额窗口重置（或配置 `SAGE_BOOTSTRAP_PROVIDER_*` 后经 UI 一键导入运行），在稳定单实例栈上重放即可，无需代码改动。
+- 2026-08-29 第 7 轮（补验收官，driver 2.3/2.6/3.2 与 C-2.2/F-3.2 全部达成）：
+  ① 环境障碍定位与修复：GitHub 搜索 API 403 之外的新阻塞是本机网络进入 fake-IP DNS 模式（api.github.com 解析为 198.18.0.44 基准测试段，受控出口策略按 SSRF 防护正确拒绝 EGRESS_ADDRESS_DENIED）——用 /etc/hosts 临时把 api.github.com 钉到真实 IP 20.200.245.245 完成验证后移除；其后更发现运行时执行的是**陈旧 dist**（workspace 包 exports 指向 dist，历史会话从未全量重建，tsc -b 增量信息掩盖了多包 dist 与 src 不一致）——`rm -rf` 全部 dist 与 tsbuildinfo 后全量 `pnpm build` 重建。此过程中暴露并修复两个真实代码缺陷：
+    a) **task-domain TaskSliceLimits.maxTokens 上限 32k 与包运行预算钳制 200k 不一致**：runs-api 按「不得静默削弱声明预算」钳到 min(budgets, 200k)，但 schema 仍拒 >32000，凡声明预算 >32k 的包在 reserveTaskStart 校验即 500（TargetSnapshotCommitError 包裹 INVALID_TASK_ROUTING_RECORD）。修复：schema 上限对齐 200k（task-domain/src/index.ts:57）。
+    b) **worker 未把 slice 预算传给 provider 请求**：liveClientFactory 只收 (route, mode)，harness-pi 缺省 maxOutputTokens=4096，MiniMax 长 think + 大 digest JSON 在 4096 处被静默截断 → JSON 解析失败 → 契约违约。修复：执行边界将 input.limits.maxTokens 直通 createLivePackageAgentClient（仅 package 模式，chat 维持逐轮缺省）。
+    github-trending 提示词随之加固：明示「整个回复仅一个 ```json 围栏 JSON 对象」并内联与 output.schema.json 完全一致的骨架（模型不读取 schema 资产，仅凭提示词对齐）；agent-web 内嵌副本按字节同步（guard 测试通过）。
+  ② E2E 结果（隔离栈 api:9620 + worker，共享 compose 基础设施与 Temporal 队列；MiniMax-M3 真实执行）：
+    - github-trending v2 空参数一键运行 **succeeded**（pkg-9f10c530）：组装输入 139,923 字节含真实最新 GitHub 快照，task-output 为 25 仓库 schema 合规 digest（首仓 affaan-m/ECC 与实时 API 一致），report.md 按 `#file/` 引用登记可取回；
+    - params 变化独立 Run：language=rust（pkg-ea66eefa） succeeded，与默认参数 Run 的 assembled_input 摘要不同（md5 412b62df… vs fd67d686…），任务互不相干；
+    - 输出契约违约路径（C-2.2 后半）：/tmp 临时探针包（任务声明 `type: array` schema 而提示词要求输出 JSON 对象）运行 → 稳定 `PACKAGE_OUTPUT_CONTRACT_VIOLATION:$: expected array, got object`，**artifacts 为空**（无 task-output 物化）；终态仍为 effect_unknown 而非 failed（第 6 轮已归 P8 失败分类的平台观察，维持）；
+    - lifecycle-probe 空参数 succeeded 且 task-output 物化；本轮模型把固定自检报告提示词误判为注入而输出拒绝文本（采样方差；round-6 同输入 pkg-51586e80 的持久化输出含 probe-ok，task_run_output 在库可查）。
+  ③ 回归：task-domain 26/26、agent-run-admission 26/26、agent-worker runtime+output-contract 26/26、agent-api runs-api/package 3 文件 26/26、agent-web example-apps guard+packages 15/15（内嵌副本字节同步）、agent-package-release 三 smoke 3/3；改动文件 eslint 零告警。
+  ④ 环境与协作留档：本机 8.8.8.8 DNS 被网关劫持返回 fake-IP，受控出口在该网络模式下对所有外部源必然拒绝（产品行为正确）；dev 栈 restore 后仍需真实 IP DNS 方可跑通 dataSources。本轮与另一并行会话（P8 契约与存储基座，commit 9ee0995 起）共用工作树与本地栈：其把本 driver 的修复一并 staged、曾在 9610/9612 端口起自己的 api/web dev server（本轮 api 移至 9620 隔离）；其未完成的 schedule-runtime/schedule-activities 存在类型错误使全仓 `tsc -b` 暂不可绿（与 driver 无关，属 P8 在途）。验证后 api/worker 进程（9620/9611）保留运行，master key 沿用进程原有 `CJwpSrEA…`（密封凭据兼容）。

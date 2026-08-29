@@ -83,6 +83,9 @@ importers:
       '@sage/agent-run-admission':
         specifier: workspace:*
         version: link:../../packages/agent-run-admission
+      '@sage/agent-state-postgres':
+        specifier: workspace:*
+        version: link:../../packages/agent-state-postgres
       '@sage/app-contracts':
         specifier: workspace:*
         version: link:../../packages/app-contracts

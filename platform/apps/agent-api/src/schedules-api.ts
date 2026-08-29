@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { Value } from 'typebox/value';
 import {
-  ApiScheduleDefinitionSchema, ApiScheduleListResponseSchema, ApiScheduleSnapshotSchema, ApiScheduleTriggerHistoryResponseSchema,
+  ApiScheduleDefinitionSchema,
   type ApiScheduleListResponse, type ApiScheduleSnapshot
 } from '@sage/app-contracts';
 import { assertScheduleDefinition, scheduleDefinitionDigest, type ScheduleControlStore, type SchedulePort, type ScheduleRef, type ScheduleSnapshot } from '@sage/platform-ports';

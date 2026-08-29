@@ -138,7 +138,7 @@ export class TemporalScheduleAdapter implements SchedulePort {
   async health(): Promise<AdapterHealth> {
     try {
       // 轻量设施探活：列出至多一个 schedule，验证服务端可达与权限。
-      for await (const _ of this.#schedules.list({ pageSize: 1 })) break;
+      for await (const _entry of this.#schedules.list({ pageSize: 1 })) { void _entry; break; }
       return { healthy: true, checkedAt: new Date().toISOString() };
     } catch (cause) {
       return { healthy: false, checkedAt: new Date().toISOString(), detail: cause instanceof Error ? cause.message.slice(0, 256) : 'SCHEDULE_FACILITY_UNAVAILABLE' };

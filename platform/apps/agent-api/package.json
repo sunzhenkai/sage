@@ -23,6 +23,7 @@
     "@sage/agent-package-release": "workspace:*",
     "@sage/agent-release-registry": "workspace:*",
     "@sage/agent-run-admission": "workspace:*",
+    "@sage/agent-state-postgres": "workspace:*",
     "@sage/app-contracts": "workspace:*",
     "@sage/chat-domain": "workspace:*",
     "@sage/local-fakes": "workspace:*",

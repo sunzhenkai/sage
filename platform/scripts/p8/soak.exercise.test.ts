@@ -134,12 +134,10 @@ describe('P8 soak exercise (compressed clock)', () => {
     const budgetFault = config.faultInjections.find(fault => fault.kind === 'budget-drain');
     expect(budgetFault).toBeDefined();
     // 故障处置证据：provider 失效与预算耗尽期间的触发稳定失败并告警；worker 重启窗口恢复成功（自愈）。
-    const failedCodes = events.filter(event => event.kind === 'FAILED').map(event => event.errorCode);
+    const failedCodes = failedEvents.filter(event => event.kind === 'FAILED').map(event => event.errorCode);
     expect(failedCodes).toContain('SCHEDULE_RELEASE_UNRESOLVABLE');
     expect(failedCodes).toContain('SCHEDULE_BUDGET_EXHAUSTED');
     expect(restarted).toBeGreaterThan(0);
-    const lastTickResult = await activities.dispatchScheduleOccurrence({ schemaVersion: '1', tenantId: definition.tenantId, scheduleId: definition.scheduleId, occurrenceId: 'soak-final', occurrenceKey: 'schedule:soak-daily:occ:soak-final', dueAtMs: config.window.durationMs, definitionDigest: `sha256:${'c'.repeat(64)}` });
-    void lastTickResult;
 
     const evidence = {
       schemaVersion: 'P8SoakEvidence.v1',

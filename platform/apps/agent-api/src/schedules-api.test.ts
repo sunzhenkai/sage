@@ -28,7 +28,7 @@ class FakeFacility implements SchedulePort {
     this.#records.set(key, snapshot);
     return snapshot;
   }
-  async update() { throw new Error('unsupported'); }
+  async update(definition: Parameters<SchedulePort['update']>[0], expectedRevision: number): ReturnType<SchedulePort['update']> { void definition; void expectedRevision; return Promise.reject(new Error('unsupported')); }
   async pause(ref: { tenantId: string; scheduleId: string }) { return this.#transition(ref, 'PAUSED'); }
   async resume(ref: { tenantId: string; scheduleId: string }) { return this.#transition(ref, 'ACTIVE'); }
   async remove(ref: { tenantId: string; scheduleId: string }) { this.#records.delete(`${ref.tenantId}\u0000${ref.scheduleId}`); }

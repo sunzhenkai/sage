@@ -15,10 +15,14 @@ import { CatalogServiceError, CatalogSyncManager, ProviderCatalogService, Provid
 import { InMemoryScheduleControlStore } from '@sage/local-fakes';
 import { TemporalScheduleAdapter } from '@sage/temporal-schedules';
 import { registerSchedulesRoutes } from './schedules-api.js';
+import { registerEffectResolutionsRoute } from './effect-resolutions-api.js';
+import { EffectResolutionService } from './effect-resolution.js';
 import { ServiceTokenAuthenticator } from './service-token.js';
+import { PostgresToolEffectLedger } from '@sage/agent-state-postgres';
 import { TASK_NAMESPACE, TASK_QUEUE } from '@sage/task-domain';
 import { createDevRegistryBundle, publishDevRegistry } from '@sage/temporal-registry';
 import { TemporalClientFactory, TrustedMultiTargetTaskController, TrustedTemporalRouter } from '@sage/temporal-routing';
+import type { TrustedPrincipal } from '@sage/platform-ports';
 import { ChatPromotionAuthorizer, createChatApi, registerTaskRoutes } from './index.js';
 import { startChatKernelExecution, type ChatCanonicalCompatibilityOptions } from './chat-compatibility.js';
 import { registerProviderCatalogRoutes } from './catalog-api.js';
@@ -295,6 +299,33 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
       } catch {
         return reply.code(404).send({ error: { code: 'RELEASE_NOT_FOUND', retryable: false } });
       }
+    });
+
+    // P8：统一裁决端点（D6）。本地模式以 Postgres effect 台账 + service token 认证；
+    // 动作执行走任务控制面 retry/cancel（「未提交+继续」新 attempt，「已提交+继续」Ledger replay 幂等）。
+    const effectLedger = new PostgresToolEffectLedger({ connectionString: config.postgresUrl });
+    registerEffectResolutionsRoute(app, {
+      service: new EffectResolutionService(effectLedger, {
+        append: async (input) => { process.stdout.write(`[resolution-audit] ${JSON.stringify(input)}\n`); return { auditRef: `audit://${input.category}` }; },
+        query: async () => ({ records: [] }),
+        health: async () => ({ healthy: true, checkedAt: new Date().toISOString() })
+      }),
+      ledger: effectLedger,
+      authenticator: {
+        authenticate: async (input): Promise<TrustedPrincipal> => {
+          const token = input.authorization === undefined ? '' : input.authorization.startsWith('Bearer ') ? input.authorization.slice(7).trim() : '';
+          const verified = serviceToken === undefined ? undefined : serviceToken.verify(token);
+          if (serviceToken === undefined) {
+            // 本地未配置 service token：trust-header stub（与既有链路的本地回退一致）。
+            const header = input.authorization;
+            if (typeof header === 'string' && header.startsWith('Bearer ')) return { principalRef: 'service-token://dev', tenantId: config.tenantId, maximumScopes: ['effect:resolve'], subject: 'local', issuer: 'local', authenticatedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 300_000).toISOString() };
+          }
+          if (verified === undefined) throw new Error('IDENTITY_INVALID');
+          return { principalRef: verified.principalId, tenantId: config.tenantId, maximumScopes: ['effect:resolve'], subject: verified.principalId, issuer: 'service-token', authenticatedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 300_000).toISOString() };
+        }
+      },
+      expectedAudience: 'sage-api',
+      taskControl: { retry: async (taskId) => controller.retry(taskId), cancel: async (taskId) => controller.cancel(taskId) }
     });
 
     const bootstrapEnv = config.secretEnv ?? process.env;

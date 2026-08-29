@@ -10,6 +10,7 @@
         "agent-package-release",
         "agent-release-registry",
         "agent-run-admission",
+        "agent-state-postgres",
         "app-contracts",
         "chat-domain",
         "local-fakes",

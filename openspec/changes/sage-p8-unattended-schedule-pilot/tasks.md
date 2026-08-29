@@ -50,6 +50,6 @@
 
 ## 8. 收尾验证
 
-- [ ] 8.1 `corepack pnpm check` 全绿（ESLint、依赖/P4–P8 边界、严格 TS、单测、构建）
-- [ ] 8.2 既有集成/垂直链路回归（P4/P5/P6/P7 套件与 `test:p7:exercises` 不回归）
-- [ ] 8.3 `openspec validate sage-p8-unattended-schedule-pilot --strict` 通过
+- [x] 8.1 `corepack pnpm check` 全绿（ESLint、依赖/P4–P8 边界、严格 TS、单测、构建）
+- [x] 8.2 既有集成/垂直链路回归（P4/P5/P6/P7 套件与 `test:p7:exercises` 不回归）
+- [x] 8.3 `openspec validate sage-p8-unattended-schedule-pilot --strict` 通过
