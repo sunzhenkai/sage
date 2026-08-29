@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { agentStateDigest, isAgentEventV2, isBoundedRunReceipt, isCheckpointCandidate } from '@sage/platform-ports';
+import { agentStateDigest, isAgentEventV2, isBoundedRunReceipt, isCheckpointCandidate, TASK_RUN_LOG_PAGE_LIMIT_MAX } from '@sage/platform-ports';
 import type {
   AdapterHealth,
   AgentTaskSpecStorePort,
@@ -22,8 +22,11 @@ import type {
   SecretManagerAdapter,
   SecretRef,
   SecretResolutionContext,
-  SecretValue
+  SecretValue,
+  TaskRunLogAttemptSummary,
+  TaskRunLogQueryPort
 } from '@sage/platform-ports';
+import type { AgentEventV2 } from '@sage/agent-contracts';
 import { assertCredentialResolutionRequest, assertNoSensitiveData } from '@sage/platform-ports';
 
 const health = (): AdapterHealth => ({ healthy: true, checkedAt: new Date().toISOString() });
@@ -379,6 +382,58 @@ export class InMemoryAgentEventStore implements AgentEventStorePort, FailureInje
 
   #sameEvent(left: Parameters<AgentEventStorePort['appendEvent']>[0]['event'], right: Parameters<AgentEventStorePort['appendEvent']>[0]['event']): boolean {
     return JSON.stringify(left) === JSON.stringify(right);
+  }
+}
+
+/** In-memory run-log read model seeded with canonical run events (route tests and local composition). */
+export class InMemoryTaskRunLogQuery implements TaskRunLogQueryPort, FailureInjectable {
+  readonly #entries = new Map<string, { readonly tenantId: string; readonly writtenAt: string; readonly event: AgentEventV2 }>();
+  readonly #failure = new FailureInjection();
+
+  seed(tenantId: string, event: AgentEventV2, writtenAt: string = new Date().toISOString()): void {
+    if (!isAgentEventV2(event)) throw new Error('EVENT_SCHEMA_INVALID');
+    this.#entries.set(`${tenantId}\u0000${event.eventId}`, { tenantId, writtenAt, event: structuredClone(event) });
+  }
+
+  failNext(operation: string, error?: Error): void { this.#failure.failNext(operation, error); }
+
+  async listAttemptSummaries(input: Parameters<TaskRunLogQueryPort['listAttemptSummaries']>[0]): Promise<readonly TaskRunLogAttemptSummary[]> {
+    this.#failure.consume('listAttemptSummaries');
+    const attempts = new Map<string, { runId: string; attemptId: string; eventCount: number; firstSequence: number; lastSequence: number; lastWrittenAt: string }>();
+    for (const { tenantId, writtenAt, event } of this.#entries.values()) {
+      if (tenantId !== input.tenantId || event.taskId !== input.taskId) continue;
+      const key = `${event.runId}\u0000${event.attemptId}`;
+      const summary = attempts.get(key);
+      if (summary === undefined) {
+        attempts.set(key, { runId: event.runId, attemptId: event.attemptId, eventCount: 1, firstSequence: event.sequence, lastSequence: event.sequence, lastWrittenAt: writtenAt });
+      } else {
+        summary.eventCount += 1;
+        summary.firstSequence = Math.min(summary.firstSequence, event.sequence);
+        summary.lastSequence = Math.max(summary.lastSequence, event.sequence);
+        summary.lastWrittenAt = summary.lastWrittenAt > writtenAt ? summary.lastWrittenAt : writtenAt;
+      }
+    }
+    return [...attempts.values()]
+      .sort((left, right) => right.lastWrittenAt.localeCompare(left.lastWrittenAt) || right.lastSequence - left.lastSequence || left.runId.localeCompare(right.runId))
+      .map((summary) => ({ ...summary }));
+  }
+
+  async listRunLogEvents(input: Parameters<TaskRunLogQueryPort['listRunLogEvents']>[0]): Promise<readonly AgentEventV2[]> {
+    this.#failure.consume('listRunLogEvents');
+    const fromSequence = Math.max(input.fromSequence ?? 1, 1);
+    const limit = Math.min(Math.max(input.limit ?? 200, 1), TASK_RUN_LOG_PAGE_LIMIT_MAX);
+    return [...this.#entries.values()]
+      .filter(({ tenantId, event }) => tenantId === input.tenantId && event.taskId === input.taskId
+        && event.runId === input.runId && event.attemptId === input.attemptId && event.sequence >= fromSequence)
+      .map(({ event }) => event)
+      .sort((left, right) => left.sequence - right.sequence)
+      .slice(0, limit)
+      .map((event) => structuredClone(event));
+  }
+
+  async health(): Promise<AdapterHealth> {
+    this.#failure.consume('health');
+    return health();
   }
 }
 

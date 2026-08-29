@@ -1,8 +1,7 @@
-# task-operations-interface Specification
+# task-operations-interface Delta
 
-## Purpose
-TBD - created by archiving change sage-p6-chat-task-reconciliation-and-e2e. Update Purpose after archive.
-## Requirements
+## MODIFIED Requirements
+
 ### Requirement: Snapshot-bound Task operations interface
 
 Task UI SHALL 展示Task list、detail、Timeline、Artifact references与current projection freshness，并 SHALL通过snapshot-bound services提供authorized Signal、Cancel与Retry。Local runtime SHALL通过API composition root和使用固定local Namespace/Task Queue的真实Temporal Worker暴露这些operation，且不得接受request-side target override。Task row、Chat Task Card和direct URL SHALL使用native canonical `?view=tasks&task=<id>` link并保留可用的`session`；一次semantic activation SHALL只加载一组detail/events/artifacts/run-logs，旧response不得覆盖新URL。
@@ -58,4 +57,3 @@ Task detail 的刷新按钮在刷新请求进行期间 SHALL禁用，避免用�
 #### Scenario: 控制操作与刷新独立
 - **WHEN** 用户执行 Signal/Cancel/Retry 控制操作
 - **THEN** 控制按钮仍受现有 guard 保护，刷新按钮的状态不影响控制操作
-

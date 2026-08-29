@@ -758,6 +758,26 @@ export interface AgentEventStorePort {
   health(): Promise<AdapterHealth>;
 }
 
+/** Read-only run-log projection over canonical run events, consumed by the operations API. */
+export interface TaskRunLogAttemptSummary {
+  readonly runId: string;
+  readonly attemptId: string;
+  readonly eventCount: number;
+  readonly firstSequence: number;
+  readonly lastSequence: number;
+  /** ISO timestamp of the most recently written event in the attempt. */
+  readonly lastWrittenAt: string;
+}
+
+export interface TaskRunLogQueryPort {
+  listAttemptSummaries(input: { readonly tenantId: string; readonly taskId: string }): Promise<readonly TaskRunLogAttemptSummary[]>;
+  listRunLogEvents(input: { readonly tenantId: string; readonly taskId: string; readonly runId: string; readonly attemptId: string; readonly fromSequence?: number; readonly limit?: number }): Promise<readonly AgentEventV2[]>;
+  health(): Promise<AdapterHealth>;
+}
+
+/** Upper bound for one run-log page; callers may pass a smaller limit. */
+export const TASK_RUN_LOG_PAGE_LIMIT_MAX = 500;
+
 export type CheckpointCandidateResult =
   | { readonly status: 'staged'; readonly candidate: CheckpointCandidate }
   | { readonly status: 'existing'; readonly candidate: CheckpointCandidate }

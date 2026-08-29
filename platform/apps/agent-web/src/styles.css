@@ -381,6 +381,37 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .task-timeline strong { color: var(--ink); font-size: 11px; font-family: var(--mono); }
 .task-timeline small { color: var(--faint); font-family: var(--mono); }
 .task-timeline time { margin-top: 4px; color: var(--muted); font-size: 10px; font-family: var(--mono); }
+
+/* --------------------------------------------------------------------------
+   运行日志：sequence 装订线
+   签名元素——左侧等宽 sequence 列与内容之间一条竖向发丝线，如账册装订线；
+   事件类型徽标复用全局状态色词汇，payload 摘要保持 data 等宽角色。
+   -------------------------------------------------------------------------- */
+.run-log-attempt-field { display: inline-flex; align-items: center; gap: 7px; min-width: 0; }
+.run-log-attempt-field span { color: var(--faint); font-size: 10px; }
+.run-log-attempt-field select { max-width: 240px; padding: 5px 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--ink); font-size: 11px; font-family: var(--mono); }
+.run-log-list { position: relative; margin: 14px 0 0; padding: 0; list-style: none; }
+/* 装订线：贯穿事件行的竖向发丝线 */
+.run-log-list::before { content: ''; position: absolute; top: 8px; bottom: 8px; left: 64px; width: 1px; background: var(--line); }
+.run-log-row { display: grid; grid-template-columns: 46px max-content minmax(0, 1fr) auto; align-items: baseline; gap: 12px; padding: 9px 0; }
+.run-log-sequence { color: var(--faint); font-family: var(--mono); font-size: 10px; text-align: right; }
+.run-log-type { padding: 2px 7px; border-radius: 5px; font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: .01em; white-space: nowrap; }
+.run-log-type-success { background: var(--pine-soft); color: var(--pine-deep); }
+.run-log-type-danger { background: var(--sealred-soft); color: #9a3a2d; }
+.run-log-type-warning { background: var(--amber-soft); color: var(--amber); }
+.run-log-type-info { background: var(--indigo-soft); color: var(--indigo); }
+.run-log-type-neutral { background: var(--neutral-soft); color: #5c645d; }
+.run-log-payload { min-width: 0; color: #454b46; font-family: var(--mono); font-size: 10px; overflow-wrap: anywhere; }
+.run-log-payload:empty { display: none; }
+.run-log-refs { color: var(--faint); font-family: var(--mono); font-size: 10px; white-space: nowrap; }
+.run-log-more { margin-top: 13px; }
+.run-log-more .button { width: 100%; }
+@media (max-width: 640px) {
+  .run-log-row { grid-template-columns: 38px minmax(0, 1fr) auto; row-gap: 4px; }
+  .run-log-list::before { left: 48px; }
+  .run-log-type { grid-column: 2 / 3; justify-self: start; }
+  .run-log-payload { grid-column: 1 / -1; padding-left: 50px; }
+}
 .artifact-list { display: grid; gap: 10px; margin-top: 15px; }
 .artifact-list .artifact-link { padding: 9px 10px; border: 1px solid var(--line); border-radius: 9px; background: #fafaf8; }
 .artifact-list .artifact-link:hover { border-color: var(--line-strong); text-decoration: none; }
@@ -418,6 +449,14 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .profile-stack { display: grid; gap: 8px; margin-top: 17px; }
 .profile-card { display: flex; align-items: center; gap: 10px; width: 100%; min-width: 0; padding: 10px 11px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); text-align: left; color: var(--ink); transition: .14s; }
 .profile-card:hover { border-color: var(--line-strong); background: #fafaf7; }
+/* Provider 删除两段式确认：就地展开的确认行（警告 + 确认/取消）。 */
+.delete-confirm-row { width: 100%; display: grid; gap: 6px; padding: 10px 11px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface-soft, #f6f6f2); }
+.delete-confirm-row p { margin: 0; font-size: 13px; color: var(--ink); }
+.delete-confirm-row .delete-confirm-warning { color: var(--sealred, #b3261e); }
+.delete-confirm-actions { display: flex; gap: 8px; }
+/* Provider 弹窗内错误反馈（校验/API 失败），渲染在提交操作上方。 */
+.provider-dialog-error { margin-bottom: 2px; }
+
 .provider-mark { display: grid; place-items: center; flex: 0 0 auto; width: 29px; height: 29px; border-radius: 8px; background: var(--surface-soft); color: #565d57; font-size: 12px; font-weight: 700; }
 .profile-card-copy { min-width: 0; flex: 1; }
 .profile-card-copy strong, .profile-card-copy small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

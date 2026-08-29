@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { P6TelemetryRecorder } from '@sage/observability';
 import type { AuthenticatedPrincipal } from '@sage/app-contracts';
+import type { AgentEventV2 } from '@sage/agent-contracts';
+import type { TaskRunLogAttemptSummary, TaskRunLogQueryPort } from '@sage/platform-ports';
 import { PilotAdmissionDeniedError, type PilotAdmissionGate } from './pilot-admission.js';
 import type { ProductionAdmissionRequest } from '@sage/agent-run-admission';
 import { ProductionApiAdmissionRuntime } from './production-runtime.js';
@@ -52,6 +54,7 @@ export interface TaskRouteOptions {
   readonly deploymentMode?:'development'|'pilot'|'production'; readonly pilotAdmissionGate?:PilotAdmissionGate;
   readonly productionAdmission?:{readonly runtime:ProductionApiAdmissionRuntime;readonly drainTimeoutMs?:number;buildRequest(request:CreateTaskRequest,principal:AuthenticatedPrincipal):ProductionAdmissionRequest}; readonly accessAudit?:TaskAccessAuditRecorder;
   readonly queryStore?:TaskProjectionQueryStore; readonly artifactResolver?:TaskArtifactResolver; readonly telemetry?:P6TelemetryRecorder;
+  readonly runLogQuery?:TaskRunLogQueryPort;
   readonly freshnessThresholdMs?:number; readonly now?:()=>Date;
 }
 
@@ -120,6 +123,8 @@ async function authorize(request:FastifyRequest,options:TaskRouteOptions,operati
   return principal;
 }
 const parseLimit=(value:unknown):number|undefined=>{if(value===undefined)return undefined;const parsed=Number(value);if(!Number.isInteger(parsed)||parsed<1||parsed>500)throw Object.assign(new Error('INVALID_TASK_LIST_FILTER'),{statusCode:400});return parsed;};
+/** 正整数或 undefined；非法返回 null（区别于 undefined=未提供）。 */
+const parseRunLogSequence=(value:string|undefined):number|undefined|null=>{if(value===undefined)return undefined;const parsed=Number(value);return Number.isInteger(parsed)&&parsed>=1&&parsed<=500?parsed:null;};
 const rejectedControlFields=(body:unknown,allowed:ReadonlySet<string>):string[]=>body&&typeof body==='object'&&!Array.isArray(body)?Object.keys(body as Record<string,unknown>).filter((field)=>!allowed.has(field)):[];
 const signalFields=new Set(['kind','controlId']);const controlFields=new Set(['controlId']);
 const signalBodySchema={type:'object',required:['kind'],additionalProperties:false,properties:{kind:{type:'string',enum:['pause','resume']},controlId:{type:'string',minLength:1,maxLength:128}}} as const;
@@ -192,6 +197,33 @@ export function registerTaskRoutes(app: FastifyInstance, controller: TaskControl
       if(view?.sessionId&&view.runId&&view.messageId)try{options.telemetry?.record('sage_artifact_store_unavailable_total',1,{tenant_id:tenantId,message_id:view.messageId,session_id:view.sessionId,run_id:view.runId,task_id:view.taskId,workflow_id:view.workflowId,target_id:view.targetId,attempt:view.attempt},{artifact_id:reference.artifactId});}catch{/* Telemetry cannot change Artifact response. */}
       return reply.code(503).send({error:{code:'ARTIFACT_STORE_UNAVAILABLE',retryable:true},artifact:reference});
     }
+  });
+  app.get<{Params:{taskId:string};Querystring:{runId?:string;attemptId?:string;fromSequence?:string;limit?:string}}>('/v1/tasks/:taskId/run-logs',async(request,reply)=>{
+    await authorize(request,options,'read',request.params.taskId);
+    if(!options.runLogQuery)return {attempts:[],events:[]};
+    if(options.queryStore){const task=await options.queryStore.getTaskView(tenantId,request.params.taskId,now(),threshold).catch(()=>undefined);if(!task)return reply.code(404).send({error:{code:'TASK_NOT_FOUND',retryable:false}});}
+    const query=request.query;
+    const runIdGiven=query.runId!==undefined&&query.runId.length>0;const attemptIdGiven=query.attemptId!==undefined&&query.attemptId.length>0;
+    if(runIdGiven!==attemptIdGiven)return reply.code(400).send({error:{code:'INVALID_RUN_LOG_QUERY',message:'runId and attemptId must be provided together',retryable:false}});
+    const fromSequence=parseRunLogSequence(query.fromSequence);const limit=parseRunLogSequence(query.limit);
+    if(fromSequence===null||limit===null)return reply.code(400).send({error:{code:'INVALID_RUN_LOG_QUERY',message:'fromSequence and limit must be positive integers (limit<=500)',retryable:false}});
+    let attempts:readonly TaskRunLogAttemptSummary[];
+    try{attempts=await options.runLogQuery.listAttemptSummaries({tenantId,taskId:request.params.taskId});}
+    catch{return reply.code(503).send({error:{code:'RUN_LOG_STORE_UNAVAILABLE',retryable:true}});}
+    let selected:TaskRunLogAttemptSummary|undefined;
+    if(runIdGiven&&attemptIdGiven){
+      selected=attempts.find((attempt)=>attempt.runId===query.runId&&attempt.attemptId===query.attemptId);
+      if(!selected)return reply.code(404).send({error:{code:'RUN_LOG_ATTEMPT_NOT_FOUND',retryable:false}});
+    }else selected=attempts[0];
+    if(selected===undefined)return {attempts:[],events:[]};
+    const pageSize=limit??200;
+    let events:readonly AgentEventV2[];
+    try{events=await options.runLogQuery.listRunLogEvents({tenantId,taskId:request.params.taskId,runId:selected.runId,attemptId:selected.attemptId,...(fromSequence===undefined?{}:{fromSequence}),limit:pageSize});}
+    catch{return reply.code(503).send({error:{code:'RUN_LOG_STORE_UNAVAILABLE',retryable:true}});}
+    // 严格白名单：仅 canonical 事件字段可离开 API；payload 保持内核契约的有界标量。
+    const whitelisted=events.map((event)=>({schemaVersion:event.schemaVersion,eventId:event.eventId,taskId:event.taskId,runId:event.runId,attemptId:event.attemptId,invocationId:event.invocationId,specDigest:event.specDigest,sequence:event.sequence,type:event.type,payload:event.payload,...(event.receiptRefs===undefined?{}:{receiptRefs:event.receiptRefs}),...(event.artifactRefs===undefined?{}:{artifactRefs:event.artifactRefs})}));
+    const lastSequence=events.length>0?events[events.length-1]?.sequence:undefined;
+    return {attempts,selected:{runId:selected.runId,attemptId:selected.attemptId},events:whitelisted,...(events.length===pageSize&&lastSequence!==undefined?{nextFromSequence:lastSequence+1}:{})};
   });
   app.post<{ Params: { taskId: string }; Body: { kind: 'pause' | 'resume'; controlId?: string } }>('/v1/tasks/:taskId/signals',{schema:{body:signalBodySchema},preValidation:controlPreValidation(options,'signal',signalFields)}, async (request, reply) => {
     const rejected=rejectedControlFields(request.body,signalFields);if(rejected.length)return reply.code(400).send({error:{code:'TASK_CONTROL_UNTRUSTED_FIELD_REJECTED',message:rejected.join(','),retryable:false}});

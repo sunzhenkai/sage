@@ -18,7 +18,7 @@ import { registerSchedulesRoutes } from './schedules-api.js';
 import { registerEffectResolutionsRoute } from './effect-resolutions-api.js';
 import { EffectResolutionService } from './effect-resolution.js';
 import { ServiceTokenAuthenticator } from './service-token.js';
-import { PostgresToolEffectLedger } from '@sage/agent-state-postgres';
+import { PostgresToolEffectLedger, PostgresTaskRunLogQuery } from '@sage/agent-state-postgres';
 import { TASK_NAMESPACE, TASK_QUEUE } from '@sage/task-domain';
 import { createDevRegistryBundle, publishDevRegistry } from '@sage/temporal-registry';
 import { TemporalClientFactory, TrustedMultiTargetTaskController, TrustedTemporalRouter } from '@sage/temporal-routing';
@@ -207,7 +207,8 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
       tenantId: config.tenantId, authenticator, authorizer: { authorize: (principal, operation) =>
         principal.tenantId === config.tenantId && (operation === 'read' || principal.roles.includes('task-operator')) },
       queryStore: tasks, deploymentMode: 'development',
-      artifactResolver: createRunOutputArtifactResolver({ tenantId: config.tenantId, lookup: tasks })
+      artifactResolver: createRunOutputArtifactResolver({ tenantId: config.tenantId, lookup: tasks }),
+      runLogQuery: new PostgresTaskRunLogQuery({ connectionString: config.postgresUrl })
     });
     const packageStore = new InMemoryAgentReleaseStore();
     const packageSpecStore = new InMemoryAgentTaskSpecStore();
