@@ -1,0 +1,38 @@
+schemaVersion: '2'
+id: finance-briefing
+version: 2.0.0
+description: 财经简报助手：自动获取最新外汇汇率与全球主要股指快照并产出结构化财经简报，无需任何用户输入
+entry: prompts/system.md
+modelRoute:
+  provider: minimax-cn
+  model: MiniMax-M3
+budgets:
+  maxTokens: 60000
+  maxToolCalls: 40
+  maxDurationMs: 300000
+skillRefs:
+  - skill://finance-brief/v1
+capabilityRefs:
+  - capability://web-snapshot-reader/v1
+inputs:
+  - name: focus
+    type: string
+    default: ""
+    required: false
+dataSources:
+  - name: fx-rates
+    ref: capability://web-snapshot-reader/v1
+    url: https://api.frankfurter.dev/v1/latest?base=USD&symbols=EUR,GBP,JPY,CNY,HKD,AUD
+    maxBytes: 65536
+    onFailure: markMissing
+  - name: index-quotes
+    ref: capability://web-snapshot-reader/v1
+    url: https://query1.finance.yahoo.com/v7/finance/spark?symbols=%5EGSPC,%5EDJI,%5EIXIC,%5EGDAXI,%5EFTSE,%5EHSI,%5EN225&range=1d&interval=1d
+    maxBytes: 262144
+    onFailure: markMissing
+tasks:
+  - name: finance-brief
+    entry: prompts/system.md
+    output:
+      schema: output.schema.json
+      files: [brief.md]

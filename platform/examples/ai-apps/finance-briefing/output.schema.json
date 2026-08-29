@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "FinanceBriefing",
+  "type": "object",
+  "properties": {
+    "headline": { "type": "string" },
+    "asOf": { "type": "string" },
+    "fx": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "pair": { "type": "string" },
+          "rate": { "type": "number" },
+          "comment": { "type": "string" }
+        },
+        "required": ["pair", "rate", "comment"]
+      }
+    },
+    "indices": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "price": { "type": "number" },
+          "changePct": { "type": "number" },
+          "comment": { "type": "string" }
+        },
+        "required": ["name", "price", "changePct", "comment"]
+      }
+    },
+    "takeaways": { "type": "array", "items": { "type": "string" } },
+    "missingData": { "type": "array", "items": { "type": "string" } }
+  },
+  "required": ["headline", "fx", "indices", "takeaways", "missingData"]
+}

@@ -10,80 +10,118 @@ export interface ExampleApp {
   readonly files: Readonly<Record<string, string>>;
 }
 
-const OPS_ANALYST = {
+const FINANCE_BRIEFING = {
   [`app.yaml`]: `schemaVersion: '2'
-id: ops-analyst
+id: finance-briefing
 version: 2.0.0
-description: 通用运维分析助手：按声明的告警参数（severity/component）解读监控指标并生成排查建议
+description: 财经简报助手：自动获取最新外汇汇率与全球主要股指快照并产出结构化财经简报，无需任何用户输入
 entry: prompts/system.md
 modelRoute:
-  provider: anthropic
-  model: claude-sonnet-4-5
-  fallbacks:
-    - claude-haiku-4-5
+  provider: minimax-cn
+  model: MiniMax-M3
 budgets:
-  maxTokens: 8000
+  maxTokens: 60000
   maxToolCalls: 40
   maxDurationMs: 300000
 skillRefs:
-  - skill://ops-triage/v1
+  - skill://finance-brief/v1
 capabilityRefs:
-  - capability://metric-reader/v1
+  - capability://web-snapshot-reader/v1
 inputs:
-  - name: severity
-    type: enum
-    enum: [low, medium, high, critical]
-    default: medium
-  - name: component
+  - name: focus
     type: string
     default: ""
     required: false
+dataSources:
+  - name: fx-rates
+    ref: capability://web-snapshot-reader/v1
+    url: https://api.frankfurter.dev/v1/latest?base=USD&symbols=EUR,GBP,JPY,CNY,HKD,AUD
+    maxBytes: 65536
+    onFailure: markMissing
+  - name: index-quotes
+    ref: capability://web-snapshot-reader/v1
+    url: https://query1.finance.yahoo.com/v7/finance/spark?symbols=%5EGSPC,%5EDJI,%5EIXIC,%5EGDAXI,%5EFTSE,%5EHSI,%5EN225&range=1d&interval=1d
+    maxBytes: 262144
+    onFailure: markMissing
+tasks:
+  - name: finance-brief
+    entry: prompts/system.md
+    output:
+      schema: output.schema.json
+      files: [brief.md]
 `,
   [`output.schema.json`]: `{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "OpsAnalystOutput",
+  "title": "FinanceBriefing",
   "type": "object",
   "properties": {
-    "summary": { "type": "string" },
-    "possibleCauses": { "type": "array", "items": { "type": "string" } },
-    "nextSteps": { "type": "array", "items": { "type": "string" } }
+    "headline": { "type": "string" },
+    "asOf": { "type": "string" },
+    "fx": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "pair": { "type": "string" },
+          "rate": { "type": "number" },
+          "comment": { "type": "string" }
+        },
+        "required": ["pair", "rate", "comment"]
+      }
+    },
+    "indices": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "price": { "type": "number" },
+          "changePct": { "type": "number" },
+          "comment": { "type": "string" }
+        },
+        "required": ["name", "price", "changePct", "comment"]
+      }
+    },
+    "takeaways": { "type": "array", "items": { "type": "string" } },
+    "missingData": { "type": "array", "items": { "type": "string" } }
   },
-  "required": ["summary", "possibleCauses", "nextSteps"]
+  "required": ["headline", "fx", "indices", "takeaways", "missingData"]
 }
 `,
-  [`prompts/system.md`]: `# ops-analyst
+  [`prompts/system.md`]: `# finance-briefing
 
-你是一名通用的运维分析助手。本次运行的参数见 \`--- params ---\` 分段：\`severity\`（告警级别 low/medium/high/critical，缺省 medium）与可选的 \`component\`（受影响组件/服务名，未提供则覆盖全部）。按参数界定的范围完成以下工作：
+你是财经简报助手。本次运行的输入中已自动注入实时市场快照（\`--- snapshots ---\` 分段）与参数（\`--- params ---\` 分段，\`focus\` 为可选的关注市场/币种，默认空）。快照说明：
 
-1. 先复述你认为的关键信号与缺失信息；
-2. 按「现象 → 可能原因 → 排查步骤 → 缓解措施」的结构输出结论；
-3. 结论必须基于参考资料中的通用运维准则，不要臆测不存在的内部系统或服务名；排查优先级与篇幅随 severity 调整（critical 聚焦止血，low 侧重归因与改进项）；提供了 component 时仅围绕该组件展开；
-4. 如果信息不足，明确列出还需要补充的指标或日志维度。
+- \`fx-rates\`：Frankfurter API 返回的 JSON（\`base\`、\`date\`、\`rates\`）。\`rates\` 为 1 美元兑换各币种的数额，欧洲央行参考汇率口径，每个工作日更新一次，\`date\` 即汇率所属日期；
+- \`index-quotes\`：Yahoo Finance spark 端点返回的 JSON，覆盖标普 500、道琼斯、纳斯达克综合、DAX、富时 100、恒生、日经 225 七个指数。每个 symbol 的 \`response[0].meta\` 含 \`shortName\`（指数名，注意去除首尾空白）、\`regularMarketPrice\`（最新点位）、\`regularMarketChangePercent\`（相对上一交易日收盘的涨跌幅百分比）、\`regularMarketTime\`（数据时点的 Unix 秒）。
 
-始终保持简洁、结构化、可执行。
+按以下要求完成简报：
+
+1. \`headline\`：用一句话概括当日全球市场基调，点明数据时点；
+2. \`fx\`：对快照中的每个币种给出「USD 兑该币种汇率 + 一句点评」，只解读数据中存在的币种，不得虚构；
+3. \`indices\`：对快照中的每个指数给出「名称 + 最新点位 + 涨跌幅 + 一句点评」，按美、欧、亚时区顺序排列；
+4. \`takeaways\`：给出 2 至 4 条跨市场观察（如美元强弱、风险偏好、区域分化），只从快照数据推导；
+5. \`missingData\`：快照标注为 unavailable 的数据源、或数据中缺失的维度，逐条列出；两个数据源都可用且维度完整时给空数组；
+6. \`asOf\`：汇总两个快照中最早的数据时点，注明「汇率日期 + 指数时间」；
+7. 若 \`focus\` 非空，优先围绕该市场或币种展开，并在 \`takeaways\` 中给出针对性观察；focus 无法对应快照中的标的时，在 \`missingData\` 中说明。
+
+纪律：所有数值逐字取自快照，不换算、不外推、不预测行情；语气克制，不使用夸张修辞。输出遵循 output.schema.json 的 JSON 结构（headline / asOf / fx / indices / takeaways / missingData），并同时产出 \`brief.md\`——一份人类可读的简报（标题、各市场段落、要点、缺失数据说明），结尾固定附免责声明：本简报由自动管道基于公开参考数据生成，存在延迟，不构成投资建议。
 `,
-  [`references/observability-basics.md`]: `# 可观测性基础
+  [`references/market-data-basics.md`]: `# 市场数据口径基础
 
-- 黄金四信号：延迟、流量、错误、饱和度（利用率）。
-- 告警分级：P1 业务中断 / P2 主要功能受损 / P3 局部影响 / P4 提示。
-- 延迟异常优先看 p50/p95/p99 分位，p99 突增通常指向尾部慢请求或 GC。
-- 错误率与流量分离：先判断错误率上升是随流量放大还是独立事件。
-- 饱和度超过阈值时，队列堆积往往先于错误出现。
+- 欧洲央行参考汇率：每个工作日约中欧时间 16:00 更新一次，周末与假日无更新；Frankfurter 的 \`date\` 字段即汇率所属日期，周末运行时拿到的是最近一个工作日的数据。
+- 参考汇率是方向性的：\`rates\` 给出 1 美元兑各币种的数额，反向汇率需自行求倒数，且需在简报中注明换算口径。
+- 指数行情的 \`regularMarketTime\` 是最近一次成交/收盘时点：美欧指数在其交易时段外会停留在上一收盘，简报应写「截至」该时点而非「现在」。
+- 涨跌幅（\`regularMarketChangePercent\`）相对上一交易日收盘；当日盘中数据随行情波动，同一交易日不同时点取数结果不同。
+- 以上均为公开参考数据，存在延迟与修正可能，不属于交易级实时行情；引用时应保留「参考数据」定位。
 `,
-  [`references/runbook-conventions.md`]: `# Runbook 撰写约定
+  [`references/brief-writing-guide.md`]: `# 财经简报撰写规范
 
-- 每个 runbook 以「触发条件」开头，明确什么信号会激活它。
-- 排查步骤按成本从低到高排列，先读日志再改配置。
-- 缓解措施区分为「止血」与「根治」，不要混为一谈。
-- 所有命令给出预期输出样例，方便核对。
-`,
-  [`references/troubleshooting-playbook.md`]: `# 通用排查手册
-
-- 资源类问题：CPU/内存/磁盘/网络，逐一确认是否触顶，触顶再判断扩容或优化。
-- 数据库问题：连接数、慢查询、锁等待、复制延迟，从最接近业务的指标开始。
-- 队列问题：消费速率 vs 生产速率、积压量、重试次数，确认是否有死信。
-- 版本变更：最近的部署/发布/配置变更，优先回滚验证假设。
-- 时间线复盘：把告警、日志、指标放在同一时间线，定位首个异常信号。
+- 结论先行：headline 先给市场基调，再展开分市场细节；每段点评不超过两句。
+- 数值保真：汇率、点位、涨跌幅逐字取自快照，不做四舍五入以外的任何加工；确需换算（如倒数）时必须注明。
+- 交叉验证：跨市场结论（美元强弱、风险偏好）至少要有两个市场的数据支撑，单一市场信号不足以定调整体基调。
+- 缺失显式化：数据源 unavailable、维度缺失、focus 无对应标的，一律写入 missingData，不得用推测补位。
+- 免责声明固定：简报结尾附固定句式免责声明，说明数据来源为公开参考数据、存在延迟、不构成投资建议。
 `
 } as const;
 
@@ -208,18 +246,18 @@ probe-ok
 
 export const EXAMPLE_APPS: readonly ExampleApp[] = [
   {
-    appId: 'ops-analyst',
-    name: `Ops Analyst`,
-    description: `通用运维分析助手：按声明的告警参数（severity/component）解读监控指标并生成排查建议`,
-    version: '2.0.0',
-    files: OPS_ANALYST
-  },
-  {
     appId: 'github-trending',
     name: `GitHub Trending`,
     description: `GitHub 热门项目解读助手：准入时自动获取真实快照并产出热门项目 digest，无需任何用户输入`,
     version: '2.0.0',
     files: GITHUB_TRENDING
+  },
+  {
+    appId: 'finance-briefing',
+    name: `Finance Briefing`,
+    description: `财经简报助手：自动获取最新外汇汇率与全球主要股指快照并产出结构化财经简报，无需任何用户输入`,
+    version: '2.0.0',
+    files: FINANCE_BRIEFING
   },
   {
     appId: 'lifecycle-probe',

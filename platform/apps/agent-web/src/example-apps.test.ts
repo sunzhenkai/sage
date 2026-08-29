@@ -7,7 +7,7 @@ const examplesRoot = new URL('../../../examples/ai-apps/', import.meta.url);
 
 describe('embedded example apps', () => {
   it('covers the bundled example source packages', () => {
-    expect(EXAMPLE_APPS.map((example) => example.appId)).toEqual(['ops-analyst', 'github-trending', 'lifecycle-probe']);
+    expect(EXAMPLE_APPS.map((example) => example.appId)).toEqual(['github-trending', 'finance-briefing', 'lifecycle-probe']);
   });
 
   it('matches the source packages on disk byte for byte', () => {

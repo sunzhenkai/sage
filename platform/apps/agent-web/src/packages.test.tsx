@@ -118,7 +118,7 @@ describe('PackagesApp example import', () => {
   it('creates the app and registers its release in one click', async () => {
     const mockFetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
-      if (init?.method === 'POST' && url.endsWith('/v1/apps')) return response({ schemaVersion: 'App.v1', appId: 'ops-analyst', status: 'active' }, 201);
+      if (init?.method === 'POST' && url.endsWith('/v1/apps')) return response({ schemaVersion: 'App.v1', appId: 'github-trending', status: 'active' }, 201);
       if (init?.method === 'POST' && url.endsWith('/releases')) return response({ schemaVersion: 'PackageReleaseResult.v1', status: 'stored', packageVersion: '1.0.0' }, 201);
       return response({ apps: [] });
     });
@@ -133,13 +133,13 @@ describe('PackagesApp example import', () => {
     expect(importButtons).toHaveLength(3);
     await act(async () => { importButtons[0]!.props.onClick(); await flush(); await flush(); });
     const posts = postBodies(mockFetch.mock.calls);
-    expect(posts[0]).toMatchObject({ url: '/v1/apps', body: { appId: 'ops-analyst', name: 'Ops Analyst' } });
+    expect(posts[0]).toMatchObject({ url: '/v1/apps', body: { appId: 'github-trending', name: 'GitHub Trending' } });
     const releasePost = posts.find((post) => post.url.endsWith('/releases'))!;
-    expect(releasePost.url).toBe('/v1/apps/ops-analyst/releases');
+    expect(releasePost.url).toBe('/v1/apps/github-trending/releases');
     const files = releasePost.body.files as Record<string, string>;
-    expect(files['app.yaml']).toContain('id: ops-analyst');
+    expect(files['app.yaml']).toContain('id: github-trending');
     expect(Object.keys(files)).toContain('prompts/system.md');
-    expect(assignSpy).toHaveBeenCalledWith('/?view=packages&package=ops-analyst');
+    expect(assignSpy).toHaveBeenCalledWith('/?view=packages&package=github-trending');
     restoreWindow();
     await act(async () => tree.unmount());
   });
@@ -161,8 +161,8 @@ describe('PackagesApp example import', () => {
     await act(async () => { importButtons[1]!.props.onClick(); await flush(); await flush(); });
     const posts = postBodies(mockFetch.mock.calls);
     expect(posts[0]!.url).toBe('/v1/apps');
-    expect(posts.find((post) => post.url.endsWith('/releases'))!.url).toBe('/v1/apps/github-trending/releases');
-    expect(assignSpy).toHaveBeenCalledWith('/?view=packages&package=github-trending');
+    expect(posts.find((post) => post.url.endsWith('/releases'))!.url).toBe('/v1/apps/finance-briefing/releases');
+    expect(assignSpy).toHaveBeenCalledWith('/?view=packages&package=finance-briefing');
     restoreWindow();
     await act(async () => tree.unmount());
   });

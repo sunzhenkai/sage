@@ -61,8 +61,8 @@ services:
       SAGE_TEMPORAL_ADDRESS: temporal:7233
       # 本地 dev 主密钥（仅 local compose）。
       SAGE_SECRET_MASTER_KEY: ${SAGE_SECRET_MASTER_KEY:-c2FnZS1sb2NhbC1kZXYtc2VjcmV0LW1hc3Rlci1reSE=}
-      # 包运行输入快照的受控出口白名单（default-deny；本地放行 GitHub Search API）。
-      SAGE_PACKAGE_SNAPSHOT_EGRESS_ALLOWLIST: api.github.com
+      # 包运行输入快照的受控出口白名单（default-deny；本地放行 GitHub Search API、Frankfurter 汇率与 Yahoo Finance 行情）。
+      SAGE_PACKAGE_SNAPSHOT_EGRESS_ALLOWLIST: api.github.com,api.frankfurter.dev,query1.finance.yahoo.com
       # 可选：提供三项完整值时，agent-api 启动即注册真实 deployment-env provider（冒烟垂直链路用）。
       SAGE_BOOTSTRAP_PROVIDER_API_KEY: ${SAGE_BOOTSTRAP_PROVIDER_API_KEY:-}
       SAGE_BOOTSTRAP_PROVIDER_BASE_URL: ${SAGE_BOOTSTRAP_PROVIDER_BASE_URL:-}
@@ -93,8 +93,8 @@ services:
       SAGE_TEMPORAL_ADDRESS: temporal:7233
       # 本地 dev 主密钥（仅 local compose）。
       SAGE_SECRET_MASTER_KEY: ${SAGE_SECRET_MASTER_KEY:-c2FnZS1sb2NhbC1kZXYtc2VjcmV0LW1hc3Rlci1reSE=}
-      # 包运行输入快照的受控出口白名单（default-deny；本地放行 GitHub Search API）。
-      SAGE_PACKAGE_SNAPSHOT_EGRESS_ALLOWLIST: api.github.com
+      # 包运行输入快照的受控出口白名单（default-deny；本地放行 GitHub Search API、Frankfurter 汇率与 Yahoo Finance 行情）。
+      SAGE_PACKAGE_SNAPSHOT_EGRESS_ALLOWLIST: api.github.com,api.frankfurter.dev,query1.finance.yahoo.com
       SAGE_HEALTH_HOST: 0.0.0.0
       SAGE_HEALTH_PORT: 9611
     depends_on:
