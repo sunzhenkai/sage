@@ -161,7 +161,7 @@ async function createWorker(options: {
   return Worker.create({
     connection: nativeConnection, namespace: TASK_NAMESPACE, taskQueue: TASK_QUEUE, workflowBundle,
     activities: createAgentTaskActivities({
-      agentClient: new LocalAgentClient({ harness: options.harness }), store: options.commitStore ?? store,
+      liveClientFactory: () => new LocalAgentClient({ harness: options.harness }), store: options.commitStore ?? store,
       inputResolver: resolver, leaseMs: 250, ...(options.afterCommit === undefined ? {} : { afterCommit: options.afterCommit })
     }),
     ...(options.deploymentVersion === undefined

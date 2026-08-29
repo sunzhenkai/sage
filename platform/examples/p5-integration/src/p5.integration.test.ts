@@ -69,7 +69,7 @@ beforeAll(async () => {
   harness = new P5Harness();
   workers = await Promise.all([DEV_QUEUE_US, DEV_QUEUE_EU].map((taskQueue) => Worker.create({
     connection: nativeConnection, namespace: 'sage-dev', taskQueue, workflowBundle,
-    activities: createAgentTaskActivities({ agentClient: new LocalAgentClient({ harness }), store, inputResolver: resolver }),
+    activities: createAgentTaskActivities({ liveClientFactory: () => new LocalAgentClient({ harness }), store, inputResolver: resolver }),
     buildId: `sage-p5-${taskQueue}`
   })));
   running = workers.map((worker) => worker.run());

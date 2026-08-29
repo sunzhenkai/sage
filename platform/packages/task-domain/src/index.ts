@@ -257,6 +257,14 @@ export interface TaskArtifactReference {
 }
 
 /** 包运行输入的物化记录：entry prompt + references 清单 + 用户输入，含资产 digest 清单。 */
+/** 包运行运行契约：准入时从 Release lock 的任务与 manifest 声明固化——输出契约（schema 文本与产物名清单）与模型路由（执行边界解析函数的输入）。 */
+export interface PackageRunContract {
+  readonly task?: string;
+  readonly schema?: string;
+  readonly files?: readonly string[];
+  readonly modelRoute?: { readonly provider: string; readonly model: string; readonly fallbacks?: readonly string[] };
+}
+
 export interface TaskPackageInputRecord {
   readonly tenantId: string;
   readonly taskId: string;
@@ -264,7 +272,26 @@ export interface TaskPackageInputRecord {
   readonly releaseDigest: string;
   readonly assembledInput: string;
   readonly assetDigests: Readonly<Record<string, string>>;
+  readonly runContract?: PackageRunContract;
   readonly createdAt: string;
+}
+
+
+/** 包运行 provider 路由解析（准入与 worker 共享的纯函数）：manifest modelRoute 依序精确匹配（model/fallbacks，条目启用且凭据在场）优先，运行 agent 设置默认兜底；两来源皆不可用返回 undefined（fail-closed）。 */
+export function resolvePackageRunConnection(
+  route: PackageRunContract['modelRoute'],
+  registry: readonly ProviderConnectionRecord[],
+  settingsConnectionId: string | undefined
+): { readonly source: 'manifest' | 'settings'; readonly connectionId: string } | undefined {
+  if (route !== undefined) {
+    for (const model of [route.model, ...(route.fallbacks ?? [])]) {
+      const entry = registry.find((item) => item.enabled && item.credentialPresent && item.modelId === model);
+      if (entry !== undefined) return { source: 'manifest', connectionId: entry.id };
+    }
+  }
+  if (settingsConnectionId === undefined) return undefined;
+  const entry = registry.find((item) => item.id === settingsConnectionId && item.enabled && item.credentialPresent);
+  return entry === undefined ? undefined : { source: 'settings', connectionId: entry.id };
 }
 
 export interface TaskPackageInputStore {
@@ -280,6 +307,8 @@ export interface TaskRunOutputRecord {
   readonly artifactRef: TaskArtifactRef;
   readonly output: string;
   readonly mediaType: string;
+  /** 任务声明的产物名清单（manifest output.files）：物化时按名登记为可取回引用。 */
+  readonly files?: readonly string[];
   readonly createdAt: string;
 }
 

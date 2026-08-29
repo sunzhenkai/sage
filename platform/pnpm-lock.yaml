@@ -89,9 +89,6 @@ importers:
       '@sage/chat-domain':
         specifier: workspace:*
         version: link:../../packages/chat-domain
-      '@sage/harness-pi':
-        specifier: workspace:*
-        version: link:../../packages/harness-pi
       '@sage/local-fakes':
         specifier: workspace:*
         version: link:../../packages/local-fakes
@@ -125,6 +122,9 @@ importers:
       '@sage/temporal-routing':
         specifier: workspace:*
         version: link:../../packages/temporal-routing
+      '@sage/tool-runtime':
+        specifier: workspace:*
+        version: link:../../packages/tool-runtime
       '@temporalio/client':
         specifier: 1.22.0
         version: 1.22.0

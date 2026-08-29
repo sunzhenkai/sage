@@ -1,7 +1,7 @@
-schemaVersion: '1'
+schemaVersion: '2'
 id: ops-analyst
-version: 1.0.0
-description: 通用运维分析助手：解读监控指标、定位告警、生成排查建议
+version: 2.0.0
+description: 通用运维分析助手：按声明的告警参数（severity/component）解读监控指标并生成排查建议
 entry: prompts/system.md
 modelRoute:
   provider: anthropic
@@ -16,3 +16,12 @@ skillRefs:
   - skill://ops-triage/v1
 capabilityRefs:
   - capability://metric-reader/v1
+inputs:
+  - name: severity
+    type: enum
+    enum: [low, medium, high, critical]
+    default: medium
+  - name: component
+    type: string
+    default: ""
+    required: false

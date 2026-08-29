@@ -7,9 +7,9 @@
 ## What Changes
 
 - **Schedule Plane（新能力）**：
-  - Canonical Schedule 契约：cron/interval/timezone、misfire/catch-up 策略、overlap 并发策略、pause/resume、调度边界（允许环境/能力复用 WorkflowTargetSnapshot 约束）；Temporal SDK 类型不进入 canonical 契约。
+  - Canonical Schedule 契约：cron/interval/timezone、misfire/catch-up 策略、overlap 并发策略、pause/resume、调度边界（允许环境/能力复用 WorkflowTargetSnapshot 约束）；运行绑定必须完整声明 `releaseBinding（FIXED/FOLLOW） + task + 固化 params`，创建时按目标 Release 校验绑定合法性；Temporal SDK 类型不进入 canonical 契约。
   - Temporal Schedules Adapter：Temporal `auto-setup:1.29.1` 原生 Schedule 作为当前 adapter 实现，与 Durable Coordinator Adapter 同一隔离纪律。
-  - 触发接线：每次触发产生唯一 occurrence，经既有 `agent-run-admission` 链路生成新 `AgentTaskSpec` 与新 attempt；schedule 绑定 Release 的语义（固定 digest 或按 policy 跟随新 Release）在 admission 时固化。
+  - 触发接线：每次触发产生唯一 occurrence（幂等键含 task 与固化参数值），以固化 task/params 走既有 `agent-run-admission` 包运行准入（`package-run-input-resolution` 语义：声明参数校验/默认值、dataSources 受控获取与 onFailure 语义），生成新 `AgentTaskSpec` 与新 attempt；schedule 绑定 Release 的语义（固定 digest 或按 policy 跟随新 Release）在 admission 时固化，FOLLOW 解析不兼容（缺同名 task 或 params 不合法）时触发稳定失败并告警、不静默跳过。不存在任何调度专属人工输入通道。
   - Schedule API/UI/审计：创建、列表、详情、pause/resume、触发历史；所有管理操作进审计。
   - 观测：missed/failed trigger 指标、schedule 维度告警与 runbook 注解。
 - **无人值守失败自治（新能力）**：
@@ -45,3 +45,4 @@
 - **基础设施**：Temporal Schedules 能力启用（服务端 1.29 已支持，无版本升级）；`compose.yaml` 不新增服务。
 - **兼容性**：不修改既有 API 行为；新增端点独立前缀（`/v1/schedules`、`/v1/effects`）；header stub 认证在 pilot 链路被 service token 替代属**行为变化**，需在 run-agent-settings/包注册调用方同步（**BREAKING（局部）**：本地脚本 `register-package.ts` 需携带 service token）。
 - **假设（记录在案）**：阶段编号沿用仓库滚动 Phase 惯例记为 P8；schedule 绑定 Release 默认"固定 digest"，跟随 policy 作为可配置项；soak 验收默认 14 天/≥100 次，harness 参数可配置。
+- **排序约束（ai-app-self-contained-runs-driver）**：P8 实施排期晚于 driver 的 `manifest-v2` 与 `input-binding` 子变更完成；本提案的绑定契约（task + 固化 params + releasePolicy）与触发走统一准入的语义由该 driver 的 schedule-binding 子变更修订引入。

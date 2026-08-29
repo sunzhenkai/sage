@@ -19,7 +19,9 @@ export function createRunOutputArtifactResolver(options: {
   return {
     async resolve(reference: TaskArtifactReference): Promise<TaskArtifactReference> {
       const output = await options.lookup.getRunOutput(options.tenantId, reference.taskId).catch(() => undefined);
-      if (output === undefined || output.artifactRef !== reference.artifactRef) return reference;
+      // `#file/{name}` 后缀引用是声明产物名清单的登记形态，内容仍取基准 run 输出。
+      const baseRef = reference.artifactRef.split('#file/')[0]!;
+      if (output === undefined || output.artifactRef !== baseRef) return reference;
       return { ...reference, content: output.output, encoding: 'utf-8' };
     }
   };

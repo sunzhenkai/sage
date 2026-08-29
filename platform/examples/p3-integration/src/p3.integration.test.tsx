@@ -130,7 +130,7 @@ integration('P3 real PostgreSQL + API + UI vertical slice', () => {
 
   async function api(outputs: string[], evidence: SequencingEvidence[] = [], metrics = new CapturingMetrics()) {
     const harness = new DeterministicHarness(outputs);
-    const app = await createChatApi({ store, tenantId, agentClient: new LocalAgentClient({ harness }), metrics, onSequencingEvidence: (item) => evidence.push(item) });
+    const app = await createChatApi({ store, tenantId, liveClientFactory: () => new LocalAgentClient({ harness }), metrics, onSequencingEvidence: (item) => evidence.push(item) });
     apps.push(app);
     return { app, harness, metrics };
   }
@@ -189,7 +189,7 @@ integration('P3 real PostgreSQL + API + UI vertical slice', () => {
 
   it('records first-token on the first non-empty provider-neutral delta well before terminal completion', async () => {
     const metrics = new CapturingMetrics();
-    const app = await createChatApi({ store, tenantId, agentClient: new ScriptedAgentClient('delayed-success'), metrics });
+    const app = await createChatApi({ store, tenantId, liveClientFactory: () => new ScriptedAgentClient('delayed-success'), metrics });
     apps.push(app);
     const sessionId = (await app.inject({ method: 'POST', url: '/v1/chat/sessions', payload: { title: 'metric timing proof' } })).json<{ sessionId: string }>().sessionId;
     const accepted = await app.inject({ method: 'POST', url: `/v1/chat/sessions/${sessionId}/messages`, payload: { parts: [{ kind: 'text', text: 'measure timing' }] } });
@@ -217,7 +217,7 @@ integration('P3 real PostgreSQL + API + UI vertical slice', () => {
   it('records one completion for terminal and consumer failures without inventing first-token', async () => {
     for (const mode of ['terminal-failure', 'consumer-failure'] as const) {
       const metrics = new CapturingMetrics();
-      const app = await createChatApi({ store, tenantId, agentClient: new ScriptedAgentClient(mode), metrics });
+      const app = await createChatApi({ store, tenantId, liveClientFactory: () => new ScriptedAgentClient(mode), metrics });
       apps.push(app);
       const sessionId = (await app.inject({ method: 'POST', url: '/v1/chat/sessions', payload: { title: mode } })).json<{ sessionId: string }>().sessionId;
       const accepted = await app.inject({ method: 'POST', url: `/v1/chat/sessions/${sessionId}/messages`, payload: { parts: [{ kind: 'text', text: mode }] } });
@@ -256,7 +256,7 @@ integration('P3 real PostgreSQL + API + UI vertical slice', () => {
 
   it('preserves a validated Tool Artifact ref, discards Tool body, and renders the ref in the UI', async () => {
     const metrics = new CapturingMetrics();
-    const app = await createChatApi({ store, tenantId, agentClient: new ScriptedAgentClient('tool-artifact'), metrics });
+    const app = await createChatApi({ store, tenantId, liveClientFactory: () => new ScriptedAgentClient('tool-artifact'), metrics });
     apps.push(app);
     const sessionId = (await app.inject({ method: 'POST', url: '/v1/chat/sessions', payload: {} })).json<{ sessionId: string }>().sessionId;
     const accepted = await app.inject({

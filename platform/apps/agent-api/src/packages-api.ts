@@ -70,7 +70,18 @@ export const PackageDetailSchema = Type.Object({
     entry: Type.String({ minLength: 1 }),
     modelRoute: Type.Object({ provider: Type.String({ minLength: 1 }), model: Type.String({ minLength: 1 }) }, { additionalProperties: false }),
     skillRefs: Type.Array(Type.String({ minLength: 1 })),
-    capabilityRefs: Type.Array(Type.String({ minLength: 1 }))
+    capabilityRefs: Type.Array(Type.String({ minLength: 1 })),
+    inputs: Type.Optional(Type.Array(Type.Object({
+      name: Type.String({ minLength: 1 }), type: Type.String({ minLength: 1 }), required: Type.Boolean(),
+      enum: Type.Optional(Type.Array(Type.Union([Type.String(), Type.Number()]))),
+      default: Type.Optional(Type.Union([Type.String(), Type.Number()]))
+    }, { additionalProperties: false }))),
+    dataSources: Type.Optional(Type.Array(Type.Object({
+      name: Type.String({ minLength: 1 }), url: Type.String({ minLength: 1 })
+    }, { additionalProperties: false }))),
+    tasks: Type.Optional(Type.Array(Type.Object({
+      name: Type.String({ minLength: 1 }), entry: Type.String({ minLength: 1 })
+    }, { additionalProperties: false })))
   }, { additionalProperties: false })),
   assets: Type.Optional(Type.Array(Type.Object({
     relativePath: Type.String({ minLength: 1 }),
@@ -266,6 +277,9 @@ interface LockManifestShape {
   readonly version?: unknown;
   readonly description?: unknown;
   readonly entry?: unknown;
+  readonly inputs?: unknown;
+  readonly dataSources?: unknown;
+  readonly tasks?: unknown;
   readonly modelRoute?: { readonly provider?: unknown; readonly model?: unknown };
   readonly skillRefs?: readonly unknown[];
   readonly capabilityRefs?: readonly unknown[];
@@ -292,6 +306,27 @@ export function extractManifestSummary(lock: Readonly<Record<string, unknown>> |
     || str(modelRoute.provider) === undefined || str(modelRoute.model) === undefined) {
     return undefined;
   }
+  const declaredInputs = Array.isArray(typed.inputs)
+    ? typed.inputs.filter(isRecord).map((input) => ({
+        name: str(input.name) ?? '',
+        type: str(input.type) ?? 'string',
+        required: input.required === true,
+        ...(Array.isArray(input.enum) ? { enum: input.enum.filter((value) => typeof value === 'string' || typeof value === 'number') } : {}),
+        ...(typeof input.default === 'string' || typeof input.default === 'number' ? { default: input.default } : {})
+      })).filter((input) => input.name !== '')
+    : undefined;
+  const declaredDataSources = Array.isArray(typed.dataSources)
+    ? typed.dataSources.filter(isRecord).map((source) => ({
+        name: str(source.name) ?? '',
+        url: str(source.url) ?? ''
+      })).filter((source) => source.name !== '')
+    : undefined;
+  const declaredTasks = Array.isArray(typed.tasks)
+    ? typed.tasks.filter(isRecord).map((task) => ({
+        name: str(task.name) ?? '',
+        entry: str(task.entry) ?? ''
+      })).filter((task) => task.name !== '')
+    : undefined;
   return {
     id: str(typed.id) as string,
     version: str(typed.version) ?? '',
@@ -300,6 +335,9 @@ export function extractManifestSummary(lock: Readonly<Record<string, unknown>> |
     modelRoute: { provider: str(modelRoute.provider) as string, model: str(modelRoute.model) as string },
     skillRefs: Array.isArray(typed.skillRefs) ? typed.skillRefs.filter(str).map(str) as string[] : [],
     capabilityRefs: Array.isArray(typed.capabilityRefs) ? typed.capabilityRefs.filter(str).map(str) as string[] : [],
+    ...(declaredInputs === undefined ? {} : { inputs: declaredInputs }),
+    ...(declaredDataSources === undefined ? {} : { dataSources: declaredDataSources }),
+    ...(declaredTasks === undefined ? {} : { tasks: declaredTasks })
   };
 }
 

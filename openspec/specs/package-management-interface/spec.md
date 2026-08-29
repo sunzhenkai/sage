@@ -15,15 +15,19 @@ web 界面 SHALL 提供包列表页（id、最新版本、描述、最近 releas
 - **THEN** 展示 manifest 摘要、资产预览与 release 历史（含 digest）
 
 ### Requirement: 从包发起运行并追踪
-详情页 SHALL 提供发起运行表单（用户输入文本可选，app 自身即可完成特定任务时无需输入）；提交成功后 SHALL 跳转到该运行的 task 视图并持续展示状态直至终态，终态后可查看 artifact。
+详情页 SHALL 提供发起运行表单：表单字段 SHALL 由该 App 归一化 manifest 的 `inputs` 声明渲染（文本/枚举控件 + 声明默认值），多任务 App SHALL 提供任务选择；界面 SHALL NOT 提供自由文本输入框或空输入警告/二次确认（输入闭环由声明与默认值保证）。提交时 SHALL 以 `{task, params}` 调用运行入口；提交成功后 SHALL 跳转到该运行的 task 视图并持续展示状态直至终态。终态后 SHALL 可查看 artifact，succeeded 且有 task-output 时 SHALL 内联渲染输出正文（markdown 渲染，如含残留 think 段则折叠展示），不要求用户离开页面下载原始 JSON。
 
 #### Scenario: 发起运行
-- **WHEN** 用户填写输入（或留空）并提交发起运行
-- **THEN** 界面创建运行并导航到运行详情，展示运行中状态
+- **WHEN** 用户在声明参数表单（预填默认值）提交发起运行
+- **THEN** 界面以 {task, params} 创建运行并导航到运行详情，展示运行中状态
+
+#### Scenario: 参数校验错误内联展示
+- **WHEN** 提交的参数未通过声明校验（API 返回 `PACKAGE_PARAMS_INVALID`）
+- **THEN** 界面内联展示违规项，不跳转
 
 #### Scenario: 追踪至终态与查看产物
 - **WHEN** 运行达到 succeeded/failed 等终态
-- **THEN** 界面展示终态与失败原因（如有），succeeded 时可查看 artifact 内容
+- **THEN** 界面展示终态与失败原因（如有），succeeded 时可查看 artifact 内容且 task-output 正文内联渲染
 
 ### Requirement: 应用包管理界面
 web 界面 SHALL 在包管理域提供应用（App）的主体管理：列表页 SHALL 提供「新建 App」入口（填写 appId、name、description，含必填与格式校验）；详情页 SHALL 提供「上传/更新版本」表单（上传源包文件登记为新版本）与「删除 App」操作（二次确认并展示结果）；界面 SHALL 展示版本历史（倒序）并在上传/删除后刷新。空态、加载态与错误态 SHALL 有明确展示，新建/删除/上传操作 SHALL 提供双语文案与 aria 语义。

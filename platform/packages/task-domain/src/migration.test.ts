@@ -4,6 +4,7 @@ import {TaskLifecyclePathSchema, TaskOwnerStateSchema, TaskProjectionSchema, Tas
 import {Value} from 'typebox/value';
 
 const migrationUrl = new URL('../migrations/002_durable_coordinator_task_persistence.sql', import.meta.url);
+const outputContractMigrationUrl = new URL('../migrations/007_task_package_run_contract.sql', import.meta.url);
 
 describe('durable coordinator task persistence migration', () => {
   it('is additive, rerunnable, and backfills legacy ownership metadata', async () => {
@@ -21,6 +22,17 @@ describe('durable coordinator task persistence migration', () => {
     expect(sql).toContain('ADD COLUMN IF NOT EXISTS');
     expect(sql).toContain('CREATE UNIQUE INDEX IF NOT EXISTS task_routing_start_key_idx');
     expect(sql).toContain('CREATE INDEX IF NOT EXISTS task_projection_path_freshness_idx');
+    expect(sql).not.toMatch(/DROP\s+TABLE/i);
+    expect(sql).not.toMatch(/DROP\s+COLUMN/i);
+    expect(sql).not.toMatch(/\bDELETE\s+FROM\b/i);
+    expect(sql).not.toMatch(/\bTRUNCATE\b/i);
+  });
+
+  it('adds the package run contract column additively and rerunnably', async () => {
+    const sql = await readFile(outputContractMigrationUrl, 'utf8');
+    expect(sql.startsWith('BEGIN;')).toBe(true);
+    expect(sql.endsWith('COMMIT;\n')).toBe(true);
+    expect(sql).toContain('ADD COLUMN IF NOT EXISTS run_contract jsonb');
     expect(sql).not.toMatch(/DROP\s+TABLE/i);
     expect(sql).not.toMatch(/DROP\s+COLUMN/i);
     expect(sql).not.toMatch(/\bDELETE\s+FROM\b/i);

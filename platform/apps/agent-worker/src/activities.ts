@@ -22,10 +22,13 @@ import type { BoundedKernelClient, LocalAgentClient } from '@sage/agent-client';
 import type { LiveProviderRoute } from '@sage/local-runtime';
 import {
   type AgentSliceResult, type ExecuteAgentSliceInput, type TaskArtifactRef,
-  type TaskCommitStore, type TaskInputRef, type TaskProjection, type ProviderConnectionStore, type RunAgentSettingsStore, type TaskRunOutputStore
+  type TaskCommitStore, type TaskInputRef, type TaskProjection, type ProviderConnectionStore, type RunAgentSettingsStore, type TaskRunOutputStore,
+  type TaskPackageInputRecord
 } from '@sage/task-domain';
 import type { SecretBackend } from '@sage/secret-vault';
+import { resolvePackageRunConnection } from '@sage/task-domain';
 import { runTaskAgentPath, type TaskCanonicalCompatibilityOptions } from './task-compatibility.js';
+import { enforceOutputContract, OutputContractViolation } from './output-contract.js';
 
 export interface TaskSliceInputResolver {
   resolve(inputRef: TaskInputRef, tenantId: string): Promise<string>;
@@ -42,6 +45,8 @@ export interface AgentTaskActivityOptions {
   readonly store: TaskCommitStore;
   readonly outputStore?: TaskRunOutputStore;
   readonly inputResolver: TaskSliceInputResolver;
+  /** 包输入读取：物化点取任务输出契约（声明 schema 的 Task 才进入强制管线）。 */
+  readonly packageInputReader?: { getPackageInput(tenantId: string, taskId: string): Promise<TaskPackageInputRecord | undefined> };
   readonly leaseMs?: number;
   readonly now?: () => Date;
   readonly afterCommit?: (result: AgentSliceResult) => Promise<void> | void;
@@ -99,15 +104,34 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
     async executeAgentSlice(input): Promise<AgentSliceResult> {
       const info = activityInfo();
       if(input.sessionId&&input.runId&&input.messageId)try{options.telemetry?.record('sage_task_worker_attempt_total',1,{tenant_id:input.tenantId,message_id:input.messageId,session_id:input.sessionId,run_id:input.runId,task_id:input.taskId,workflow_id:input.workflowId,target_id:input.targetId,attempt:input.attempt},{activity_attempt:info.attempt,slice_number:input.sliceNumber});}catch{/* Telemetry cannot change Activity semantics. */}
-      // 执行前依赖检查（fail-closed）：所有 slice（package 与 chat）在执行边界按运行 agent 设置解析注册表路由，
-      // 设置 unset 或条目不可用时以不可重试错误显式失败，不 claim slice、不写 run 输出。设置每 slice 现读，改设置即时生效。
+      // 执行前依赖检查（fail-closed，双来源）：包 slice 按 manifest modelRoute（model/fallbacks 依序）匹配注册表可用条目优先，
+      // 未匹配回退运行 agent 设置默认；两来源皆不可用即不可重试失败，不 claim slice、不写 run 输出。chat slice 仅按设置。每 slice 现读，改设置即时生效。
       const isPackageInput = input.inputRef.startsWith('task-input://package/');
+      const packageTaskId = isPackageInput
+        ? decodeURIComponent(/^task-input:\/\/package\/([^/]+)\/([^/]+)$/.exec(input.inputRef)?.[2] ?? '')
+        : '';
       const settings = options.settingsStore !== undefined
         ? await options.settingsStore.getRunAgentSettings(input.tenantId)
         : undefined;
+      const packageRecord = packageTaskId === '' || options.packageInputReader === undefined
+        ? undefined
+        : await options.packageInputReader.getPackageInput(input.tenantId, packageTaskId);
+      const manifestRoute = packageRecord?.runContract?.modelRoute;
+      const registry = options.providerConnections === undefined
+        ? []
+        : await options.providerConnections.listProviderConnections(input.tenantId).catch(() => [] as const);
+      const resolvedConnection = resolvePackageRunConnection(manifestRoute, registry, settings?.providerConnectionId);
+      if (resolvedConnection === undefined) {
+        throw ApplicationFailure.nonRetryable(
+          manifestRoute === undefined
+            ? `PROVIDER_DEPENDENCY_MISSING: run agent settings have no default provider connection. Add a workspace provider and select it in run agent settings.`
+            : `PROVIDER_DEPENDENCY_MISSING: no enabled registry entry with a stored credential matches the manifest model route (${manifestRoute.model}${(manifestRoute.fallbacks ?? []).length > 0 ? ` or fallbacks ${(manifestRoute.fallbacks ?? []).join(', ')}` : ''}) and the run agent settings default is ${settings?.providerConnectionId === undefined ? 'unset' : 'unavailable'}.`,
+          'PROVIDER_DEPENDENCY_MISSING'
+        );
+      }
       const sliceClient = await resolveConnectionLiveClient(
         options.providerConnections, options.secretBackend, options.liveClientFactory,
-        input.tenantId, settings?.providerConnectionId, isPackageInput ? 'package' : 'chat'
+        input.tenantId, resolvedConnection.connectionId, isPackageInput ? 'package' : 'chat'
       );
       const idempotencyKey = `${input.workflowId}:attempt:${input.attempt}:slice:${input.sliceNumber}`;
       const ownerToken = `${info.activityId}:delivery:${info.attempt}`;
@@ -164,7 +188,23 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
         })();
         const [outcome] = await Promise.all([execution.result, consumeEvents]);
         if (signal.aborted || outcome.status === 'cancelled') throw new CancelledFailure('TASK_SLICE_CANCELLED');
-        if (outcome.status !== 'succeeded' && outcome.status !== 'paused') throw new Error(`AGENT_SLICE_${outcome.status.toUpperCase()}`);
+        if (outcome.status !== 'succeeded' && outcome.status !== 'paused') {
+          const failure = (outcome as { readonly error?: { readonly message?: string } }).error;
+          process.stderr.write(`agent slice outcome ${outcome.status} for ${input.taskId}: ${failure?.message ?? 'no error detail'}\n`);
+          throw new Error(`AGENT_SLICE_${outcome.status.toUpperCase()}`);
+        }
+
+        // 输出契约强制（声明 schema 的 Task）：剥离→解包→校验；违约在 commit 前以稳定错误失败（可重试）。
+        const outputContract = packageRecord?.runContract;
+        let materializedOutput = outcome.output;
+        if (outputContract?.schema !== undefined && outcome.output !== undefined && outcome.output.length > 0) {
+          try {
+            materializedOutput = enforceOutputContract(outcome.output, outputContract);
+          } catch (cause) {
+            if (cause instanceof OutputContractViolation) throw new ApplicationFailure(cause.message, 'PACKAGE_OUTPUT_CONTRACT_VIOLATION');
+            throw cause;
+          }
+        }
 
         const artifactRef = (outcome.output === undefined || outcome.output.length === 0 ? undefined
           : `artifact://tasks/${encodeURIComponent(input.taskId)}/attempt-${input.attempt}/slice-${input.sliceNumber}`) as TaskArtifactRef | undefined;
@@ -183,7 +223,8 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
           try {
             await options.outputStore.writeRunOutput({
               tenantId: input.tenantId, taskId: input.taskId, artifactRef,
-              output: outcome.output, mediaType: 'text/plain', createdAt: now().toISOString()
+              output: materializedOutput ?? outcome.output, mediaType: 'text/plain', createdAt: now().toISOString(),
+              ...(outputContract?.files === undefined || outputContract.files.length === 0 ? {} : { files: [...outputContract.files] })
             });
           } catch (cause) {
             process.stderr.write(`task run output materialization failed for ${input.taskId}: ${cause instanceof Error ? cause.message : String(cause)}\n`);
@@ -201,6 +242,8 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
         }
         if (cause instanceof Error && cause.message === 'TASK_EFFECT_CLAIM_LOST') throw cause;
         if (committed) throw cause;
+        // 观测：effect_unknown 的原始异常必须可见，否则裁决无据可查。
+        process.stderr.write(`agent slice effect-unknown cause for ${input.taskId}: ${cause instanceof Error ? cause.stack : String(cause)}\n`);
         const result: AgentSliceResult = {
           schemaVersion: '1', taskId: input.taskId, sliceNumber: input.sliceNumber, outcome: 'effect_unknown', done: false,
           duplicate: false, detail: 'Agent Slice ended without a known committed outcome'

@@ -19,7 +19,10 @@ describe('lifecycle-probe sample package smoke', () => {
     });
     expect(isAgentPackageReleaseV1(result.release)).toBe(true);
     expect(result.release.packageId).toBe('lifecycle-probe');
-    expect(result.release.packageVersion).toBe('1.0.0');
+    expect(result.release.packageVersion).toBe('2.0.0');
+    // v2 自闭环：隐式单任务归一化，无 inputs/dataSources。
+    expect(result.assetLock.manifest.tasks?.[0]).toMatchObject({ name: 'default', entry: 'prompts/system.md' });
+    expect(result.assetLock.manifest.inputs).toHaveLength(0);
     expect(result.release.provenance.compilerBuild).toBe('local-dev');
     // 编译确定性。
     const again = compileSourcePackage({

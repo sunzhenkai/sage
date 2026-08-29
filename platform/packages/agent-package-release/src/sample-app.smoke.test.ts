@@ -20,7 +20,9 @@ describe('ops-analyst sample package smoke', () => {
     });
     expect(isAgentPackageReleaseV1(result.release)).toBe(true);
     expect(result.release.packageId).toBe('ops-analyst');
-    expect(result.release.packageVersion).toBe('1.0.0');
+    expect(result.release.packageVersion).toBe('2.0.0');
+    // v2 参数声明进 lock（severity/component，隐式单任务继承）。
+    expect(result.assetLock.manifest.inputs?.map((input) => input.name)).toEqual(['severity', 'component']);
     expect(result.release.provenance.compilerBuild).toBe('local-dev');
     expect(result.assetLock.manifest.entry).toBe('prompts/system.md');
     // 编译确定性。

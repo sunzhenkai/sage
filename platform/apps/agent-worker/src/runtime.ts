@@ -173,7 +173,8 @@ export async function createWorkerRuntime(config = readWorkerRuntimeConfig()): P
         store: tasks, outputStore: tasks, inputResolver: new CompositeTaskInputResolver([
           { scheme: 'chat', resolver: new ChatTaskInputResolver(chat) },
           { scheme: 'package', resolver: new PackageTaskInputResolver(tasks) }
-        ])
+        ]),
+        packageInputReader: tasks
       }),
       buildId: env('SAGE_WORKER_BUILD_ID', 'sage-local-worker-v1')
     });

@@ -33,7 +33,7 @@ Canonical Schedule 契约（`ScheduleDefinition`、`ScheduleOccurrence`、`Sched
 
 ### D3. 触发接线：dispatcher workflow + occurrence 幂等键
 
-Temporal Schedule 的 target action 是一个**确定性 dispatcher workflow**（`ScheduleTriggerDispatcher.v1`，输入 scheduleId + occurrenceId + schedule snapshot ref），它只做一件事：调用控制面 activity 执行 admission（失败按 retry policy 有界重试，最终记 failed trigger）。幂等键 `schedule:{scheduleId}:occ:{occurrenceId}` 三层生效：admission 侧稳定 commandKey（复用 Coordinator `recordedCommandKeys` 模式）、task store 唯一约束、dispatcher workflow ID 本身（Temporal workflow ID = 幂等键）。备选：schedule 直接投递 task queue 由 worker admission——拒绝，admission 必须在控制面 fail closed、写审计，且不能让调度设施绕过租户/预算检查。
+Temporal Schedule 的 target action 是一个**确定性 dispatcher workflow**（`ScheduleTriggerDispatcher.v1`，输入 scheduleId + occurrenceId + schedule snapshot ref；snapshot 内含运行绑定 `releaseBinding + task + 固化 params`），它只做一件事：以固化 task/params 调用控制面 activity 执行既有包运行准入（`package-run-input-resolution` 语义，含 dataSources 受控获取；失败按 retry policy 有界重试，最终记 failed trigger）。幂等键 `schedule:{scheduleId}:occ:{occurrenceId}` 三层生效：admission 侧稳定 commandKey（复用 Coordinator `recordedCommandKeys` 模式，键输入含 task 与固化参数值——参数值不同即不同 occurrence 输入）、task store 唯一约束、dispatcher workflow ID 本身（Temporal workflow ID = 幂等键）。FOLLOW 绑定在 admission 解析出新 Release 时校验绑定兼容性：缺同名 task 或固化 params 不再合法 → 本次触发稳定失败进告警路由（错误信息指明不兼容项），不静默跳过、不以降级输入继续。备选：schedule 直接投递 task queue 由 worker admission——拒绝，admission 必须在控制面 fail closed、写审计，且不能让调度设施绕过租户/预算检查。
 
 ### D4. missed/skipped 事件靠对账，不靠调度设施原生事件
 

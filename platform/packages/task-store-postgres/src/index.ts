@@ -46,7 +46,7 @@ interface RoutingRow extends QueryResultRow {
 }
 interface PackageInputRow extends QueryResultRow {
   tenant_id: string; task_id: string; release_id: string; release_digest: string;
-  assembled_input: string; asset_digests: unknown; created_at: Date | string;
+  assembled_input: string; asset_digests: unknown; run_contract: unknown; created_at: Date | string;
 }
 
 interface RunOutputRow extends QueryResultRow {
@@ -116,7 +116,8 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
       new URL('../../task-domain/migrations/003_task_package_input.sql', import.meta.url),
       new URL('../../task-domain/migrations/004_task_run_output.sql', import.meta.url),
       new URL('../../task-domain/migrations/005_run_agent_settings.sql', import.meta.url),
-      new URL('../../task-domain/migrations/006_provider_connections.sql', import.meta.url)
+      new URL('../../task-domain/migrations/006_provider_connections.sql', import.meta.url),
+      new URL('../../task-domain/migrations/007_task_package_run_contract.sql', import.meta.url)
     ];
     const migrations = (await Promise.all(migrationUrls.map((url) => readFile(url, 'utf8'))))
       .map((sql) => sql.replace(/^\s*BEGIN;\s*/, '').replace(/\s*COMMIT;\s*$/, '').trim());
@@ -541,17 +542,18 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
       throw new TaskStoreError('writePackageInput.invalid');
     }
     const inserted = await this.#query('writePackageInput.insert', `INSERT INTO task_package_input
-      (tenant_id, task_id, release_id, release_digest, assembled_input, asset_digests, created_at)
-      VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (tenant_id, task_id) DO NOTHING RETURNING tenant_id`,
-    [record.tenantId, record.taskId, record.releaseId, record.releaseDigest, record.assembledInput, json(record.assetDigests), iso(record.createdAt)]);
+      (tenant_id, task_id, release_id, release_digest, assembled_input, asset_digests, run_contract, created_at)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT (tenant_id, task_id) DO NOTHING RETURNING tenant_id`,
+    [record.tenantId, record.taskId, record.releaseId, record.releaseDigest, record.assembledInput, json(record.assetDigests), record.runContract === undefined ? null : json(record.runContract), iso(record.createdAt)]);
     if (inserted.rowCount === 1) return { status: 'stored' };
     const existing = await this.#query<PackageInputRow>('writePackageInput.get', `SELECT
-      tenant_id, task_id, release_id, release_digest, assembled_input, asset_digests, created_at
+      tenant_id, task_id, release_id, release_digest, assembled_input, asset_digests, run_contract, created_at
       FROM task_package_input WHERE tenant_id=$1 AND task_id=$2`, [record.tenantId, record.taskId]);
     const row = existing.rows[0];
     if (row === undefined) throw new TaskStoreError('writePackageInput.missing');
     if (row.assembled_input !== record.assembledInput || row.release_id !== record.releaseId
-      || row.release_digest !== record.releaseDigest || JSON.stringify(row.asset_digests) !== JSON.stringify(record.assetDigests)) {
+      || row.release_digest !== record.releaseDigest || JSON.stringify(row.asset_digests) !== JSON.stringify(record.assetDigests)
+      || JSON.stringify(row.run_contract ?? null) !== JSON.stringify(record.runContract ?? null)) {
       throw new TaskStoreError('writePackageInput.conflict');
     }
     return { status: 'existing' };
@@ -560,10 +562,14 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
   async getPackageInput(tenantId: string, taskId: string): Promise<TaskPackageInputRecord | undefined> {
     if (typeof tenantId !== 'string' || typeof taskId !== 'string') throw new TaskStoreError('getPackageInput.invalid');
     const result = await this.#query<PackageInputRow>('getPackageInput', `SELECT
-      tenant_id, task_id, release_id, release_digest, assembled_input, asset_digests, created_at
+      tenant_id, task_id, release_id, release_digest, assembled_input, asset_digests, run_contract, created_at
       FROM task_package_input WHERE tenant_id=$1 AND task_id=$2`, [tenantId, taskId]);
     const row = result.rows[0];
     if (row === undefined) return undefined;
+    const contract = row.run_contract;
+    const typedContract = contract !== null && contract !== undefined
+      ? contract as NonNullable<TaskPackageInputRecord['runContract']>
+      : undefined;
     const record: TaskPackageInputRecord = {
       tenantId: row.tenant_id,
       taskId: row.task_id,
@@ -571,6 +577,7 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
       releaseDigest: row.release_digest,
       assembledInput: row.assembled_input,
       assetDigests: row.asset_digests as Readonly<Record<string, string>>,
+      ...(typedContract === undefined ? {} : { runContract: typedContract }),
       createdAt: iso(row.created_at)
     };
     return record;
@@ -592,6 +599,13 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
       (tenant_id, task_id, artifact_id, artifact_ref, attempt, name, media_type) VALUES ($1,$2,$3,$4,1,'task-output',$5)
       ON CONFLICT (tenant_id, task_id, artifact_ref) DO NOTHING`,
       [record.tenantId, record.taskId, artifactId, record.artifactRef, record.mediaType]);
+    // 声明式产物名清单：以 `#file/` 后缀引用登记（取回器按基准引用解析内容）。
+    for (const fileName of record.files ?? []) {
+      await this.#query('writeRunOutput.artifactFile', `INSERT INTO task_artifact_reference
+        (tenant_id, task_id, artifact_id, artifact_ref, attempt, name, media_type) VALUES ($1,$2,$3,$4,1,$5,$6)
+        ON CONFLICT (tenant_id, task_id, artifact_ref) DO NOTHING`,
+        [record.tenantId, record.taskId, `${artifactId}-file-${fileName}`, `${record.artifactRef}#file/${fileName}`, fileName, record.mediaType]);
+    }
     if (inserted.rowCount === 1) return { status: 'stored' };
     const existing = await this.#query<RunOutputRow>('writeRunOutput.get', `SELECT
       tenant_id, task_id, artifact_ref, output, media_type, created_at

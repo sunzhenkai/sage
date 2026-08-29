@@ -21,6 +21,7 @@ import { registerProviderCatalogRoutes } from './catalog-api.js';
 import { registerPackagesRoutes } from './packages-api.js';
 import { registerAppsRoutes } from './apps-api.js';
 import { registerPackageRunsRoutes, type ResolvedReleaseLockPayload } from './runs-api.js';
+import { buildSnapshotEgressConnector, SNAPSHOT_EGRESS_ALLOWLIST_ENV } from './package-snapshots.js';
 import { registerRunAgentSettingsRoutes } from './run-agent-settings-api.js';
 import { bootstrapDeploymentEnvProviderConnection, registerProviderConnectionRoutes } from './provider-connections-api.js';
 import { createRunOutputArtifactResolver } from './run-output-resolver.js';
@@ -230,7 +231,8 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
       settingsStore: tasks,
       providerConnections: tasks,
       authenticator,
-      deploymentMode: 'local'
+      deploymentMode: 'local',
+      snapshotConnector: buildSnapshotEgressConnector(process.env[SNAPSHOT_EGRESS_ALLOWLIST_ENV])
     });
     const bootstrapEnv = config.secretEnv ?? process.env;
     try {

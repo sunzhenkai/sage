@@ -975,7 +975,7 @@ export interface DurableCoordinatorPort {
 
 // ===== Schedule Plane (canonical, scheduler-facility neutral) =====
 // Canonical schedule contracts express periodic AI App triggers. Concrete scheduler
-// facility types (Temporal Schedules, cron daemons, …) are adapter details and must
+// facility types (managed schedulers, cron daemons, …) are adapter details and must
 // never leak into these schemas, the public API, or canonical boundary scans.
 
 export const ScheduleTriggerRuleSchema = Type.Union([
@@ -1033,7 +1033,12 @@ export const ScheduleTargetConstraintsSchema = Type.Object({
 export type ScheduleTargetConstraints = Static<typeof ScheduleTargetConstraintsSchema>;
 
 export const ScheduleInvocationTemplateSchema = Type.Object({
-  input: Type.Optional(Type.String({ maxLength: 100_000 }))
+  task: Type.Optional(Type.String({ minLength: 1, maxLength: 64, pattern: '^[a-z][a-z0-9-]{0,63}$' })),
+  params: Type.Optional(Type.Record(
+    Type.String({ minLength: 1, maxLength: 64 }),
+    Type.Union([Type.String({ maxLength: 2_048 }), Type.Number()]),
+    { maxProperties: 16 }
+  ))
 }, { additionalProperties: false, $id: 'ScheduleInvocationTemplate.v1' });
 export type ScheduleInvocationTemplate = Static<typeof ScheduleInvocationTemplateSchema>;
 
@@ -1072,7 +1077,7 @@ export const ScheduleOccurrenceSchema = Type.Object({
   schemaVersion: Type.Literal('1'),
   scheduleId: Type.String({ minLength: 3, maxLength: 128 }),
   tenantId: Type.String({ minLength: 1, maxLength: 128 }),
-  occurrenceId: Type.String({ minLength: 1, maxLength: 128, pattern: '^[a-z0-9][a-z0-9._-]*$' }),
+  occurrenceId: Type.String({ minLength: 1, maxLength: 128, pattern: '^[a-zA-Z0-9][a-zA-Z0-9._:-]*$' }),
   dueAtMs: Type.Integer({ minimum: 0 })
 }, { additionalProperties: false, $id: 'ScheduleOccurrence.v1' });
 export type ScheduleOccurrence = Static<typeof ScheduleOccurrenceSchema>;

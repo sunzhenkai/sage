@@ -180,6 +180,20 @@ export async function loadSourcePackage(
   if (!foundFiles.has(manifest.entry)) {
     throw new SourcePackageError('SOURCE_MANIFEST_INVALID', `entry not found: ${manifest.entry}`);
   }
+  // v2 任务引用校验：task.entry（缺省继承顶层 entry）必须是包内 prompt 资产；
+  // task.output.schema 必须是包内存在的输出 schema 资产（当前目录契约下即 output.schema.json）。
+  for (const task of manifest.tasks ?? []) {
+    const taskEntry = task.entry ?? manifest.entry;
+    const entryClass = classifyEntry(taskEntry);
+    const entryIsPrompt = entryClass !== null && typeof entryClass === 'object' && entryClass.kind === 'prompt';
+    if (!foundFiles.has(taskEntry) || !entryIsPrompt) {
+      throw new SourcePackageError('SOURCE_MANIFEST_INVALID', `tasks/${task.name}/entry not found: ${taskEntry}`);
+    }
+    const outputSchema = task.output?.schema;
+    if (outputSchema !== undefined && (!foundFiles.has(outputSchema) || classifyEntry(outputSchema) !== 'output-schema')) {
+      throw new SourcePackageError('SOURCE_MANIFEST_INVALID', `tasks/${task.name}/output/schema not found: ${outputSchema}`);
+    }
+  }
 
   const assets: SourceAssetDescriptor[] = [];
   const promptCount = new Map<string, number>();

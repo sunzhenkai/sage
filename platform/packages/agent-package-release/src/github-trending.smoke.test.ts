@@ -21,7 +21,11 @@ describe('github-trending sample package smoke', () => {
     });
     expect(isAgentPackageReleaseV1(result.release)).toBe(true);
     expect(result.release.packageId).toBe('github-trending');
-    expect(result.release.packageVersion).toBe('1.0.0');
+    expect(result.release.packageVersion).toBe('2.0.0');
+    // v2 自闭环声明进 lock：参数、数据源与任务输出契约。
+    expect(result.assetLock.manifest.inputs?.[0]).toMatchObject({ name: 'language', type: 'string', default: '' });
+    expect(result.assetLock.manifest.dataSources?.[0]).toMatchObject({ name: 'trending-snapshot', onFailure: 'fail' });
+    expect(result.assetLock.manifest.tasks?.[0]).toMatchObject({ name: 'trending-digest', output: { schema: 'output.schema.json', files: ['report.md'] } });
     expect(result.release.provenance.compilerBuild).toBe('local-dev');
     expect(result.assetLock.manifest.entry).toBe('prompts/system.md');
     // 编译确定性。

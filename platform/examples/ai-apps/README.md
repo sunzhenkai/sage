@@ -130,3 +130,18 @@ curl -sS http://127.0.0.1:9610/v1/packages/ops-analyst -H 'x-authentication-id: 
 `lifecycle-probe/` 是专用于生命周期验证的最小测试源包。此前依赖 `SAGE_FAKE_LIVE_PROVIDER` 受信开关的确定性端到端套件（`ai-app-lifecycle.e2e.test.ts` + `pnpm test:ai-app-e2e`）已随该开关一并移除——不存在任何绕过真实 provider 的模型调用路径。
 
 手工走通方式即上文「命令序列」：将 `examples/ai-apps/lifecycle-probe` 以 `pnpm --filter @sage/agent-api register-package examples/ai-apps/lifecycle-probe --api-url http://127.0.0.1:9610 --auth local-dev-auth` 登记，从 Release 发起运行，等待成功终态后经 `/v1/tasks/<taskId>/artifacts` 取回产物。整栈冒烟（`corepack pnpm smoke:local`）默认只校验服务健康与 API 面，注入 `SAGE_BOOTSTRAP_PROVIDER_*` 三项真实凭据时会额外执行 Chat→promotion→Task 模型调用垂直链路。
+
+## v2 自闭环声明（ai-app-self-contained-runs）
+
+三个示例均已升级 `schemaVersion: '2'`，运行不依赖任何任务级用户输入：
+
+| 示例 | inputs | dataSources | 输出契约 |
+|------|--------|-------------|----------|
+| `github-trending` | `language`（可选，模型按其过滤快照） | `trending-snapshot`：GitHub Search API「2026 年新建、star 降序 Top 25」 | `trending-digest` 任务绑定 output.schema.json + `report.md` |
+| `ops-analyst` | `severity`（enum，默认 medium）、`component`（可选） | —（references 资料） | 未声明（跳过强制校验） |
+| `lifecycle-probe` | — | — | 固定自检报告，逐字可断言 |
+
+- 发起运行请求体为 `{ task?, params? }`；旧自由文本 `input` 字段返回 `410 INPUT_REMOVED`。
+- 留空的参数由服务端按声明默认值补齐；声明 schema 的任务输出在物化点强制校验（不符即任务失败）。
+- 数据源获取走受控出口白名单：agent-api env `SAGE_PACKAGE_SNAPSHOT_EGRESS_ALLOWLIST`（local compose 已配置 `api.github.com`；缺省即全拒绝，声明了数据源的运行会以 `PACKAGE_SNAPSHOT_SOURCE_UNAVAILABLE` 稳定失败）。
+- 已知限制：数据源 URL 为静态地址（无日期/参数模板）。github-trending 以「2026 年新建」为口径；动态时间窗需要后续的 URL 模板契约。

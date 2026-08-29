@@ -17,6 +17,34 @@ import {
  * 本模块不依赖 agent-package-release / agent-release-registry，输入均为纯数据。
  */
 
+/** v2 归一化声明（结构镜像 agent-package-release 的 compiler 归一化形；v1 包不出现这些键）。 */
+export interface PackageRunInputDeclaration {
+  readonly name: string;
+  readonly type: 'string' | 'enum' | 'number';
+  readonly enum?: readonly (string | number)[];
+  readonly default?: string | number;
+  readonly required: boolean;
+}
+
+export interface PackageRunDataSourceDeclaration {
+  readonly name: string;
+  readonly ref: string;
+  readonly url: string;
+  readonly maxBytes: number;
+  readonly onFailure: 'fail' | 'markMissing';
+}
+
+export type PackageRunTaskParamBinding =
+  | { readonly kind: 'input'; readonly input: string }
+  | { readonly kind: 'literal'; readonly value: string | number };
+
+export interface PackageRunTaskDeclaration {
+  readonly name: string;
+  readonly entry: string;
+  readonly params: readonly { readonly name: string; readonly from: PackageRunTaskParamBinding }[];
+  readonly output: { readonly schema?: string; readonly files?: readonly string[] };
+}
+
 export interface PackageRunManifestSummary {
   readonly id: string;
   readonly version: string;
@@ -25,6 +53,9 @@ export interface PackageRunManifestSummary {
   readonly skillRefs: readonly string[];
   readonly capabilityRefs: readonly string[];
   readonly budgets?: { readonly maxTokens?: number; readonly maxToolCalls?: number; readonly maxTurns?: number; readonly maxDurationMs?: number };
+  readonly inputs?: readonly PackageRunInputDeclaration[];
+  readonly dataSources?: readonly PackageRunDataSourceDeclaration[];
+  readonly tasks?: readonly PackageRunTaskDeclaration[];
 }
 
 export interface PackageRunReleaseIdentity {
@@ -63,8 +94,29 @@ export interface PackageRunAdmissionResult {
   readonly inputDigest: ContentDigest;
 }
 
-export function packageRunInputDigest(userInput: string, releaseDigest: string, assetDigests: Readonly<Record<string, string>>): ContentDigest {
-  return sha256Digest({ releaseDigest, userInput, assetDigests: Object.keys(assetDigests).sort().map((key) => [key, assetDigests[key]]) });
+export interface PackageRunInputDigestExtras {
+  readonly task?: string;
+  readonly params?: readonly { readonly name: string; readonly value: string | number }[];
+  readonly snapshots?: readonly { readonly name: string; readonly url: string; readonly content: string; readonly unavailableReason?: string }[];
+}
+
+export function packageRunInputDigest(
+  userInput: string,
+  releaseDigest: string,
+  assetDigests: Readonly<Record<string, string>>,
+  extras?: PackageRunInputDigestExtras
+): ContentDigest {
+  // v1 调用（无 extras）的 digest 输入保持逐字节不变；extras 仅在出现时参与哈希。
+  if (extras === undefined) {
+    return sha256Digest({ releaseDigest, userInput, assetDigests: Object.keys(assetDigests).sort().map((key) => [key, assetDigests[key]]) });
+  }
+  return sha256Digest({
+    releaseDigest, userInput,
+    assetDigests: Object.keys(assetDigests).sort().map((key) => [key, assetDigests[key]]),
+    ...(extras.task === undefined ? {} : { task: extras.task }),
+    ...(extras.params === undefined || extras.params.length === 0 ? {} : { params: extras.params.map((param) => [param.name, String(param.value)]) }),
+    ...(extras.snapshots === undefined || extras.snapshots.length === 0 ? {} : { snapshots: extras.snapshots.map((snapshot) => [snapshot.name, snapshot.url, sha256Digest(snapshot.content)]) })
+  });
 }
 
 /** 幂等键：tenant + releaseId + input digest，覆盖同 Release 同输入的重试。 */

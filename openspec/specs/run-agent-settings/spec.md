@@ -3,9 +3,7 @@
 ## Purpose
 
 本地部署模式下包运行（ai-app）的「运行 agent」默认 provider 设置契约：设置持久化与 API（必填 providerConnectionId）、运行前（准入）与执行前（worker）的 provider 依赖检查——无设置（unset）即显式拒绝，不存在无 provider 的照常准入路径。
-
 ## Requirements
-
 ### Requirement: 工作区默认模型呈现与 Chat 初始运行时
 运行 agent 设置面 SHALL 将默认设置呈现为「默认模型」选择：候选为注册表条目，选项 SHALL 同时展示条目名与 model（provider · model 形态），使同一 provider 下指向不同 model 的多个条目可区分。存储与 API SHALL 保持 `providerConnectionId` 引用语义不变（无新增字段），包运行准入与执行前依赖检查行为不变。Chat 运行时选择器 SHALL 在无 browser-local 选择时以工作区默认模型对应条目为初始选中，并在选择器中可见呈现该选中（非静默路由）；browser-local 显式选择 SHALL 优先于默认模型；默认模型条目失效（停用/删除/凭据缺失）时 Chat SHALL 按既有「所选条目失效」规则阻止发送并引导，SHALL NOT 静默切换到其他条目。
 
@@ -72,14 +70,14 @@
 - **THEN** API 拒绝请求（401 / 400），不改变设置
 
 ### Requirement: 运行前依赖检查（准入）
-`POST /v1/releases/:releaseId/runs` SHALL 在组装输入与创建任务之前读取运行 agent 设置并执行 provider 依赖检查：设置 unset、或指向的条目缺失、停用或凭据缺失时，SHALL 拒绝准入（HTTP 409、错误码 `PROVIDER_DEPENDENCY_MISSING`、不可重试，消息附修复指引），且不物化 package 输入、不创建任务。系统 SHALL NOT 提供任何无 provider 的照常准入路径。
+`POST /v1/releases/:releaseId/runs` SHALL 在组装输入与创建任务之前执行 provider 依赖检查，解析顺序为：所选 Task 的 manifest `modelRoute`（model 及 fallbacks 依序）在受信 provider 注册表中匹配可用条目（modelId 精确相等、条目启用、凭据在场）；无可用匹配时回退运行 agent 设置的默认条目。manifest 路由匹配对所有包运行生效（modelRoute 自始为 manifest 必填，v1 包同样适用）；未匹配时 SHALL 回退运行 agent 设置默认（设置语义不变）。两来源均不可用（manifest 路由无匹配且设置 unset/条目缺失/停用/凭据缺失）时，SHALL 拒绝准入（HTTP 409、错误码 `PROVIDER_DEPENDENCY_MISSING`、不可重试，消息附修复指引），且不物化 package 输入、不创建任务。系统 SHALL NOT 提供任何无 provider 的照常准入路径。
 
 #### Scenario: 固定 minimax 缺 key 拒绝
-- **WHEN** 存量设置为 legacy 值 `minimax`（读取时归一为 unset），主体发起包运行
+- **WHEN** 存量设置为 legacy 值 `minimax`（读取时归一为 unset），主体发起包运行且 manifest 无 modelRoute
 - **THEN** 响应 409 `PROVIDER_DEPENDENCY_MISSING`（retryable=false，消息附修复指引），不产生 task/package 输入
 
 #### Scenario: connection 指向不可用条目拒绝
-- **WHEN** 设置指向的条目已停用或凭据缺失，主体发起包运行
+- **WHEN** 设置指向的条目已停用或凭据缺失，主体发起包运行且 manifest 路由无可用匹配
 - **THEN** 响应 409 `PROVIDER_DEPENDENCY_MISSING`（retryable=false，消息附修复指引），不产生 task/package 输入
 
 #### Scenario: auto 或 echo 照常准入
@@ -87,18 +85,26 @@
 - **THEN** 准入同样以 `PROVIDER_DEPENDENCY_MISSING` 拒绝，不存在任何无 provider 的照常准入路径
 
 #### Scenario: 设置有效时照常准入
-- **WHEN** 设置指向 enabled 且凭据在场的条目，主体发起包运行
+- **WHEN** 设置指向 enabled 且凭据在场的条目，主体发起包运行（manifest 无路由或无匹配）
 - **THEN** 准入照常，输入物化与任务创建行为不变
 
+#### Scenario: manifest 路由可满足优先
+- **WHEN** manifest modelRoute 的 model（或任一 fallback）在注册表存在可用条目，而运行 agent 设置 unset
+- **THEN** 准入照常，解析结果固定为 manifest 路由条目，不因设置 unset 拒绝
+
+#### Scenario: manifest 路由无匹配回退默认
+- **WHEN** manifest modelRoute 的全部 model 均无可用注册表条目，运行 agent 设置指向可用条目
+- **THEN** 准入照常，解析结果为设置默认条目
+
 ### Requirement: 执行前依赖检查（worker fail-closed）
-包运行 slice 执行前，agent-worker SHALL 按运行 agent 设置从注册表解析条目构造执行 harness（缺失、停用、凭据缺失或 SecretBackend 不可用 SHALL 以稳定错误 `PROVIDER_DEPENDENCY_MISSING` 使任务失败，SHALL NOT 写入 run 输出）。系统 SHALL NOT 提供任何本地确定性执行路径作为兜底。worker SHALL NOT 从进程 env 读取任何 provider key 来决定执行路由。
+包运行 slice 执行前，agent-worker SHALL 按「manifest `modelRoute` 优先（model/fallbacks 依序匹配受信 provider 注册表）、运行 agent 设置默认兜底」的同一解析顺序构造执行 harness；未匹配时回退设置默认（设置语义不变）。两来源均不可用（匹配缺失、停用、凭据缺失或 SecretBackend 不可用）SHALL 以稳定错误 `PROVIDER_DEPENDENCY_MISSING` 使任务失败，SHALL NOT 写入 run 输出。系统 SHALL NOT 提供任何本地确定性执行路径作为兜底。worker SHALL NOT 从进程 env 读取任何 provider key 来决定执行路由。
 
 #### Scenario: 固定 minimax 且 worker 无 key
-- **WHEN** 存量设置为 legacy 值 `minimax`（读取时归一为 unset），包运行 slice 开始执行
+- **WHEN** 存量设置为 legacy 值 `minimax`（读取时归一为 unset），包运行 slice 开始执行且 manifest 无 modelRoute
 - **THEN** 活动以不可重试的稳定错误 `PROVIDER_DEPENDENCY_MISSING` 失败，不写 run 输出
 
 #### Scenario: connection 条目不可用
-- **WHEN** 设置指向条目停用或凭据缺失，包运行 slice 开始执行
+- **WHEN** manifest 路由无可用匹配且设置指向条目停用或凭据缺失，包运行 slice 开始执行
 - **THEN** 活动以不可重试的稳定错误 `PROVIDER_DEPENDENCY_MISSING` 失败，不写 run 输出
 
 #### Scenario: 固定 echo 且 worker 有 key
@@ -113,6 +119,10 @@
 - **WHEN** 任意 provider 依赖缺失导致 slice 失败
 - **THEN** 任务进入 failed，不出现任何确定性回声或本地 harness 执行痕迹
 
+#### Scenario: manifest 路由在执行边界解析
+- **WHEN** manifest modelRoute 存在可用注册表条目
+- **THEN** worker 在执行边界按该条目构造 live harness，凭据只在执行边界解密，不进入任何持久化或响应
+
 ### Requirement: 可用性状态展示的作用域限定
 「运行 Agent」设置面 SHALL 以明确作用域的方式展示 provider 可用性状态：可用性判定对象 SHALL 仅为受信 provider 注册表条目，文案 SHALL NOT 出现任何具体 vendor 名称或 vendor 专属环境变量名。无设置或无可用条目时设置面 SHALL 引导添加工作区 provider 并说明包运行需要 provider 才能执行。
 
@@ -123,3 +133,4 @@
 #### Scenario: 可用状态同样限定
 - **WHEN** 设置面展示某注册表条目可用
 - **THEN** 文案以条目显示名标识，限定为包运行的受信服务端凭据
+

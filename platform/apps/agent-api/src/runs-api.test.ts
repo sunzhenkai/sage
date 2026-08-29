@@ -114,6 +114,9 @@ class FakeSettingsStore {
 
 class FakeConnectionStore {
   readonly entries = new Map<string, ProviderConnectionRecord>();
+  async listProviderConnections(tenantId: string): Promise<readonly ProviderConnectionRecord[]> {
+    return [...this.entries.values()].filter((entry) => entry.tenantId === tenantId);
+  }
   async getProviderConnection(tenantId: string, id: string): Promise<ProviderConnectionRecord | undefined> {
     return this.entries.get(`${tenantId}/${id}`);
   }
@@ -154,9 +157,9 @@ async function api(options: { readonly principal?: AuthenticatedPrincipal; reado
 describe('Package run API boundaries', () => {
   it('requires authentication and rejects unknown fields', async () => {
     const { app } = await api({});
-    expect((await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: { input: 'hi' } })).statusCode).toBe(401);
+    expect((await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: {} })).statusCode).toBe(401);
     const authed = await api({ principal: operator });
-    const untrusted = await authed.app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: { input: 'hi', ownerId: 'leak' } });
+    const untrusted = await authed.app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: { ownerId: 'leak' } });
     expect(untrusted.statusCode).toBe(400);
     expect(untrusted.json().error.code).toBe('PACKAGE_RUN_UNTRUSTED_FIELD');
     await app.close();
@@ -165,7 +168,7 @@ describe('Package run API boundaries', () => {
 
   it('starts a run from a release and materializes package input', async () => {
     const { app, controller, taskStore } = await api({ principal: operator });
-    const response = await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: { input: '请介绍产品' } });
+    const response = await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: {} });
     expect(response.statusCode).toBe(202);
     const body = response.json();
     expect(body).toMatchObject({
@@ -182,7 +185,7 @@ describe('Package run API boundaries', () => {
     expect(controller.created[0]).toMatchObject({ slice: { maxTurns: 1, maxToolCalls: 16, maxTokens: 4000, timeoutMs: 10_000 } });
     const stored = await taskStore.getPackageInput('tenant-local', body.taskId);
     expect(stored?.assembledInput).toContain('你是演示助手。');
-    expect(stored?.assembledInput).toContain('--- user input ---');
+    expect(stored?.assembledInput).not.toContain('--- user input ---');
     expect(stored?.assetDigests['references/product.md']).toMatch(/^sha256:[a-f0-9]{64}$/);
     await app.close();
   });
@@ -201,8 +204,8 @@ describe('Package run API boundaries', () => {
 
   it('is idempotent for the same release and input', async () => {
     const { app, controller } = await api({ principal: operator });
-    const first = await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: { input: 'hi', taskId: 'pkg-fixed' } });
-    const second = await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: { input: 'hi', taskId: 'pkg-fixed' } });
+    const first = await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: { taskId: 'pkg-fixed' } });
+    const second = await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: { taskId: 'pkg-fixed' } });
     expect(first.statusCode).toBe(202);
     expect(second.statusCode).toBe(200);
     expect(second.json().status).toBe('existing');
@@ -214,8 +217,8 @@ describe('Package run API boundaries', () => {
   it('returns the original run ids on idempotent replay with auto-generated taskId', async () => {
     const { app, controller } = await api({ principal: operator });
     // 不传 taskId：首次请求生成随机 id；重放必须回填首次准入的 id，而不是新生成的幻影 id。
-    const first = await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: { input: 'hi' } });
-    const second = await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: { input: 'hi' } });
+    const first = await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: {} });
+    const second = await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: {} });
     expect(first.statusCode).toBe(202);
     expect(second.statusCode).toBe(200);
     expect(second.json().status).toBe('existing');
@@ -229,7 +232,7 @@ describe('Package run API boundaries', () => {
 
   it('fails closed with 501 in production mode', async () => {
     const { app } = await api({ principal: operator, deploymentMode: 'production' });
-    const response = await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: { input: 'hi' } });
+    const response = await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: {} });
     expect(response.statusCode).toBe(501);
     expect(response.json().error.code).toBe('PACKAGE_RUN_ADMISSION_NOT_AVAILABLE');
     await app.close();
@@ -237,7 +240,7 @@ describe('Package run API boundaries', () => {
 
   it('returns 404 for an unknown release', async () => {
     const { app } = await api({ principal: operator });
-    const response = await app.inject({ method: 'POST', url: `/v1/releases/${'f'.repeat(64)}/runs`, payload: { input: 'hi' } });
+    const response = await app.inject({ method: 'POST', url: `/v1/releases/${'f'.repeat(64)}/runs`, payload: {} });
     expect(response.statusCode).toBe(404);
     expect(response.json().error.code).toBe('RELEASE_NOT_FOUND');
     await app.close();
@@ -246,7 +249,7 @@ describe('Package run API boundaries', () => {
   it('rejects admission when settings are unset: no provider-less admission path exists', async () => {
     // 无设置行（或存量 legacy 值在存储层归一为 unset）：包运行以 PROVIDER_DEPENDENCY_MISSING 拒绝。
     const noSettings = await api({ principal: operator, settingsStore: new FakeSettingsStore(), connections: new FakeConnectionStore() });
-    const response = await noSettings.app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: { input: 'hi' } });
+    const response = await noSettings.app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: {} });
     expect(response.statusCode).toBe(409);
     expect(response.json().error.code).toBe('PROVIDER_DEPENDENCY_MISSING');
     expect(response.json().error.retryable).toBe(false);
@@ -278,7 +281,7 @@ describe('Package run API boundaries', () => {
         updatedAt: '2026-08-25T00:00:00.000Z', updatedBy: 'principal://op'
       });
       const { app, controller, taskStore } = await api({ principal: operator, settingsStore: settings, connections });
-      const response = await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: { input: 'hi' } });
+      const response = await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: {} });
       expect(response.statusCode).toBe(409);
       expect(response.json().error.code).toBe('PROVIDER_DEPENDENCY_MISSING');
       expect(controller.created).toHaveLength(0);
@@ -291,7 +294,7 @@ describe('Package run API boundaries', () => {
       updatedAt: '2026-08-25T00:00:00.000Z', updatedBy: 'principal://op'
     });
     const ok = await api({ principal: operator, settingsStore: settings, connections });
-    const admitted = await ok.app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: { input: 'hi' } });
+    const admitted = await ok.app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: {} });
     expect(admitted.statusCode).toBe(202);
     await ok.app.close();
   });

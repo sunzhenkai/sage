@@ -10,6 +10,7 @@ const fixturesRoot = fileURLToPath(new URL('../fixtures/source-packages/', impor
 const validCases: ReadonlyArray<{ readonly name: string; readonly code: string }> = [
   { name: 'valid-app', code: 'SOURCE_OK' },
   { name: 'with-output-schema', code: 'SOURCE_OK' },
+  { name: 'v2-valid', code: 'SOURCE_OK' },
 ];
 
 const invalidCases: ReadonlyArray<{ readonly name: string; readonly code: string }> = [
@@ -20,6 +21,7 @@ const invalidCases: ReadonlyArray<{ readonly name: string; readonly code: string
   { name: 'script', code: 'SOURCE_EXECUTABLE_REJECTED' },
   { name: 'secret', code: 'SOURCE_SECRET_REJECTED' },
   { name: 'missing-entry', code: 'SOURCE_MANIFEST_INVALID' },
+  { name: 'v2-task-missing-entry', code: 'SOURCE_MANIFEST_INVALID' },
 ];
 
 describe('source package loader', () => {

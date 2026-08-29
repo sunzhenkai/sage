@@ -1,7 +1,7 @@
-schemaVersion: '1'
+schemaVersion: '2'
 id: lifecycle-probe
-version: 1.0.0
-description: 生命周期探针：专用于 AI App 创建/提交/运行/产物管理全链路端到端验证的确定性测试应用
+version: 2.0.0
+description: 生命周期探针：自闭环确定性测试应用——不依赖任何用户输入，输出固定自检报告，专用于创建/提交/运行/产物管理全链路端到端验证
 entry: prompts/system.md
 modelRoute:
   provider: minimax-cn

@@ -1,16 +1,33 @@
-schemaVersion: '1'
+schemaVersion: '2'
 id: github-trending
-version: 1.0.0
-description: GitHub 热门项目解读助手：分析 trending 项目快照，产出排名解读、亮点与趋势 digest
+version: 2.0.0
+description: GitHub 热门项目解读助手：准入时自动获取真实快照并产出热门项目 digest，无需任何用户输入
 entry: prompts/system.md
 modelRoute:
   provider: minimax-cn
   model: MiniMax-M3
 budgets:
-  maxTokens: 8000
+  maxTokens: 60000
   maxToolCalls: 40
   maxDurationMs: 300000
 skillRefs:
   - skill://repo-digest/v1
 capabilityRefs:
   - capability://web-snapshot-reader/v1
+inputs:
+  - name: language
+    type: string
+    default: ""
+    required: false
+dataSources:
+  - name: trending-snapshot
+    ref: capability://web-snapshot-reader/v1
+    url: https://api.github.com/search/repositories?q=created%3A%3E2026-01-01&sort=stars&order=desc&per_page=25
+    maxBytes: 262144
+    onFailure: fail
+tasks:
+  - name: trending-digest
+    entry: prompts/system.md
+    output:
+      schema: output.schema.json
+      files: [report.md]

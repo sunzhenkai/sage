@@ -5,6 +5,10 @@ import {
   assertScheduleTriggerEvent,
   scheduleDefinitionDigest,
   scheduleOccurrenceKey,
+  ScheduleDefinitionSchema,
+  ScheduleSnapshotSchema,
+  ScheduleTriggerEventSchema,
+  ScheduleErrorCodeSchema,
   type ScheduleDefinition
 } from './index.js';
 
@@ -19,7 +23,7 @@ const validDefinition: ScheduleDefinition = {
   releaseBinding: { strategy: 'FIXED', releaseId: 'release-1', contentDigest: `sha256:${'a'.repeat(64)}` },
   targetConstraints: { allowedEnvironments: ['local'] },
   budget: { limits: [{ dimension: 'runs', limit: 100 }] },
-  invocation: { input: 'daily report instruction' }
+  invocation: { task: 'daily', params: { window: 7 } }
 };
 
 describe('canonical schedule contracts', () => {
@@ -52,6 +56,13 @@ describe('canonical schedule contracts', () => {
     expect(() => assertScheduleOccurrence({ ...occurrence, occurrenceId: 'bad id' })).toThrow('SCHEDULE_RULE_INVALID');
   });
 
+  it('rejects legacy free-form invocation input', () => {
+    expect(() => assertScheduleDefinition({
+      ...validDefinition,
+      invocation: { input: 'daily report instruction' } as unknown as ScheduleDefinition['invocation']
+    })).toThrow('SCHEDULE_RULE_INVALID');
+  });
+
   it('validates trigger events and bounds task references', () => {
     const event = {
       schemaVersion: '1' as const, scheduleId: 'daily-report', tenantId: 'tenant-a',
@@ -63,9 +74,11 @@ describe('canonical schedule contracts', () => {
   });
 
   it('exposes canonical schema ids without scheduler facility naming', () => {
-    expect(ScheduleDefinitionSchema.$id).toBe('ScheduleDefinition.v1');
-    expect(ScheduleSnapshotSchema.$id).toBe('ScheduleSnapshot.v1');
-    expect(ScheduleTriggerEventSchema.$id).toBe('ScheduleTriggerEvent.v1');
-    expect(ScheduleErrorCodeSchema.$id).toBe('ScheduleErrorCode.v1');
+    // typebox 的 TSchema 类型不声明 $id（运行时经 options 展开），用类型化读取断言。
+    const schemaId = (schema: unknown): string | undefined => (schema as { readonly $id?: string }).$id;
+    expect(schemaId(ScheduleDefinitionSchema)).toBe('ScheduleDefinition.v1');
+    expect(schemaId(ScheduleSnapshotSchema)).toBe('ScheduleSnapshot.v1');
+    expect(schemaId(ScheduleTriggerEventSchema)).toBe('ScheduleTriggerEvent.v1');
+    expect(schemaId(ScheduleErrorCodeSchema)).toBe('ScheduleErrorCode.v1');
   });
 });
