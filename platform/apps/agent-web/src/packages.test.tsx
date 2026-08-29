@@ -12,8 +12,14 @@ const detail: PackageDetailType = {
   packageId: 'ops-analyst',
   name: 'Ops Analyst',
   manifest: {
-    id: 'ops-analyst', version: '1.0.0', description: '通用运维分析助手', entry: 'prompts/system.md',
+    id: 'ops-analyst', version: '2.0.0', description: '通用运维分析助手', entry: 'prompts/system.md',
     modelRoute: { provider: 'anthropic', model: 'claude-sonnet-4-5' }, skillRefs: ['skill://ops-triage/v1'], capabilityRefs: [],
+    inputs: [
+      { name: 'severity', type: 'enum', required: false, enum: ['low', 'medium', 'high'], default: 'medium' },
+      { name: 'window', type: 'number', required: false },
+    ],
+    dataSources: [{ name: 'metrics-snapshot', url: 'https://api.example/metrics' }],
+    tasks: [{ name: 'triage', entry: 'prompts/system.md' }],
   },
   assets: [
     { relativePath: 'prompts/system.md', kind: 'prompt', digest: 'sha256:' + 'a'.repeat(64), bytes: 12, preview: '你是运维助手。' },
@@ -99,6 +105,90 @@ describe('PackagesApp list', () => {
   });
 });
 
+describe('PackagesApp example import', () => {
+  const postBodies = (calls: readonly unknown[][]) => calls
+    .filter(([, init]) => (init as RequestInit | undefined)?.method === 'POST')
+    .map(([url, init]) => ({ url: String(url), body: JSON.parse(String((init as RequestInit).body)) as Record<string, unknown> }));
+  const withWindow = (assignSpy: ReturnType<typeof vi.fn>) => {
+    const originalWindow = (globalThis as { window?: unknown }).window;
+    (globalThis as { window?: unknown }).window = { location: { assign: assignSpy } };
+    return () => { (globalThis as { window?: unknown }).window = originalWindow; };
+  };
+
+  it('creates the app and registers its release in one click', async () => {
+    const mockFetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (init?.method === 'POST' && url.endsWith('/v1/apps')) return response({ schemaVersion: 'App.v1', appId: 'ops-analyst', status: 'active' }, 201);
+      if (init?.method === 'POST' && url.endsWith('/releases')) return response({ schemaVersion: 'PackageReleaseResult.v1', status: 'stored', packageVersion: '1.0.0' }, 201);
+      return response({ apps: [] });
+    });
+    const fetcher = mockFetch as typeof fetch;
+    const assignSpy = vi.fn();
+    const restoreWindow = withWindow(assignSpy);
+    let tree!: ReturnType<typeof create>;
+    await act(async () => { tree = create(<PackagesApp fetcher={fetcher} />); await flush(); });
+    const toggle = tree.root.findAllByType('button').find((b) => b.props.children === '+ Import example')!;
+    await act(async () => { toggle.props.onClick(); await flush(); });
+    const importButtons = tree.root.findAllByType('button').filter((b) => b.props.children === 'Import');
+    expect(importButtons).toHaveLength(3);
+    await act(async () => { importButtons[0]!.props.onClick(); await flush(); await flush(); });
+    const posts = postBodies(mockFetch.mock.calls);
+    expect(posts[0]).toMatchObject({ url: '/v1/apps', body: { appId: 'ops-analyst', name: 'Ops Analyst' } });
+    const releasePost = posts.find((post) => post.url.endsWith('/releases'))!;
+    expect(releasePost.url).toBe('/v1/apps/ops-analyst/releases');
+    const files = releasePost.body.files as Record<string, string>;
+    expect(files['app.yaml']).toContain('id: ops-analyst');
+    expect(Object.keys(files)).toContain('prompts/system.md');
+    expect(assignSpy).toHaveBeenCalledWith('/?view=packages&package=ops-analyst');
+    restoreWindow();
+    await act(async () => tree.unmount());
+  });
+
+  it('treats an already-registered app as importable and still registers the release', async () => {
+    const mockFetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (init?.method === 'POST' && url.endsWith('/v1/apps')) return response({ error: { code: 'APP_ALREADY_EXISTS', message: 'App already exists' } }, 409);
+      if (init?.method === 'POST' && url.endsWith('/releases')) return response({ schemaVersion: 'PackageReleaseResult.v1', status: 'existing', packageVersion: '1.0.0' }, 200);
+      return response({ apps: [] });
+    });
+    const fetcher = mockFetch as typeof fetch;
+    const assignSpy = vi.fn();
+    const restoreWindow = withWindow(assignSpy);
+    let tree!: ReturnType<typeof create>;
+    await act(async () => { tree = create(<PackagesApp fetcher={fetcher} />); await flush(); });
+    await act(async () => { tree.root.findAllByType('button').find((b) => b.props.children === '+ Import example')!.props.onClick(); await flush(); });
+    const importButtons = tree.root.findAllByType('button').filter((b) => b.props.children === 'Import');
+    await act(async () => { importButtons[1]!.props.onClick(); await flush(); await flush(); });
+    const posts = postBodies(mockFetch.mock.calls);
+    expect(posts[0]!.url).toBe('/v1/apps');
+    expect(posts.find((post) => post.url.endsWith('/releases'))!.url).toBe('/v1/apps/github-trending/releases');
+    expect(assignSpy).toHaveBeenCalledWith('/?view=packages&package=github-trending');
+    restoreWindow();
+    await act(async () => tree.unmount());
+  });
+
+  it('shows an inline error and stays on the list when the release registration fails', async () => {
+    const mockFetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (init?.method === 'POST' && url.endsWith('/v1/apps')) return response({ schemaVersion: 'App.v1', appId: 'lifecycle-probe', status: 'active' }, 201);
+      if (init?.method === 'POST' && url.endsWith('/releases')) return response({ error: { code: 'APP_PACKAGE_INVALID', message: 'package rejected by compiler' } }, 400);
+      return response({ apps: [] });
+    });
+    const fetcher = mockFetch as typeof fetch;
+    const assignSpy = vi.fn();
+    const restoreWindow = withWindow(assignSpy);
+    let tree!: ReturnType<typeof create>;
+    await act(async () => { tree = create(<PackagesApp fetcher={fetcher} />); await flush(); });
+    await act(async () => { tree.root.findAllByType('button').find((b) => b.props.children === '+ Import example')!.props.onClick(); await flush(); });
+    const importButtons = tree.root.findAllByType('button').filter((b) => b.props.children === 'Import');
+    await act(async () => { importButtons[2]!.props.onClick(); await flush(); await flush(); });
+    expect(tree.root.findByProps({ children: 'package rejected by compiler' })).toBeTruthy();
+    expect(assignSpy).not.toHaveBeenCalled();
+    restoreWindow();
+    await act(async () => tree.unmount());
+  });
+});
+
 describe('PackageDetailView management', () => {
   it('uploads a new version after filling files', async () => {
     const onUploadVersion = vi.fn(async () => undefined);
@@ -161,22 +251,25 @@ describe('PackageDetailView', () => {
     expect(markup).toContain('sha256:' + 'd'.repeat(64));
   });
 
-  it('warns before starting a run with empty input and starts on confirmation', async () => {
+  it('starts a run with declared params: blanks use defaults, enum selects pass through, numbers validate', async () => {
     const startRun = vi.fn(async () => undefined);
     let tree!: ReturnType<typeof create>;
     await act(async () => { tree = create(<PackageDetailView {...detailProps({ onStartRun: startRun })} />); await flush(); });
-    const textarea = tree.root.findByProps({ 'aria-label': 'User input (optional)' });
-    const form = tree.root.findAllByType('form').find((node) => node.findAllByProps({ 'aria-label': 'User input (optional)' }).length > 0)!;
-    // 空输入首次提交：只显示警示、不发起运行（防止误触产生无数据运行）。
+    const form = tree.root.findAllByType('form').find((node) => node.findAllByProps({ 'aria-label': 'severity' }).length > 0)!;
+    // 全部留空：以空 params 发起（缺省值由服务端按声明补齐），无空输入警告。
     await act(async () => { form.props.onSubmit({ preventDefault: () => undefined }); await flush(); });
-    expect(startRun).not.toHaveBeenCalled();
-    // 再次提交（确认）：空输入运行仍被允许（app 自身即可完成特定任务，不阻塞运行）。
+    expect(startRun).toHaveBeenCalledWith({ task: 'triage', params: {} });
+    // 枚举选择 + 非法数字：数字内联报错且不发起。
+    const severity = tree.root.findByProps({ 'aria-label': 'severity' });
+    const window = tree.root.findByProps({ 'aria-label': 'window' });
+    await act(async () => { severity.props.onChange({ target: { value: 'high' } }); window.props.onChange({ target: { value: 'not-a-number' } }); await flush(); });
     await act(async () => { form.props.onSubmit({ preventDefault: () => undefined }); await flush(); });
-    expect(startRun).toHaveBeenCalledWith('');
-    // 输入后提交：直接发起，无需确认。
-    await act(async () => { textarea.props.onChange({ target: { value: 'hello' } }); await flush(); });
+    expect(tree.root.findByProps({ children: 'Param window must be a number' })).toBeTruthy();
+    expect(startRun).toHaveBeenCalledTimes(1);
+    // 修正数字后：枚举与数字一并提交。
+    await act(async () => { window.props.onChange({ target: { value: '7' } }); await flush(); });
     await act(async () => { form.props.onSubmit({ preventDefault: () => undefined }); await flush(); });
-    expect(startRun).toHaveBeenCalledWith('hello');
+    expect(startRun).toHaveBeenLastCalledWith({ task: 'triage', params: { severity: 'high', window: 7 } });
     await act(async () => tree.unmount());
   });
 });

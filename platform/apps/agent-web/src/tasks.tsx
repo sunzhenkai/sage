@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { workspaceHref } from './workspace.js';
 import { useLocale, type LocaleContextValue } from './locale.js';
 import { Banner, EmptyPanel, LoadingState } from './feedback.js';
+import { Markdown } from './markdown.js';
+import { splitAssistantText } from './chat.js';
 
 export interface TaskViewModel { readonly taskId: string; readonly taskType: string; readonly workflowId: string; readonly targetId: string; readonly attempt: number; readonly status: string; readonly revision: number; readonly projectionUpdatedAt?: string; readonly freshness: 'fresh' | 'stale' | 'unavailable'; readonly staleReason?: string; readonly sessionId?: string; readonly runId?: string; readonly messageId?: string; readonly targetSnapshot: { readonly targetId: string; readonly environment: string; readonly namespace: string; readonly taskQueue: string; readonly region?: string; readonly targetProfileVersion?: string }; }
 export interface TaskEventView { readonly eventId: string; readonly sequence: number; readonly kind: 'task' | 'agent'; readonly type: string; readonly occurredAt: string; readonly payload: Readonly<Record<string, unknown>>; }
@@ -16,13 +18,37 @@ export function ProjectionFreshness({ task }: { readonly task: TaskViewModel }) 
 
 export function TaskList({ tasks, sessionId }: { readonly tasks: readonly TaskViewModel[]; readonly sessionId?: string }) { const { t } = useLocale(); return <section className="task-list-section" aria-label={t('tasks')}><div className="task-list-heading"><div><p className="eyebrow">{t('durableExecution')}</p><h2>{tasks.length} {tasks.length === 1 ? t('task') : t('tasks')}</h2></div><span className="muted-copy">{t('mostRecentFirst')}</span></div>{tasks.length === 0 ? <EmptyPanel icon="▣" title={t('noTasks')} hint={t('promoteImportant')} action={<a className="button button-secondary" href={workspaceHref({ view: 'chat', ...(sessionId ? { sessionId } : {}) })}>{t('goToChat')} <span>→</span></a>} /> : <div className="task-table">{tasks.map((task) => <a className="task-row" key={task.taskId} href={workspaceHref({ view: 'tasks', taskId: task.taskId, ...(sessionId ? { sessionId } : {}) })}><span className="task-row-icon">▣</span><span className="task-row-main"><strong className="task-id-link">{task.taskId}</strong><small>{task.taskType} · {task.targetSnapshot.environment} · {t('attempt')} {task.attempt}</small></span><span className={`status-badge status-${statusTone(task.status)}`}>{statusLabel(task.status, t)}</span><span className="task-row-target">{task.targetSnapshot.targetId}<small>{task.targetSnapshot.namespace}</small></span><span className="task-row-chevron">→</span><ProjectionFreshness task={task}/></a>)}</div>}</section>; }
 
-export function TaskDetail({ task, events, artifacts, sessionId, detailLoading, onControl, onRefresh }: { readonly task: TaskViewModel; readonly events: readonly TaskEventView[]; readonly artifacts: readonly TaskArtifactView[]; readonly sessionId?: string; readonly detailLoading?: boolean; readonly onControl?: (operation: TaskControl) => void; readonly onRefresh?: () => void }) {
+/** 终态 succeeded 时的内联输出：拉取 task-output 内容渲染 markdown，think 段折叠兜底。 */
+export function TaskOutputPreview({ fetcher = fetch, taskId, artifactId }: { readonly fetcher?: typeof fetch; readonly taskId: string; readonly artifactId: string }) {
+  const { t } = useLocale();
+  const [content, setContent] = useState<string>();
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const response = await fetcher(`/v1/tasks/${encodeURIComponent(taskId)}/artifacts/${encodeURIComponent(artifactId)}`, { credentials: 'include' });
+        if (!response.ok) throw new Error(`HTTP_${response.status}`);
+        const body = await response.json() as { content?: string };
+        if (!cancelled) setContent(body.content ?? '');
+      } catch { if (!cancelled) setFailed(true); }
+    })();
+    return () => { cancelled = true; };
+  }, [fetcher, taskId, artifactId]);
+  if (failed) return <p className="muted-copy">{t('outputPreviewUnavailable')}</p>;
+  if (content === undefined) return <LoadingState label={t('loading')} />;
+  return <div className="task-output-preview">{splitAssistantText(content).map((segment, index) => segment.kind === 'thinking'
+    ? <details key={index}><summary>{t('thoughtProcess')}</summary><Markdown text={segment.text} /></details>
+    : <Markdown key={index} text={segment.text} />)}</div>;
+}
+
+export function TaskDetail({ task, events, artifacts, sessionId, detailLoading, onControl, onRefresh, fetcher = fetch }: { readonly task: TaskViewModel; readonly events: readonly TaskEventView[]; readonly artifacts: readonly TaskArtifactView[]; readonly sessionId?: string; readonly detailLoading?: boolean; readonly onControl?: (operation: TaskControl) => void; readonly onRefresh?: () => void; readonly fetcher?: typeof fetch }) {
   const { t, formatDateTime } = useLocale();
   const controls: readonly [TaskControl, string][] = [['pause', 'pauseControl'], ['resume', 'resumeControl'], ['cancel', 'cancelControl'], ['retry', 'retryControl']];
   return <article className="task-detail"><header className="detail-heading"><div><a className="back-link" href={workspaceHref({ view: 'tasks', ...(sessionId ? { sessionId } : {}) })}>← {t('allTasks')}</a><div className="detail-title"><span className="task-row-icon">▣</span><div><p className="eyebrow">{t('taskDetail')}</p><h2>{task.taskId}</h2></div><span className={`status-badge status-${statusTone(task.status)}`}>{statusLabel(task.status, t)}</span></div></div><button className="button button-secondary" type="button" disabled={detailLoading} onClick={onRefresh}>↻ {t('refresh')}</button></header><div className="detail-banner"><ProjectionFreshness task={task}/><span>{t('revision')} {task.revision}</span></div>
     <div className="detail-grid"><section className="detail-card"><span className="eyebrow">{t('execution')}</span><dl><dt>{t('workflow')}</dt><dd>{task.workflowId}</dd><dt>{t('target')}</dt><dd>{task.targetSnapshot.targetId}</dd><dt>{t('namespace')}</dt><dd>{task.targetSnapshot.namespace}</dd><dt>{t('taskQueue')}</dt><dd>{task.targetSnapshot.taskQueue}</dd><dt>{t('attempt')}</dt><dd>{task.attempt}</dd></dl></section><section className="detail-card"><span className="eyebrow">{t('controls')}</span><p className="muted-copy">{t('controlsAuthorized')}</p><nav className="control-grid" aria-label={t('taskControls')}>{controls.map(([operation, label]) => <button className={`button ${operation === 'cancel' ? 'button-danger' : 'button-secondary'}`} disabled={!controlAllowed(task.status, operation)} type="button" key={operation} onClick={() => onControl?.(operation)}>{t(label as 'pauseControl' | 'resumeControl' | 'cancelControl' | 'retryControl')}</button>)}</nav></section></div>
     <section className="detail-card timeline-card" aria-label={t('taskTimeline')}><div className="section-heading"><div><span className="eyebrow">{t('executionHistory')}</span><h3>{t('timeline')}</h3></div><span className="badge badge-neutral">{t('eventsCount', { count: events.length })}</span></div>{events.length === 0 ? <p className="muted-copy">{t('noProjectionEvents')}</p> : <ol className="task-timeline">{events.map((event) => <li key={event.eventId}><span className={`timeline-marker marker-${event.kind}`} /><div><strong>{event.type}</strong><time>{formatDateTime(event.occurredAt)}</time></div><small>#{event.sequence}</small></li>)}</ol>}</section>
-    <section className="detail-card" aria-label={t('taskArtifacts')}><div className="section-heading"><div><span className="eyebrow">{t('outputs')}</span><h3>{t('artifacts')}</h3></div><span className="badge badge-neutral">{artifacts.length}</span></div>{artifacts.length === 0 ? <p className="muted-copy">{t('artifactsPending')}</p> : <div className="artifact-list">{artifacts.map((artifact) => <a className="artifact-link" key={artifact.artifactId} href={`/v1/tasks/${encodeURIComponent(task.taskId)}/artifacts/${encodeURIComponent(artifact.artifactId)}`} title={artifact.mediaType}><span className="file-icon">↗</span>{artifact.name}<small>{artifact.mediaType} · {artifact.artifactRef}</small></a>)}</div>}</section>
+    <section className="detail-card" aria-label={t('taskArtifacts')}><div className="section-heading"><div><span className="eyebrow">{t('outputs')}</span><h3>{t('artifacts')}</h3></div><span className="badge badge-neutral">{artifacts.length}</span></div>{artifacts.length === 0 ? <p className="muted-copy">{t('artifactsPending')}</p> : <><div className="artifact-list">{artifacts.map((artifact) => <a className="artifact-link" key={artifact.artifactId} href={`/v1/tasks/${encodeURIComponent(task.taskId)}/artifacts/${encodeURIComponent(artifact.artifactId)}`} title={artifact.mediaType}><span className="file-icon">↗</span>{artifact.name}<small>{artifact.mediaType} · {artifact.artifactRef}</small></a>)}</div>{task.status === 'succeeded' && artifacts.some((artifact) => artifact.name === 'task-output') ? <div className="section-heading"><div><span className="eyebrow">{t('outputPreview')}</span></div></div> : null}{task.status === 'succeeded' ? <TaskOutputPreview fetcher={fetcher} taskId={task.taskId} artifactId={(artifacts.find((artifact) => artifact.name === 'task-output') ?? artifacts[0])?.artifactId ?? ''} /> : null}</>}</section>
   </article>;
 }
 

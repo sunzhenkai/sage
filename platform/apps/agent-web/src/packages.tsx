@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { workspaceHref } from './workspace.js';
 import { useLocale } from './locale.js';
-import { TextAreaField, TextField } from './fields.js';
+import { Field, SelectField, TextAreaField, TextField } from './fields.js';
 import { Banner, EmptyPanel, InlineNotice, LoadingState } from './feedback.js';
+import { EXAMPLE_APPS, type ExampleApp } from './example-apps.js';
 
 export interface PackageSummaryView {
   readonly packageId: string;
@@ -29,6 +30,15 @@ export interface PackageAssetView {
   readonly bytes: number;
   readonly preview?: string;
 }
+export interface PackageManifestInputView {
+  readonly name: string;
+  readonly type: 'string' | 'enum' | 'number';
+  readonly required: boolean;
+  readonly enum?: readonly (string | number)[];
+  readonly default?: string | number;
+}
+export interface PackageManifestDataSourceView { readonly name: string; readonly url: string }
+export interface PackageManifestTaskView { readonly name: string; readonly entry: string }
 export interface PackageManifestView {
   readonly id: string;
   readonly version: string;
@@ -37,6 +47,9 @@ export interface PackageManifestView {
   readonly modelRoute: { readonly provider: string; readonly model: string };
   readonly skillRefs: readonly string[];
   readonly capabilityRefs: readonly string[];
+  readonly inputs?: readonly PackageManifestInputView[];
+  readonly dataSources?: readonly PackageManifestDataSourceView[];
+  readonly tasks?: readonly PackageManifestTaskView[];
 }
 export interface PackageDetailView {
   readonly packageId: string;
@@ -48,11 +61,15 @@ export interface PackageDetailView {
 }
 
 export type PackageFetch = typeof fetch;
+export interface PackageRequestError extends Error { status?: number; code?: string }
 async function packageJson<T>(fetcher: PackageFetch, url: string, init: RequestInit = {}): Promise<T> {
   const response = await fetcher(url, { ...init, credentials: 'include', headers: { ...(init.body === undefined ? {} : { 'content-type': 'application/json' }), ...init.headers } });
   if (!response.ok) {
     const body = await response.json().catch(() => ({ error: { code: `HTTP_${response.status}` } })) as { error?: { code?: string; message?: string } };
-    throw new Error(body.error?.message ?? body.error?.code ?? `HTTP ${response.status}`);
+    const failure: PackageRequestError = new Error(body.error?.message ?? body.error?.code ?? `HTTP ${response.status}`);
+    failure.status = response.status;
+    if (body.error?.code !== undefined) failure.code = body.error.code;
+    throw failure;
   }
   return response.json() as Promise<T>;
 }
@@ -65,12 +82,15 @@ function formatBytes(bytes: number): string {
 
 const APP_ID_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,126}[a-z0-9])?$/;
 
-export function PackageList({ packages, loading, creating, error, onCreateApp }: {
+export function PackageList({ packages, loading, creating, importing, importError, error, onCreateApp, onImportExample }: {
   readonly packages: readonly PackageSummaryView[];
   readonly loading: boolean;
   readonly creating: boolean;
+  readonly importing?: string | undefined;
+  readonly importError?: string | undefined;
   readonly error?: string | undefined;
   readonly onCreateApp: (input: { appId: string; name: string; description?: string }) => void | Promise<void>;
+  readonly onImportExample: (example: ExampleApp) => void | Promise<void>;
 }) {
   const { t, formatDateTime } = useLocale();
   const [showForm, setShowForm] = useState(false);
@@ -78,6 +98,7 @@ export function PackageList({ packages, loading, creating, error, onCreateApp }:
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [formError, setFormError] = useState<string>();
+  const [showExamples, setShowExamples] = useState(false);
   const submit = () => {
     const trimmedId = appId.trim();
     const trimmedName = name.trim();
@@ -90,8 +111,20 @@ export function PackageList({ packages, loading, creating, error, onCreateApp }:
   };
   return <section className="package-list-section" aria-label={t('packages')}>
     <div className="task-list-heading"><div><p className="eyebrow">{t('durableExecution')}</p><h2>{packages.length} {packages.length === 1 ? t('asset') : t('packages')}</h2></div>
-      <div className="task-list-heading-actions"><span className="muted-copy">{t('mostRecentFirst')}</span><button className="button button-primary" type="button" onClick={() => { setShowForm((value) => !value); setFormError(undefined); }}>{t('newApp')}</button></div></div>
+      <div className="task-list-heading-actions"><span className="muted-copy">{t('mostRecentFirst')}</span><button className="button button-secondary" type="button" onClick={() => { setShowExamples((value) => !value); setFormError(undefined); }}>{t('importExamples')}</button><button className="button button-primary" type="button" onClick={() => { setShowForm((value) => !value); setFormError(undefined); }}>{t('newApp')}</button></div></div>
     {error ? <Banner kind="error" title={t('packageDataUnavailable')}>{error}</Banner> : null}
+    {showExamples ? <section className="detail-card app-create-card" aria-label={t('importExamples')}>
+      <div className="section-heading"><div><span className="eyebrow">{t('importExamples')}</span><h3>{t('importExamplesTitle')}</h3></div></div>
+      <p className="muted-copy">{t('importExamplesHint')}</p>
+      {importError ? <InlineNotice error>{importError}</InlineNotice> : null}
+      <div className="example-app-list">
+        {EXAMPLE_APPS.map((example) => <div className="example-app-row" key={example.appId}>
+          <span className="provider-mark">▤</span>
+          <div className="example-app-copy"><strong>{example.name}</strong><small>{example.appId} · v{example.version}</small><p>{example.description}</p></div>
+          <button className="button button-secondary example-import-button" type="button" disabled={importing !== undefined} onClick={() => onImportExample(example)}>{importing === example.appId ? t('importingExample') : t('importExampleAction')}</button>
+        </div>)}
+      </div>
+    </section> : null}
     {showForm ? <section className="detail-card app-create-card" aria-label={t('createApp')}>
       <div className="section-heading"><div><span className="eyebrow">{t('newApp')}</span><h3>{t('createApp')}</h3></div></div>
       <form className="form-grid" onSubmit={(event) => { event.preventDefault(); submit(); }}>
@@ -121,19 +154,39 @@ export function PackageDetailView({ detail, loading, starting, error, runStarted
   readonly uploadMessage?: { readonly kind: 'success' | 'error'; readonly text: string } | undefined;
   readonly deleting: boolean;
   readonly deleteConfirm: boolean;
-  readonly onStartRun: (input: string) => void | Promise<void>;
+  readonly onStartRun: (request: { readonly task?: string; readonly params: Readonly<Record<string, string | number>> }) => void | Promise<void>;
   readonly onUploadVersion: (files: Record<string, string>) => void | Promise<void>;
   readonly onRequestDelete: () => void;
   readonly onCancelDelete: () => void;
   readonly onConfirmDelete: () => void | Promise<void>;
 }) {
   const { t, formatDateTime } = useLocale();
-  const [input, setInput] = useState('');
-  const [emptyRunConfirm, setEmptyRunConfirm] = useState(false);
+  const manifest = detail?.manifest;
+  const declaredInputs = manifest?.inputs ?? [];
+  const declaredTasks = manifest?.tasks ?? [];
+  const [selectedTask, setSelectedTask] = useState<string>('');
+  const effectiveTask = declaredTasks.find((task) => task.name === selectedTask)?.name ?? declaredTasks[0]?.name;
+  const [paramValues, setParamValues] = useState<Record<string, string>>({});
+  const [paramError, setParamError] = useState<string>();
   const [uploadText, setUploadText] = useState('');
   const [uploadError, setUploadError] = useState<string>();
   const [showUpload, setShowUpload] = useState(false);
-  const manifest = detail?.manifest;
+  const submitRun = () => {
+    const params: Record<string, string | number> = {};
+    for (const input of declaredInputs) {
+      const raw = (paramValues[input.name] ?? '').trim();
+      if (raw === '') continue; // 留空即用声明默认值
+      if (input.type === 'number') {
+        const numeric = Number(raw);
+        if (!Number.isFinite(numeric)) { setParamError(t('numberParamInvalid', { name: input.name })); return; }
+        params[input.name] = numeric;
+        continue;
+      }
+      params[input.name] = raw;
+    }
+    setParamError(undefined);
+    void onStartRun({ ...(effectiveTask === undefined ? {} : { task: effectiveTask }), params });
+  };
   const submitUpload = () => {
     const trimmed = uploadText.trim();
     if (trimmed.length === 0) { setUploadError(t('uploadFilesRequired')); return; }
@@ -178,14 +231,25 @@ export function PackageDetailView({ detail, loading, starting, error, runStarted
           <dt>{t('modelRoute')}</dt><dd>{manifest.modelRoute.provider} / {manifest.modelRoute.model}</dd>
           <dt>{t('skills')}</dt><dd>{manifest.skillRefs.length === 0 ? '—' : manifest.skillRefs.join(', ')}</dd>
           <dt>{t('capabilities')}</dt><dd>{manifest.capabilityRefs.length === 0 ? '—' : manifest.capabilityRefs.join(', ')}</dd>
+          {manifest.inputs === undefined ? null : <><dt>{t('declaredInputs')}</dt><dd>{manifest.inputs.length === 0 ? '—' : manifest.inputs.map((input) => `${input.name} (${input.type}${input.default === undefined ? '' : `=${String(input.default)}`})`).join(', ')}</dd></>}
+          {manifest.dataSources === undefined ? null : <><dt>{t('declaredDataSources')}</dt><dd>{manifest.dataSources.length === 0 ? '—' : manifest.dataSources.map((source) => source.name).join(', ')}</dd></>}
+          {manifest.tasks === undefined ? null : <><dt>{t('declaredTasks')}</dt><dd>{manifest.tasks.length === 0 ? '—' : manifest.tasks.map((task) => task.name).join(', ')}</dd></>}
         </dl>
         {manifest.description ? <p className="muted-copy">{manifest.description}</p> : null}
       </section>
       <section className="detail-card"><span className="eyebrow">{t('startRun')}</span><p className="muted-copy">{t('startRunHint')}</p>
-        <form className="form-grid" onSubmit={(event) => { event.preventDefault(); const trimmed = input.trim(); if (trimmed.length === 0 && !emptyRunConfirm) { setEmptyRunConfirm(true); return; } setEmptyRunConfirm(false); onStartRun(trimmed); }}>
-          <TextAreaField label={t('runInput')} value={input} rows={4} maxLength={100_000} onChange={(value) => { setInput(value); if (value.trim().length > 0) setEmptyRunConfirm(false); }} placeholder={t('runInputPlaceholder')} />
-          {emptyRunConfirm ? <InlineNotice error>{t('emptyRunWarning')}</InlineNotice> : null}
-          <div className="form-actions">{emptyRunConfirm ? <button className="button button-secondary" type="button" onClick={() => setEmptyRunConfirm(false)}>{t('cancelAction')}</button> : null}<button className="button button-primary" type="submit" disabled={starting}>{starting ? t('startingRun') : emptyRunConfirm ? t('emptyRunConfirmAction') : t('startRunAction')}</button></div>
+        <form className="form-grid" onSubmit={(event) => { event.preventDefault(); submitRun(); }}>
+          {declaredTasks.length > 1
+            ? <Field label={t('taskChoice')}><select aria-label={t('taskChoice')} value={effectiveTask ?? ''} onChange={(event) => setSelectedTask(event.target.value)}>{declaredTasks.map((task) => <option key={task.name} value={task.name}>{task.name}</option>)}</select></Field>
+            : null}
+          {declaredInputs.map((input) => input.type === 'enum'
+            ? <SelectField key={input.name} label={input.name} value={paramValues[input.name] ?? ''} onChange={(value) => setParamValues((current) => ({ ...current, [input.name]: value }))}>
+                <option value="">{t('paramDefaultOption')}</option>
+                {(input.enum ?? []).map((option) => <option key={String(option)} value={String(option)}>{String(option)}</option>)}
+              </SelectField>
+            : <TextField key={input.name} label={input.name} value={paramValues[input.name] ?? ''} maxLength={2_048} onChange={(value) => setParamValues((current) => ({ ...current, [input.name]: value }))} placeholder={input.type === 'number' ? '0' : ''} />)}
+          {paramError ? <InlineNotice error>{paramError}</InlineNotice> : null}
+          <div className="form-actions"><button className="button button-primary" type="submit" disabled={starting}>{starting ? t('startingRun') : t('startRunAction')}</button></div>
         </form>
       </section></div> : null}
       <section className="detail-card"><div className="section-heading"><div><span className="eyebrow">{t('assets')}</span><h3>{t('assets')}</h3></div><span className="badge badge-neutral">{detail.assets?.length ?? 0}</span></div>
@@ -208,6 +272,8 @@ export function PackagesApp({ apiBase = '', fetcher = fetch, packageId }: { read
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [importingExample, setImportingExample] = useState<string>();
+  const [importError, setImportError] = useState<string>();
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
@@ -278,6 +344,26 @@ interface AppSummaryResponse {
     finally { setCreating(false); }
   };
 
+  const importExample = async (example: ExampleApp) => {
+    if (importingExample !== undefined) return;
+    setImportingExample(example.appId); setImportError(undefined); setError(undefined);
+    try {
+      try {
+        await packageJson(fetcher, `${apiBase}/v1/apps`, { method: 'POST', body: JSON.stringify({ appId: example.appId, name: example.name, description: example.description }) });
+      } catch (cause) {
+        // 应用已登记（409）不算失败：继续走 Release 登记，重复导入保持幂等。
+        const failure = cause as PackageRequestError;
+        if (failure?.status !== 409 && failure?.code !== 'APP_ALREADY_EXISTS') throw cause;
+      }
+      await packageJson<{ packageVersion: string }>(fetcher, `${apiBase}/v1/apps/${encodeURIComponent(example.appId)}/releases`, {
+        method: 'POST', body: JSON.stringify({ files: example.files })
+      });
+      await loadList();
+      window.location.assign(workspaceHref({ view: 'packages', packageId: example.appId }));
+    } catch (cause) { setImportError(cause instanceof Error ? cause.message : t('importExampleFailed')); }
+    finally { setImportingExample(undefined); }
+  };
+
   const uploadVersion = async (files: Record<string, string>) => {
     if (detail === undefined) return;
     setUploading(true); setUploadMessage(undefined); setError(undefined);
@@ -300,14 +386,14 @@ interface AppSummaryResponse {
     } catch (cause) { setError(cause instanceof Error ? cause.message : t('deleteAppFailed')); setDeleting(false); }
   };
 
-  const startRun = async (input: string) => {
+  const startRun = async (request: { readonly task?: string; readonly params: Readonly<Record<string, string | number>> }) => {
     if (startGuard.current || detail === undefined) return;
     startGuard.current = true; setStarting(true); setError(undefined);
     try {
       const releaseId = detail.releases[0]?.releaseId;
       if (releaseId === undefined) throw new Error(t('packageNotFound'));
       const result = await packageJson<{ taskId: string }>(fetcher, `${apiBase}/v1/releases/${encodeURIComponent(releaseId)}/runs`, {
-        method: 'POST', body: JSON.stringify({ input })
+        method: 'POST', body: JSON.stringify({ ...(request.task === undefined ? {} : { task: request.task }), params: { ...request.params } })
       });
       setRunStartedTaskId(result.taskId);
     } catch (cause) { setError(cause instanceof Error ? cause.message : t('runStartFailed')); }
@@ -318,6 +404,6 @@ interface AppSummaryResponse {
     <header className="page-heading"><div><p className="eyebrow">{t('durableExecution')}</p><h1>{t('packages')}</h1><p className="page-subtitle">{t('packagesSubtitle')}</p></div></header>
     {packageId || (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('package'))
       ? <PackageDetailView detail={detail} loading={loading} starting={starting} error={error} runStartedTaskId={runStartedTaskId} uploading={uploading} uploadMessage={uploadMessage} deleting={deleting} deleteConfirm={deleteConfirm} onStartRun={startRun} onUploadVersion={uploadVersion} onRequestDelete={() => setDeleteConfirm(true)} onCancelDelete={() => setDeleteConfirm(false)} onConfirmDelete={confirmDelete} />
-      : <PackageList packages={packages} loading={loading} creating={creating} error={error} onCreateApp={createApp} />}
+      : <PackageList packages={packages} loading={loading} creating={creating} importing={importingExample} importError={importError} error={error} onCreateApp={createApp} onImportExample={importExample} />}
   </section>;
 }
