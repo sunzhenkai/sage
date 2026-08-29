@@ -204,10 +204,7 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
           try {
             materializedOutput = enforceOutputContract(outcome.output, outputContract);
           } catch (cause) {
-            if (cause instanceof OutputContractViolation) {
-              console.error(`[DEBUG contract violation raw output] len=${outcome.output.length} head=${JSON.stringify(outcome.output.slice(0, 400))} tail=${JSON.stringify(outcome.output.slice(-200))}`);
-              throw new ApplicationFailure(cause.message, 'PACKAGE_OUTPUT_CONTRACT_VIOLATION');
-            }
+            if (cause instanceof OutputContractViolation) throw new ApplicationFailure(cause.message, 'PACKAGE_OUTPUT_CONTRACT_VIOLATION');
             throw cause;
           }
         }

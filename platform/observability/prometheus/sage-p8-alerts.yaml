@@ -1,0 +1,93 @@
+groups:
+  - name: sage-p8-unattended-schedule
+    rules:
+      - alert: SageScheduleModelFallbackExhausted
+        expr: increase(sage_schedule_trigger_total{outcome="failed",reason_code="MODEL_FALLBACK_EXHAUSTED"}[10m]) > 0
+        for: 5m
+        labels:
+          severity: critical
+          responder_service: sage-pilot-primary-oncall
+        annotations:
+          summary: "Unattended failure MODEL_FALLBACK_EXHAUSTED requires response"
+          runbook_url: "docs/p8-incident-runbooks.md#model-fallback-exhausted"
+      - alert: SageScheduleAdmissionFailClosed
+        expr: increase(sage_schedule_trigger_total{outcome="failed",reason_code=~"ADMISSION_.*"}[10m]) > 0
+        for: 5m
+        labels:
+          severity: critical
+          responder_service: sage-pilot-primary-oncall
+        annotations:
+          summary: "Unattended failure ADMISSION_ requires response"
+          runbook_url: "docs/p8-incident-runbooks.md#admission-fail-closed"
+      - alert: SageScheduleBudgetExhausted
+        expr: increase(sage_schedule_trigger_total{outcome="failed",reason_code="SCHEDULE_BUDGET_EXHAUSTED"}[10m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          responder_service: sage-pilot-primary-oncall
+        annotations:
+          summary: "Unattended failure SCHEDULE_BUDGET_EXHAUSTED requires response"
+          runbook_url: "docs/p8-incident-runbooks.md#budget-exhausted"
+      - alert: SageScheduleLedgerUnavailable
+        expr: increase(sage_schedule_trigger_total{outcome="failed",reason_code=~"LEDGER_.*"}[10m]) > 0
+        for: 5m
+        labels:
+          severity: critical
+          responder_service: sage-pilot-primary-oncall
+        annotations:
+          summary: "Unattended failure LEDGER_ requires response"
+          runbook_url: "docs/p8-incident-runbooks.md#ledger-unavailable"
+      - alert: SageScheduleEffectUnknown
+        expr: increase(sage_tool_effect_unknown_total[5m]) > 0 or increase(sage_task_effect_unknown_total[5m]) > 0
+        for: 5m
+        labels:
+          severity: critical
+          responder_service: sage-pilot-primary-oncall
+        annotations:
+          summary: "Unattended failure EFFECT_UNKNOWN requires response"
+          runbook_url: "docs/p8-incident-runbooks.md#effect-unknown"
+      - alert: SageScheduleTriggerMissed
+        expr: increase(sage_schedule_trigger_total{outcome="missed"}[15m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          responder_service: sage-pilot-primary-oncall
+        annotations:
+          summary: "Unattended failure SCHEDULE_TRIGGER_MISSED requires response"
+          runbook_url: "docs/p8-incident-runbooks.md#trigger-missed"
+      - alert: SageScheduleTriggerFailed
+        expr: increase(sage_schedule_trigger_total{outcome="failed",reason_code=~"SCHEDULE_.*"}[10m]) > 0
+        for: 5m
+        labels:
+          severity: critical
+          responder_service: sage-pilot-primary-oncall
+        annotations:
+          summary: "Unattended failure SCHEDULE_ requires response"
+          runbook_url: "docs/p8-incident-runbooks.md#trigger-failed"
+      - alert: SageScheduleProjectionDrift
+        expr: increase(sage_task_projection_drift_total[10m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          responder_service: sage-pilot-primary-oncall
+        annotations:
+          summary: "Unattended failure TASK_PROJECTION_DRIFT requires response"
+          runbook_url: "docs/p8-incident-runbooks.md#projection-drift"
+      - alert: SageScheduleApprovalTimeout
+        expr: increase(sage_schedule_trigger_total{outcome="failed",reason_code="APPROVAL_TIMEOUT"}[15m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          responder_service: sage-pilot-primary-oncall
+        annotations:
+          summary: "Unattended failure APPROVAL_TIMEOUT requires response"
+          runbook_url: "docs/p8-incident-runbooks.md#approval-timeout"
+      - alert: SageScheduleUnknownFailure
+        expr: increase(sage_schedule_trigger_total{outcome="failed",reason_code="UNKNOWN"}[10m]) > 0
+        for: 5m
+        labels:
+          severity: critical
+          responder_service: sage-pilot-primary-oncall
+        annotations:
+          summary: "Unattended failure * requires response"
+          runbook_url: "docs/p8-incident-runbooks.md#unknown-failure"

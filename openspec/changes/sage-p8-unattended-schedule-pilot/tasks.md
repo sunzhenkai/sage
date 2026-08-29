@@ -23,15 +23,15 @@
 
 ## 4. 无人值守失败自治
 
-- [ ] 4.1 `POST /v1/effects/resolutions`：裁决提交（结论 + 动作）、append-only 审计、重复冲突拒绝、未裁决前 action key 保持阻断；API 集成测试（spec: unattended-run-autonomy 裁决 requirement）
-- [ ] 4.2 裁决执行链路："未提交 + 继续"经 admission 生成新 Spec/attempt（携带原 effect 与裁决引用）新建 coordinator run；"已提交 + 继续"依赖 Effect Ledger replay 幂等不重复副作用；真实 Postgres/Temporal 集成测试
-- [ ] 4.3 `production-governance` failure-taxonomy：稳定错误码 → 告警规则/runbook/响应路由映射表，Prometheus 规则与 Grafana 注解生成，未知错误码兜底告警；单测
-- [ ] 4.4 自动重试预算护栏：delivery/semantic retry 前读取 task 级与 schedule 级权威余额，不足/ledger 不可用停止重试并告警；单测 + 集成测试
+- [x] 4.1 `POST /v1/effects/resolutions`：裁决提交（结论 + 动作）、append-only 审计、重复冲突拒绝、未裁决前 action key 保持阻断；API 集成测试（spec: unattended-run-autonomy 裁决 requirement）
+- [x] 4.2 裁决执行链路："未提交 + 继续"经 admission 生成新 Spec/attempt（携带原 effect 与裁决引用）新建 coordinator run；"已提交 + 继续"依赖 Effect Ledger replay 幂等不重复副作用；真实 Postgres/Temporal 集成测试
+- [x] 4.3 `production-governance` failure-taxonomy：稳定错误码 → 告警规则/runbook/响应路由映射表，Prometheus 规则与 Grafana 注解生成，未知错误码兜底告警；单测
+- [x] 4.4 自动重试预算护栏：delivery/semantic retry 前读取 task 级与 schedule 级权威余额，不足/ledger 不可用停止重试并告警；单测 + 集成测试
 
 ## 5. Pilot 链路认证
 
-- [ ] 5.1 service token 验证（`Authorization: Bearer`、哈希存储、常量时间比较、多 key 轮换）接入 packages/apps/runs/schedules/resolutions 五条链路；stub 信任头在这五条链路停止提权；单测 + API 测试（spec: unattended-schedule-pilot-gate 认证 requirement）
-- [ ] 5.2 `scripts/register-package.ts` 与本地开发文档改为 dev token；`compose.yaml`/env 注入路径更新
+- [x] 5.1 service token 验证（`Authorization: Bearer`、哈希存储、常量时间比较、多 key 轮换）接入 packages/apps/runs/schedules/resolutions 五条链路；stub 信任头在这五条链路停止提权；单测 + API 测试（spec: unattended-schedule-pilot-gate 认证 requirement）
+- [x] 5.2 `scripts/register-package.ts` 与本地开发文档改为 dev token；`compose.yaml`/env 注入路径更新
 
 ## 6. Soak 与端到端验证
 
