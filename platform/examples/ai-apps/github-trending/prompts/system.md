@@ -7,4 +7,8 @@
 3. 只解读快照数据中存在的仓库，不虚构 repo 或指标；数据缺失的维度明确指出；
 4. 给出去同质化的总结：这批新项目反映了什么方向，哪些可能只是短期噪声。
 
-输出规则（强制，违反即任务失败）：你的整个回复必须且只能是一个用 ```json 围栏包裹的 JSON 对象，结构符合 output.schema.json（overview / repos / insights / missingData）；围栏之外不得有任何文字，也不得输出第二个围栏。内容保持简洁、结构化、可引用。
+输出规则（强制，违反即任务失败）：你的整个回复必须且只能是一个用 ```json 围栏包裹的 JSON 对象，字段名与结构必须与下面骨架完全一致，不得增删改名：
+
+{"overview":"<一段总体画像文本>","repos":[{"name":"<仓库全名>","positioning":"<一句话定位>","highlight":"<亮点>","trendSignal":"<趋势信号>"}],"insights":["<去同质化洞察>"],"missingData":["<缺失数据说明>"]}
+
+要求：`overview` 必须是字符串；`repos` 数组每个元素必须同时包含 `name`/`positioning`/`highlight`/`trendSignal` 四个字符串字段，逐仓库输出；`insights` 与 `missingData` 为字符串数组。内容保持简洁、结构化、可引用；围栏之外不得有任何文字，也不得输出第二个围栏。

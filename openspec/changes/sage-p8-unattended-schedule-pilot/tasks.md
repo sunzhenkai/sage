@@ -17,9 +17,9 @@
 
 ## 3. Schedule API / UI / 观测
 
-- [ ] 3.1 `agent-api` schedules 路由：CRUD + pause/resume + 触发历史，认证、租户隔离、不可变审计；API 集成测试（含越权拒绝）
-- [ ] 3.2 `agent-web` Schedule 管理 UI：列表、详情（状态/next fire/绑定 release/预算账户）、触发历史、暂停/恢复；组件测试
-- [ ] 3.3 观测埋点：succeeded/failed/skipped/missed trigger 指标，schedule → occurrence → task → spec digest 关联字段，高基数 ID 不进 metrics label；单测
+- [x] 3.1 `agent-api` schedules 路由：CRUD + pause/resume + 触发历史，认证、租户隔离、不可变审计；API 集成测试（含越权拒绝）
+- [x] 3.2 `agent-web` Schedule 管理 UI：列表、详情（状态/next fire/绑定 release/预算账户）、触发历史、暂停/恢复；组件测试
+- [x] 3.3 观测埋点：succeeded/failed/skipped/missed trigger 指标，schedule → occurrence → task → spec digest 关联字段，高基数 ID 不进 metrics label；单测
 
 ## 4. 无人值守失败自治
 

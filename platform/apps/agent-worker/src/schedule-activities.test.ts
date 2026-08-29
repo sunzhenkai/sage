@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { AgentTaskSpec, AgentTaskSpecStorePort, AdapterHealth, ProductionConsumptionLedgerPort, ScheduleControlStore, ScheduleSnapshot } from '@sage/platform-ports';
+import type { AgentTaskSpec } from '@sage/agent-contracts';
+import type { AgentTaskSpecStorePort, AdapterHealth, ProductionConsumptionLedgerPort, ScheduleControlStore, ScheduleSnapshot } from '@sage/platform-ports';
 import { InMemoryScheduleControlStore } from '@sage/local-fakes';
+import type { AdmissionAuditOutboxPortV1, AdmissionAuditRecordV1, AdmissionIdempotencyRecordV1, AdmissionIdempotencyStoreV1, PackageRunManifestSummary, ScheduleDispatchReleaseResolution } from '@sage/agent-run-admission';
 import { createScheduleDispatcherActivities, type DispatcherReleaseResolver } from './schedule-activities.js';
 
 const definition = (overrides: Partial<ScheduleSnapshot['definition']> = {}): ScheduleSnapshot['definition'] => ({
@@ -14,12 +16,14 @@ const definition = (overrides: Partial<ScheduleSnapshot['definition']> = {}): Sc
   ...overrides
 });
 
-const snapshot = (store: ScheduleControlStore, snap: Partial<ScheduleSnapshot> = {}): Promise<void> => store.putRecord({
-  snapshot: { schemaVersion: '1', definition: definition(), revision: 1, state: 'ACTIVE', contentDigest: `sha256:${'b'.repeat(64)}`, createdAtMs: 1_000, updatedAtMs: 1_000, ...snap },
-  ...(snap.definition?.releaseBinding.strategy === 'FOLLOW' ? { followAnchorReleaseId: 'release-1' } : {})
-});
+const snapshot = async (store: ScheduleControlStore, snap: Partial<ScheduleSnapshot> = {}): Promise<void> => {
+  await store.putRecord({
+    snapshot: { schemaVersion: '1', definition: definition(), revision: 1, state: 'ACTIVE', contentDigest: `sha256:${'b'.repeat(64)}`, createdAtMs: 1_000, updatedAtMs: 1_000, ...snap },
+    ...(snap.definition?.releaseBinding.strategy === 'FOLLOW' ? { followAnchorReleaseId: 'release-1' } : {})
+  });
+};
 
-const manifest = {
+const manifest: PackageRunManifestSummary = {
   id: 'finance-briefing', version: '2.0.0', entry: 'prompts/system.md',
   modelRoute: { provider: 'minimax-cn', model: 'MiniMax-M3' },
   skillRefs: [], capabilityRefs: [],
@@ -28,13 +32,36 @@ const manifest = {
   tasks: [{ name: 'daily', entry: 'prompts/system.md', params: [{ name: 'window', from: { kind: 'input', input: 'window' } }], output: {} }]
 };
 
-const resolution = {
+const resolution: ScheduleDispatchReleaseResolution = {
   release: { releaseRef: 'release://release-1', releaseId: 'release-1', releaseDigest: `sha256:${'a'.repeat(64)}`, packageId: 'finance-briefing', packageVersion: '2.0.0', ownerRef: 'owner', engineIds: ['engine-local'], kernelContractMajor: 1 },
-  manifest, entryPrompt: '系统提示词', references: [], declaredSchemaAsset: undefined
+  manifest, entryPrompt: '系统提示词', references: []
+};
+
+const idempotencyStore = (): AdmissionIdempotencyStoreV1 => {
+  const records = new Map<string, AdmissionIdempotencyRecordV1>();
+  return {
+    get: async (input) => records.get(`${input.tenantId}\u0000${input.idempotencyKey}`),
+    putIfAbsent: async (input) => {
+      const key = `${input.record.tenantId}\u0000${input.record.idempotencyKey}`;
+      const existing = records.get(key);
+      if (existing !== undefined) return { status: 'existing', record: existing };
+      records.set(key, input.record);
+      return { status: 'created', record: input.record };
+    },
+    putTerminal: async (input) => {
+      const key = `${input.record.tenantId}\u0000${input.record.idempotencyKey}`;
+      records.set(key, input.record);
+      return { status: 'stored', record: input.record };
+    }
+  };
+};
+const auditOutbox = (): AdmissionAuditOutboxPortV1 => {
+  const records: AdmissionAuditRecordV1[] = [];
+  return { append: async (input) => { records.push(input.record); return 'stored'; } };
 };
 
 const resolver = (overrides: Partial<DispatcherReleaseResolver> = {}): DispatcherReleaseResolver => ({
-  resolveRelease: async () => resolution,
+  resolveRelease: async (): Promise<ScheduleDispatchReleaseResolution> => ({ ...resolution, references: [] }),
   ...overrides
 });
 
@@ -49,16 +76,16 @@ const ledgerOk = (): ProductionConsumptionLedgerPort => ({
 
 const specStore = (): AgentTaskSpecStorePort => {
   const specs = new Map<string, AgentTaskSpec>();
-  return {
-    putSpec: async (input) => {
-      const key = `${input.tenantId}\u0000${input.spec.specRef}`;
-      if (specs.has(key)) return { status: 'existing', value: specs.get(key)! };
-      specs.set(key, input.spec);
-      return { status: 'created', value: input.spec };
-    },
-    getSpec: async (input) => specs.get(`${input.tenantId}\u0000${input.specRef}`),
-    health: async () => ({ healthy: true, checkedAt: new Date().toISOString() })
+  const putSpec = async (input: Parameters<AgentTaskSpecStorePort['putSpec']>[0]): Promise<Awaited<ReturnType<AgentTaskSpecStorePort['putSpec']>>> => {
+    const key = `${input.tenantId}\u0000${input.spec.specRef}`;
+    const existing = specs.get(key);
+    if (existing !== undefined) return { status: 'stored', value: existing } as Awaited<ReturnType<AgentTaskSpecStorePort['putSpec']>>;
+    specs.set(key, input.spec);
+    return { status: 'stored', value: input.spec } as Awaited<ReturnType<AgentTaskSpecStorePort['putSpec']>>;
   };
+  const getSpec = async (input: Parameters<AgentTaskSpecStorePort['getSpec']>[0]): Promise<Awaited<ReturnType<AgentTaskSpecStorePort['getSpec']>>> => specs.get(`${input.tenantId}\u0000${input.specRef}`);
+  const health = async (): Promise<AdapterHealth> => ({ healthy: true, checkedAt: new Date().toISOString() });
+  return { putSpec, getSpec, health };
 };
 
 const harness = (store: ScheduleControlStore, resolverOverride: DispatcherReleaseResolver = resolver(), ledger: ProductionConsumptionLedgerPort | undefined = ledgerOk()) => {
@@ -69,21 +96,8 @@ const harness = (store: ScheduleControlStore, resolverOverride: DispatcherReleas
     ...(ledger === undefined ? {} : { ledger }),
     releaseResolver: resolverOverride,
     specStore: specStore(),
-    idempotencyStore: (() => {
-      const records = new Map<string, object>();
-      return {
-        async get(input: { readonly tenantId: string; readonly idempotencyKey: string }) { return records.get(`${input.tenantId}\u0000${input.idempotencyKey}`); },
-        async putIfAbsent(input: { readonly record: { readonly tenantId: string; readonly idempotencyKey: string } & object }) {
-          const key = `${input.record.tenantId}\u0000${input.record.idempotencyKey}`;
-          const existing = records.get(key);
-          if (existing !== undefined) return { status: 'existing' as const, record: existing as never };
-          records.set(key, input.record as never);
-          return { status: 'created' as const, record: input.record as never };
-        },
-        async putTerminal(input: { readonly record: object }) { records.set(`${(input.record as { tenantId: string }).tenantId}\u0000${(input.record as { idempotencyKey: string }).idempotencyKey}`, input.record); return { status: 'stored' as const, record: input.record as never }; }
-      };
-    })(),
-    auditOutbox: { async append(input) { this.records.push(input.record); return 'stored' as const; }, records: [] as unknown[] },
+    idempotencyStore: idempotencyStore(),
+    auditOutbox: auditOutbox(),
     writePackageInput: async (record) => { writtenInputs.push(record.taskId); },
     startRun: async (input) => { startedRuns.push(input.taskId); },
     now: () => new Date(10_000)
@@ -159,8 +173,8 @@ describe('schedule dispatcher activities', () => {
     await store.putRecord({ snapshot: { schemaVersion: '1', definition: definition({ trigger: { kind: 'interval', everyMs: 60_000 } }), revision: 1, state: 'ACTIVE', contentDigest: `sha256:${'b'.repeat(64)}`, createdAtMs: 0, updatedAtMs: 0 } });
     const activities = createScheduleDispatcherActivities({
       scheduleStore: store, releaseResolver: resolver(), specStore: specStore(),
-      idempotencyStore: { async get() { return undefined; }, async putIfAbsent(input) { return { status: 'created' as const, record: input.record }; }, async putTerminal(input) { return { status: 'stored' as const, record: input.record }; } },
-      auditOutbox: { async append(input) { this.records.push(input.record); return 'stored' as const; }, records: [] as unknown[] },
+      idempotencyStore: idempotencyStore(),
+      auditOutbox: auditOutbox(),
       writePackageInput: async () => undefined, startRun: async () => undefined,
       now: () => new Date(clock.nowMs)
     });
@@ -181,8 +195,8 @@ function createLedgerlessHarness(store: ScheduleControlStore) {
     scheduleStore: store,
     releaseResolver: resolver(),
     specStore: specStore(),
-    idempotencyStore: { async get() { return undefined; }, async putIfAbsent(input) { return { status: 'created' as const, record: input.record }; }, async putTerminal(input) { return { status: 'stored' as const, record: input.record }; } },
-    auditOutbox: { async append(input) { this.records.push(input.record); return 'stored' as const; }, records: [] as unknown[] },
+    idempotencyStore: idempotencyStore(),
+    auditOutbox: auditOutbox(),
     writePackageInput: async () => undefined, startRun: async () => undefined,
     now: () => new Date(10_000)
   });

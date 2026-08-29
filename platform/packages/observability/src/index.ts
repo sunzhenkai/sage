@@ -273,3 +273,23 @@ export function recordAgentPlatformCorrelation(
   });
   return metric;
 }
+
+// ===== P8 Schedule 触发观测（低基数：metrics 只带 outcome/reason_code，schedule 标识进日志字段） =====
+export type ScheduleTriggerOutcome = 'succeeded' | 'failed' | 'skipped' | 'missed';
+export interface ScheduleTriggerSignalInput {
+  readonly outcome: ScheduleTriggerOutcome;
+  readonly reasonCode?: string;
+  /** 日志/追踪可保留的关联标识（schedule/occurrence/task）；metrics label 不含高基数标识。 */
+  readonly correlation?: Readonly<Record<string, unknown>>;
+}
+export const scheduleTriggerMetricName = 'sage_schedule_trigger_total';
+export function recordScheduleTriggerSignal(
+  observability: AgentObservability,
+  input: ScheduleTriggerSignalInput
+): void {
+  const reasonCode = (input.reasonCode ?? 'none').slice(0, 64);
+  try {
+    observability.metricLowCardinality(scheduleTriggerMetricName, 1, { outcome: input.outcome, reason_code: reasonCode });
+    observability.log(`schedule.trigger.${input.outcome}`, { outcome: input.outcome, reason_code: reasonCode, ...sanitizeTelemetry(input.correlation ?? {}) });
+  } catch { /* Telemetry cannot change dispatch semantics */ }
+}

@@ -4,7 +4,7 @@ import { navigate } from './routing.js';
 import { useLocale } from './locale.js';
 import { Banner, EmptyPanel, LoadingState } from './feedback.js';
 
-export type WorkspaceView = 'chat' | 'tasks' | 'providers' | 'packages';
+export type WorkspaceView = 'chat' | 'tasks' | 'providers' | 'packages' | 'schedules';
 export interface WorkspaceLocation { readonly view: WorkspaceView; readonly sessionId?: string; readonly taskId?: string; readonly packageId?: string }
 
 export function workspaceHref({ view, sessionId, taskId, packageId }: WorkspaceLocation): string {

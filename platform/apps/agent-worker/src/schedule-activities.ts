@@ -1,6 +1,7 @@
 import type { ProductionConsumptionLedgerPort, ScheduleControlStore, ScheduleSnapshot, ScheduleTriggerEvent } from '@sage/platform-ports';
 import { admitScheduleTrigger, fetchScheduleInputSnapshots, PackageSnapshotError, type AdmissionAuditOutboxPortV1, type AdmissionIdempotencyStoreV1, type ScheduleDispatchReleaseResolution, type ScheduleSnapshotConnector } from '@sage/agent-run-admission';
 import type { DispatchScheduleOccurrenceActivityInput, DispatchScheduleOccurrenceActivityResult, ReconcileScheduleOccurrencesActivityInput, ReconcileScheduleOccurrencesActivityResult, ScheduleDispatcherActivities } from '@sage/temporal-schedules';
+import { recordScheduleTriggerSignal, type AgentObservability } from '@sage/observability';
 
 /**
  * P8 dispatcher 控制面活动（D3/D4）：每次 schedule 触发以固化 task/params 走既有包运行准入；
@@ -28,6 +29,8 @@ export interface CreateScheduleDispatcherActivitiesOptions {
   /** 对账用：设施侧 miss/overlap 计数（cron 触发规则的差集辅助证据）。 */
   readonly facilityCounters?: (ref: { readonly tenantId: string; readonly scheduleId: string }) => Promise<{ readonly missedCatchup: number; readonly skippedOverlap: number } | undefined>;
   readonly now?: () => Date;
+  /** 观测（3.3）：schedule 触发指标，低基数 label（outcome/reason_code）。 */
+  readonly observability?: AgentObservability;
 }
 
 const errorCodeOf = (cause: unknown): string => {
@@ -51,6 +54,7 @@ export function createScheduleDispatcherActivities(options: CreateScheduleDispat
         if (snapshot === undefined || snapshot.state !== 'ACTIVE') {
           // 删除/暂停竞态：设施侧已 fire，控制面不再准入，记录 SKIPPED 而非失败。
           await recordEvent({ ...ref, occurrenceId: activityInput.occurrenceId, kind: 'SKIPPED', errorCode: 'SCHEDULE_NOT_ACTIVE' }, now().getTime());
+          if (options.observability !== undefined) recordScheduleTriggerSignal(options.observability, { outcome: 'skipped', reasonCode: 'SCHEDULE_NOT_ACTIVE', correlation: { schedule_id: ref.scheduleId, occurrence_id: activityInput.occurrenceId } });
           return { outcome: 'SKIPPED', occurrenceKey: activityInput.occurrenceKey, errorCode: 'SCHEDULE_NOT_ACTIVE' };
         }
         const binding = snapshot.definition.releaseBinding;
@@ -109,6 +113,7 @@ export function createScheduleDispatcherActivities(options: CreateScheduleDispat
         // 触发 run 的 invocation 记账走 schedule 账户（reserve/commit 与既有机制一致）。
         // 结算 reservation 由 coordinator 执行面按 specRef 建立时的账户约定创建，这里只保证预检与事件流。
         await recordEvent({ ...ref, occurrenceId: activityInput.occurrenceId, kind: 'SUCCEEDED', taskId: result.taskId }, now().getTime());
+        if (options.observability !== undefined) recordScheduleTriggerSignal(options.observability, { outcome: 'succeeded', correlation: { schedule_id: ref.scheduleId, occurrence_id: activityInput.occurrenceId, task_id: result.taskId } });
         return { outcome: 'SUCCEEDED', occurrenceKey: activityInput.occurrenceKey, taskId: result.taskId };
       } catch (cause) {
         const code = errorCodeOf(cause);
@@ -116,6 +121,7 @@ export function createScheduleDispatcherActivities(options: CreateScheduleDispat
           const detail = cause instanceof Error ? cause.message.slice(0, 512) : undefined;
           await recordEvent({ ...ref, occurrenceId: activityInput.occurrenceId, kind: 'FAILED', errorCode: code, ...(detail === undefined ? {} : { detail }) }, now().getTime());
         } catch { /* 事件流不可用不改变稳定失败语义 */ }
+        if (options.observability !== undefined) recordScheduleTriggerSignal(options.observability, { outcome: 'failed', reasonCode: code, correlation: { schedule_id: ref.scheduleId, occurrence_id: activityInput.occurrenceId } });
         // 预算拒止/绑定漂移/不兼容属稳定失败：不再重试；其余（设施/registry 短暂不可用）按 activity retry 有界重试。
         if (['SCHEDULE_BUDGET_EXHAUSTED', 'SCHEDULE_BINDING_DRIFTED', 'SCHEDULE_BINDING_INCOMPATIBLE', 'SCHEDULE_BINDING_ANCHOR_MISSING', 'SCHEDULE_RELEASE_UNRESOLVABLE', 'LEDGER_SCHEDULE_ACCOUNTS_UNSUPPORTED'].includes(code)) {
           return { outcome: 'FAILED', occurrenceKey: activityInput.occurrenceKey, errorCode: code };
@@ -147,6 +153,7 @@ export function createScheduleDispatcherActivities(options: CreateScheduleDispat
             // MISSED 事件的 occurredAt 锚定期望触发时刻（对账语义：事件流以触发窗口为轴）。
             await recordEvent({ ...ref, occurrenceId: `recon-${fire}`, kind: 'MISSED', errorCode: 'SCHEDULE_TRIGGER_MISSED', detail: `expected interval fire at ${new Date(fire).toISOString()}` }, fire);
             missedRecorded += 1;
+            if (options.observability !== undefined) recordScheduleTriggerSignal(options.observability, { outcome: 'missed', reasonCode: 'SCHEDULE_TRIGGER_MISSED', correlation: { schedule_id: ref.scheduleId } });
           }
         }
       }

@@ -129,7 +129,7 @@ export function registerSchedulesRoutes(app: FastifyInstance, options: RegisterS
     const principal = await principalFor(request);
     if (principal === undefined) return sendError(reply, 401, 'SCHEDULE_AUTHENTICATION_REQUIRED', 'Schedule management requires a service token');
     const record = await options.store.getRecord({ tenantId: options.tenantId, scheduleId: request.params.scheduleId });
-    if (record === undefined) return sendError(reply, 404, 'SCHEDULE_NOT_FOUND', `Schedule ${request.params.scheduleId} not found`);
+    if (record === undefined || record.state === 'DELETED') return sendError(reply, 404, 'SCHEDULE_NOT_FOUND', `Schedule ${request.params.scheduleId} not found`);
     return reply.code(200).send(await toApiSnapshot(record, options.adapter));
   });
 
@@ -150,13 +150,15 @@ export function registerSchedulesRoutes(app: FastifyInstance, options: RegisterS
     const ref: ScheduleRef = { tenantId: options.tenantId, scheduleId: request.params.scheduleId };
     const record = await options.store.getRecord(ref);
     if (record === undefined) return sendError(reply, 404, 'SCHEDULE_NOT_FOUND', `Schedule ${ref.scheduleId} not found`);
-    let snapshot: ScheduleSnapshot;
+    let facilitySnapshot: ScheduleSnapshot;
     try {
-      snapshot = action === 'pause' ? await options.adapter.pause(ref) : await options.adapter.resume(ref);
+      facilitySnapshot = action === 'pause' ? await options.adapter.pause(ref) : await options.adapter.resume(ref);
     } catch (cause) {
       const code = cause instanceof Error ? cause.message.split(':')[0]! : 'SCHEDULE_UNAVAILABLE';
       return sendError(reply, 502, code, cause instanceof Error ? cause.message.slice(0, 512) : 'schedule facility unavailable', true);
     }
+    // 控制面 revision 权威：任何状态转换都递增（设施镜像不承载 revision 语义）。
+    const snapshot: ScheduleSnapshot = { ...facilitySnapshot, revision: record.revision + 1, contentDigest: facilitySnapshot.contentDigest, updatedAtMs: now().getTime() };
     await options.store.replaceRecord(snapshot);
     await audit(principal, action === 'pause' ? 'PAUSED' : 'RESUMED', `SCHEDULE_${action.toUpperCase()}`, { schedule_id: ref.scheduleId }, snapshot.contentDigest);
     return reply.code(200).send(await toApiSnapshot(snapshot, options.adapter));

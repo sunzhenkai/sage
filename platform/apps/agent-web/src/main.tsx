@@ -4,6 +4,7 @@ import { ChatApp } from './chat.js';
 import { LocaleProvider, useLocale } from './locale.js';
 import { ProvidersApp } from './providers.js';
 import { PackagesApp } from './packages.js';
+import { SchedulesApp } from './schedules.js';
 import { TasksApp } from './tasks.js';
 import { ChatLanding, workspaceHref, type WorkspaceView } from './workspace.js';
 import { handleAnchorNavigation, navigate, useLocation } from './routing.js';
@@ -14,7 +15,7 @@ const root = typeof document === 'undefined' ? null : document.getElementById('r
 
 export function currentView(search = location.search): WorkspaceView {
   const view = new URLSearchParams(search).get('view');
-  return view === 'tasks' || view === 'providers' || view === 'packages' ? view : 'chat';
+  return view === 'tasks' || view === 'providers' || view === 'packages' || view === 'schedules' ? view : 'chat';
 }
 
 const SIDEBAR_STORAGE_KEY = 'sage.web.sidebar.collapsed';
@@ -42,6 +43,7 @@ export function WorkspaceShell({ view, sessionId, children }: { readonly view: W
         <a className={view === 'chat' ? 'nav-item is-active' : 'nav-item'} href={workspaceHref({ view: 'chat' })} title={t('chat')}><span className="nav-icon">✦</span><span className="nav-copy">{t('chat')}</span></a>
         <a className={view === 'tasks' ? 'nav-item is-active' : 'nav-item'} href={workspaceHref({ view: 'tasks', ...(sessionId ? { sessionId } : {}) })} title={t('tasks')}><span className="nav-icon">▣</span><span className="nav-copy">{t('tasks')}</span></a>
         <a className={view === 'packages' ? 'nav-item is-active' : 'nav-item'} href={workspaceHref({ view: 'packages', ...(sessionId ? { sessionId } : {}) })} title={t('packages')}><span className="nav-icon">▤</span><span className="nav-copy">{t('packages')}</span></a>
+        <a className={view === 'schedules' ? 'nav-item is-active' : 'nav-item'} href={workspaceHref({ view: 'schedules', ...(sessionId ? { sessionId } : {}) })} title={t('schedules')}><span className="nav-icon">⏱</span><span className="nav-copy">{t('schedules')}</span></a>
         <p className="nav-label nav-label-spaced">{t('configuration')}</p>
         <a className={view === 'providers' ? 'nav-item is-active' : 'nav-item'} href={workspaceHref({ view: 'providers', ...(sessionId ? { sessionId } : {}) })} title={t('providers')}><span className="nav-icon">◈</span><span className="nav-copy">{t('providers')}</span><span className="nav-pill">{t('new')}</span></a>
       </nav>
@@ -64,7 +66,7 @@ export function renderWorkspace(search = location.search): ReactNode {
   const sessionId = query.get('session') ?? undefined;
   const taskId = query.get('task') ?? undefined;
   const packageId = query.get('package') ?? undefined;
-  const content = view === 'providers' ? <ProvidersApp /> : view === 'tasks' ? <TasksApp {...(sessionId ? { sessionId } : {})} {...(taskId ? { taskId } : {})} /> : view === 'packages' ? <PackagesApp {...(packageId ? { packageId } : {})} /> : sessionId ? <ChatApp sessionId={sessionId} /> : <ChatLanding />;
+  const content = view === 'providers' ? <ProvidersApp /> : view === 'tasks' ? <TasksApp {...(sessionId ? { sessionId } : {})} {...(taskId ? { taskId } : {})} /> : view === 'packages' ? <PackagesApp {...(packageId ? { packageId } : {})} /> : view === 'schedules' ? <SchedulesApp /> : sessionId ? <ChatApp sessionId={sessionId} /> : <ChatLanding />;
   return <StrictMode><LocaleProvider><WorkspaceShell view={view} {...(sessionId ? { sessionId } : {})}>{content}</WorkspaceShell></LocaleProvider></StrictMode>;
 }
 
@@ -74,7 +76,7 @@ export function WorkspaceApp({ searchOverride, fetcher }: { readonly searchOverr
   const sessionId = location.get('session') ?? undefined;
   const taskId = location.get('task') ?? undefined;
   const packageId = location.get('package') ?? undefined;
-  const content = view === 'providers' ? <ProvidersApp fetcher={fetcher ?? fetch} /> : view === 'tasks' ? <TasksApp key={`tasks-${sessionId ?? ''}`} fetcher={fetcher ?? fetch} {...(sessionId ? { sessionId } : {})} {...(taskId ? { taskId } : {})} /> : view === 'packages' ? <PackagesApp key={`packages-${sessionId ?? ''}`} fetcher={fetcher ?? fetch} {...(packageId ? { packageId } : {})} /> : sessionId ? <ChatApp key={`chat-${sessionId}`} sessionId={sessionId} fetcher={fetcher ?? fetch} /> : <ChatLanding fetcher={fetcher ?? fetch} />;
+  const content = view === 'providers' ? <ProvidersApp fetcher={fetcher ?? fetch} /> : view === 'tasks' ? <TasksApp key={`tasks-${sessionId ?? ''}`} fetcher={fetcher ?? fetch} {...(sessionId ? { sessionId } : {})} {...(taskId ? { taskId } : {})} /> : view === 'packages' ? <PackagesApp key={`packages-${sessionId ?? ''}`} fetcher={fetcher ?? fetch} {...(packageId ? { packageId } : {})} /> : view === 'schedules' ? <SchedulesApp key={`schedules-${sessionId ?? ''}`} fetcher={fetcher ?? fetch} /> : sessionId ? <ChatApp key={`chat-${sessionId}`} sessionId={sessionId} fetcher={fetcher ?? fetch} /> : <ChatLanding fetcher={fetcher ?? fetch} />;
   return <LocaleProvider><WorkspaceShell view={view} {...(sessionId ? { sessionId } : {})}>{content}</WorkspaceShell></LocaleProvider>;
 }
 
