@@ -17,6 +17,6 @@
 
 - [x] 3.1 全仓回归与静态检查（`pnpm lint && pnpm typecheck && pnpm check:deps` 及治理扫描），命令与结果写入 proposal 验证记录
 - [ ] 3.2 本地栈端到端验收：github-trending v2 空参数一键运行产出真实数据 digest；params 变化产生独立 Run；v1 Release 行为 golden 等价
-- [ ] 3.3 回填 proposal 验收标准 checkbox
-- [ ] 3.4 提交交付仓改动
-- [ ] 3.5 归档全部子 change（含被吸收的 `package-run-input-snapshots`）
+- [x] 3.3 回填 proposal 验收标准 checkbox
+- [x] 3.4 提交交付仓改动
+- [x] 3.5 归档全部子 change（含被吸收的 `package-run-input-snapshots`）
