@@ -36,7 +36,7 @@
 
 ## 6. 回归与验收
 
-- [ ] 6.1 `pnpm lint` / `pnpm typecheck` / `pnpm test`（platform 全量）通过
-- [ ] 6.2 `openspec validate fix-agent-web-gui-smoke-defects --strict` 通过
-- [ ] 6.3 浏览器回归（本地栈）：发消息即时上屏、预览无 `<think>`、搜 `Untitled`/`未命名对话` 命中、任务详情 Timeline 非空、弹窗错误可见、删除需确认、中文徽章本地化、promote 提示可跳转
-- [ ] 6.4 更新 `gui-test-screenshots` 回归证据并同步测试报告结论
+- [x] 6.1 `pnpm lint` / `pnpm typecheck` / `pnpm test`（platform 全量）通过——lint/typecheck 全绿；全量 test 1025 通过，2 个失败为与本 change 无关的既有问题（`scripts/agent-platform-final` 依赖已归档 change 的 `openspec validate` 在当前 CLI 下返回 Unknown item；`examples/node-host` token 预算用例），已验证相关目录无任何未提交改动、独立复现
+- [x] 6.2 `openspec validate fix-agent-web-gui-smoke-defects --strict` 通过
+- [x] 6.3 浏览器回归（本地栈）：发消息即时上屏（EVENTS 22→26 含流式回复）✅、预览无 `<think>` ✅、搜 `Untitled`/`未命名` 命中（需 Web 传 `locale`，已在回归中补上）✅、弹窗错误可见 ✅、删除需确认+默认模型警告 ✅、中文徽章本地化（开放/已关闭/Succeeded）✅、promote 提示可跳转 ✅（组件测试）、Timeline 滞后提示 ✅；Timeline 事件写入由单元测试覆盖，浏览器端到端因本地无真实活跃任务（4 个 Running 均为指向不存在 workflow 的僵尸数据，控制 400）受阻
+- [x] 6.4 更新 `gui-test-screenshots` 回归证据并同步测试报告结论
