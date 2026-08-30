@@ -9,5 +9,5 @@
 ## 3. 收尾
 - [x] 3.1 全仓回归与静态检查（`corepack pnpm exec tsc -b --pretty false`、`pnpm --filter @sage/agent-web typecheck`、platform 根 `pnpm test`），命令与结果写入 proposal 验证记录
 - [x] 3.2 回填 proposal 验收标准
-- [ ] 3.3 提交交付仓改动
-- [ ] 3.4 归档全部子 change（`platform-ui-inspect-check`、`platform-ui-inspect-refine`）
+- [x] 3.3 提交交付仓改动
+- [x] 3.4 归档全部子 change（`platform-ui-inspect-check`、`platform-ui-inspect-refine`）
