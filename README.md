@@ -39,7 +39,10 @@ cd platform
 # 启动本地基础设施（Postgres / Temporal / MinIO）
 docker compose up -d --wait postgres temporal artifact-store
 
-# 启动应用服务
+# 启动应用服务（Schedule 管理 UI 需先配置 dev service token）
+TOKEN=$(openssl rand -hex 32)
+printf 'SAGE_SERVICE_TOKEN=%s\nSAGE_SERVICE_TOKEN_HASHES=%s\n' "$TOKEN" "$(printf '%s' "$TOKEN" | sha256sum | cut -d' ' -f1)" >> .env
+
 docker compose up -d --build --wait agent-api agent-worker agent-web
 
 # 健康检查

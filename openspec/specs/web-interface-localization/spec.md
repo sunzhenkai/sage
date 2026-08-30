@@ -132,3 +132,36 @@ TBD - created by archiving change web-interface-localization. Update Purpose aft
 #### Scenario: key 完整性检查
 - **WHEN** 构建或测试检查翻译资源
 - **THEN** `savedMetadata`、`catalogSyncStatus`、`catalogSyncAttempt` 在 `zh-CN` 与 `en` 中均存在且非空
+
+### Requirement: 用户可见状态标签随 locale 渲染
+
+Agent Web 对用户可见的枚举状态标签（包括但不限于 session history 的 `open`/`closed` 徽章、chat 详情的 run 状态 `ready`/`active`/`succeeded` 等）SHALL 经 locale 字典映射后渲染当前 locale 文案，SHALL NOT 直接输出枚举原始字符串。字典 SHALL 覆盖所有实际会渲染的状态值；遇到字典缺失的未知状态值时 SHALL 回退为可读的原文兜底并保持布局稳定，不得渲染空白或抛错。
+
+#### Scenario: 中文界面徽章本地化
+
+- **WHEN** locale 为 zh-CN 且会话列表存在 `open` 状态条目
+- **THEN** 状态徽章渲染为中文字典文案（如「开放」），而非英文枚举 `open`
+
+#### Scenario: 英文界面保持原文语义
+
+- **WHEN** locale 为 en 且会话列表存在 `open` 状态条目
+- **THEN** 状态徽章渲染为 `Open` 形态的英文字典文案，行为与既有界面一致
+
+#### Scenario: 未知状态回退
+
+- **WHEN** 服务端返回字典未收录的新状态值
+- **THEN** 界面以原文兜底展示该状态，不出现空白徽章或渲染错误
+
+### Requirement: 文案密度与话语类型
+
+翻译资源 SHALL 受话语密度门禁约束：非豁免的中文 key 文案 SHALL 不超过 24 字、英文 key SHALL 不超过 10 词；豁免 key SHALL 限于三类（承载产品安全语义的状态说明、含可操作下一步的错误文案、表单字段约束 hint）且以测试内显式白名单登记。门禁 SHALL 在 locale 单测中执行，未登记白名单的超限文案 SHALL 使测试失败。该约束只约束文案长度与话语类型，不改变 key 结构与运行时行为。
+
+#### Scenario: 密度门禁拦截超限文案
+
+- **WHEN** 开发者新增或修改一条非豁免 key 的中文文案超过 24 字（或英文超过 10 词）且未登记白名单
+- **THEN** locale 测试失败并指出该 key，合并被阻断
+
+#### Scenario: 豁免白名单显式登记
+
+- **WHEN** 某条文案因安全语义、可操作错误或字段 hint 需要超出密度上限
+- **THEN** 该 key 出现在测试的豁免白名单中，测试通过且登记可评审

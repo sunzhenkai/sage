@@ -54,7 +54,8 @@ export type TaskControl = Static<typeof TaskControlSchema>;
 export const TaskSliceLimitsSchema = Type.Object({
   maxTurns: Type.Integer({ minimum: 1, maximum: 4 }),
   maxToolCalls: Type.Integer({ minimum: 0, maximum: 16 }),
-  maxTokens: Type.Integer({ minimum: 1, maximum: 32_000 }),
+  // 上限对齐包运行预算钳制（runs-api 200k：须覆盖 512 KiB 输入快照 ≈128k token + 输出，不静默削弱声明预算）。
+  maxTokens: Type.Integer({ minimum: 1, maximum: 200_000 }),
   // 上限对齐 live provider 真实推理（活动 startToClose 5 分钟 + 重试余量）；echo 执行毫秒级完成不受影响。
   timeoutMs: Type.Integer({ minimum: 100, maximum: 600_000 })
 }, { additionalProperties: false, $id: 'TaskSliceLimits.v1' });
@@ -216,6 +217,8 @@ export interface TaskProjectionStore {
   getProjection(tenantId: string, taskId: string): Promise<TaskProjection | undefined>;
   writeProjection(projection: TaskProjection): Promise<void>;
   backfillProjection(limit?: number): Promise<number>;
+  /** 常规投影推进的 Timeline 事件追加；可选——实现方未提供时写入方跳过，不改变投影语义。 */
+  appendProjectionEvents?(events: readonly TaskProjectionEvent[]): Promise<number>;
 }
 export interface TaskStartClaim {
   readonly status: 'claimed' | 'already_claimed' | 'owner_conflict';
@@ -257,6 +260,14 @@ export interface TaskArtifactReference {
 }
 
 /** 包运行输入的物化记录：entry prompt + references 清单 + 用户输入，含资产 digest 清单。 */
+/** 包运行运行契约：准入时从 Release lock 的任务与 manifest 声明固化——输出契约（schema 文本与产物名清单）与模型路由（执行边界解析函数的输入）。 */
+export interface PackageRunContract {
+  readonly task?: string;
+  readonly schema?: string;
+  readonly files?: readonly string[];
+  readonly modelRoute?: { readonly provider: string; readonly model: string; readonly fallbacks?: readonly string[] };
+}
+
 export interface TaskPackageInputRecord {
   readonly tenantId: string;
   readonly taskId: string;
@@ -264,7 +275,26 @@ export interface TaskPackageInputRecord {
   readonly releaseDigest: string;
   readonly assembledInput: string;
   readonly assetDigests: Readonly<Record<string, string>>;
+  readonly runContract?: PackageRunContract;
   readonly createdAt: string;
+}
+
+
+/** 包运行 provider 路由解析（准入与 worker 共享的纯函数）：manifest modelRoute 依序精确匹配（model/fallbacks，条目启用且凭据在场）优先，运行 agent 设置默认兜底；两来源皆不可用返回 undefined（fail-closed）。 */
+export function resolvePackageRunConnection(
+  route: PackageRunContract['modelRoute'],
+  registry: readonly ProviderConnectionRecord[],
+  settingsConnectionId: string | undefined
+): { readonly source: 'manifest' | 'settings'; readonly connectionId: string } | undefined {
+  if (route !== undefined) {
+    for (const model of [route.model, ...(route.fallbacks ?? [])]) {
+      const entry = registry.find((item) => item.enabled && item.credentialPresent && item.modelId === model);
+      if (entry !== undefined) return { source: 'manifest', connectionId: entry.id };
+    }
+  }
+  if (settingsConnectionId === undefined) return undefined;
+  const entry = registry.find((item) => item.id === settingsConnectionId && item.enabled && item.credentialPresent);
+  return entry === undefined ? undefined : { source: 'settings', connectionId: entry.id };
 }
 
 export interface TaskPackageInputStore {
@@ -280,6 +310,8 @@ export interface TaskRunOutputRecord {
   readonly artifactRef: TaskArtifactRef;
   readonly output: string;
   readonly mediaType: string;
+  /** 任务声明的产物名清单（manifest output.files）：物化时按名登记为可取回引用。 */
+  readonly files?: readonly string[];
   readonly createdAt: string;
 }
 

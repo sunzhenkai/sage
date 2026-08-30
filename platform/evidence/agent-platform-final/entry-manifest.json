@@ -4,7 +4,7 @@
   "status": "BLOCKED",
   "decision": "NO-GO",
   "canonicalContractMajor": 1,
-  "sourceRevision": "ec5f9c8986a8fc8966aab3ec2de23a8cc84ebda5",
+  "sourceRevision": "53b178e145f8787ac621be34703d2fe4217ded5f",
   "sourceDigest": "sha256:a1d98de5122d95585e4854efe5f62ce82cba7c283fc006c9edce3b0e0cf93c66",
   "toolDigest": "sha256:3eb1ef94b5890ca727158b106142685c8733b0ace5bcb4cf3f0ac14f9f0643f4",
   "compatibilityWindow": {
@@ -64,6 +64,6 @@
     "12.5"
   ],
   "promotionToken": null,
-  "generatedAt": "2026-08-25T12:45:39.948Z",
-  "contentDigest": "sha256:22aa659bce3a4d2fd617db528b19c8634f281e253bc471a25fea7743bbb7daf4"
+  "generatedAt": "2026-08-30T07:02:45.360Z",
+  "contentDigest": "sha256:7805434149f7e637a0c6b05cc6c315934d0b9b72ac97111cd566fd973fd15c74"
 }

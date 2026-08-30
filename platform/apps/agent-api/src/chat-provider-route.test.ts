@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AgentEvent, AgentRunOutcome, AgentRunSpec } from '@sage/agent-contracts';
 import type { LocalAgentClient } from '@sage/agent-client';
-import type { LiveProviderRoute, LiveProviderTurnMessage } from '@sage/local-runtime';
+import type { LiveProviderRoute } from '@sage/local-runtime';
 import type { ChatStore } from '@sage/chat-domain';
 import type { ProviderConnectionRecord, ProviderConnectionStore, ProviderCredentialSealed } from '@sage/task-domain';
 import { LocalAesGcmSecretBackend } from '@sage/secret-vault';

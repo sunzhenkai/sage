@@ -2,7 +2,6 @@
 
 ## Purpose
 This specification defines the canonical agent-run-admission behavior, authority boundaries, compatibility rules, and fail-closed scenarios synchronized from the implemented T0005 delivery sequence.
-
 ## Requirements
 ### Requirement: 可信且有界的 Admission 输入
 系统 SHALL 接受严格版本化的 `AdmissionRequest`，只允许 immutable release ref 或 package/channel selector、immutable input refs、执行 mode 和有界 invocation metadata。principal、tenant、role、environment、residency 和 authentication context MUST 来自服务端可信 Identity；调用方或 Package 提供的身份声明、Secret、Model/Provider 物理 endpoint、Temporal endpoint/namespace/task queue、数据库标识和 runtime override MUST NOT 成为 authority。
@@ -165,15 +164,31 @@ Admission SHALL 将 Release、Invocation、Identity、Policy、精确依赖、ta
 - **THEN** 后续 invocation 在 per-call authorization 处停止，不修改原 Spec，也不静默替换依赖
 
 ### Requirement: 基于 Release 的运行 admission 与包输入物化
-系统 SHALL 提供 `POST /v1/releases/{releaseId}/runs` 运行入口：从 registry resolve 不可变 Release，经服务端可信 admission 生成并持久化 canonical `AgentTaskSpec`（goalRef 指向包 entry prompt，model/skill/bounds 来自 manifest，principal/tenant 由服务端决定），签发只引用该 Spec 的 Envelope，并以既有确定性 workflowId 机制启动 durable workflow。发起时系统 SHALL 将「entry prompt + references + 用户输入」物化为该任务唯一的包输入记录（含资产 digest 清单），`inputRef` 使用 `task-input://package/` scheme；重复提交相同输入 SHALL 幂等返回既有结果。production 模式下该端点 SHALL fail closed。
+系统 SHALL 提供 `POST /v1/releases/{releaseId}/runs` 运行入口：从 registry resolve 不可变 Release，经服务端可信 admission 生成并持久化 canonical `AgentTaskSpec`（goalRef 指向所选 Task 的 entry prompt，model/skill/bounds 来自 manifest，principal/tenant 由服务端决定），签发只引用该 Spec 的 Envelope，并以既有确定性 workflowId 机制启动 durable workflow。请求体 SHALL 为 `{ task?, params?, taskId? }`：`task` 缺省解析为唯一任务（多任务未指定拒绝），`params` 按声明校验并取默认值，自由文本 `input` 字段 SHALL 以 `410 INPUT_REMOVED` 拒绝。发起时系统 SHALL 将「entry prompt + references + 输入快照（dataSources 声明，经 `package-run-input-resolution` 能力获取）+ 解析后参数 + promotion 物化输入（如有）」物化为该任务唯一的包输入记录（含资产 digest 清单），快照内容、来源 URL 与参数值纳入 `inputDigest`（作为请求摘要入审计与幂等冲突校验）；快照获取按声明失败语义（fail 拒绝准入 / markMissing 标注继续）。`inputRef` 使用 `task-input://package/` scheme。重试去重 SHALL 以调用方显式 `Idempotency-Key` 请求头（1-255 字符，无效值以 400 `IDEMPOTENCY_KEY_INVALID` 拒绝）按 (tenant, key) 定界：同键重复提交 SHALL 幂等返回首次准入结果并回填首次 taskId/runId/attemptId（HTTP 200 + `status: existing`），同键但解析输入不同 SHALL 以 409 拒绝；未携带该头时每次请求 SHALL 独立准入、生成新 taskId 并启动新运行——解析输入相同也不得据此合并或重放既有运行。production 模式下该端点 SHALL fail closed。
 
 #### Scenario: 从包发起运行
-- **WHEN** 客户端对已登记 Release 提交运行请求（含用户输入）
+- **WHEN** 客户端对已登记 Release 提交运行请求（含声明参数）
 - **THEN** 系统生成 digest 一致的 Spec 与 Envelope、写入包输入记录并启动 workflow，返回 taskId
 
-#### Scenario: 相同输入幂等
-- **WHEN** 同一 Release 与相同用户输入被重复提交
-- **THEN** admission 幂等机返回既有 Spec/运行，不产生新 Attempt
+#### Scenario: 声明数据源的运行自动获取数据
+- **WHEN** 客户端对声明了 dataSources 的 Task 提交运行请求（params 为空）
+- **THEN** 准入先获取全部快照（按 onFailure 语义），物化的 assembled input 含快照与默认参数段，模型无需人工输入即拿到真实数据
+
+#### Scenario: 参数或快照失败拒绝准入
+- **WHEN** params 校验失败（400），或任一 `onFailure: fail` 的快照源获取失败（502）
+- **THEN** 准入返回稳定错误码且不生成 Spec、不启动 workflow、不物化输入
+
+#### Scenario: 显式 Idempotency-Key 重试幂等
+- **WHEN** 携带同一 `Idempotency-Key` 的运行请求被重复提交（解析输入相同）
+- **THEN** admission 幂等机返回首次准入的 Spec/运行与回填的首次运行 id（`idempotent-replayed: true`），不产生新 Attempt、不重复启动 workflow
+
+#### Scenario: 同键跨输入冲突
+- **WHEN** 同一 `Idempotency-Key` 被用于解析输入不同的运行请求（如不同 Release 或不同参数）
+- **THEN** 准入以 409 `PACKAGE_RUN_ADMISSION_IDEMPOTENCY_CONFLICT` 拒绝，不产生新 Spec 或运行
+
+#### Scenario: 无键请求独立准入
+- **WHEN** 未携带 `Idempotency-Key` 的运行请求对同一 Release 以相同解析参数与相同快照内容重复提交
+- **THEN** 每次请求独立准入并生成新 taskId、启动新 workflow；`inputDigest` 仅入审计与冲突校验，不参与去重
 
 #### Scenario: worker 解析包输入
 - **WHEN** executeAgentSlice 收到 `task-input://package/{tenant}/{taskId}` 引用
@@ -182,3 +197,4 @@ Admission SHALL 将 Release、Invocation、Identity、Policy、精确依赖、ta
 #### Scenario: production fail closed
 - **WHEN** 非 local 部署模式调用该端点
 - **THEN** 返回 501 稳定错误，不生成 Spec、不启动 workflow
+

@@ -1,0 +1,7 @@
+schema: spec-driven
+created: 2026-08-29
+goal: >-
+  修订 sage-p8-unattended-schedule-pilot 的 planning artifacts：schedule 绑定 releaseRef + task +
+  固化 params + releasePolicy，occurrence 触发走统一包运行准入，调度输入来源由自闭环模型消解。
+  本 change 不直接改系统行为（P8 自己实施调度面），故 skip_specs
+skip_specs: true

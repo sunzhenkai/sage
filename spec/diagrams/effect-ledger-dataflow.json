@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "Effect Ledger 数据流",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "viewBox": [1068, 720],
+    "views": [
+      { "id": "effect-production", "label": "Effect 产生", "focus": ["agent-lib", "model-broker", "tool-runtime"], "note": "LLM 调用与 Tool 调用产生 Effect。" },
+      { "id": "ledger-authority", "label": "单一 authority", "focus": ["effect-ledger", "agent-state", "artifact-store"], "note": "Effect 落库，大对象走 ReferenceEnvelope 到 Artifact Store。" },
+      { "id": "consumption", "label": "消费与对账", "focus": ["consumption-ledger", "audit-consumer", "billing-consumer"], "note": "Effect 派生 Consumption，供审计与计费消费。" }
+    ]
+  },
+  "stages": [
+    { "label": "Agent Run" },
+    { "label": "Effect 产生" },
+    { "label": "Ledger" },
+    { "label": "派生与持久化" },
+    { "label": "消费者" }
+  ],
+  "nodes": [
+    { "id": "agent-lib", "type": "backend", "label": "agent-lib", "sublabel": "kernel / PiHarness", "stage": 0, "row": 1, "tag": "Run 入口" },
+    { "id": "model-broker", "type": "cloud", "label": "model-broker", "sublabel": "LLM 调用", "stage": 1, "row": 0 },
+    { "id": "tool-runtime", "type": "backend", "label": "tool-runtime", "sublabel": "Tool / MCP", "stage": 1, "row": 2 },
+    { "id": "effect-ledger", "type": "database", "label": "Effect Ledger", "sublabel": "effect_entries", "stage": 2, "row": 1, "tag": "单一 authority" },
+    { "id": "agent-state", "type": "database", "label": "Agent State", "sublabel": "Postgres", "stage": 3, "row": 0, "width": 120 },
+    { "id": "consumption-ledger", "type": "database", "label": "Consumption Ledger", "sublabel": "consumption_entries", "stage": 3, "row": 2 },
+    { "id": "artifact-store", "type": "cloud", "label": "Artifact Store", "sublabel": "MinIO S3", "stage": 3, "row": 1 },
+    { "id": "audit-consumer", "type": "external", "label": "审计 Consumer", "sublabel": "对账 / 重放", "stage": 4, "row": 0 },
+    { "id": "billing-consumer", "type": "external", "label": "计费 Consumer", "sublabel": "用量结算", "stage": 4, "row": 2 }
+  ],
+  "flows": [
+    { "id": "lib-to-model", "from": "agent-lib", "to": "model-broker", "label": "调用 LLM", "variant": "default" },
+    { "id": "lib-to-tool", "from": "agent-lib", "to": "tool-runtime", "label": "调用 Tool", "variant": "default" },
+    { "id": "model-to-ledger", "from": "model-broker", "to": "effect-ledger", "label": "LLM Effect", "variant": "emphasis" },
+    { "id": "tool-to-ledger", "from": "tool-runtime", "to": "effect-ledger", "label": "Tool Effect", "variant": "emphasis" },
+    { "id": "ledger-to-postgres", "from": "effect-ledger", "to": "agent-state", "label": "持久化", "variant": "emphasis" },
+    { "id": "ledger-to-consumption", "from": "effect-ledger", "to": "consumption-ledger", "label": "aggregate", "variant": "default" },
+    { "id": "ledger-to-artifact", "from": "effect-ledger", "to": "artifact-store", "label": "Reference >8KiB", "variant": "dashed", "labelAt": [720, 330] },
+    { "id": "postgres-to-audit", "from": "agent-state", "to": "audit-consumer", "label": "重放 / 对账", "variant": "default" },
+    { "id": "consumption-to-billing", "from": "consumption-ledger", "to": "billing-consumer", "label": "结算", "variant": "default" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "先记账再执行", "items": ["Agent Library 在副作用发生前写 Effect Ledger", "Tool Runtime 与 Model Broker 把调用结果转为 Effect", "Effect 是 Run 可重放与对账的最小单元"] },
+    { "dot": "emerald", "title": "单一 authority", "items": ["Effect 与 Consumption 写入同一 Postgres 事务", "大对象通过 ReferenceEnvelope 引用，不内联 >8KiB", "Artifact Store 保存 Checkpoint 与 Run 输出快照"] },
+    { "dot": "amber", "title": "消费侧", "items": ["审计 Consumer 按 effect_id 重放核对", "计费 Consumer 按 Consumption Ledger 结算", "两者都依赖 Ledger authority，不直接读 Agent Run 内部状态"] }
+  ]
+}

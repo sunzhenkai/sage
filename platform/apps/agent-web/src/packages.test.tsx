@@ -12,8 +12,14 @@ const detail: PackageDetailType = {
   packageId: 'ops-analyst',
   name: 'Ops Analyst',
   manifest: {
-    id: 'ops-analyst', version: '1.0.0', description: '通用运维分析助手', entry: 'prompts/system.md',
+    id: 'ops-analyst', version: '2.0.0', description: '通用运维分析助手', entry: 'prompts/system.md',
     modelRoute: { provider: 'anthropic', model: 'claude-sonnet-4-5' }, skillRefs: ['skill://ops-triage/v1'], capabilityRefs: [],
+    inputs: [
+      { name: 'severity', type: 'enum', required: false, enum: ['low', 'medium', 'high'], default: 'medium' },
+      { name: 'window', type: 'number', required: false },
+    ],
+    dataSources: [{ name: 'metrics-snapshot', url: 'https://api.example/metrics' }],
+    tasks: [{ name: 'triage', entry: 'prompts/system.md' }],
   },
   assets: [
     { relativePath: 'prompts/system.md', kind: 'prompt', digest: 'sha256:' + 'a'.repeat(64), bytes: 12, preview: '你是运维助手。' },
@@ -42,6 +48,8 @@ describe('PackagesApp list', () => {
     expect(tree.root.findAllByProps({ children: 'Ops Analyst' }).length).toBeGreaterThan(0);
     const row = tree.root.findAllByProps({ href: '/?view=packages&package=ops-analyst' })[0];
     expect(row).toBeTruthy();
+    // 版本号单处呈现：徽章保留，副标题不再重复「最新版本 · vX」
+    expect(JSON.stringify(tree.toJSON())).not.toContain('Latest version');
     await act(async () => tree.unmount());
   });
 
@@ -95,6 +103,113 @@ describe('PackagesApp list', () => {
     await act(async () => { form.props.onSubmit({ preventDefault: () => undefined }); await flush(); });
     expect(tree.root.findByProps({ children: 'Invalid App ID format' })).toBeTruthy();
     expect(mockFetch.mock.calls.filter((c) => (c[1] as RequestInit | undefined)?.method === 'POST')).toHaveLength(0);
+    await act(async () => tree.unmount());
+  });
+  it('clears the stale detail when the package param leaves the URL, so the next detail never flashes the previous app', async () => {
+    let resolveSlow!: (value: Response) => void;
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/v1/apps')) return response({ apps: [{ appId: 'ops-analyst', name: 'Ops Analyst', latestVersion: '1.0.0', releaseCount: 1, updatedAt: '2026-08-17T00:00:00.000Z', createdAt: '2026-08-17T00:00:00.000Z' }] });
+      if (url.endsWith('/v1/apps/ops-analyst')) return response({ ...detail, appId: 'ops-analyst' });
+      if (url.endsWith('/v1/apps/slow-app')) return new Promise<Response>((resolve) => { resolveSlow = resolve; });
+      return response({}, 404);
+    }) as typeof fetch;
+    let tree!: ReturnType<typeof create>;
+    await act(async () => { tree = create(<PackagesApp fetcher={fetcher} packageId="ops-analyst" />); await flush(); await flush(); });
+    expect(tree.root.findAllByType(PackageDetailView)).toHaveLength(1);
+    // ← 全部应用：摘掉 package 参数回到列表。
+    await act(async () => { tree.update(<PackagesApp fetcher={fetcher} />); await flush(); await flush(); });
+    expect(tree.root.findAllByType(PackageDetailView)).toHaveLength(0);
+    expect(tree.root.findAllByProps({ href: '/?view=packages&package=ops-analyst' }).length).toBeGreaterThan(0);
+    // 再打开其他应用：旧详情已清空，加载期间不得渲染上一个应用的内容。
+    await act(async () => { tree.update(<PackagesApp fetcher={fetcher} packageId="slow-app" />); await flush(); });
+    expect(tree.root.findAllByProps({ children: 'Ops Analyst' })).toHaveLength(0);
+    await act(async () => { resolveSlow(response({ ...detail, appId: 'slow-app', packageId: 'slow-app', name: 'Slow App' })); await flush(); });
+    expect(tree.root.findByProps({ children: 'Slow App' })).toBeTruthy();
+    await act(async () => tree.unmount());
+  });
+});
+
+describe('PackagesApp example import', () => {
+  const postBodies = (calls: readonly unknown[][]) => calls
+    .filter(([, init]) => (init as RequestInit | undefined)?.method === 'POST')
+    .map(([url, init]) => ({ url: String(url), body: JSON.parse(String((init as RequestInit).body)) as Record<string, unknown> }));
+  const withWindow = (assignSpy: ReturnType<typeof vi.fn>) => {
+    const originalWindow = (globalThis as { window?: unknown }).window;
+    (globalThis as { window?: unknown }).window = { location: { assign: assignSpy } };
+    return () => { (globalThis as { window?: unknown }).window = originalWindow; };
+  };
+
+  it('creates the app and registers its release in one click', async () => {
+    const mockFetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (init?.method === 'POST' && url.endsWith('/v1/apps')) return response({ schemaVersion: 'App.v1', appId: 'github-trending', status: 'active' }, 201);
+      if (init?.method === 'POST' && url.endsWith('/releases')) return response({ schemaVersion: 'PackageReleaseResult.v1', status: 'stored', packageVersion: '1.0.0' }, 201);
+      return response({ apps: [] });
+    });
+    const fetcher = mockFetch as typeof fetch;
+    const assignSpy = vi.fn();
+    const restoreWindow = withWindow(assignSpy);
+    let tree!: ReturnType<typeof create>;
+    await act(async () => { tree = create(<PackagesApp fetcher={fetcher} />); await flush(); });
+    const toggle = tree.root.findAllByType('button').find((b) => b.props.children === '+ Import example')!;
+    await act(async () => { toggle.props.onClick(); await flush(); });
+    const importButtons = tree.root.findAllByType('button').filter((b) => b.props.children === 'Import');
+    expect(importButtons).toHaveLength(3);
+    await act(async () => { importButtons[0]!.props.onClick(); await flush(); await flush(); });
+    const posts = postBodies(mockFetch.mock.calls);
+    expect(posts[0]).toMatchObject({ url: '/v1/apps', body: { appId: 'github-trending', name: 'GitHub Trending' } });
+    const releasePost = posts.find((post) => post.url.endsWith('/releases'))!;
+    expect(releasePost.url).toBe('/v1/apps/github-trending/releases');
+    const files = releasePost.body.files as Record<string, string>;
+    expect(files['app.yaml']).toContain('id: github-trending');
+    expect(Object.keys(files)).toContain('prompts/system.md');
+    expect(assignSpy).toHaveBeenCalledWith('/?view=packages&package=github-trending');
+    restoreWindow();
+    await act(async () => tree.unmount());
+  });
+
+  it('treats an already-registered app as importable and still registers the release', async () => {
+    const mockFetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (init?.method === 'POST' && url.endsWith('/v1/apps')) return response({ error: { code: 'APP_ALREADY_EXISTS', message: 'App already exists' } }, 409);
+      if (init?.method === 'POST' && url.endsWith('/releases')) return response({ schemaVersion: 'PackageReleaseResult.v1', status: 'existing', packageVersion: '1.0.0' }, 200);
+      return response({ apps: [] });
+    });
+    const fetcher = mockFetch as typeof fetch;
+    const assignSpy = vi.fn();
+    const restoreWindow = withWindow(assignSpy);
+    let tree!: ReturnType<typeof create>;
+    await act(async () => { tree = create(<PackagesApp fetcher={fetcher} />); await flush(); });
+    await act(async () => { tree.root.findAllByType('button').find((b) => b.props.children === '+ Import example')!.props.onClick(); await flush(); });
+    const importButtons = tree.root.findAllByType('button').filter((b) => b.props.children === 'Import');
+    await act(async () => { importButtons[1]!.props.onClick(); await flush(); await flush(); });
+    const posts = postBodies(mockFetch.mock.calls);
+    expect(posts[0]!.url).toBe('/v1/apps');
+    expect(posts.find((post) => post.url.endsWith('/releases'))!.url).toBe('/v1/apps/finance-briefing/releases');
+    expect(assignSpy).toHaveBeenCalledWith('/?view=packages&package=finance-briefing');
+    restoreWindow();
+    await act(async () => tree.unmount());
+  });
+
+  it('shows an inline error and stays on the list when the release registration fails', async () => {
+    const mockFetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (init?.method === 'POST' && url.endsWith('/v1/apps')) return response({ schemaVersion: 'App.v1', appId: 'lifecycle-probe', status: 'active' }, 201);
+      if (init?.method === 'POST' && url.endsWith('/releases')) return response({ error: { code: 'APP_PACKAGE_INVALID', message: 'package rejected by compiler' } }, 400);
+      return response({ apps: [] });
+    });
+    const fetcher = mockFetch as typeof fetch;
+    const assignSpy = vi.fn();
+    const restoreWindow = withWindow(assignSpy);
+    let tree!: ReturnType<typeof create>;
+    await act(async () => { tree = create(<PackagesApp fetcher={fetcher} />); await flush(); });
+    await act(async () => { tree.root.findAllByType('button').find((b) => b.props.children === '+ Import example')!.props.onClick(); await flush(); });
+    const importButtons = tree.root.findAllByType('button').filter((b) => b.props.children === 'Import');
+    await act(async () => { importButtons[2]!.props.onClick(); await flush(); await flush(); });
+    expect(tree.root.findByProps({ children: 'package rejected by compiler' })).toBeTruthy();
+    expect(assignSpy).not.toHaveBeenCalled();
+    restoreWindow();
     await act(async () => tree.unmount());
   });
 });
@@ -159,22 +274,45 @@ describe('PackageDetailView', () => {
     expect(markup).toContain('你是运维助手。');
     expect(markup).toContain('local-dev');
     expect(markup).toContain('sha256:' + 'd'.repeat(64));
+    // 空值字段不占位：capabilityRefs 为空 → 不渲染该行、不出现「—」
+    expect(markup).not.toContain('Capabilities');
+    expect(markup).not.toContain('>—<');
   });
 
-  it('requires user input before starting a run', async () => {
+  it('hides all empty manifest rows and renders the run card without a dangling divider when no params are declared', () => {
+    const bare: PackageDetailType = {
+      ...detail,
+      manifest: { ...detail.manifest!, skillRefs: [], capabilityRefs: [], inputs: [], dataSources: [], tasks: [{ name: 'triage', entry: 'prompts/system.md' }] }
+    };
+    const markup = renderToStaticMarkup(<PackageDetailView {...detailProps({ detail: bare })} />);
+    expect(markup).not.toContain('>—<');
+    expect(markup).not.toContain('Skills');
+    expect(markup).not.toContain('Declared parameters');
+    expect(markup).not.toContain('Data sources');
+    expect(markup).toContain('Start run');
+    // 无参数无多任务选择：提交按钮直接呈现，无悬空 form-actions 分隔线
+    expect(markup).not.toContain('form-actions');
+  });
+
+  it('starts a run with declared params: blanks use defaults, enum selects pass through, numbers validate', async () => {
     const startRun = vi.fn(async () => undefined);
     let tree!: ReturnType<typeof create>;
     await act(async () => { tree = create(<PackageDetailView {...detailProps({ onStartRun: startRun })} />); await flush(); });
-    const textarea = tree.root.findByProps({ 'aria-label': 'User input' });
-    const form = tree.root.findAllByType('form').find((node) => node.findAllByProps({ 'aria-label': 'User input' }).length > 0)!;
-    // 空输入提交：显示必填错误，不触发 onStartRun。
+    const form = tree.root.findAllByType('form').find((node) => node.findAllByProps({ 'aria-label': 'severity' }).length > 0)!;
+    // 全部留空：以空 params 发起（缺省值由服务端按声明补齐），无空输入警告。
     await act(async () => { form.props.onSubmit({ preventDefault: () => undefined }); await flush(); });
-    expect(startRun).not.toHaveBeenCalled();
-    expect(tree.root.findByProps({ children: 'User input is required' })).toBeTruthy();
-    // 输入后提交。
-    await act(async () => { textarea.props.onChange({ target: { value: 'hello' } }); await flush(); });
+    expect(startRun).toHaveBeenCalledWith({ task: 'triage', params: {} });
+    // 枚举选择 + 非法数字：数字内联报错且不发起。
+    const severity = tree.root.findByProps({ 'aria-label': 'severity' });
+    const window = tree.root.findByProps({ 'aria-label': 'window' });
+    await act(async () => { severity.props.onChange({ target: { value: 'high' } }); window.props.onChange({ target: { value: 'not-a-number' } }); await flush(); });
     await act(async () => { form.props.onSubmit({ preventDefault: () => undefined }); await flush(); });
-    expect(startRun).toHaveBeenCalledWith('hello');
+    expect(tree.root.findByProps({ children: 'Param window must be a number' })).toBeTruthy();
+    expect(startRun).toHaveBeenCalledTimes(1);
+    // 修正数字后：枚举与数字一并提交。
+    await act(async () => { window.props.onChange({ target: { value: '7' } }); await flush(); });
+    await act(async () => { form.props.onSubmit({ preventDefault: () => undefined }); await flush(); });
+    expect(startRun).toHaveBeenLastCalledWith({ task: 'triage', params: { severity: 'high', window: 7 } });
     await act(async () => tree.unmount());
   });
 });

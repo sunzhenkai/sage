@@ -33,4 +33,11 @@ describe('run output artifact resolver', () => {
     const failing = createRunOutputArtifactResolver({ tenantId: 'tenant-local', lookup: { async getRunOutput() { throw new Error('db down'); } } });
     await expect(failing.resolve(reference, principal as never)).resolves.toEqual(reference);
   });
+
+  it('resolves declared file-name references to the same run output content', async () => {
+    const output = { tenantId: 'tenant-local', taskId: 't1', artifactRef: 'artifact://tasks/t1/attempt-1/slice-1', output: 'body', mediaType: 'text/plain', createdAt: '2026-08-29T00:00:00.000Z' };
+    const resolver = createRunOutputArtifactResolver({ tenantId: 'tenant-local', lookup: { getRunOutput: async () => output } });
+    const resolved = await resolver.resolve({ taskId: 't1', attempt: 1, artifactId: 'artifact-a-file-report.md', name: 'report.md', mediaType: 'text/plain', artifactRef: 'artifact://tasks/t1/attempt-1/slice-1#file/report.md' }, principal);
+    expect(resolved).toMatchObject({ name: 'report.md', content: 'body', encoding: 'utf-8' });
+  });
 });

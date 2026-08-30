@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import type { AgentExecutionEnvelope, AgentTaskSpec, CheckpointCandidate } from '@sage/agent-contracts';
 import type { EngineAdapterConformanceFactory, EngineConformanceErrorCode } from '@sage/agent-runtime-conformance';
 import type { KernelEngineCallbacks } from '@sage/agent-lib';
-import { createFakeLiveInvoker, LiveProviderHarness, PiEngineAdapter, PiHarness } from './index.js';
+import { anthropicSdkBaseUrl, createFakeLiveInvoker, defaultLiveInvoker, LiveProviderHarness, PiEngineAdapter, PiHarness } from './index.js';
 
 describe('fake live provider invoker（确定性测试替身）', () => {
   const route = { adapterKind: 'openai-compatible' as const, baseUrl: 'https://provider.example/v1', modelId: 'model-x', apiKey: 'key-1' };
@@ -36,6 +38,51 @@ describe('fake live provider invoker（确定性测试替身）', () => {
     expect(paused.pause).toBe(true);
     const budgeted = await harness.executeTurn(turn('[tokens:100]'), new AbortController().signal);
     expect(budgeted.tokens).toBe(100);
+  });
+});
+
+describe('defaultLiveInvoker provider endpoint addressing', () => {
+  // 通过真实本地 HTTP 服务断言最终出站请求路径，覆盖「目录 baseUrl（OpenAI 风格含 /v1）
+  // × Anthropic SDK 追加 /v1/messages」的约定冲突——正是测试环境 MiniMax 404 的根因。
+  const serverRecordingPaths = async (): Promise<{ readonly url: string; readonly paths: string[]; close: () => Promise<void> }> => {
+    const paths: string[] = [];
+    const server = createServer((_request, response) => { paths.push(_request.url ?? ''); response.writeHead(404, { 'content-type': 'text/plain' }).end('404 page not found'); });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const port = (server.address() as AddressInfo).port;
+    return {
+      url: `http://127.0.0.1:${port}`,
+      paths,
+      close: () => new Promise<void>((resolve, reject) => server.close((cause) => cause === undefined ? resolve() : reject(cause)))
+    };
+  };
+  const call = (baseUrl: string) => defaultLiveInvoker({
+    route: { adapterKind: 'anthropic', baseUrl, modelId: 'MiniMax-M3', apiKey: 'key-test' },
+    systemPrompt: '', messages: [{ role: 'user' as const, text: '你好' }], maxTokens: 16, signal: new AbortController().signal
+  });
+
+  it('normalizes an OpenAI-style anthropic base so exactly one version segment reaches the wire', async () => {
+    const provider = await serverRecordingPaths();
+    try {
+      await expect(call(`${provider.url}/anthropic/v1`)).rejects.toThrow();
+      expect(provider.paths).toEqual(['/anthropic/v1/messages']);
+    } finally { await provider.close(); }
+  });
+
+  it('keeps a bare anthropic base working and leaves openai-compatible bases untouched', async () => {
+    expect(anthropicSdkBaseUrl('https://api.minimaxi.com/anthropic/v1/')).toBe('https://api.minimaxi.com/anthropic');
+    expect(anthropicSdkBaseUrl('https://api.minimaxi.com/anthropic')).toBe('https://api.minimaxi.com/anthropic');
+    const provider = await serverRecordingPaths();
+    try {
+      await expect(call(`${provider.url}/anthropic`)).rejects.toThrow();
+      expect(provider.paths).toEqual(['/anthropic/v1/messages']);
+    } finally { await provider.close(); }
+  });
+
+  it('propagates the provider error body so failures stay diagnosable', async () => {
+    const provider = await serverRecordingPaths();
+    try {
+      await expect(call(`${provider.url}/anthropic/v1`)).rejects.toThrow(/404 page not found|404/u);
+    } finally { await provider.close(); }
   });
 });
 

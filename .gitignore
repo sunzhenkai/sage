@@ -34,3 +34,5 @@ platform/.evidence/
 *.pfx
 *.crt
 *.keystore
+
+gui-test-screenshots

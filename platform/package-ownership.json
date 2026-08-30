@@ -1,92 +1,693 @@
 {
   "$schema": "./package-ownership.schema.json",
   "rules": {
-    "agent-contracts": { "owner": "Agent Core", "mayDependOn": [] },
-    "agent-runtime-conformance": { "owner": "Quality", "mayDependOn": ["agent-contracts", "agent-lib"] },
-    "agent-platform-conformance": { "owner": "Quality", "mayDependOn": ["agent-runtime-conformance"] },
-    "evidence-digest": { "owner": "Examples", "mayDependOn": ["agent-platform-conformance", "agent-package-release", "agent-runtime-conformance", "harness-pi"] },
-    "app-contracts": { "owner": "Application", "mayDependOn": [] },
-    "agent-lib": { "owner": "Agent Core", "mayDependOn": ["agent-contracts", "platform-ports"] },
-    "harness-pi": { "owner": "Agent Core", "mayDependOn": ["agent-contracts", "agent-lib", "agent-runtime-conformance", "platform-ports"] },
-    "agent-client": { "owner": "Agent Core", "mayDependOn": ["agent-contracts", "agent-lib", "agent-run-admission", "platform-ports"] },
-    "agent-package-release": { "owner": "Package Platform", "mayDependOn": ["agent-contracts", "platform-ports"] },
-    "agent-release-registry": { "owner": "Package Platform", "mayDependOn": ["agent-contracts", "platform-ports"] },
-    "agent-run-admission": { "owner": "Package Platform", "mayDependOn": ["agent-contracts", "platform-ports", "production-governance"] },
-    "platform-ports": { "owner": "Platform", "mayDependOn": ["agent-contracts"] },
-    "production-governance": { "owner": "Platform Security", "mayDependOn": ["agent-contracts", "platform-ports"] },
-    "model-broker": { "owner": "Platform", "mayDependOn": ["platform-ports"] },
-    "context-resolver": { "owner": "Platform", "mayDependOn": ["platform-ports"] },
-    "local-fakes": { "owner": "Platform", "mayDependOn": ["agent-contracts", "platform-ports"] },
-    "tool-runtime": { "owner": "Agent Core", "mayDependOn": ["agent-contracts", "platform-ports", "local-fakes"] },
-    "agent-state-postgres": { "owner": "Platform", "mayDependOn": ["agent-contracts", "platform-ports", "production-governance"] },
-    "observability": { "owner": "Platform", "mayDependOn": ["platform-ports"] },
-    "node-host": { "owner": "Examples", "mayDependOn": ["agent-contracts", "agent-client", "harness-pi", "local-fakes"] },
-    "chat-domain": { "owner": "Application", "mayDependOn": ["app-contracts", "postgres-migrations"] },
-    "postgres-migrations": { "owner": "Platform", "mayDependOn": [] },
-    "provider-catalog": { "owner": "Application", "mayDependOn": ["app-contracts", "postgres-migrations"] },
-    "task-domain": { "owner": "Application", "mayDependOn": [] },
-    "task-store-postgres": { "owner": "Platform", "mayDependOn": ["task-domain"] },
-    "agent-api": { "owner": "Application", "mayDependOn": ["agent-client", "agent-contracts", "agent-lib", "agent-package-release", "agent-release-registry", "agent-run-admission", "app-contracts", "chat-domain", "local-fakes", "local-runtime", "observability", "platform-ports", "production-governance", "provider-catalog", "task-domain", "task-store-postgres", "temporal-registry", "temporal-routing"] },
-    "agent-web": { "owner": "Application", "mayDependOn": ["app-contracts"] },
-    "p3-integration": { "owner": "Quality", "mayDependOn": ["agent-api", "agent-client", "agent-contracts", "agent-web", "app-contracts", "chat-domain"] },
-    "p4-integration": { "owner": "Quality", "mayDependOn": ["agent-api", "agent-client", "agent-contracts", "agent-worker", "task-domain", "task-store-postgres", "temporal-routing"] },
-    "p5-integration": { "owner": "Quality", "mayDependOn": ["agent-client", "agent-contracts", "agent-worker", "platform-ports", "task-domain", "task-store-postgres", "temporal-registry", "temporal-routing"] },
-    "p6-integration": { "owner": "Quality", "mayDependOn": ["agent-api", "agent-client", "agent-contracts", "agent-package-release", "agent-release-registry", "agent-web", "agent-worker", "app-contracts", "chat-domain", "local-fakes", "observability", "platform-ports", "task-domain", "task-store-postgres", "temporal-registry", "temporal-routing"] },
-    "production-governance-integration": { "owner": "Quality", "mayDependOn": ["production-governance", "tool-runtime"] },
-    "local-runtime": { "owner": "Platform", "mayDependOn": ["agent-client", "agent-contracts", "agent-lib", "harness-pi", "local-fakes", "platform-ports"] },
-    "agent-worker": { "owner": "Task Runtime", "mayDependOn": ["agent-client", "agent-contracts", "agent-lib", "chat-domain", "local-runtime", "observability", "platform-ports", "production-governance", "task-domain", "task-store-postgres", "temporal-workflows"] },
-    "temporal-workflows": { "owner": "Task Runtime", "mayDependOn": ["task-domain", "platform-ports"] },
-    "temporal-registry": { "owner": "Control Plane", "mayDependOn": ["task-domain"] },
-    "temporal-routing": { "owner": "Control Plane", "mayDependOn": ["task-domain", "platform-ports", "observability", "temporal-registry"] }
+    "agent-api": {
+      "owner": "Application",
+      "mayDependOn": [
+        "agent-client",
+        "agent-contracts",
+        "agent-lib",
+        "agent-package-release",
+        "agent-release-registry",
+        "agent-run-admission",
+        "agent-state-postgres",
+        "app-contracts",
+        "chat-domain",
+        "local-fakes",
+        "local-runtime",
+        "observability",
+        "platform-ports",
+        "production-governance",
+        "provider-catalog",
+        "secret-vault",
+        "task-domain",
+        "task-store-postgres",
+        "temporal-registry",
+        "temporal-routing",
+        "temporal-schedules",
+        "tool-runtime"
+      ]
+    },
+    "agent-client": {
+      "owner": "Agent Core",
+      "mayDependOn": [
+        "agent-contracts",
+        "agent-lib",
+        "agent-run-admission",
+        "platform-ports"
+      ]
+    },
+    "agent-contracts": {
+      "owner": "Agent Core",
+      "mayDependOn": []
+    },
+    "agent-lib": {
+      "owner": "Agent Core",
+      "mayDependOn": [
+        "agent-contracts",
+        "platform-ports"
+      ]
+    },
+    "agent-package-release": {
+      "owner": "Package Platform",
+      "mayDependOn": [
+        "agent-contracts",
+        "platform-ports"
+      ]
+    },
+    "agent-platform-conformance": {
+      "owner": "Quality",
+      "mayDependOn": [
+        "agent-runtime-conformance"
+      ]
+    },
+    "agent-release-registry": {
+      "owner": "Package Platform",
+      "mayDependOn": [
+        "agent-contracts",
+        "platform-ports"
+      ]
+    },
+    "agent-run-admission": {
+      "owner": "Package Platform",
+      "mayDependOn": [
+        "agent-contracts",
+        "platform-ports",
+        "production-governance"
+      ]
+    },
+    "agent-runtime-conformance": {
+      "owner": "Quality",
+      "mayDependOn": [
+        "agent-contracts",
+        "agent-lib"
+      ]
+    },
+    "agent-state-postgres": {
+      "owner": "Platform",
+      "mayDependOn": [
+        "agent-contracts",
+        "platform-ports",
+        "production-governance"
+      ]
+    },
+    "agent-web": {
+      "owner": "Application",
+      "mayDependOn": [
+        "app-contracts"
+      ]
+    },
+    "agent-worker": {
+      "owner": "Task Runtime",
+      "mayDependOn": [
+        "agent-client",
+        "agent-contracts",
+        "agent-lib",
+        "agent-run-admission",
+        "agent-state-postgres",
+        "chat-domain",
+        "local-fakes",
+        "local-runtime",
+        "observability",
+        "platform-ports",
+        "production-governance",
+        "secret-vault",
+        "task-domain",
+        "task-store-postgres",
+        "temporal-schedules",
+        "temporal-workflows",
+        "tool-runtime"
+      ]
+    },
+    "app-contracts": {
+      "owner": "Application",
+      "mayDependOn": []
+    },
+    "chat-domain": {
+      "owner": "Application",
+      "mayDependOn": [
+        "app-contracts",
+        "postgres-migrations"
+      ]
+    },
+    "context-resolver": {
+      "owner": "Platform",
+      "mayDependOn": [
+        "platform-ports"
+      ]
+    },
+    "evidence-digest": {
+      "owner": "Examples",
+      "mayDependOn": [
+        "agent-platform-conformance",
+        "agent-package-release",
+        "agent-runtime-conformance",
+        "harness-pi"
+      ]
+    },
+    "harness-pi": {
+      "owner": "Agent Core",
+      "mayDependOn": [
+        "agent-contracts",
+        "agent-lib",
+        "agent-runtime-conformance",
+        "platform-ports"
+      ]
+    },
+    "local-fakes": {
+      "owner": "Platform",
+      "mayDependOn": [
+        "agent-contracts",
+        "platform-ports"
+      ]
+    },
+    "local-runtime": {
+      "owner": "Platform",
+      "mayDependOn": [
+        "agent-client",
+        "agent-contracts",
+        "agent-lib",
+        "harness-pi",
+        "local-fakes",
+        "platform-ports"
+      ]
+    },
+    "model-broker": {
+      "owner": "Platform",
+      "mayDependOn": [
+        "platform-ports"
+      ]
+    },
+    "node-host": {
+      "owner": "Examples",
+      "mayDependOn": [
+        "agent-contracts",
+        "agent-client",
+        "harness-pi",
+        "local-fakes"
+      ]
+    },
+    "observability": {
+      "owner": "Platform",
+      "mayDependOn": [
+        "platform-ports"
+      ]
+    },
+    "p3-integration": {
+      "owner": "Quality",
+      "mayDependOn": [
+        "agent-api",
+        "agent-client",
+        "agent-contracts",
+        "agent-web",
+        "app-contracts",
+        "chat-domain"
+      ]
+    },
+    "p4-integration": {
+      "owner": "Quality",
+      "mayDependOn": [
+        "agent-api",
+        "agent-client",
+        "agent-contracts",
+        "agent-worker",
+        "task-domain",
+        "task-store-postgres",
+        "temporal-routing"
+      ]
+    },
+    "p5-integration": {
+      "owner": "Quality",
+      "mayDependOn": [
+        "agent-client",
+        "agent-contracts",
+        "agent-worker",
+        "platform-ports",
+        "task-domain",
+        "task-store-postgres",
+        "temporal-registry",
+        "temporal-routing"
+      ]
+    },
+    "p6-integration": {
+      "owner": "Quality",
+      "mayDependOn": [
+        "agent-api",
+        "agent-client",
+        "agent-contracts",
+        "agent-package-release",
+        "agent-release-registry",
+        "agent-web",
+        "agent-worker",
+        "app-contracts",
+        "chat-domain",
+        "local-fakes",
+        "observability",
+        "platform-ports",
+        "task-domain",
+        "task-store-postgres",
+        "temporal-registry",
+        "temporal-routing",
+        "secret-vault"
+      ]
+    },
+    "platform-ports": {
+      "owner": "Platform",
+      "mayDependOn": [
+        "agent-contracts"
+      ]
+    },
+    "postgres-migrations": {
+      "owner": "Platform",
+      "mayDependOn": []
+    },
+    "production-governance": {
+      "owner": "Platform Security",
+      "mayDependOn": [
+        "agent-contracts",
+        "platform-ports"
+      ]
+    },
+    "production-governance-integration": {
+      "owner": "Quality",
+      "mayDependOn": [
+        "production-governance",
+        "tool-runtime"
+      ]
+    },
+    "provider-catalog": {
+      "owner": "Application",
+      "mayDependOn": [
+        "app-contracts",
+        "postgres-migrations"
+      ]
+    },
+    "secret-vault": {
+      "owner": "Platform Security",
+      "mayDependOn": []
+    },
+    "task-domain": {
+      "owner": "Application",
+      "mayDependOn": []
+    },
+    "task-store-postgres": {
+      "owner": "Platform",
+      "mayDependOn": [
+        "task-domain"
+      ]
+    },
+    "temporal-registry": {
+      "owner": "Control Plane",
+      "mayDependOn": [
+        "task-domain"
+      ]
+    },
+    "temporal-routing": {
+      "owner": "Control Plane",
+      "mayDependOn": [
+        "task-domain",
+        "platform-ports",
+        "observability",
+        "temporal-registry"
+      ]
+    },
+    "temporal-workflows": {
+      "owner": "Task Runtime",
+      "mayDependOn": [
+        "task-domain",
+        "platform-ports"
+      ]
+    },
+    "tool-runtime": {
+      "owner": "Agent Core",
+      "mayDependOn": [
+        "agent-contracts",
+        "platform-ports",
+        "local-fakes"
+      ]
+    },
+    "temporal-schedules": {
+      "owner": "Task Runtime",
+      "mayDependOn": [
+        "local-fakes",
+        "platform-ports"
+      ]
+    }
   },
   "hardConstraints": {
     "agent-package-release": {
-      "forbiddenExternalPrefixes": ["@temporalio/", "@mariozechner/pi-", "@modelcontextprotocol/", "@aws-sdk/", "openai", "@anthropic-ai/", "fastify", "express", "pg", "postgres", "prisma", "drizzle-orm"],
-      "forbiddenSourceTokens": ["WorkflowId", "WorkflowID", "HistoryEvent", "SignalHandler", "QueryHandler", "BuildId", "BuildID", "TaskQueue"],
-      "forbiddenSerializedKeys": ["workflowId", "workflowID", "historyEvent", "signalHandler", "queryHandler", "buildId", "buildID", "taskQueue", "providerClient", "providerRequest", "providerResponse", "databaseClient", "databaseConnection", "mcpClient", "mcpConnection"]
+      "forbiddenExternalPrefixes": [
+        "@temporalio/",
+        "@mariozechner/pi-",
+        "@modelcontextprotocol/",
+        "@aws-sdk/",
+        "openai",
+        "@anthropic-ai/",
+        "fastify",
+        "express",
+        "pg",
+        "postgres",
+        "prisma",
+        "drizzle-orm"
+      ],
+      "forbiddenSourceTokens": [
+        "WorkflowId",
+        "WorkflowID",
+        "HistoryEvent",
+        "SignalHandler",
+        "QueryHandler",
+        "BuildId",
+        "BuildID",
+        "TaskQueue"
+      ],
+      "forbiddenSerializedKeys": [
+        "workflowId",
+        "workflowID",
+        "historyEvent",
+        "signalHandler",
+        "queryHandler",
+        "buildId",
+        "buildID",
+        "taskQueue",
+        "providerClient",
+        "providerRequest",
+        "providerResponse",
+        "databaseClient",
+        "databaseConnection",
+        "mcpClient",
+        "mcpConnection"
+      ]
     },
     "agent-release-registry": {
-      "forbiddenExternalPrefixes": ["@temporalio/", "@mariozechner/pi-", "@modelcontextprotocol/", "@aws-sdk/", "openai", "@anthropic-ai/", "fastify", "express", "pg", "postgres", "prisma", "drizzle-orm"],
-      "forbiddenSourceTokens": ["WorkflowId", "WorkflowID", "HistoryEvent", "SignalHandler", "QueryHandler", "BuildId", "BuildID", "TaskQueue"],
-      "forbiddenSerializedKeys": ["workflowId", "workflowID", "historyEvent", "signalHandler", "queryHandler", "buildId", "buildID", "taskQueue", "providerClient", "providerRequest", "providerResponse", "databaseClient", "databaseConnection", "mcpClient", "mcpConnection"]
+      "forbiddenExternalPrefixes": [
+        "@temporalio/",
+        "@mariozechner/pi-",
+        "@modelcontextprotocol/",
+        "@aws-sdk/",
+        "openai",
+        "@anthropic-ai/",
+        "fastify",
+        "express",
+        "pg",
+        "postgres",
+        "prisma",
+        "drizzle-orm"
+      ],
+      "forbiddenSourceTokens": [
+        "WorkflowId",
+        "WorkflowID",
+        "HistoryEvent",
+        "SignalHandler",
+        "QueryHandler",
+        "BuildId",
+        "BuildID",
+        "TaskQueue"
+      ],
+      "forbiddenSerializedKeys": [
+        "workflowId",
+        "workflowID",
+        "historyEvent",
+        "signalHandler",
+        "queryHandler",
+        "buildId",
+        "buildID",
+        "taskQueue",
+        "providerClient",
+        "providerRequest",
+        "providerResponse",
+        "databaseClient",
+        "databaseConnection",
+        "mcpClient",
+        "mcpConnection"
+      ]
     },
     "agent-run-admission": {
-      "forbiddenExternalPrefixes": ["@temporalio/", "@mariozechner/pi-", "@modelcontextprotocol/", "@aws-sdk/", "openai", "@anthropic-ai/", "fastify", "express", "pg", "postgres", "prisma", "drizzle-orm"],
-      "forbiddenSourceTokens": ["WorkflowId", "WorkflowID", "HistoryEvent", "SignalHandler", "QueryHandler", "BuildId", "BuildID", "TaskQueue"],
-      "forbiddenSerializedKeys": ["workflowId", "workflowID", "historyEvent", "signalHandler", "queryHandler", "buildId", "buildID", "taskQueue", "providerClient", "providerRequest", "providerResponse", "databaseClient", "databaseConnection", "mcpClient", "mcpConnection"]
+      "forbiddenExternalPrefixes": [
+        "@temporalio/",
+        "@mariozechner/pi-",
+        "@modelcontextprotocol/",
+        "@aws-sdk/",
+        "openai",
+        "@anthropic-ai/",
+        "fastify",
+        "express",
+        "pg",
+        "postgres",
+        "prisma",
+        "drizzle-orm"
+      ],
+      "forbiddenSourceTokens": [
+        "WorkflowId",
+        "WorkflowID",
+        "HistoryEvent",
+        "SignalHandler",
+        "QueryHandler",
+        "BuildId",
+        "BuildID",
+        "TaskQueue"
+      ],
+      "forbiddenSerializedKeys": [
+        "workflowId",
+        "workflowID",
+        "historyEvent",
+        "signalHandler",
+        "queryHandler",
+        "buildId",
+        "buildID",
+        "taskQueue",
+        "providerClient",
+        "providerRequest",
+        "providerResponse",
+        "databaseClient",
+        "databaseConnection",
+        "mcpClient",
+        "mcpConnection"
+      ]
     },
     "agent-contracts": {
-      "forbiddenSourceTokens": ["Temporal", "WorkflowId", "WorkflowID", "HistoryEvent", "SignalHandler", "QueryHandler", "BuildId", "BuildID", "TaskQueue", "TemporalError"],
-      "forbiddenExternalPrefixes": ["@mariozechner/pi-", "@temporalio/", "@modelcontextprotocol/", "@aws-sdk/", "openai", "@anthropic-ai/", "fastify", "express", "koa", "hono", "@nestjs/", "node:http", "node:https", "pg", "postgres", "mysql2", "sqlite3", "better-sqlite3", "prisma", "@prisma/", "typeorm", "sequelize", "drizzle-orm"],
-      "forbiddenSerializedKeys": ["piSession", "piAgent", "temporalWorkflow", "temporalWorkflowId", "temporalRunId", "temporalTaskQueue", "providerClient", "providerRequest", "providerResponse", "httpRequest", "httpResponse", "fastifyRequest", "fastifyReply", "databaseClient", "databaseConnection", "queryRunner", "mcpClient", "mcpConnection"]
+      "forbiddenSourceTokens": [
+        "Temporal",
+        "WorkflowId",
+        "WorkflowID",
+        "HistoryEvent",
+        "SignalHandler",
+        "QueryHandler",
+        "BuildId",
+        "BuildID",
+        "TaskQueue",
+        "TemporalError"
+      ],
+      "forbiddenExternalPrefixes": [
+        "@mariozechner/pi-",
+        "@temporalio/",
+        "@modelcontextprotocol/",
+        "@aws-sdk/",
+        "openai",
+        "@anthropic-ai/",
+        "fastify",
+        "express",
+        "koa",
+        "hono",
+        "@nestjs/",
+        "node:http",
+        "node:https",
+        "pg",
+        "postgres",
+        "mysql2",
+        "sqlite3",
+        "better-sqlite3",
+        "prisma",
+        "@prisma/",
+        "typeorm",
+        "sequelize",
+        "drizzle-orm"
+      ],
+      "forbiddenSerializedKeys": [
+        "piSession",
+        "piAgent",
+        "temporalWorkflow",
+        "temporalWorkflowId",
+        "temporalRunId",
+        "temporalTaskQueue",
+        "providerClient",
+        "providerRequest",
+        "providerResponse",
+        "httpRequest",
+        "httpResponse",
+        "fastifyRequest",
+        "fastifyReply",
+        "databaseClient",
+        "databaseConnection",
+        "queryRunner",
+        "mcpClient",
+        "mcpConnection"
+      ]
     },
     "agent-runtime-conformance": {
-      "forbiddenExternalPrefixes": ["@mariozechner/pi-", "@temporalio/", "@modelcontextprotocol/", "@aws-sdk/", "openai", "@anthropic-ai/", "fastify", "express", "koa", "hono", "@nestjs/", "node:http", "node:https", "pg", "postgres", "mysql2", "sqlite3", "better-sqlite3", "prisma", "@prisma/", "typeorm", "sequelize", "drizzle-orm"],
-      "forbiddenSerializedKeys": ["piSession", "piAgent", "temporalWorkflow", "temporalWorkflowId", "temporalRunId", "temporalTaskQueue", "providerClient", "providerRequest", "providerResponse", "httpRequest", "httpResponse", "fastifyRequest", "fastifyReply", "databaseClient", "databaseConnection", "queryRunner", "mcpClient", "mcpConnection"]
+      "forbiddenExternalPrefixes": [
+        "@mariozechner/pi-",
+        "@temporalio/",
+        "@modelcontextprotocol/",
+        "@aws-sdk/",
+        "openai",
+        "@anthropic-ai/",
+        "fastify",
+        "express",
+        "koa",
+        "hono",
+        "@nestjs/",
+        "node:http",
+        "node:https",
+        "pg",
+        "postgres",
+        "mysql2",
+        "sqlite3",
+        "better-sqlite3",
+        "prisma",
+        "@prisma/",
+        "typeorm",
+        "sequelize",
+        "drizzle-orm"
+      ],
+      "forbiddenSerializedKeys": [
+        "piSession",
+        "piAgent",
+        "temporalWorkflow",
+        "temporalWorkflowId",
+        "temporalRunId",
+        "temporalTaskQueue",
+        "providerClient",
+        "providerRequest",
+        "providerResponse",
+        "httpRequest",
+        "httpResponse",
+        "fastifyRequest",
+        "fastifyReply",
+        "databaseClient",
+        "databaseConnection",
+        "queryRunner",
+        "mcpClient",
+        "mcpConnection"
+      ]
     },
     "platform-ports": {
-      "forbiddenSourceTokens": ["Temporal", "WorkflowId", "WorkflowID", "HistoryEvent", "SignalHandler", "QueryHandler", "BuildId", "BuildID", "TaskQueue", "TemporalError"],
-      "forbiddenExternalPrefixes": ["@temporalio/", "@mariozechner/pi-", "@modelcontextprotocol/", "@aws-sdk/", "openai", "@anthropic-ai/", "fastify", "express", "koa", "hono", "@nestjs/", "node:http", "node:https", "pg", "postgres", "mysql2", "sqlite3", "better-sqlite3", "prisma", "@prisma/", "typeorm", "sequelize", "drizzle-orm"],
-      "forbiddenSerializedKeys": ["workflowId", "workflowID", "historyEvent", "signalHandler", "queryHandler", "buildId", "buildID", "taskQueue", "temporalWorkflow", "temporalRunId", "temporalTaskQueue", "providerClient", "providerRequest", "providerResponse", "httpRequest", "httpResponse", "databaseClient", "databaseConnection", "queryRunner", "mcpClient", "mcpConnection"]
+      "forbiddenSourceTokens": [
+        "Temporal",
+        "WorkflowId",
+        "WorkflowID",
+        "HistoryEvent",
+        "SignalHandler",
+        "QueryHandler",
+        "BuildId",
+        "BuildID",
+        "TaskQueue",
+        "TemporalError"
+      ],
+      "forbiddenExternalPrefixes": [
+        "@temporalio/",
+        "@mariozechner/pi-",
+        "@modelcontextprotocol/",
+        "@aws-sdk/",
+        "openai",
+        "@anthropic-ai/",
+        "fastify",
+        "express",
+        "koa",
+        "hono",
+        "@nestjs/",
+        "node:http",
+        "node:https",
+        "pg",
+        "postgres",
+        "mysql2",
+        "sqlite3",
+        "better-sqlite3",
+        "prisma",
+        "@prisma/",
+        "typeorm",
+        "sequelize",
+        "drizzle-orm"
+      ],
+      "forbiddenSerializedKeys": [
+        "workflowId",
+        "workflowID",
+        "historyEvent",
+        "signalHandler",
+        "queryHandler",
+        "buildId",
+        "buildID",
+        "taskQueue",
+        "temporalWorkflow",
+        "temporalRunId",
+        "temporalTaskQueue",
+        "providerClient",
+        "providerRequest",
+        "providerResponse",
+        "httpRequest",
+        "httpResponse",
+        "databaseClient",
+        "databaseConnection",
+        "queryRunner",
+        "mcpClient",
+        "mcpConnection"
+      ]
     },
     "agent-lib": {
-      "forbiddenPackages": ["agent-api", "agent-web", "agent-worker", "chat-domain", "task-domain", "temporal-routing", "temporal-workflows"],
-      "forbiddenExternalPrefixes": ["@temporalio/", "fastify", "pg", "postgres", "react", "vite"]
+      "forbiddenPackages": [
+        "agent-api",
+        "agent-web",
+        "agent-worker",
+        "chat-domain",
+        "task-domain",
+        "temporal-routing",
+        "temporal-workflows"
+      ],
+      "forbiddenExternalPrefixes": [
+        "@temporalio/",
+        "fastify",
+        "pg",
+        "postgres",
+        "react",
+        "vite"
+      ]
     },
     "chat-domain": {
-      "forbiddenPackages": ["agent-lib", "harness-pi"],
-      "forbiddenExternalPrefixes": ["@mariozechner/pi-"]
+      "forbiddenPackages": [
+        "agent-lib",
+        "harness-pi"
+      ],
+      "forbiddenExternalPrefixes": [
+        "@mariozechner/pi-"
+      ]
     },
     "agent-api": {
-      "forbiddenPackages": ["harness-pi"],
-      "forbiddenExternalPrefixes": ["@mariozechner/pi-"]
+      "forbiddenPackages": [
+        "harness-pi"
+      ],
+      "forbiddenExternalPrefixes": [
+        "@mariozechner/pi-"
+      ]
     },
     "agent-web": {
-      "forbiddenPackages": ["agent-lib", "agent-client", "harness-pi"],
-      "forbiddenExternalPrefixes": ["@mariozechner/pi-"]
+      "forbiddenPackages": [
+        "agent-lib",
+        "agent-client",
+        "harness-pi"
+      ],
+      "forbiddenExternalPrefixes": [
+        "@mariozechner/pi-"
+      ]
     },
     "temporal-workflows": {
-      "forbiddenExternalPrefixes": ["@sage/agent-lib", "@sage/agent-client", "fastify", "pg", "postgres", "react", "vite"]
+      "forbiddenExternalPrefixes": [
+        "@sage/agent-lib",
+        "@sage/agent-client",
+        "fastify",
+        "pg",
+        "postgres",
+        "react",
+        "vite"
+      ]
     }
   }
 }

@@ -57,6 +57,20 @@ describe('Chat session history API', () => {
     await app.close();
   });
 
+  it('forwards the locale query to the store for untitled-title search fallback', async () => {
+    const { state, store } = fakeStore();
+    const app = await createChatApi({ store });
+    const zh = await app.inject({ method: 'GET', url: '/v1/chat/sessions?locale=zh-CN&q=x' });
+    expect(zh.statusCode).toBe(200);
+    expect((state.listed as { locale?: string }).locale).toBe('zh-CN');
+    const en = await app.inject({ method: 'GET', url: '/v1/chat/sessions?locale=en-US' });
+    expect(en.statusCode).toBe(200);
+    expect((state.listed as { locale?: string }).locale).toBe('en-US');
+    const oversized = await app.inject({ method: 'GET', url: '/v1/chat/sessions?locale=' + 'a'.repeat(36) });
+    expect(oversized.statusCode).toBe(400);
+    await app.close();
+  });
+
   it('maps invalid and additional query fields to CHAT_INVALID_REQUEST', async () => {
     const { store } = fakeStore();
     const app = await createChatApi({ store });

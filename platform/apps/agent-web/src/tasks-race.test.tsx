@@ -61,4 +61,39 @@ describe('Task canonical activation', () => {
     for (const suffix of ['', '/events', '/artifacts']) expect(calls.filter((url) => url === `/v1/tasks/task-b${suffix}`)).toHaveLength(1);
     await act(async () => tree.unmount());
   });
+
+  it('returns to the list when the task param is removed (back link / nav item / browser back)', async () => {
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === '/v1/tasks') return response({ tasks: [task('task-a')] });
+      if (url === '/v1/tasks/task-a') return response(task('task-a'));
+      if (url.endsWith('/task-a/events')) return response({ events: [] });
+      if (url.endsWith('/task-a/artifacts')) return response({ artifacts: [] });
+      throw new Error(`unexpected ${url}`);
+    }) as typeof fetch;
+    let tree!: ReturnType<typeof create>;
+    await act(async () => { tree = create(<TasksApp fetcher={fetcher} taskId="task-a" />); await flush(); await flush(); });
+    expect(tree.root.findAllByType(TaskDetail)).toHaveLength(1);
+    await act(async () => { tree.update(<TasksApp fetcher={fetcher} />); await flush(); await flush(); });
+    expect(tree.root.findAllByType(TaskDetail)).toHaveLength(0);
+    expect(tree.root.findAllByType(TaskList)).toHaveLength(1);
+    await act(async () => tree.unmount());
+  });
+
+  it('clears a detail error and shows the list when navigating back from a failed detail', async () => {
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === '/v1/tasks') return response({ tasks: [task('task-a')] });
+      if (url.includes('/v1/tasks/task-a')) return new Response(JSON.stringify({ error: { message: 'boom' } }), { status: 500, headers: { 'content-type': 'application/json' } });
+      throw new Error(`unexpected ${url}`);
+    }) as typeof fetch;
+    let tree!: ReturnType<typeof create>;
+    await act(async () => { tree = create(<TasksApp fetcher={fetcher} taskId="task-a" />); await flush(); await flush(); });
+    expect(tree.root.findByProps({ children: 'Task data unavailable' })).toBeTruthy();
+    expect(tree.root.findAllByType(TaskList)).toHaveLength(0);
+    await act(async () => { tree.update(<TasksApp fetcher={fetcher} />); await flush(); await flush(); });
+    expect(tree.root.findAllByProps({ children: 'Task data unavailable' })).toHaveLength(0);
+    expect(tree.root.findAllByType(TaskList)).toHaveLength(1);
+    await act(async () => tree.unmount());
+  });
 });

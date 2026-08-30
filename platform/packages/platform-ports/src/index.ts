@@ -758,6 +758,26 @@ export interface AgentEventStorePort {
   health(): Promise<AdapterHealth>;
 }
 
+/** Read-only run-log projection over canonical run events, consumed by the operations API. */
+export interface TaskRunLogAttemptSummary {
+  readonly runId: string;
+  readonly attemptId: string;
+  readonly eventCount: number;
+  readonly firstSequence: number;
+  readonly lastSequence: number;
+  /** ISO timestamp of the most recently written event in the attempt. */
+  readonly lastWrittenAt: string;
+}
+
+export interface TaskRunLogQueryPort {
+  listAttemptSummaries(input: { readonly tenantId: string; readonly taskId: string }): Promise<readonly TaskRunLogAttemptSummary[]>;
+  listRunLogEvents(input: { readonly tenantId: string; readonly taskId: string; readonly runId: string; readonly attemptId: string; readonly fromSequence?: number; readonly limit?: number }): Promise<readonly AgentEventV2[]>;
+  health(): Promise<AdapterHealth>;
+}
+
+/** Upper bound for one run-log page; callers may pass a smaller limit. */
+export const TASK_RUN_LOG_PAGE_LIMIT_MAX = 500;
+
 export type CheckpointCandidateResult =
   | { readonly status: 'staged'; readonly candidate: CheckpointCandidate }
   | { readonly status: 'existing'; readonly candidate: CheckpointCandidate }
@@ -971,6 +991,233 @@ export interface DurableCoordinatorPort {
   command(command: CoordinatorCommand): Promise<CoordinatorCommandResult>;
   observe(input: CoordinatorObservationKey): Promise<CoordinatorObservation | undefined>;
   health(): Promise<AdapterHealth>;
+}
+
+// ===== Schedule Plane (canonical, scheduler-facility neutral) =====
+// Canonical schedule contracts express periodic AI App triggers. Concrete scheduler
+// facility types (managed schedulers, cron daemons, …) are adapter details and must
+// never leak into these schemas, the public API, or canonical boundary scans.
+
+export const ScheduleTriggerRuleSchema = Type.Union([
+  Type.Object({
+    kind: Type.Literal('cron'),
+    expression: Type.String({ minLength: 5, maxLength: 128 }),
+    timezone: Type.String({ minLength: 1, maxLength: 64 })
+  }, { additionalProperties: false }),
+  Type.Object({
+    kind: Type.Literal('interval'),
+    everyMs: Type.Integer({ minimum: 60_000, maximum: 2_147_483_647 })
+  }, { additionalProperties: false })
+], { $id: 'ScheduleTriggerRule.v1' });
+export type ScheduleTriggerRule = Static<typeof ScheduleTriggerRuleSchema>;
+
+export const ScheduleOverlapPolicySchema = Type.Union([
+  Type.Literal('SKIP'), Type.Literal('ALLOW'), Type.Literal('BUFFER_ONE')
+], { $id: 'ScheduleOverlapPolicy.v1' });
+export type ScheduleOverlapPolicy = Static<typeof ScheduleOverlapPolicySchema>;
+
+export const ScheduleMisfirePolicySchema = Type.Union([
+  Type.Literal('SKIP'), Type.Literal('CATCH_UP_ONE')
+], { $id: 'ScheduleMisfirePolicy.v1' });
+export type ScheduleMisfirePolicy = Static<typeof ScheduleMisfirePolicySchema>;
+
+export const ScheduleReleaseBindingSchema = Type.Union([
+  Type.Object({
+    strategy: Type.Literal('FIXED'),
+    releaseId: Type.String({ minLength: 1, maxLength: 128 }),
+    contentDigest: Type.String({ pattern: '^sha256:[a-f0-9]{64}$' })
+  }, { additionalProperties: false }),
+  Type.Object({ strategy: Type.Literal('FOLLOW') }, { additionalProperties: false })
+], { $id: 'ScheduleReleaseBinding.v1' });
+export type ScheduleReleaseBinding = Static<typeof ScheduleReleaseBindingSchema>;
+
+export const ScheduleBudgetDimensionSchema = Type.Union([
+  Type.Literal('runs'), Type.Literal('tokens'), Type.Literal('tool_calls'), Type.Literal('cost_minor_units')
+], { $id: 'ScheduleBudgetDimension.v1' });
+export type ScheduleBudgetDimension = Static<typeof ScheduleBudgetDimensionSchema>;
+
+export const ScheduleBudgetSchema = Type.Object({
+  limits: Type.Array(Type.Object({
+    dimension: ScheduleBudgetDimensionSchema,
+    limit: Type.Integer({ minimum: 1 })
+  }, { additionalProperties: false }), { minItems: 1, maxItems: 8 }),
+  windowMs: Type.Optional(Type.Integer({ minimum: 60_000, maximum: 2_147_483_647 }))
+}, { additionalProperties: false, $id: 'ScheduleBudget.v1' });
+export type ScheduleBudget = Static<typeof ScheduleBudgetSchema>;
+
+export const ScheduleTargetConstraintsSchema = Type.Object({
+  allowedEnvironments: Type.Array(EnvironmentSchema, { minItems: 1, maxItems: 8 }),
+  isolationLevel: Type.Optional(Type.String({ minLength: 1, maxLength: 64 })),
+  dataResidency: Type.Optional(Type.String({ minLength: 1, maxLength: 64 }))
+}, { additionalProperties: false, $id: 'ScheduleTargetConstraints.v1' });
+export type ScheduleTargetConstraints = Static<typeof ScheduleTargetConstraintsSchema>;
+
+export const ScheduleInvocationTemplateSchema = Type.Object({
+  // task 必填：P8 绑定语义（schedule MUST 声明目标 task），legacy 空输入在 schema 层即拒绝。
+  task: Type.String({ minLength: 1, maxLength: 64, pattern: '^[a-z][a-z0-9-]{0,63}$' }),
+  params: Type.Optional(Type.Record(
+    Type.String({ minLength: 1, maxLength: 64 }),
+    Type.Union([Type.String({ maxLength: 2_048 }), Type.Number()]),
+    { maxProperties: 16 }
+  ))
+}, { additionalProperties: false, $id: 'ScheduleInvocationTemplate.v1' });
+export type ScheduleInvocationTemplate = Static<typeof ScheduleInvocationTemplateSchema>;
+
+export const ScheduleStateSchema = Type.Union([
+  Type.Literal('ACTIVE'), Type.Literal('PAUSED'), Type.Literal('DELETED')
+], { $id: 'ScheduleState.v1' });
+export type ScheduleState = Static<typeof ScheduleStateSchema>;
+
+export const ScheduleDefinitionSchema = Type.Object({
+  schemaVersion: Type.Literal('1'),
+  scheduleId: Type.String({ minLength: 3, maxLength: 128, pattern: '^[a-z0-9][a-z0-9._-]*$' }),
+  tenantId: Type.String({ minLength: 1, maxLength: 128 }),
+  displayName: Type.Optional(Type.String({ minLength: 1, maxLength: 256 })),
+  trigger: ScheduleTriggerRuleSchema,
+  overlapPolicy: ScheduleOverlapPolicySchema,
+  misfirePolicy: ScheduleMisfirePolicySchema,
+  releaseBinding: ScheduleReleaseBindingSchema,
+  targetConstraints: ScheduleTargetConstraintsSchema,
+  budget: ScheduleBudgetSchema,
+  invocation: ScheduleInvocationTemplateSchema
+}, { additionalProperties: false, $id: 'ScheduleDefinition.v1' });
+export type ScheduleDefinition = Static<typeof ScheduleDefinitionSchema>;
+
+export const ScheduleSnapshotSchema = Type.Object({
+  schemaVersion: Type.Literal('1'),
+  definition: ScheduleDefinitionSchema,
+  revision: Type.Integer({ minimum: 1 }),
+  state: ScheduleStateSchema,
+  contentDigest: Type.String({ pattern: '^sha256:[a-f0-9]{64}$' }),
+  createdAtMs: Type.Integer({ minimum: 0 }),
+  updatedAtMs: Type.Integer({ minimum: 0 })
+}, { additionalProperties: false, $id: 'ScheduleSnapshot.v1' });
+export type ScheduleSnapshot = Static<typeof ScheduleSnapshotSchema>;
+
+export const ScheduleOccurrenceSchema = Type.Object({
+  schemaVersion: Type.Literal('1'),
+  scheduleId: Type.String({ minLength: 3, maxLength: 128 }),
+  tenantId: Type.String({ minLength: 1, maxLength: 128 }),
+  occurrenceId: Type.String({ minLength: 1, maxLength: 128, pattern: '^[a-zA-Z0-9][a-zA-Z0-9._:-]*$' }),
+  dueAtMs: Type.Integer({ minimum: 0 })
+}, { additionalProperties: false, $id: 'ScheduleOccurrence.v1' });
+export type ScheduleOccurrence = Static<typeof ScheduleOccurrenceSchema>;
+
+export const scheduleOccurrenceKey = (occurrence: Pick<ScheduleOccurrence, 'scheduleId' | 'occurrenceId'>): string =>
+  `schedule:${occurrence.scheduleId}:occ:${occurrence.occurrenceId}`;
+
+export const ScheduleTriggerEventKindSchema = Type.Union([
+  Type.Literal('SUCCEEDED'), Type.Literal('FAILED'), Type.Literal('SKIPPED'), Type.Literal('MISSED')
+], { $id: 'ScheduleTriggerEventKind.v1' });
+export type ScheduleTriggerEventKind = Static<typeof ScheduleTriggerEventKindSchema>;
+
+export const ScheduleTriggerEventSchema = Type.Object({
+  schemaVersion: Type.Literal('1'),
+  scheduleId: Type.String({ minLength: 3, maxLength: 128 }),
+  tenantId: Type.String({ minLength: 1, maxLength: 128 }),
+  occurrenceId: Type.String({ minLength: 1, maxLength: 128 }),
+  kind: ScheduleTriggerEventKindSchema,
+  occurredAtMs: Type.Integer({ minimum: 0 }),
+  taskId: Type.Optional(Type.String({ minLength: 1, maxLength: 128 })),
+  errorCode: Type.Optional(Type.String({ minLength: 1, maxLength: 128 })),
+  detail: Type.Optional(Type.String({ maxLength: 1_024 }))
+}, { additionalProperties: false, $id: 'ScheduleTriggerEvent.v1' });
+export type ScheduleTriggerEvent = Static<typeof ScheduleTriggerEventSchema>;
+
+export const ScheduleErrorCodeSchema = Type.Union([
+  Type.Literal('SCHEDULE_ALREADY_EXISTS'), Type.Literal('SCHEDULE_NOT_FOUND'),
+  Type.Literal('SCHEDULE_RULE_INVALID'), Type.Literal('SCHEDULE_STATE_CONFLICT'),
+  Type.Literal('SCHEDULE_REVISION_CONFLICT'), Type.Literal('SCHEDULE_UNAVAILABLE')
+], { $id: 'ScheduleErrorCode.v1' });
+export type ScheduleErrorCode = Static<typeof ScheduleErrorCodeSchema>;
+
+export const ScheduleErrorSchema = Type.Object({
+  code: ScheduleErrorCodeSchema,
+  safeMessage: Type.String({ minLength: 1, maxLength: 1_024 }),
+  retryable: Type.Boolean()
+}, { additionalProperties: false, $id: 'ScheduleError.v1' });
+export type ScheduleError = Static<typeof ScheduleErrorSchema>;
+
+export interface ScheduleRef {
+  readonly tenantId: string;
+  readonly scheduleId: string;
+}
+
+/**
+ * SDK-neutral schedule lifecycle authority for the control plane. Adapters map this
+ * port onto a concrete scheduler facility; occurrence dispatch and missed-window
+ * accounting remain canonical behavior expressed by the trigger event stream.
+ */
+export interface SchedulePort {
+  create(definition: ScheduleDefinition): Promise<ScheduleSnapshot>;
+  update(definition: ScheduleDefinition, expectedRevision: number): Promise<ScheduleSnapshot>;
+  pause(ref: ScheduleRef): Promise<ScheduleSnapshot>;
+  resume(ref: ScheduleRef): Promise<ScheduleSnapshot>;
+  remove(ref: ScheduleRef): Promise<void>;
+  describe(ref: ScheduleRef): Promise<ScheduleSnapshot | undefined>;
+  /** 设施侧下次触发时间（P8 UI next fire 展示）；不支持或暂停时返回 undefined。 */
+  nextFireAtMs?(ref: ScheduleRef): Promise<number | undefined>;
+  health(): Promise<AdapterHealth>;
+}
+
+const scheduleReferenceValues = (value: ScheduleDefinition | ScheduleSnapshot | ScheduleTriggerEvent): readonly string[] => {
+  if (value.schemaVersion !== '1') return [];
+  if ('definition' in value) {
+    const binding = value.definition.releaseBinding;
+    return binding.strategy === 'FIXED' ? [`release://${binding.releaseId}`] : [];
+  }
+  if ('taskId' in value) return value.taskId !== undefined ? [`task://${value.taskId}`] : [];
+  return [];
+};
+
+export function assertScheduleDefinition(value: unknown): asserts value is ScheduleDefinition {
+  if (!Value.Check(ScheduleDefinitionSchema, value)) throw new TypeError('SCHEDULE_RULE_INVALID');
+  assertNoSensitiveData(value);
+  try {
+    assertCanonicalPayloadBounds(value, scheduleReferenceValues(value as ScheduleDefinition));
+  } catch (error) {
+    if (error instanceof RangeError) throw new RangeError('SCHEDULE_RULE_INVALID');
+    throw error;
+  }
+}
+
+export function assertScheduleOccurrence(value: unknown): asserts value is ScheduleOccurrence {
+  if (!Value.Check(ScheduleOccurrenceSchema, value)) throw new TypeError('SCHEDULE_RULE_INVALID');
+  assertNoSensitiveData(value);
+}
+
+export function assertScheduleTriggerEvent(value: unknown): asserts value is ScheduleTriggerEvent {
+  if (!Value.Check(ScheduleTriggerEventSchema, value)) throw new TypeError('SCHEDULE_TRIGGER_EVENT_INVALID');
+  assertNoSensitiveData(value);
+  try {
+    assertCanonicalPayloadBounds(value, scheduleReferenceValues(value as ScheduleTriggerEvent));
+  } catch (error) {
+    if (error instanceof RangeError) throw new RangeError('PAYLOAD_BOUND_EXCEEDED');
+    throw error;
+  }
+}
+
+export const scheduleDefinitionDigest = (definition: ScheduleDefinition): string =>
+  `sha256:${createHash('sha256').update(JSON.stringify(definition)).digest('hex')}`;
+
+export const SCHEDULE_TRIGGER_HISTORY_LIMIT_MAX = 200;
+
+/** Control-plane authority store for schedule snapshots and the append-only trigger event stream. */
+export interface ScheduleControlStore {
+  /** 创建记录；FOLLOW 绑定必须携带锚点 Release（canonical 契约不含该字段，属控制面细节）。 */
+  putRecord(input: { readonly snapshot: ScheduleSnapshot; readonly followAnchorReleaseId?: string }): Promise<'stored' | 'existing'>;
+  getRecord(ref: ScheduleRef): Promise<ScheduleSnapshot | undefined>;
+  listRecords(tenantId: string, input?: { readonly state?: ScheduleState; readonly limit?: number }): Promise<readonly ScheduleSnapshot[]>;
+  replaceRecord(snapshot: ScheduleSnapshot): Promise<void>;
+  getFollowAnchor(ref: ScheduleRef): Promise<string | undefined>;
+  appendTriggerEvent(event: ScheduleTriggerEvent): Promise<'stored' | 'existing'>;
+  listTriggerEvents(ref: ScheduleRef, input: { readonly limit: number }): Promise<readonly ScheduleTriggerEvent[]>;
+  health(): Promise<AdapterHealth>;
+}
+
+export function assertScheduleSnapshot(value: unknown): asserts value is ScheduleSnapshot {
+  if (!Value.Check(ScheduleSnapshotSchema, value)) throw new TypeError('SCHEDULE_RULE_INVALID');
+  assertNoSensitiveData(value);
 }
 
 export * from './runtime.js';

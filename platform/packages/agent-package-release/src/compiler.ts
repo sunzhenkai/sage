@@ -8,7 +8,7 @@ import {
 } from './index.js';
 import { canonicalJson, sha256Digest } from '@sage/agent-contracts';
 import type { LoadedSourcePackage } from './source-loader.js';
-import type { AgentSourceManifest } from './source-manifest.js';
+import { MAX_SOURCE_DATA_SOURCE_BYTES, type AgentSourceManifest } from './source-manifest.js';
 
 /**
  * 源包域：本地编译器。消费源包校验结果，产出 canonical 的 AgentPackageRelease.v1。
@@ -38,6 +38,117 @@ export interface AssetLockManifestSummaryV1 {
   readonly skillRefs: readonly string[];
   readonly capabilityRefs: readonly string[];
   readonly budgets?: { readonly maxTokens?: number; readonly maxToolCalls?: number; readonly maxTurns?: number; readonly maxDurationMs?: number };
+  /** v2 声明（归一化形）。v1 包不出现这些键，lock 逐字节不变。 */
+  readonly inputs?: readonly NormalizedSourceInput[];
+  readonly dataSources?: readonly NormalizedSourceDataSource[];
+  readonly tasks?: readonly NormalizedSourceTask[];
+}
+
+/** 归一化后的 v2 声明形：运行时（准入/worker/前端）只消费此形，不重复实现缺省分支。 */
+export interface NormalizedSourceInput {
+  readonly name: string;
+  readonly type: 'string' | 'enum' | 'number';
+  readonly enum?: readonly (string | number)[];
+  readonly default?: string | number;
+  readonly required: boolean;
+}
+
+export interface NormalizedSourceDataSource {
+  readonly name: string;
+  readonly ref: string;
+  readonly url: string;
+  readonly maxBytes: number;
+  readonly onFailure: 'fail' | 'markMissing';
+}
+
+export type NormalizedTaskParamBinding =
+  | { readonly kind: 'input'; readonly input: string }
+  | { readonly kind: 'literal'; readonly value: string | number };
+
+export interface NormalizedSourceTask {
+  readonly name: string;
+  readonly entry: string;
+  readonly params: readonly { readonly name: string; readonly from: NormalizedTaskParamBinding }[];
+  readonly output: { readonly schema?: string; readonly files?: readonly string[] };
+}
+
+export interface NormalizedSourceManifest {
+  readonly id: string;
+  readonly version: string;
+  readonly description: string;
+  readonly entry: string;
+  readonly modelRoute: AgentSourceManifest['modelRoute'];
+  readonly budgets?: AgentSourceManifest['budgets'];
+  readonly skillRefs: readonly string[];
+  readonly capabilityRefs: readonly string[];
+  readonly inputs: readonly NormalizedSourceInput[];
+  readonly dataSources: readonly NormalizedSourceDataSource[];
+  readonly tasks: readonly NormalizedSourceTask[];
+}
+
+/** 无 tasks 声明的包归一化后的隐式单任务名。 */
+export const DEFAULT_TASK_NAME = 'default';
+
+const PARAM_BINDING_PATTERN = /^\$\{inputs\.([a-z][a-z0-9-]{0,63})\}$/;
+
+export function normalizeSourceManifest(manifest: AgentSourceManifest): NormalizedSourceManifest {
+  const inputs: NormalizedSourceInput[] = (manifest.inputs ?? []).map((input) => ({
+    name: input.name,
+    type: input.type,
+    ...(input.enum === undefined ? {} : { enum: [...input.enum] }),
+    ...(input.default === undefined ? {} : { default: input.default }),
+    required: input.required ?? false,
+  }));
+  const dataSources: NormalizedSourceDataSource[] = (manifest.dataSources ?? []).map((source) => ({
+    name: source.name,
+    ref: source.ref,
+    url: source.url,
+    maxBytes: source.maxBytes ?? MAX_SOURCE_DATA_SOURCE_BYTES,
+    onFailure: source.onFailure ?? 'fail',
+  }));
+  const declaredTasks = manifest.tasks ?? [];
+  const tasks: NormalizedSourceTask[] = (declaredTasks.length === 0
+    ? [{ name: DEFAULT_TASK_NAME }]
+    : declaredTasks.map((task) => ({ name: task.name, ...(task.entry === undefined ? {} : { entry: task.entry }) }))
+  ).map((task) => {
+    const raw = declaredTasks.find((candidate) => candidate.name === task.name);
+    const params = raw?.params;
+    const resolvedParams = params === undefined
+      // 缺省绑定：每个已声明 input 按同名绑定。
+      ? inputs.map((input) => ({ name: input.name, from: { kind: 'input' as const, input: input.name } }))
+      : Object.entries(params).map(([name, value]) => {
+        const binding = typeof value === 'string' ? value.match(PARAM_BINDING_PATTERN) : null;
+        return {
+          name,
+          from: binding !== null
+            ? { kind: 'input' as const, input: binding[1] as string }
+            : { kind: 'literal' as const, value }
+        };
+      });
+    const output = raw?.output;
+    return {
+      name: task.name,
+      entry: task.entry ?? manifest.entry,
+      params: resolvedParams,
+      output: {
+        ...(output?.schema === undefined ? {} : { schema: output.schema }),
+        ...(output?.files === undefined ? {} : { files: [...output.files] }),
+      },
+    };
+  });
+  return {
+    id: manifest.id,
+    version: manifest.version,
+    description: manifest.description,
+    entry: manifest.entry,
+    modelRoute: manifest.modelRoute,
+    ...(manifest.budgets === undefined ? {} : { budgets: manifest.budgets }),
+    skillRefs: [...(manifest.skillRefs ?? [])],
+    capabilityRefs: [...(manifest.capabilityRefs ?? [])],
+    inputs,
+    dataSources,
+    tasks,
+  };
 }
 
 export interface AssetLockV1 {
@@ -59,6 +170,12 @@ export function buildAssetLock(loaded: LoadedSourcePackage): AssetLockV1 {
       content: asset.content,
     }))
     .sort((left, right) => left.relativePath.localeCompare(right.relativePath));
+  // v2 声明只在出现时进入 lock 摘要（归一化形）；v1 包不新增任何键，digest 保持逐字节稳定。
+  const normalized = normalizeSourceManifest(loaded.manifest);
+  const declaresV2 = loaded.manifest.schemaVersion === '2'
+    || (loaded.manifest.inputs?.length ?? 0) > 0
+    || (loaded.manifest.dataSources?.length ?? 0) > 0
+    || (loaded.manifest.tasks?.length ?? 0) > 0;
   return {
     schemaVersion: '1',
     packageId: loaded.manifest.id,
@@ -76,6 +193,7 @@ export function buildAssetLock(loaded: LoadedSourcePackage): AssetLockV1 {
       skillRefs: [...(loaded.manifest.skillRefs ?? [])],
       capabilityRefs: [...(loaded.manifest.capabilityRefs ?? [])],
       ...(loaded.manifest.budgets === undefined ? {} : { budgets: { ...loaded.manifest.budgets } }),
+      ...(declaresV2 ? { inputs: normalized.inputs, dataSources: normalized.dataSources, tasks: normalized.tasks } : {}),
     },
     assets,
   };

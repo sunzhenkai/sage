@@ -2,6 +2,19 @@ import { act, create } from 'react-test-renderer';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { LOCALE_STORAGE_KEY, LocaleProvider, messageKeys, messages, normalizeLocale, resolveInitialLocale, useLocale, type LocaleNavigator } from './locale.js';
 
+// 话语密度门禁（web-interface-localization「文案密度与话语类型」）：非豁免 key 中文 ≤24 字、英文 ≤10 词。
+// 豁免白名单仅限三类：安全语义 / 可操作错误 / 字段 hint（含 placeholder 与键位说明）。新增豁免必须在此登记并注明归类。
+const DENSITY_EXEMPT: Readonly<Record<string, '安全语义' | '可操作错误' | '字段hint'>> = {
+  effectUnknownTitle: '安全语义', effectUnknownBody: '安全语义', effectUnknownGuidance: '安全语义',
+  scheduleAuthRequired: '可操作错误', chatNeedsProvider: '可操作错误',
+  catalogSyncRateLimited: '可操作错误', catalogSyncForbidden: '可操作错误', catalogUnavailableManual: '可操作错误',
+  appIdHint: '字段hint', apiKeyServer: '字段hint', apiKeyRequiredPlaceholder: '字段hint', apiKeyRotatePlaceholder: '字段hint',
+  uploadFilesPlaceholder: '字段hint', enterToSend: '字段hint',
+};
+const stripPlaceholders = (value: string): string => value.replace(/\{\w+\}/g, '');
+const zhLength = (value: string): number => Array.from(stripPlaceholders(value)).length;
+const enWords = (value: string): number => stripPlaceholders(value).trim().split(/\s+/).filter(Boolean).length;
+
 class MemoryStorage {
   #data = new Map<string, string>();
   getItem(key: string) { return this.#data.get(key) ?? null; }
@@ -24,6 +37,16 @@ describe('Web locale contract', () => {
   it('keeps dictionary keys identical and values non-empty', () => {
     expect(Object.keys(messages.en).sort()).toEqual(Object.keys(messages['zh-CN']).sort());
     expect(messageKeys.every((key) => messages.en[key].trim() && messages['zh-CN'][key].trim())).toBe(true);
+  });
+  it('enforces copy density limits outside the explicit exemption whitelist', () => {
+    const over: string[] = [];
+    for (const key of messageKeys) {
+      if (DENSITY_EXEMPT[key]) continue;
+      if (zhLength(messages['zh-CN'][key]) > 24) over.push(`zh:${key}(${zhLength(messages['zh-CN'][key])})`);
+      if (enWords(messages.en[key]) > 10) over.push(`en:${key}(${enWords(messages.en[key])})`);
+    }
+    expect(over).toEqual([]);
+    for (const key of Object.keys(DENSITY_EXEMPT)) expect(messageKeys).toContain(key);
   });
   it('switches immediately, persists best-effort, and synchronizes document language', async () => {
     (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;

@@ -206,7 +206,8 @@ export async function createChatApi(options: CreateChatApiOptions): Promise<Fast
       ...(request.query.status === undefined ? {} : { status: request.query.status }),
       ...(request.query.q === undefined ? {} : { q: request.query.q }),
       ...(request.query.archived === undefined ? {} : { archived: request.query.archived === 'true' }),
-      ...(request.query.cursor === undefined ? {} : { cursor: request.query.cursor })
+      ...(request.query.cursor === undefined ? {} : { cursor: request.query.cursor }),
+      ...(request.query.locale === undefined ? {} : { locale: request.query.locale })
     });
     return { schemaVersion: '1', ...result };
   });
@@ -294,6 +295,12 @@ export async function createChatApi(options: CreateChatApiOptions): Promise<Fast
     // SSE 注释行：让代理/中间层（vite dev/preview 的 http-proxy 等）收到首个 data，
     // 立即向客户端转发已被缓冲的响应头；EventSource 会忽略注释行本身。
     reply.raw.write(':ok\n\n');
+    // 心跳注释帧：waitForTimeline 每秒轮询返回，空闲超过间隔时补写 ': ping'，
+    // 供中间代理保活与「连接 live 但无数据帧」的链路诊断；写入与 data 帧同处一个
+    // 控制流，天然规避 write-after-end 竞态。
+    const heartbeatIntervalMs = 20_000;
+    const heartbeatNow = options.now ?? (() => new Date());
+    let lastWriteAt = heartbeatNow().getTime();
     let cursor = afterSequence;
     try {
       while (!controller.signal.aborted) {
@@ -308,10 +315,18 @@ export async function createChatApi(options: CreateChatApiOptions): Promise<Fast
             if (events.at(-1)?.runId === runId) disconnectContext = metricContext;
           }
         }
+        let wroteData = false;
         for (const event of events) {
           if (event.sequence <= cursor) continue;
           reply.raw.write(`id: ${event.sequence}\nevent: timeline\ndata: ${JSON.stringify(event)}\n\n`);
           cursor = event.sequence;
+          wroteData = true;
+        }
+        if (wroteData) {
+          lastWriteAt = heartbeatNow().getTime();
+        } else if (heartbeatNow().getTime() - lastWriteAt >= heartbeatIntervalMs && !reply.raw.destroyed) {
+          reply.raw.write(': ping\n\n');
+          lastWriteAt = heartbeatNow().getTime();
         }
       }
     } finally {

@@ -14,7 +14,7 @@
     "test": "vitest run --exclude '**/dist/**' --exclude '**/dist-types/**' --exclude 'examples/p4-integration/src/p4.integration.test.ts' --exclude 'examples/p5-integration/src/p5.integration.test.ts'",
     "build": "pnpm -r --if-present build",
     "lint": "eslint . --max-warnings=0",
-    "check:deps": "node scripts/check-dependencies.mjs && node scripts/check-agent-client-boundaries.mjs && node scripts/check-pi-boundaries.mjs && node scripts/check-chat-boundaries.mjs && node scripts/check-p4-boundaries.mjs && node scripts/check-p5-boundaries.mjs && node scripts/check-p6-boundaries.mjs && node scripts/check-p7-boundaries.mjs",
+    "check:deps": "node scripts/check-dependencies.mjs && node scripts/check-agent-client-boundaries.mjs && node scripts/check-pi-boundaries.mjs && node scripts/check-chat-boundaries.mjs && node scripts/check-p4-boundaries.mjs && node scripts/check-p5-boundaries.mjs && node scripts/check-p6-boundaries.mjs && node scripts/check-p7-boundaries.mjs && node scripts/check-p8-boundaries.mjs",
     "check-p6-boundaries": "node scripts/check-p6-boundaries.mjs",
     "check-p7-boundaries": "node scripts/check-p7-boundaries.mjs",
     "check:reference-workload": "node scripts/check-reference-workload-boundaries.mjs",
@@ -47,7 +47,9 @@
     "test:p3:integration": "docker compose up -d --wait postgres && P3_POSTGRES_URL=${P3_POSTGRES_URL:-postgres://sage:sage-local-only@127.0.0.1:${SAGE_POSTGRES_PORT:-15432}/sage} vitest run examples/p3-integration/src/p3.integration.test.tsx",
     "test:p4:integration": "docker compose up -d --wait postgres temporal && P4_POSTGRES_URL=${P4_POSTGRES_URL:-postgres://sage:sage-local-only@127.0.0.1:${SAGE_POSTGRES_PORT:-15432}/sage} SAGE_TEMPORAL_ADDRESS=${SAGE_TEMPORAL_ADDRESS:-127.0.0.1:${SAGE_TEMPORAL_PORT:-17233}} vitest run examples/p4-integration/src/p4.integration.test.ts",
     "test:p5:integration": "docker compose up -d --wait postgres temporal && P5_POSTGRES_URL=${P5_POSTGRES_URL:-postgres://sage:sage-local-only@127.0.0.1:${SAGE_POSTGRES_PORT:-15432}/sage} SAGE_TEMPORAL_ADDRESS=${SAGE_TEMPORAL_ADDRESS:-127.0.0.1:${SAGE_TEMPORAL_PORT:-17233}} vitest run examples/p5-integration/src/p5.integration.test.ts",
-    "test:p6:e2e": "pnpm --filter @sage/p6-integration... build && docker compose up -d --wait postgres temporal && P6_POSTGRES_URL=${P6_POSTGRES_URL:-postgres://sage:sage-local-only@127.0.0.1:${SAGE_POSTGRES_PORT:-15432}/sage} SAGE_TEMPORAL_ADDRESS=${SAGE_TEMPORAL_ADDRESS:-127.0.0.1:${SAGE_TEMPORAL_PORT:-17233}} vitest run packages/chat-domain/src/p6-immutability.integration.test.ts packages/task-store-postgres/src/p6-projection.integration.test.ts examples/p6-integration/src/p6.e2e.test.tsx"
+    "test:p6:e2e": "pnpm --filter @sage/p6-integration... build && docker compose up -d --wait postgres temporal && P6_POSTGRES_URL=${P6_POSTGRES_URL:-postgres://sage:sage-local-only@127.0.0.1:${SAGE_POSTGRES_PORT:-15432}/sage} SAGE_TEMPORAL_ADDRESS=${SAGE_TEMPORAL_ADDRESS:-127.0.0.1:${SAGE_TEMPORAL_PORT:-17233}} vitest run packages/chat-domain/src/p6-immutability.integration.test.ts packages/task-store-postgres/src/p6-projection.integration.test.ts examples/p6-integration/src/p6.e2e.test.tsx",
+    "test:p8:integration": "SAGE_TEMPORAL_ADDRESS=${SAGE_TEMPORAL_ADDRESS:-127.0.0.1:17233} vitest run packages/temporal-schedules/src/adapter.temporal.integration.test.ts",
+    "test:p8:exercises": "vitest run scripts/p8/soak.exercise.test.ts", "test:p8:unit": "vitest run packages/temporal-schedules/src/index.test.ts packages/local-fakes/src/schedule-store.test.ts packages/app-contracts/src/index.test.ts packages/agent-state-postgres/src/runtime-migration.test.ts"
   },
   "devDependencies": {
     "@eslint/js": "9.39.2",

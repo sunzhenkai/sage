@@ -7,21 +7,29 @@ import type { AuthenticatedPrincipal } from '@sage/app-contracts';
 import { ChatStore } from '@sage/chat-domain';
 import { InMemoryAgentTaskSpecStore, InMemoryCredentialProvider } from '@sage/local-fakes';
 import { InMemoryAgentReleaseStore } from '@sage/agent-release-registry';
-import { createLiveProviderAgentClient, createLocalKernelComposition, type LiveProviderRoute, type LiveProviderTurnMessage } from '@sage/local-runtime';
-import { createFakeLiveInvoker } from '@sage/harness-pi';
+import { createLocalKernelComposition } from '@sage/local-runtime';
 import { LegacyAgentRunSpecV1Adapter, parseAgentExecutionFeatureConfig, runShadowEngine, selectAgentExecutionMode, type AgentExecutionMode, type AgentLifecycleOwner, type LegacyAdapterResult } from '@sage/agent-client';
 import { PostgresTaskStore } from '@sage/task-store-postgres';
 import { createLocalSecretBackendFromEnv } from '@sage/secret-vault';
 import { CatalogServiceError, CatalogSyncManager, ProviderCatalogService, ProviderCatalogStore } from '@sage/provider-catalog';
+import { InMemoryScheduleControlStore } from '@sage/local-fakes';
+import { TemporalScheduleAdapter } from '@sage/temporal-schedules';
+import { registerSchedulesRoutes } from './schedules-api.js';
+import { registerEffectResolutionsRoute } from './effect-resolutions-api.js';
+import { EffectResolutionService } from './effect-resolution.js';
+import { ServiceTokenAuthenticator } from './service-token.js';
+import { PostgresToolEffectLedger, PostgresTaskRunLogQuery } from '@sage/agent-state-postgres';
 import { TASK_NAMESPACE, TASK_QUEUE } from '@sage/task-domain';
 import { createDevRegistryBundle, publishDevRegistry } from '@sage/temporal-registry';
 import { TemporalClientFactory, TrustedMultiTargetTaskController, TrustedTemporalRouter } from '@sage/temporal-routing';
+import type { TrustedPrincipal } from '@sage/platform-ports';
 import { ChatPromotionAuthorizer, createChatApi, registerTaskRoutes } from './index.js';
 import { startChatKernelExecution, type ChatCanonicalCompatibilityOptions } from './chat-compatibility.js';
 import { registerProviderCatalogRoutes } from './catalog-api.js';
 import { registerPackagesRoutes } from './packages-api.js';
 import { registerAppsRoutes } from './apps-api.js';
 import { registerPackageRunsRoutes, type ResolvedReleaseLockPayload } from './runs-api.js';
+import { buildSnapshotEgressConnector, SNAPSHOT_EGRESS_ALLOWLIST_ENV } from './package-snapshots.js';
 import { registerRunAgentSettingsRoutes } from './run-agent-settings-api.js';
 import { bootstrapDeploymentEnvProviderConnection, registerProviderConnectionRoutes } from './provider-connections-api.js';
 import { createRunOutputArtifactResolver } from './run-output-resolver.js';
@@ -183,15 +191,8 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
   };
     const authenticate = (authenticationId?: string): AuthenticatedPrincipal | undefined =>
       authenticationId === undefined || authenticationId === config.principal.authenticationId ? config.principal : undefined;
-    // 受信测试开关：显式配置时 chat 的 live client 以进程内确定性 invoker 替换最终模型 HTTP 调用，
-    // 设置→注册表解析→harness 路由链路保真；未配置时走真实 provider。
-    const fakeLiveProvider = (config.secretEnv ?? process.env).SAGE_FAKE_LIVE_PROVIDER === 'true';
     app = await createChatApi({
       store: chat, tenantId: config.tenantId,
-      ...(fakeLiveProvider
-        ? { liveClientFactory: (input: { route: LiveProviderRoute; transcript: readonly LiveProviderTurnMessage[] }) =>
-            createLiveProviderAgentClient({ route: input.route, transcript: input.transcript, invoker: createFakeLiveInvoker() }) }
-        : {}),
       providerConnections: tasks,
       secretBackend,
       ...(canonicalCompatibility === undefined ? {} : { canonicalCompatibility }),
@@ -206,7 +207,8 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
       tenantId: config.tenantId, authenticator, authorizer: { authorize: (principal, operation) =>
         principal.tenantId === config.tenantId && (operation === 'read' || principal.roles.includes('task-operator')) },
       queryStore: tasks, deploymentMode: 'development',
-      artifactResolver: createRunOutputArtifactResolver({ tenantId: config.tenantId, lookup: tasks })
+      artifactResolver: createRunOutputArtifactResolver({ tenantId: config.tenantId, lookup: tasks }),
+      runLogQuery: new PostgresTaskRunLogQuery({ connectionString: config.postgresUrl })
     });
     const packageStore = new InMemoryAgentReleaseStore();
     const packageSpecStore = new InMemoryAgentTaskSpecStore();
@@ -238,8 +240,94 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
       settingsStore: tasks,
       providerConnections: tasks,
       authenticator,
-      deploymentMode: 'local'
+      deploymentMode: 'local',
+      snapshotConnector: buildSnapshotEgressConnector(process.env[SNAPSHOT_EGRESS_ALLOWLIST_ENV])
     });
+    // P8：service token（配置即强认证）+ schedules 管理链路 + dispatcher 内部解析端点。
+    const serviceToken = ServiceTokenAuthenticator.fromEnv(process.env, config.tenantId);
+    // schedules 管理链路口径（与运行门「schedule 管理必须服务身份认证」一致）：
+    // 配置了 SAGE_SERVICE_TOKEN_HASHES 时只认 Bearer service token（stub 信任头不提权）；
+    // 未配置时对所有请求 fail closed（401）。浏览器侧凭据由 agent-web 同源代理在服务端注入（SAGE_SERVICE_TOKEN），不在浏览器持有。
+    registerSchedulesRoutes(app, {
+      tenantId: config.tenantId,
+      store: new InMemoryScheduleControlStore(),
+      adapter: await TemporalScheduleAdapter.connect({ address: config.temporalAddress, namespace: 'sage-dev' }),
+      releaseResolver: {
+        async resolveRelease(tenantId, releaseId) {
+          try {
+            const resolution = packageStore.resolveImmutableRelease(tenantId, `release://${releaseId}`);
+            const stored = packageStore.getStoredRelease(tenantId, `release://${releaseId}`);
+            const lockPayload = stored === undefined ? {} : (stored.lockPayload as ResolvedReleaseLockPayload);
+            const manifest = lockPayload.manifest;
+            const assets = (lockPayload.assets ?? []).filter((asset) => typeof asset.content === 'string');
+            const entry = manifest === undefined ? undefined : assets.find((asset) => asset.relativePath === manifest.entry);
+            return {
+              release: { releaseRef: resolution.release.releaseRef, releaseId: resolution.release.releaseId, contentDigest: resolution.release.contentDigest },
+              ...(manifest === undefined ? {} : { manifest }),
+              ...(entry === undefined ? {} : { entryPrompt: entry.content }),
+              references: assets.filter((asset) => asset.kind === 'reference').map((asset) => ({ relativePath: asset.relativePath, content: asset.content }))
+            };
+          } catch {
+            return undefined;
+          }
+        }
+      },
+      authenticator: { authenticateRequest: (request) => serviceToken?.authenticateRequest(request) },
+      audit: { append: async (input: { readonly tenantId: string; readonly occurredAt: string; readonly category: 'schedule'; readonly decision: string; readonly reasonCode: string; readonly actorRef: string; readonly correlation: Readonly<Record<string, string | number>>; readonly authorityDigest: string }) => { process.stdout.write(`[schedule-audit] ${JSON.stringify(input)}\n`); } },
+    });
+    const scheduleDispatchToken = serviceToken;
+    app.get<{ Params: { releaseId: string } }>('/internal/schedule-dispatch/releases/:releaseId', async (request, reply) => {
+      if (scheduleDispatchToken === undefined) return reply.code(503).send({ error: { code: 'SCHEDULE_DISPATCH_AUTH_UNCONFIGURED', retryable: false } });
+      const authorization = request.headers.authorization;
+      const token = typeof authorization === 'string' && authorization.startsWith('Bearer ') ? authorization.slice(7).trim() : '';
+      if (scheduleDispatchToken.verify(token) === undefined) return reply.code(401).send({ error: { code: 'SCHEDULE_AUTHENTICATION_REQUIRED', retryable: false } });
+      try {
+        const resolution = packageStore.resolveImmutableRelease(config.tenantId, `release://${request.params.releaseId}`);
+        const stored = packageStore.getStoredRelease(config.tenantId, `release://${request.params.releaseId}`);
+        const lockPayload = stored === undefined ? {} : (stored.lockPayload as ResolvedReleaseLockPayload);
+        const manifest = lockPayload.manifest;
+        const assets = (lockPayload.assets ?? []).filter((asset) => typeof asset.content === 'string');
+        const entry = manifest === undefined ? undefined : assets.find((asset) => asset.relativePath === manifest.entry);
+        const declaredSchemaAsset = manifest === undefined ? undefined : assets.find((asset) => manifest.tasks?.some((task) => task.output?.schema === asset.relativePath));
+        return reply.code(200).send({
+          release: { releaseRef: resolution.release.releaseRef, releaseId: resolution.release.releaseId, releaseDigest: resolution.release.contentDigest, packageId: resolution.release.packageId, packageVersion: resolution.release.packageVersion, ownerRef: resolution.release.ownerRef, engineIds: resolution.release.compatibility.engineIds, kernelContractMajor: resolution.release.compatibility.kernelContractMajor },
+          ...(manifest === undefined ? {} : { manifest }),
+          ...(entry === undefined ? {} : { entryPrompt: entry.content }),
+          references: assets.filter((asset) => asset.kind === 'reference').map((asset) => ({ relativePath: asset.relativePath, content: asset.content })),
+          ...(declaredSchemaAsset === undefined ? {} : { declaredSchemaAsset: { relativePath: declaredSchemaAsset.relativePath, content: declaredSchemaAsset.content } })
+        });
+      } catch {
+        return reply.code(404).send({ error: { code: 'RELEASE_NOT_FOUND', retryable: false } });
+      }
+    });
+
+    // P8：统一裁决端点（D6）。本地模式以 Postgres effect 台账 + service token 认证；
+    // 动作执行走任务控制面 retry/cancel（「未提交+继续」新 attempt，「已提交+继续」Ledger replay 幂等）。
+    const effectLedger = new PostgresToolEffectLedger({ connectionString: config.postgresUrl });
+    registerEffectResolutionsRoute(app, {
+      service: new EffectResolutionService(effectLedger, {
+        append: async (input) => { process.stdout.write(`[resolution-audit] ${JSON.stringify(input)}\n`); return { auditRef: `audit://${input.category}` }; },
+        query: async () => ({ records: [] }),
+        health: async () => ({ healthy: true, checkedAt: new Date().toISOString() })
+      }),
+      ledger: effectLedger,
+      authenticator: {
+        authenticate: async (input): Promise<TrustedPrincipal> => {
+          const token = input.authorization === undefined ? '' : input.authorization.startsWith('Bearer ') ? input.authorization.slice(7).trim() : '';
+          const verified = serviceToken === undefined ? undefined : serviceToken.verify(token);
+          if (serviceToken === undefined) {
+            // 本地未配置 service token：trust-header stub（与既有链路的本地回退一致）。
+            const header = input.authorization;
+            if (typeof header === 'string' && header.startsWith('Bearer ')) return { principalRef: 'service-token://dev', tenantId: config.tenantId, maximumScopes: ['effect:resolve'], subject: 'local', issuer: 'local', authenticatedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 300_000).toISOString() };
+          }
+          if (verified === undefined) throw new Error('IDENTITY_INVALID');
+          return { principalRef: verified.principalId, tenantId: config.tenantId, maximumScopes: ['effect:resolve'], subject: verified.principalId, issuer: 'service-token', authenticatedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 300_000).toISOString() };
+        }
+      },
+      expectedAudience: 'sage-api',
+      taskControl: { retry: async (taskId) => controller.retry(taskId), cancel: async (taskId) => controller.cancel(taskId) }
+    });
+
     const bootstrapEnv = config.secretEnv ?? process.env;
     try {
       const bootstrap = await bootstrapDeploymentEnvProviderConnection(tasks, secretBackend, bootstrapEnv, config.tenantId);
@@ -262,9 +350,9 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
           tasks.listTaskViews(config.tenantId, { limit: 1 }),
           temporalReady(config.temporalAddress)
         ]);
-        return { status: 'ready', secretBackend: { mode: secretBackendMode }, providerExecution: { mode: fakeLiveProvider ? 'fake' : 'live' } };
+        return { status: 'ready', secretBackend: { mode: secretBackendMode } };
       } catch {
-        return reply.code(503).send({ status: 'not_ready', dependencies: ['postgres', 'temporal'], secretBackend: { mode: secretBackendMode }, providerExecution: { mode: fakeLiveProvider ? 'fake' : 'live' } });
+        return reply.code(503).send({ status: 'not_ready', dependencies: ['postgres', 'temporal'], secretBackend: { mode: secretBackendMode } });
       }
     });
     const close = async (): Promise<void> => {

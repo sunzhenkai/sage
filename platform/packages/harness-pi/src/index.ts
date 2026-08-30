@@ -48,6 +48,17 @@ export type LiveProviderInvoker = (input: {
 
 const SYSTEM_PROMPT = 'You are Sage, a local workspace assistant. Answer the user directly and concisely in the language they use.';
 
+/**
+ * 目录（models.dev）的 api 字段按 OpenAI 约定含版本段（…/v1），而 Anthropic 兼容端点
+ * 以「baseURL + /v1/messages」寻址：直接透传会产生 …/v1/v1/messages 并稳定 404
+ * （真实案例：MiniMax anthropic 端点返回 "404 page not found"）。在唯一发起边界归一化，
+ * 剥掉尾部版本段；无版本段的 baseURL 不受影响。
+ */
+export const anthropicSdkBaseUrl = (baseUrl: string): string => baseUrl.replace(/\/v1\/?$/u, '');
+
+const modelBaseUrlFor = (route: LiveProviderRoute): string =>
+  route.adapterKind === 'anthropic' ? anthropicSdkBaseUrl(route.baseUrl) : route.baseUrl;
+
 const piMessages = (messages: readonly LiveProviderTurnMessage[]): PiMessage[] => messages.map((message): PiMessage => {
   if (message.role === 'user') {
     const user: UserMessage = { role: 'user', content: message.text, timestamp: Date.now() };
@@ -119,7 +130,7 @@ export const defaultLiveInvoker: LiveProviderInvoker = async ({ route, systemPro
     name: route.modelId,
     api: route.adapterKind === 'anthropic' ? 'anthropic-messages' : 'openai-completions',
     provider: route.adapterKind,
-    baseUrl: route.baseUrl,
+    baseUrl: modelBaseUrlFor(route),
     reasoning: false,
     input: ['text'],
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },

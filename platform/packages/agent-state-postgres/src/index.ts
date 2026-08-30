@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { isDeepStrictEqual } from 'node:util';
 import { Pool, type PoolConfig, type QueryResultRow } from 'pg';
+import type { AgentEventV2 } from '@sage/agent-contracts';
 import {
   assertNoSensitiveData,
   assertReferenceEnvelope,
@@ -13,6 +14,9 @@ import {
   type AgentEventStorePort,
   type AgentEventWriterFence,
   type AgentTaskSpecStorePort,
+  type TaskRunLogAttemptSummary,
+  type TaskRunLogQueryPort,
+  TASK_RUN_LOG_PAGE_LIMIT_MAX,
   type BoundedRunReceiptStorePort,
   type CheckpointStorePort,
   type AgentCheckpointRecord,
@@ -66,8 +70,10 @@ export class PostgresAgentStateAdapter extends PostgresPort implements AgentStat
   async migrate(): Promise<void> {
     const migrations = await Promise.all([
       '001_agent_state.sql', '002_canonical_agent_authority.sql', '003_runtime_kernel_broker.sql',
-      '004_agent_package_release_registry.sql', '005_production_governance_core.sql',
-      '006_production_rls_roles.sql', '007_artifact_checkpoint_lifecycle.sql', '008_supply_chain_governance.sql'
+      // RLS 引导（sage_security schema/函数/角色）先于 005：005 的表策略引用 sage_security.current_tenant_id()。
+      '004_agent_package_release_registry.sql', '004_production_rls_bootstrap.sql', '005_production_governance_core.sql',
+      '006_production_rls_roles.sql',
+      '007_artifact_checkpoint_lifecycle.sql', '008_supply_chain_governance.sql', '009_p8_schedule_plane.sql'
     ].map(async (name) => ({ name, sql: await readFile(new URL(`../migrations/${name}`, import.meta.url), 'utf8') })));
     const client = await this.pool.connect();
     try {
@@ -315,10 +321,37 @@ export class PostgresAgentAuthorityStore extends PostgresPort implements Canonic
   }
 }
 
+/**
+ * Read-only run-log queries over `canonical_agent_events` for the operations API.
+ * Never mutates event authority state; ordering keys stay on the primary key prefix.
+ */
+export class PostgresTaskRunLogQuery extends PostgresPort implements TaskRunLogQueryPort {
+  async listAttemptSummaries(input: { readonly tenantId: string; readonly taskId: string }): Promise<readonly TaskRunLogAttemptSummary[]> {
+    const rows = (await this.query<AttemptSummaryRow>('listRunLogAttemptSummaries', `SELECT run_id, attempt_id, COUNT(*)::integer AS event_count,
+      MIN(sequence)::integer AS first_sequence, MAX(sequence)::integer AS last_sequence, MAX(created_at) AS last_written_at
+      FROM canonical_agent_events WHERE tenant_id=$1 AND task_id=$2
+      GROUP BY run_id, attempt_id ORDER BY MAX(created_at) DESC, run_id DESC, attempt_id DESC`, [input.tenantId, input.taskId])).rows;
+    return rows.map((row) => ({
+      runId: row.run_id, attemptId: row.attempt_id, eventCount: row.event_count,
+      firstSequence: row.first_sequence, lastSequence: row.last_sequence, lastWrittenAt: row.last_written_at.toISOString()
+    }));
+  }
+
+  async listRunLogEvents(input: Parameters<TaskRunLogQueryPort['listRunLogEvents']>[0]): Promise<readonly AgentEventV2[]> {
+    const fromSequence = Math.max(input.fromSequence ?? 1, 1);
+    const limit = Math.min(Math.max(input.limit ?? 200, 1), TASK_RUN_LOG_PAGE_LIMIT_MAX);
+    const rows = (await this.query<EventAuthorityRow>('listRunLogEvents', `SELECT * FROM canonical_agent_events
+      WHERE tenant_id=$1 AND task_id=$2 AND run_id=$3 AND attempt_id=$4 AND sequence >= $5
+      ORDER BY sequence LIMIT $6`, [input.tenantId, input.taskId, input.runId, input.attemptId, fromSequence, limit])).rows;
+    return rows.map((row) => row.event as AgentEventV2);
+  }
+}
+
 interface SpecRow extends QueryResultRow { spec_digest: string; spec: unknown }
 interface ReceiptRow extends QueryResultRow { receipt_digest: string; receipt: unknown }
 interface FenceRow extends QueryResultRow { owner_token: string; epoch: number | string }
 interface EventAuthorityRow extends QueryResultRow { event: unknown }
+interface AttemptSummaryRow extends QueryResultRow { run_id: string; attempt_id: string; event_count: number; first_sequence: number; last_sequence: number; last_written_at: Date }
 interface CandidateRow extends QueryResultRow { candidate: unknown }
 interface SealedCheckpointRow extends QueryResultRow { checkpoint: unknown }
 interface SealedLookupRow extends QueryResultRow { checkpoint: unknown; candidate: unknown }
@@ -326,6 +359,7 @@ interface SealedLookupRow extends QueryResultRow { checkpoint: unknown; candidat
 export * from './governance-store.js';
 export * from './effect-ledger.js';
 export * from './consumption-ledger.js';
+export * from './schedule-store.js';
 export * from './artifact-checkpoint-store.js';
 export * from './audit-store.js';
 export * from './checkpoint-lifecycle.js';

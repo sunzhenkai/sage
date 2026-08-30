@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Chat 短请求 Agent Run 时序",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "viewBox": [900, 780],
+    "views": [
+      { "id": "request-intake", "label": "请求接入", "focus": ["browser", "agent-api", "chat-domain"], "note": "创建 Session 并写入 message.start 事件。" },
+      { "id": "agent-loop", "label": "Agent Loop", "focus": ["agent-client", "agent-lib", "model-broker", "agent-state"], "note": "PiHarness 调度，副作用先落 Effect Ledger。" },
+      { "id": "sse-return", "label": "流式返回", "focus": ["agent-lib", "agent-api", "browser"], "note": "SSE 推送 delta / tool / artifact / done 事件。" }
+    ]
+  },
+  "participants": [
+    { "id": "browser", "type": "external", "label": "浏览器", "sublabel": "agent-web" },
+    { "id": "agent-api", "type": "backend", "label": "agent-api", "sublabel": "Fastify" },
+    { "id": "chat-domain", "type": "backend", "label": "chat-domain", "sublabel": "history" },
+    { "id": "agent-client", "type": "backend", "label": "agent-client", "sublabel": "LocalClient" },
+    { "id": "agent-lib", "type": "backend", "label": "agent-lib", "sublabel": "kernel" },
+    { "id": "model-broker", "type": "cloud", "label": "model-broker", "sublabel": "Provider" },
+    { "id": "agent-state", "type": "database", "label": "agent-state", "sublabel": "Postgres" }
+  ],
+  "segments": [
+    { "from": 150, "to": 280, "label": "接入" },
+    { "from": 300, "to": 580, "label": "Agent Loop" },
+    { "from": 600, "to": 720, "label": "流式返回" }
+  ],
+  "messages": [
+    { "id": "post-chat", "from": "browser", "to": "agent-api", "y": 170, "label": "POST /v1/chat", "variant": "emphasis" },
+    { "id": "append-start", "from": "agent-api", "to": "chat-domain", "y": 210, "label": "appendEvent(start)" },
+    { "id": "insert-stream", "from": "chat-domain", "to": "agent-state", "y": 250, "label": "INSERT stream_event" },
+    { "id": "run-agent", "from": "agent-api", "to": "agent-client", "y": 310, "label": "runAgent(spec)", "variant": "emphasis" },
+    { "id": "start-loop", "from": "agent-client", "to": "agent-lib", "y": 350, "label": "runLoop" },
+    { "id": "call-provider", "from": "agent-lib", "to": "model-broker", "y": 390, "label": "callProvider" },
+    { "id": "provider-request", "from": "model-broker", "to": "agent-state", "y": 430, "label": "HTTPS POST LLM" },
+    { "id": "provider-response", "from": "model-broker", "to": "agent-lib", "y": 470, "label": "content/tool_call", "variant": "return" },
+    { "id": "record-effect", "from": "agent-lib", "to": "agent-state", "y": 510, "label": "recordEffect", "variant": "emphasis" },
+    { "id": "stream-event", "from": "agent-lib", "to": "agent-api", "y": 610, "label": "stream event" },
+    { "id": "sse-delta", "from": "agent-api", "to": "browser", "y": 650, "label": "SSE delta / done", "variant": "return" },
+    { "id": "final-state", "from": "agent-api", "to": "agent-state", "y": 690, "label": "UPDATE run state" }
+  ],
+  "activations": [
+    { "participant": "agent-api", "from": 160, "to": 720, "type": "backend" },
+    { "participant": "chat-domain", "from": 200, "to": 270, "type": "backend" },
+    { "participant": "agent-client", "from": 300, "to": 560, "type": "backend" },
+    { "participant": "agent-lib", "from": 340, "to": 590, "type": "backend" },
+    { "participant": "model-broker", "from": 380, "to": 490, "type": "cloud" },
+    { "participant": "agent-state", "from": 240, "to": 270, "type": "database" },
+    { "participant": "agent-state", "from": 420, "to": 450, "type": "database" },
+    { "participant": "agent-state", "from": 500, "to": 530, "type": "database" },
+    { "participant": "agent-state", "from": 690, "to": 720, "type": "database" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "同步路径", "items": ["短请求在 HTTP 连接内完成", "Chat Session 创建与 message.start 同事务落库", "AgentRun 在单进程内推进"] },
+    { "dot": "emerald", "title": "副作用先记账", "items": ["每次 LLM / Tool 调用先写 Effect Ledger", "ReferenceEnvelope 强制不内联大对象", "失败时已发生的 Effect 保留，Run 可重放"] },
+    { "dot": "amber", "title": "流式输出", "items": ["SSE 推送 message.delta / tool.start / tool.end / artifact.ref / error / done", "前端在收到 done 后关闭连接"] }
+  ]
+}

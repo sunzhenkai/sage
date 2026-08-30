@@ -99,7 +99,8 @@ export const AgentRunSpecSchema = Type.Object({
   schemaVersion: Type.Literal('1'),
   runId: Type.String({ minLength: 1, maxLength: 128 }),
   sessionRef: Type.Optional(Type.String({ pattern: '^session://' })),
-  input: Type.String({ minLength: 1, maxLength: 100_000 }),
+  // 输入上限对齐平台输入快照上限（512 KiB）：声明数据源的组装输入可合法达到该量级。
+  input: Type.String({ minLength: 1, maxLength: 512 * 1024 }),
   skillRefs: Type.Array(Type.String({ minLength: 1 }), { maxItems: 32 }),
   requiredCapabilities: Type.Array(HarnessCapabilitySchema, { uniqueItems: true }),
   limits: Type.Object({

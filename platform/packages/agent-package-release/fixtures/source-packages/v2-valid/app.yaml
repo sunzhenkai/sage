@@ -1,0 +1,31 @@
+schemaVersion: '2'
+id: v2-demo
+version: 1.0.0
+description: v2 声明演示源包
+entry: prompts/system.md
+modelRoute:
+  provider: anthropic
+  model: claude-sonnet-4-5
+inputs:
+  - name: window
+    type: enum
+    enum: [1, 7, 30]
+    default: 7
+  - name: language
+    type: string
+    default: ""
+    required: false
+dataSources:
+  - name: weekly-digest
+    ref: capability://web-snapshot-reader/v1
+    url: https://api.github.com/search/repositories?sort=stars
+    maxBytes: 262144
+    onFailure: markMissing
+tasks:
+  - name: digest
+    entry: prompts/system.md
+    params:
+      window: 30
+    output:
+      schema: output.schema.json
+      files: [report.md]

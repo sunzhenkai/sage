@@ -2,7 +2,6 @@
 
 ## Purpose
 This specification defines the canonical agent-package-release behavior, authority boundaries, compatibility rules, and fail-closed scenarios synchronized from the implemented T0005 delivery sequence.
-
 ## Requirements
 ### Requirement: 声明式 AgentPackage schema 与安全边界
 系统 SHALL 提供显式 major 版本、严格校验且有界的 `AgentPackage` schema，只允许 metadata、agent definition、Skill requirements、Capability requirements、Context plan、Model requirements、输入/输出 schema、Policy、Budget、eval cases、可选 plan hints 和 View metadata。普通 Package MUST NOT 包含或加载动态原生代码、WASM/脚本、远程 include、Secret/credential bytes、物理 endpoint/namespace/task queue、数据库或表标识、SQL/MQL、自定义前端代码或基础设施 SDK 配置。
@@ -89,6 +88,13 @@ Compiler SHALL 从已验证 lock 和 attestations 生成内容寻址的 `AgentPa
 ### Requirement: 源包目录规范与 manifest 契约
 系统 SHALL 定义 ai app 源包的目录规范与 manifest 契约：根目录必含 `app.yaml`（package id、version、description、entry prompt 引用、模型路由要求、budgets、skillRefs、capabilityRefs），可选包含 `prompts/*.md`、`references/*.md`、`output.schema.json`；manifest 校验 SHALL 拒绝未知字段与缺失必填字段，目录校验 SHALL 拒绝未声明资产与路径穿越。源包 SHALL NOT 包含可执行脚本、动态 include 或 Secret。
 
+声明 `schemaVersion: '2'` 的 manifest 额外接受三个可选声明块，全部缺省时语义与 v1 逐字节等价：
+- `inputs`（≤8 条）：App 级参数定义，每项含唯一 `name`、`type ∈ {string, enum, number}`（enum 须带非空 `enum` 值集）、可选 `default`（须通过类型校验）与 `required`（缺省 false；无 default 且 required 的参数由准入强制提供）。
+- `dataSources`（≤8 条）：声明式外部数据依赖，每项含唯一 `name`、`ref`（`capability://` scheme）、`url`（public HTTPS、无凭据/fragment）、可选 `maxBytes`（≤ 512 KiB 平台上限）与 `onFailure ∈ {fail, markMissing}`（缺省 `fail`）。
+- `tasks`（≤16 条）：命名执行入口，每项含唯一 `name`、可选 `entry`（缺省继承顶层 entry，指向包内存在的 prompt 资产）、可选 `params`（绑定映射，值只可引用已声明的 `inputs` 名或字面量，缺省继承全部 inputs 默认绑定）与可选 `output`（`schema` 指向包内存在的 schema 资产、`files` 为非空产物名清单）。
+
+编译器 SHALL 将归一化后的声明（含隐式单任务展开）透传进 Release lock 的 manifest 摘要；`capabilityRefs` 保持纯声明语义。校验 SHALL 拒绝：越界清单、重复 name、引用不存在的 entry/schema 资产、params 绑定引用未声明 input、非法 URL、default 类型不符。
+
 #### Scenario: 合法源包通过校验
 - **WHEN** 校验器加载一个由 `app.yaml` 与若干 prompts/references/output schema 组成的源包目录
 - **THEN** 校验通过并返回结构化的包描述（资产相对路径、digest、manifest 内容）
@@ -100,6 +106,18 @@ Compiler SHALL 从已验证 lock 和 attestations 生成内容寻址的 `AgentPa
 #### Scenario: 目录包含未声明或危险资产
 - **WHEN** 目录中出现 manifest 未声明的文件、跨出包根的路径引用、可执行脚本或疑似 Secret
 - **THEN** 校验器拒绝该源包并返回稳定错误码，不读取资产内容进结果
+
+#### Scenario: v2 声明通过校验并进入 lock
+- **WHEN** manifest 声明了有界的 inputs/dataSources/tasks 且引用的 entry/schema 资产均存在
+- **THEN** 编译通过，归一化声明（含任务展开）透传进 Release lock 的 manifest 摘要
+
+#### Scenario: 无新字段的 v1 包逐字节等价
+- **WHEN** 编译一个不含任何 v2 声明的既有源包
+- **THEN** 编译产物（Release、lock、digest）与 v1 行为逐字节一致，隐式单任务展开仅出现在 lock 摘要的规范化表示中且不改变 digest 输入
+
+#### Scenario: v2 声明非法被拒绝
+- **WHEN** 清单越界（>8 inputs/dataSources 或 >16 tasks）、name 重复、dataSources URL 非 HTTPS 或含凭据/fragment、maxBytes 超平台上限、tasks 引用不存在的资产、params 绑定引用未声明的 input、default 类型不符
+- **THEN** manifest 校验以稳定错误拒绝该源包，列出违规路径，不产生部分结果
 
 ### Requirement: 本地源包编译为不可变 Release
 系统 SHALL 提供本地编译器将校验通过的源包目录编译为 canonical `AgentPackageRelease.v1`：计算全部资产与 manifest 的内容 digest，生成资产 lock，并以确定性方式填充 provenance 必填字段（本地占位，compilerBuild 标识 local-dev）。编译 SHALL 可复现：相同源内容重复编译产出相同 Release；任何资产或 manifest 变更 SHALL 改变 contentDigest 与 lockDigest。
@@ -115,3 +133,4 @@ Compiler SHALL 从已验证 lock 和 attestations 生成内容寻址的 `AgentPa
 #### Scenario: 内容变化改变 digest
 - **WHEN** 源包内任一资产或 manifest 字段发生变更后重新编译
 - **THEN** 新 Release 的 contentDigest 与 lockDigest 均不同于旧值
+

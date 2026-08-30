@@ -222,4 +222,43 @@ describe('WorkspaceApp layout/content separation', () => {
     expect(tree.root.findAllByProps({ className: 'sidebar' })).toHaveLength(1);
     await act(async () => { tree.unmount(); });
   });
+
+  it('returns from task detail to the task list when the task param leaves the URL', async () => {
+    vi.stubGlobal('document', { documentElement: { lang: '' } });
+    const fakeWindow = new FakeWindow();
+    fakeWindow.history.pushState(null, '', '/?view=tasks');
+    fakeWindow.history.pushState(null, '', '/?view=tasks&task=task-a');
+    vi.stubGlobal('window', fakeWindow);
+    const taskView = { taskId: 'task-a', taskType: 'sage.agent-task.v1', workflowId: 'workflow-task-a', targetId: 'target-local', attempt: 1, status: 'running', revision: 1, projectionUpdatedAt: '2026-08-14T00:00:00.000Z', freshness: 'fresh', targetSnapshot: { targetId: 'target-local', environment: 'development', namespace: 'sage-dev', taskQueue: 'sage-local' } };
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/v1/tasks')) return response({ tasks: [taskView] });
+      if (url.endsWith('/v1/tasks/task-a')) return response(taskView);
+      if (url.endsWith('/task-a/events')) return response({ events: [] });
+      if (url.endsWith('/task-a/artifacts')) return response({ artifacts: [] });
+      throw new Error(`unexpected ${url}`);
+    }) as typeof fetch;
+    let tree!: ReturnType<typeof create>;
+    await act(async () => {
+      tree = create(<LocaleProvider><WorkspaceApp fetcher={fetcher} /></LocaleProvider>);
+      await flush(); await flush(); await flush();
+    });
+    // 任务详情已展示。
+    expect(tree.root.findAllByProps({ className: 'task-detail' })).toHaveLength(1);
+    // 「← 全部任务」/ 侧栏「任务」：客户端导航摘掉 task 参数后必须回到列表。
+    await act(async () => {
+      navigate('?view=tasks');
+      await flush(); await flush();
+    });
+    expect(tree.root.findAllByProps({ className: 'task-detail' })).toHaveLength(0);
+    expect(tree.root.findAllByProps({ className: 'task-list-section' })).toHaveLength(1);
+    // 浏览器前进/后退同样恢复详情。
+    await act(async () => {
+      fakeWindow.history.pushState(null, '', '/?view=tasks&task=task-a');
+      fakeWindow.dispatchEvent(new Event('popstate'));
+      await flush(); await flush();
+    });
+    expect(tree.root.findAllByProps({ className: 'task-detail' })).toHaveLength(1);
+    await act(async () => { tree.unmount(); });
+  });
 });

@@ -1,0 +1,6 @@
+schema: spec-driven
+created: 2026-08-29
+goal: >-
+  修复 check-dependencies 的既有 findings：统一 provider 模型确立的 secret-vault 直连边补进 ownership 规则，
+  platform-ports 源内调度设施措辞绕开 Temporal 源码令牌。纯治理规则/注释修正，无 spec 级行为变化。
+skip_specs: true

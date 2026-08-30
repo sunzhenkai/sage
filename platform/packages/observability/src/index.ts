@@ -119,7 +119,8 @@ export type P6MetricName=
   |'sage_chat_task_promotions_total'|'sage_task_route_decisions_total'|'sage_task_worker_attempt_total'
   |'sage_task_projection_lag_ms'|'sage_task_reconcile_retryable_failure_total'
   |'sage_artifact_store_unavailable_total'|'sage_temporal_target_unavailable_total'
-  |'sage_task_effect_unknown_total'|'sage_task_projection_drift_total';
+  |'sage_task_effect_unknown_total'|'sage_task_projection_drift_total'
+  |'sage_task_projection_event_append_failed_total';
 export interface P6Correlation{readonly tenant_id:string;readonly message_id:string;readonly session_id:string;readonly run_id:string;readonly task_id:string;readonly workflow_id:string;readonly target_id:string;readonly attempt:number}
 export interface P6TelemetryRecorder{record(name:P6MetricName,value:number,correlation:P6Correlation,fields?:Readonly<Record<string,unknown>>):void}
 export class OtlpP6TelemetryRecorder implements P6TelemetryRecorder{
@@ -272,4 +273,24 @@ export function recordAgentPlatformCorrelation(
     stage: metric.stage, outcome: metric.outcome, reason_code: metric.reasonCode,
   });
   return metric;
+}
+
+// ===== P8 Schedule 触发观测（低基数：metrics 只带 outcome/reason_code，schedule 标识进日志字段） =====
+export type ScheduleTriggerOutcome = 'succeeded' | 'failed' | 'skipped' | 'missed';
+export interface ScheduleTriggerSignalInput {
+  readonly outcome: ScheduleTriggerOutcome;
+  readonly reasonCode?: string;
+  /** 日志/追踪可保留的关联标识（schedule/occurrence/task）；metrics label 不含高基数标识。 */
+  readonly correlation?: Readonly<Record<string, unknown>>;
+}
+export const scheduleTriggerMetricName = 'sage_schedule_trigger_total';
+export function recordScheduleTriggerSignal(
+  observability: AgentObservability,
+  input: ScheduleTriggerSignalInput
+): void {
+  const reasonCode = (input.reasonCode ?? 'none').slice(0, 64);
+  try {
+    observability.metricLowCardinality(scheduleTriggerMetricName, 1, { outcome: input.outcome, reason_code: reasonCode });
+    observability.log(`schedule.trigger.${input.outcome}`, { outcome: input.outcome, reason_code: reasonCode, ...sanitizeTelemetry(input.correlation ?? {}) });
+  } catch { /* Telemetry cannot change dispatch semantics */ }
 }

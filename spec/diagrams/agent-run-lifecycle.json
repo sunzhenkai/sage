@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "AgentRun 状态机",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "viewBox": [1000, 720],
+    "views": [
+      { "id": "main-path", "label": "主路径", "focus": ["queued", "running", "succeeded"], "note": "Run 从排队到成功完成的标准路径。" },
+      { "id": "input-wait", "label": "等待输入", "focus": ["running", "awaiting-input", "succeeded"], "note": "Run 暂停等待用户输入后恢复。" },
+      { "id": "terminal-exits", "label": "终态退出", "focus": ["running", "failed", "cancelled"], "note": "失败可重试，取消为终态。" }
+    ]
+  },
+  "lanes": [
+    { "id": "main", "label": "主生命周期" },
+    { "id": "waiting", "label": "等待" },
+    { "id": "terminal", "label": "终态" }
+  ],
+  "states": [
+    { "id": "queued", "type": "start", "label": "queued", "sublabel": "请求已接受", "lane": "main", "col": 0, "tag": "entry" },
+    { "id": "running", "type": "active", "label": "running", "sublabel": "执行中", "lane": "main", "col": 1, "tag": "work" },
+    { "id": "awaiting-input", "type": "waiting", "label": "awaiting_input", "sublabel": "等待用户输入", "lane": "waiting", "col": 2, "tag": "pause" },
+    { "id": "succeeded", "type": "success", "label": "succeeded", "sublabel": "成功完成", "lane": "main", "col": 4, "tag": "done" },
+    { "id": "failed", "type": "failure", "label": "failed", "sublabel": "可重试失败", "lane": "terminal", "col": 0, "tag": "retryable" },
+    { "id": "cancelled", "type": "failure", "label": "cancelled", "sublabel": "用户取消", "lane": "terminal", "col": 2, "tag": "terminal" }
+  ],
+  "transitions": [
+    { "id": "start", "from": "queued", "to": "running", "label": "start", "variant": "emphasis", "labelAt": [170, 140] },
+    { "id": "need-input", "from": "running", "to": "awaiting-input", "label": "need input", "variant": "default", "labelAt": [390, 210] },
+    { "id": "resume", "from": "awaiting-input", "to": "running", "label": "resume", "variant": "emphasis", "labelAt": [390, 250] },
+    { "id": "complete", "from": "running", "to": "succeeded", "label": "complete", "variant": "emphasis", "route": "straight", "labelAt": [450, 130] },
+    { "id": "fail", "from": "running", "to": "failed", "label": "error", "variant": "security", "labelAt": [230, 290] },
+    { "id": "retry", "from": "failed", "to": "running", "label": "retry", "variant": "emphasis", "labelAt": [230, 330] },
+    { "id": "cancel-from-running", "from": "running", "to": "cancelled", "label": "cancel", "variant": "security", "labelAt": [520, 290] },
+    { "id": "cancel-from-waiting", "from": "awaiting-input", "to": "cancelled", "label": "cancel", "variant": "security", "labelAt": [520, 380] }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "主路径", "items": ["queued → running → succeeded", "Agent Library 推进 Run 状态", "成功时 Effect Ledger 已落库"] },
+    { "dot": "amber", "title": "等待与恢复", "items": ["running 可转入 awaiting_input 等待用户输入", "resume 后回到 running", "等待期间不释放 Fence，防止重复 Effect"] },
+    { "dot": "rose", "title": "失败与取消", "items": ["failed 为可重试状态，在预算内可回到 running", "cancelled 为终态，由用户显式取消触发", "失败时已记录的 Effect 保留，支持重放续跑"] }
+  ]
+}

@@ -59,9 +59,17 @@ services:
       SAGE_TENANT_ID: tenant-local
       SAGE_POSTGRES_URL: postgres://sage:sage-local-only@postgres:5432/sage
       SAGE_TEMPORAL_ADDRESS: temporal:7233
-      # 本地 dev 主密钥（仅 local compose）；fake 开关默认关闭，显式置 true 才启用进程内确定性模型替身。
+      # 本地 dev 主密钥（仅 local compose）。
       SAGE_SECRET_MASTER_KEY: ${SAGE_SECRET_MASTER_KEY:-c2FnZS1sb2NhbC1kZXYtc2VjcmV0LW1hc3Rlci1reSE=}
-      SAGE_FAKE_LIVE_PROVIDER: ${SAGE_FAKE_LIVE_PROVIDER:-false}
+      # 包运行输入快照的受控出口白名单（default-deny；本地放行 GitHub Search API、Frankfurter 汇率与 Yahoo Finance 行情）。
+      SAGE_PACKAGE_SNAPSHOT_EGRESS_ALLOWLIST: api.github.com,api.frankfurter.dev,query1.finance.yahoo.com
+      # 可选：提供三项完整值时，agent-api 启动即注册真实 deployment-env provider（冒烟垂直链路用）。
+      SAGE_BOOTSTRAP_PROVIDER_API_KEY: ${SAGE_BOOTSTRAP_PROVIDER_API_KEY:-}
+      # P8：service token（sha256 hex，逗号分隔可轮换）——配置即对 packages/apps/runs/schedules/resolutions 强认证。
+      SAGE_SERVICE_TOKEN_HASHES: ${SAGE_SERVICE_TOKEN_HASHES:-}
+      # P8：Schedule 设施由 agent-api（控制面）直连 Temporal Schedules。
+      SAGE_BOOTSTRAP_PROVIDER_BASE_URL: ${SAGE_BOOTSTRAP_PROVIDER_BASE_URL:-}
+      SAGE_BOOTSTRAP_PROVIDER_MODEL: ${SAGE_BOOTSTRAP_PROVIDER_MODEL:-}
       SAGE_HTTP_HOST: 0.0.0.0
       SAGE_HTTP_PORT: 9610
     depends_on:
@@ -86,9 +94,14 @@ services:
       SAGE_TENANT_ID: tenant-local
       SAGE_POSTGRES_URL: postgres://sage:sage-local-only@postgres:5432/sage
       SAGE_TEMPORAL_ADDRESS: temporal:7233
-      # 本地 dev 主密钥（仅 local compose）；fake 开关默认关闭，显式置 true 才启用进程内确定性模型替身。
+      # 本地 dev 主密钥（仅 local compose）。
       SAGE_SECRET_MASTER_KEY: ${SAGE_SECRET_MASTER_KEY:-c2FnZS1sb2NhbC1kZXYtc2VjcmV0LW1hc3Rlci1reSE=}
-      SAGE_FAKE_LIVE_PROVIDER: ${SAGE_FAKE_LIVE_PROVIDER:-false}
+      # 包运行输入快照的受控出口白名单（default-deny；本地放行 GitHub Search API、Frankfurter 汇率与 Yahoo Finance 行情）。
+      SAGE_PACKAGE_SNAPSHOT_EGRESS_ALLOWLIST: api.github.com,api.frankfurter.dev,query1.finance.yahoo.com
+      # P8：dispatcher worker（schedule 触发准入执行面）+ service token + API 内部解析端点。
+      SAGE_SCHEDULE_DISPATCH_ENABLED: '1'
+      SAGE_API_BASE_URL: http://agent-api:9610
+      SAGE_SERVICE_TOKEN: ${SAGE_SERVICE_TOKEN:-}
       SAGE_HEALTH_HOST: 0.0.0.0
       SAGE_HEALTH_PORT: 9611
     depends_on:
@@ -110,6 +123,8 @@ services:
       target: agent-web
     environment:
       SAGE_API_PROXY_TARGET: http://agent-api:9610
+      # P8：同源代理注入 schedule 管理凭据（浏览器不持有；未配置时 schedule UI 保持未认证错误态）。
+      SAGE_SERVICE_TOKEN: ${SAGE_SERVICE_TOKEN:-}
     depends_on:
       agent-api:
         condition: service_healthy

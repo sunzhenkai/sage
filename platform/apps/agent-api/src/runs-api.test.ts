@@ -94,10 +94,19 @@ class FakeController implements TaskControllerPort {
   async retry(): Promise<TaskQueryResult> { return this.#result; }
 }
 
+// 第二个 Release：contentDigest 不同，用于验证同一 Idempotency-Key 跨输入复用即冲突。
+const releasePayloadB = {
+  ...releasePayload,
+  releaseRef: 'release://sha256:' + 'b'.repeat(64),
+  releaseId: 'sha256:' + 'b'.repeat(64),
+  contentDigest: 'sha256:' + '9'.repeat(64),
+};
+
 const resolver: PackageReleaseResolver = {
   async resolveRelease(tenantId, releaseId) {
-    if (releaseId !== 'a'.repeat(64)) return undefined;
-    return { release: releasePayload, lockPayload };
+    if (releaseId === 'a'.repeat(64)) return { release: releasePayload, lockPayload };
+    if (releaseId === 'b'.repeat(64)) return { release: releasePayloadB, lockPayload };
+    return undefined;
   },
 };
 
@@ -114,6 +123,9 @@ class FakeSettingsStore {
 
 class FakeConnectionStore {
   readonly entries = new Map<string, ProviderConnectionRecord>();
+  async listProviderConnections(tenantId: string): Promise<readonly ProviderConnectionRecord[]> {
+    return [...this.entries.values()].filter((entry) => entry.tenantId === tenantId);
+  }
   async getProviderConnection(tenantId: string, id: string): Promise<ProviderConnectionRecord | undefined> {
     return this.entries.get(`${tenantId}/${id}`);
   }
@@ -154,9 +166,9 @@ async function api(options: { readonly principal?: AuthenticatedPrincipal; reado
 describe('Package run API boundaries', () => {
   it('requires authentication and rejects unknown fields', async () => {
     const { app } = await api({});
-    expect((await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: { input: 'hi' } })).statusCode).toBe(401);
+    expect((await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: {} })).statusCode).toBe(401);
     const authed = await api({ principal: operator });
-    const untrusted = await authed.app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: { input: 'hi', ownerId: 'leak' } });
+    const untrusted = await authed.app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: { ownerId: 'leak' } });
     expect(untrusted.statusCode).toBe(400);
     expect(untrusted.json().error.code).toBe('PACKAGE_RUN_UNTRUSTED_FIELD');
     await app.close();
@@ -165,7 +177,7 @@ describe('Package run API boundaries', () => {
 
   it('starts a run from a release and materializes package input', async () => {
     const { app, controller, taskStore } = await api({ principal: operator });
-    const response = await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: { input: '请介绍产品' } });
+    const response = await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: {} });
     expect(response.statusCode).toBe(202);
     const body = response.json();
     expect(body).toMatchObject({
@@ -182,26 +194,83 @@ describe('Package run API boundaries', () => {
     expect(controller.created[0]).toMatchObject({ slice: { maxTurns: 1, maxToolCalls: 16, maxTokens: 4000, timeoutMs: 10_000 } });
     const stored = await taskStore.getPackageInput('tenant-local', body.taskId);
     expect(stored?.assembledInput).toContain('你是演示助手。');
-    expect(stored?.assembledInput).toContain('--- user input ---');
+    expect(stored?.assembledInput).not.toContain('--- user input ---');
     expect(stored?.assetDigests['references/product.md']).toMatch(/^sha256:[a-f0-9]{64}$/);
     await app.close();
   });
 
-  it('is idempotent for the same release and input', async () => {
-    const { app, controller } = await api({ principal: operator });
-    const first = await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: { input: 'hi', taskId: 'pkg-fixed' } });
-    const second = await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: { input: 'hi', taskId: 'pkg-fixed' } });
-    expect(first.statusCode).toBe(202);
-    expect(second.statusCode).toBe(200);
-    expect(second.json().status).toBe('existing');
-    expect(second.json().taskId).toBe('pkg-fixed');
+  it('admits a run without user input and omits the user input section', async () => {
+    const { app, controller, taskStore } = await api({ principal: operator });
+    const response = await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: {} });
+    expect(response.statusCode).toBe(202);
+    const body = response.json();
     expect(controller.created).toHaveLength(1);
+    const stored = await taskStore.getPackageInput('tenant-local', body.taskId);
+    expect(stored?.assembledInput).toContain('你是演示助手。');
+    expect(stored?.assembledInput).not.toContain('--- user input ---');
+    await app.close();
+  });
+
+  it('starts a new run on every headerless request even for the same release and input', async () => {
+    const { app, controller } = await api({ principal: operator });
+    // 无 Idempotency-Key：每次点击独立准入、新 taskId 新运行——输入摘要不参与去重。
+    const first = await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: {} });
+    const second = await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: {} });
+    expect(first.statusCode).toBe(202);
+    expect(second.statusCode).toBe(202);
+    expect(second.json().status).toBe('admitted');
+    expect(second.json().taskId).not.toBe(first.json().taskId);
+    expect(controller.created).toHaveLength(2);
+    expect(controller.created[1]?.taskId).toBe(second.json().taskId);
+    await app.close();
+  });
+
+  it('replays the original admission when the same Idempotency-Key is reused', async () => {
+    const { app, controller } = await api({ principal: operator });
+    const headers = { 'idempotency-key': 'client-retry-key' };
+    const first = await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: {}, headers });
+    const second = await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: {}, headers });
+    expect(first.statusCode).toBe(202);
+    expect(first.json().status).toBe('admitted');
+    expect(second.statusCode).toBe(200);
+    expect(second.headers['idempotent-replayed']).toBe('true');
+    expect(second.json().status).toBe('existing');
+    // 重放必须回填首次准入的 id，而不是新请求生成的幻影 id。
+    expect(second.json().taskId).toBe(first.json().taskId);
+    expect(second.json().runId).toBe(first.json().runId);
+    expect(second.json().attemptId).toBe(first.json().attemptId);
+    expect(second.json().inputRef).toBe(first.json().inputRef);
+    expect(controller.created).toHaveLength(1);
+    await app.close();
+  });
+
+  it('rejects with 409 when the same Idempotency-Key is reused with a different input', async () => {
+    const { app, controller } = await api({ principal: operator });
+    const headers = { 'idempotency-key': 'client-retry-key' };
+    // 同键换 Release（contentDigest 不同 → inputDigest 不同）：标准幂等语义下必须冲突而不是静默重放。
+    const first = await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: {}, headers });
+    const second = await app.inject({ method: 'POST', url: `/v1/releases/${'b'.repeat(64)}/runs`, payload: {}, headers });
+    expect(first.statusCode).toBe(202);
+    expect(second.statusCode).toBe(409);
+    expect(second.json().error.code).toBe('PACKAGE_RUN_ADMISSION_IDEMPOTENCY_CONFLICT');
+    expect(controller.created).toHaveLength(1);
+    await app.close();
+  });
+
+  it('rejects an invalid Idempotency-Key header with 400', async () => {
+    const { app } = await api({ principal: operator });
+    const blank = await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: {}, headers: { 'idempotency-key': '   ' } });
+    expect(blank.statusCode).toBe(400);
+    expect(blank.json().error.code).toBe('IDEMPOTENCY_KEY_INVALID');
+    const oversized = await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: {}, headers: { 'idempotency-key': 'k'.repeat(256) } });
+    expect(oversized.statusCode).toBe(400);
+    expect(oversized.json().error.code).toBe('IDEMPOTENCY_KEY_INVALID');
     await app.close();
   });
 
   it('fails closed with 501 in production mode', async () => {
     const { app } = await api({ principal: operator, deploymentMode: 'production' });
-    const response = await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: { input: 'hi' } });
+    const response = await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: {} });
     expect(response.statusCode).toBe(501);
     expect(response.json().error.code).toBe('PACKAGE_RUN_ADMISSION_NOT_AVAILABLE');
     await app.close();
@@ -209,7 +278,7 @@ describe('Package run API boundaries', () => {
 
   it('returns 404 for an unknown release', async () => {
     const { app } = await api({ principal: operator });
-    const response = await app.inject({ method: 'POST', url: `/v1/releases/${'f'.repeat(64)}/runs`, payload: { input: 'hi' } });
+    const response = await app.inject({ method: 'POST', url: `/v1/releases/${'f'.repeat(64)}/runs`, payload: {} });
     expect(response.statusCode).toBe(404);
     expect(response.json().error.code).toBe('RELEASE_NOT_FOUND');
     await app.close();
@@ -218,7 +287,7 @@ describe('Package run API boundaries', () => {
   it('rejects admission when settings are unset: no provider-less admission path exists', async () => {
     // 无设置行（或存量 legacy 值在存储层归一为 unset）：包运行以 PROVIDER_DEPENDENCY_MISSING 拒绝。
     const noSettings = await api({ principal: operator, settingsStore: new FakeSettingsStore(), connections: new FakeConnectionStore() });
-    const response = await noSettings.app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: { input: 'hi' } });
+    const response = await noSettings.app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: {} });
     expect(response.statusCode).toBe(409);
     expect(response.json().error.code).toBe('PROVIDER_DEPENDENCY_MISSING');
     expect(response.json().error.retryable).toBe(false);
@@ -250,7 +319,7 @@ describe('Package run API boundaries', () => {
         updatedAt: '2026-08-25T00:00:00.000Z', updatedBy: 'principal://op'
       });
       const { app, controller, taskStore } = await api({ principal: operator, settingsStore: settings, connections });
-      const response = await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: { input: 'hi' } });
+      const response = await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: {} });
       expect(response.statusCode).toBe(409);
       expect(response.json().error.code).toBe('PROVIDER_DEPENDENCY_MISSING');
       expect(controller.created).toHaveLength(0);
@@ -263,7 +332,7 @@ describe('Package run API boundaries', () => {
       updatedAt: '2026-08-25T00:00:00.000Z', updatedBy: 'principal://op'
     });
     const ok = await api({ principal: operator, settingsStore: settings, connections });
-    const admitted = await ok.app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: { input: 'hi' } });
+    const admitted = await ok.app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: {} });
     expect(admitted.statusCode).toBe(202);
     await ok.app.close();
   });

@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Pool } from 'pg';
 import type { AgentStateAdapter, CheckpointRef, AgentTaskSpecStorePort, BoundedRunReceiptStorePort, AgentEventStorePort, CheckpointStorePort } from '@sage/platform-ports';
-import { PostgresAgentAuthorityStore, PostgresAgentStateAdapter, PostgresIdempotencyStore, assertReferenceOnly } from './index.js';
+import { PostgresAgentAuthorityStore, PostgresAgentStateAdapter, PostgresIdempotencyStore, PostgresTaskRunLogQuery, assertReferenceOnly } from './index.js';
 
 const databaseUrl = process.env.P2_POSTGRES_URL;
 const integration = describe.skipIf(!databaseUrl);
@@ -249,6 +249,48 @@ integration('PostgreSQL canonical authority stores', () => {
     expect(await authority.getSealedCheckpoint({ tenantId, checkpointRef: sealed.checkpoint.checkpointRef, taskId: spec.taskId, runId: spec.runId, attemptId: spec.attemptId, specDigest: spec.specDigest, engineCodec: 'other@1', runtimeContractMajor: 1 })).toBeUndefined();
     expect(await authority.getSealedCheckpoint({ tenantId, checkpointRef: sealed.checkpoint.checkpointRef, taskId: spec.taskId, runId: spec.runId, attemptId: spec.attemptId, specDigest: spec.specDigest, engineCodec: 'reference@1', runtimeContractMajor: 2 })).toBeUndefined();
     expect(await authority.getSealedCheckpoint({ tenantId: `other-${tenantId}`, checkpointRef: sealed.checkpoint.checkpointRef, taskId: spec.taskId, runId: spec.runId, attemptId: spec.attemptId, specDigest: spec.specDigest, engineCodec: 'reference@1', runtimeContractMajor: 1 })).toBeUndefined();
+  });
+});
+
+
+integration('PostgreSQL Task run log queries', () => {
+  let authority: PostgresAgentAuthorityStore;
+  let runLogs: PostgresTaskRunLogQuery;
+  beforeAll(async () => {
+    const legacy = new PostgresAgentStateAdapter({ connectionString: databaseUrl, connectionTimeoutMillis: 2_000 });
+    await legacy.migrate();
+    await legacy.close();
+    authority = new PostgresAgentAuthorityStore({ connectionString: databaseUrl, connectionTimeoutMillis: 2_000 });
+    runLogs = new PostgresTaskRunLogQuery({ connectionString: databaseUrl, connectionTimeoutMillis: 2_000 });
+  });
+  afterAll(async () => { await authority.close(); await runLogs.close(); });
+
+  it('summarizes attempts and pages canonical events with tenant isolation', async () => {
+    const suffix = randomUUID(); const tenantId = `tenant-runlogs-${suffix}`;
+    const taskId = `task-${suffix}`; const digest = `sha256:${'b'.repeat(64)}`;
+    const writeEvent = async (attemptId: string, sequence: number, eventId: string) => {
+      const acquire = await authority.acquireWriterFence({ tenantId, taskId, runId: `run-${suffix}`, attemptId, ownerToken: 'writer-runlogs' });
+      if (acquire.status !== 'acquired') throw new Error('expected acquired fence');
+      const appended = await authority.appendEvent({ fence: acquire.fence, event: { schemaVersion: '2', eventId, taskId, runId: `run-${suffix}`, attemptId, invocationId: `invoke-${attemptId}`, specDigest: digest, sequence, type: 'run.started', payload: { step: sequence } } });
+      if (appended.status !== 'appended') throw new Error(`expected appended event, got ${appended.status}`);
+    };
+    await writeEvent(`attempt-a-${suffix}`, 1, `event-a1-${suffix}`);
+    await writeEvent(`attempt-a-${suffix}`, 2, `event-a2-${suffix}`);
+    await writeEvent(`attempt-b-${suffix}`, 1, `event-b1-${suffix}`);
+
+    const summaries = await runLogs.listAttemptSummaries({ tenantId, taskId });
+    expect(summaries.map((attempt) => attempt.attemptId)).toEqual([`attempt-b-${suffix}`, `attempt-a-${suffix}`]);
+    const attemptA = summaries.find((attempt) => attempt.attemptId === `attempt-a-${suffix}`);
+    expect(attemptA).toMatchObject({ eventCount: 2, firstSequence: 1, lastSequence: 2 });
+
+    const firstPage = await runLogs.listRunLogEvents({ tenantId, taskId, runId: `run-${suffix}`, attemptId: `attempt-a-${suffix}`, limit: 1 });
+    expect(firstPage.map((event) => event.sequence)).toEqual([1]);
+    expect(firstPage[0]).toMatchObject({ taskId, runId: `run-${suffix}`, attemptId: `attempt-a-${suffix}`, type: 'run.started' });
+    const tailPage = await runLogs.listRunLogEvents({ tenantId, taskId, runId: `run-${suffix}`, attemptId: `attempt-a-${suffix}`, fromSequence: 2, limit: 1 });
+    expect(tailPage.map((event) => event.sequence)).toEqual([2]);
+    expect(await runLogs.listRunLogEvents({ tenantId, taskId, runId: `run-${suffix}`, attemptId: `attempt-missing-${suffix}` })).toEqual([]);
+    expect(await runLogs.listAttemptSummaries({ tenantId: `other-${tenantId}`, taskId })).toEqual([]);
+    expect(await runLogs.listAttemptSummaries({ tenantId, taskId: `task-unknown-${suffix}` })).toEqual([]);
   });
 });
 

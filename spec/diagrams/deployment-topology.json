@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Sage 进程与部署拓扑",
+    "locale": "zh-CN",
+    "quality_profile": "standard",
+    "viewBox": [1100, 720],
+    "views": [
+      { "id": "local-ports", "label": "本地端口映射", "focus": ["postgres", "temporal", "minio", "agent-api", "agent-worker", "agent-web"], "note": "本地开发时各容器对外暴露的端口。" },
+      { "id": "request-flow", "label": "请求流向", "focus": ["user-browser", "agent-web", "agent-api", "agent-worker", "model-provider"], "note": "短请求与长请求的进程路径。" },
+      { "id": "data-flow", "label": "数据依赖", "focus": ["agent-api", "agent-worker", "postgres", "temporal", "minio"], "note": "启动顺序与健康检查依赖。" }
+    ]
+  },
+  "components": [
+    { "id": "user-browser", "type": "external", "label": "浏览器", "sublabel": "终端用户", "pos": [40, 320], "size": [120, 60] },
+    { "id": "agent-web", "type": "frontend", "label": "agent-web", "sublabel": ":4173 / :14173", "pos": [240, 320], "size": [130, 60] },
+    { "id": "agent-api", "type": "backend", "label": "agent-api", "sublabel": ":9610", "pos": [460, 220], "size": [130, 60] },
+    { "id": "agent-worker", "type": "backend", "label": "agent-worker", "sublabel": ":9611", "pos": [460, 420], "size": [130, 60] },
+    { "id": "postgres", "type": "database", "label": "PostgreSQL", "sublabel": "5432 / 15432", "pos": [720, 160], "size": [130, 60] },
+    { "id": "temporal", "type": "messagebus", "label": "Temporal", "sublabel": "7233 / 17233", "pos": [720, 300], "size": [130, 60] },
+    { "id": "minio", "type": "cloud", "label": "MinIO", "sublabel": "9000 / 19000", "pos": [720, 440], "size": [130, 60] },
+    { "id": "model-provider", "type": "external", "label": "模型 Provider", "sublabel": "HTTPS 出站", "pos": [940, 420], "size": [130, 60] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "Sage 运行时", "wraps": ["agent-web", "agent-api", "agent-worker", "postgres", "temporal", "minio"], "pad": 16 },
+    { "kind": "security-group", "label": "基础设施层", "wraps": ["postgres", "temporal", "minio"], "pad": 10 },
+    { "kind": "security-group", "label": "应用进程层", "wraps": ["agent-api", "agent-worker"], "pad": 10 }
+  ],
+  "connections": [
+    { "id": "browser-web", "from": "user-browser", "to": "agent-web", "label": "HTTPS" },
+    { "id": "web-api", "from": "agent-web", "to": "agent-api", "label": "HTTP/SSE" },
+    { "id": "api-postgres", "from": "agent-api", "to": "postgres", "label": "SQL" },
+    { "id": "api-temporal", "from": "agent-api", "to": "temporal", "label": "gRPC" },
+    { "id": "worker-temporal", "from": "agent-worker", "to": "temporal", "label": "gRPC subscribe" },
+    { "id": "worker-postgres", "from": "agent-worker", "to": "postgres", "label": "SQL" },
+    { "id": "worker-minio", "from": "agent-worker", "to": "minio", "label": "S3" },
+    { "id": "worker-provider", "from": "agent-worker", "to": "model-provider", "label": "HTTPS" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "启动顺序", "items": ["1. postgres (pg_isready)", "2. temporal (cluster health)", "3. minio (/minio/health/live)", "4. agent-api / agent-worker", "5. agent-web"] },
+    { "dot": "emerald", "title": "副本策略", "items": ["local：单实例", "prod：agent-api / agent-web / agent-worker 多副本", "Postgres / Temporal / MinIO 按环境高可用"] },
+    { "dot": "rose", "title": "健康检查", "items": ["agent-api /readyz", "agent-worker /readyz", "agent-web /", "compose condition: service_healthy 串接"] }
+  ]
+}

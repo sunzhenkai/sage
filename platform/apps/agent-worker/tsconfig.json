@@ -11,7 +11,7 @@
       "@sage/observability": ["../../packages/observability/src/index.ts"],
       "@sage/platform-ports": ["../../packages/platform-ports/src/index.ts"],
       "@sage/production-governance": ["../../packages/production-governance/src/index.ts"],
-      "@sage/task-domain": ["../../packages/task-domain/src/index.ts"],
+      "@sage/task-domain": ["../../packages/task-domain/src/index.ts"], "@sage/agent-run-admission": ["../../packages/agent-run-admission/src/index.ts"], "@sage/agent-state-postgres": ["../../packages/agent-state-postgres/src/index.ts"], "@sage/temporal-schedules": ["../../packages/temporal-schedules/src/index.ts"], "@sage/tool-runtime": ["../../packages/tool-runtime/src/index.ts"], "@sage/local-fakes": ["../../packages/local-fakes/src/index.ts"],
       "@sage/task-store-postgres": ["../../packages/task-store-postgres/src/index.ts"],
       "@sage/temporal-workflows": ["../../packages/temporal-workflows/src/workflows.ts"]
     }
@@ -26,7 +26,7 @@
     { "path": "../../packages/observability" },
     { "path": "../../packages/platform-ports" },
     { "path": "../../packages/production-governance" },
-    { "path": "../../packages/task-domain" },
+    { "path": "../../packages/task-domain" }, { "path": "../../packages/agent-run-admission" }, { "path": "../../packages/agent-state-postgres" }, { "path": "../../packages/temporal-schedules" }, { "path": "../../packages/tool-runtime" }, { "path": "../../packages/local-fakes" },
     { "path": "../../packages/task-store-postgres" },
     { "path": "../../packages/temporal-workflows" }
   ]

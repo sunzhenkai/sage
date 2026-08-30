@@ -1,0 +1,7 @@
+schema: spec-driven
+created: 2026-08-29
+goal: >-
+  重构 AI App 运行体系为自闭环模型：App 携带输入/处理/输出的完整定义，Task 为 App 内声明的命名入口，
+  Run 创建即闭环（参数物化、数据依赖平台兑现、输出契约强制），调度运行无人工输入；
+  参照 fengine-ai-apps 的声明式形态，保持 sage 声明式纯度与治理不变
+skip_specs: true

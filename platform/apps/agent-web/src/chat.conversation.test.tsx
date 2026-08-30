@@ -190,13 +190,18 @@ describe('mounted event stream panel', () => {
     await act(async () => { tree = create(<ChatApp sessionId="session-copy" fetcher={fetcher} />); await flush(); });
     expect(() => tree.root.findByProps({ children: 'Copy event stream' })).toThrow();
     await act(async () => { tree.root.findByProps({ children: 'Event stream' }).props.onClick(); await flush(); });
+    // 面板去重：头部已有的会话信息条不在事件流面板内重复呈现
+    const panel = tree.root.findByProps({ id: 'chat-event-stream' });
+    const descendants = panel.findAll(() => true);
+    expect(descendants.some((node) => typeof node.props?.className === 'string' && (node.props.className as string).includes('event-stream-meta'))).toBe(false);
+    expect(descendants.some((node) => typeof node.props?.children === 'string' && (node.props.children as string).includes('session-copy'))).toBe(false);
     await act(async () => { tree.root.findByProps({ children: 'Copy event stream' }).props.onClick(); await flush(); });
     const copied = String(writeText.mock.calls[0]?.[0]);
     const lines = copied.split('\n');
     expect(lines).toHaveLength(2);
     expect((JSON.parse(lines[0]!) as TimelineEvent).payload).toMatchObject({ kind: 'text', text: 'copy me' });
     expect((JSON.parse(lines[1]!) as TimelineEvent).payload).toMatchObject({ kind: 'run', status: 'succeeded' });
-    expect(tree.root.findByProps({ children: 'Copied 2 events as JSONL for troubleshooting.' })).toBeTruthy();
+    expect(tree.root.findByProps({ children: 'Copied 2 events.' })).toBeTruthy();
     await act(async () => tree.unmount());
   });
 
@@ -216,7 +221,7 @@ describe('mounted event stream panel', () => {
     expect(tree.root.findByProps({ children: 'Closed session · Read only' })).toBeTruthy();
     await act(async () => { tree.root.findByProps({ children: 'Event stream' }).props.onClick(); await flush(); });
     await act(async () => { tree.root.findByProps({ children: 'Copy event stream' }).props.onClick(); await flush(); });
-    expect(tree.root.findByProps({ children: 'Copying the event stream failed. Clipboard is unavailable and the fallback copy did not succeed.' })).toBeTruthy();
+    expect(tree.root.findByProps({ children: 'Copy failed; clipboard is unavailable.' })).toBeTruthy();
     await act(async () => tree.unmount());
   });
 });

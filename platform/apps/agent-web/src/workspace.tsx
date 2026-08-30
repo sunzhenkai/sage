@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import type { ListSessionsResponse, SessionHistoryItem, SessionHistoryStatus } from '@sage/app-contracts';
 import { navigate } from './routing.js';
 import { useLocale } from './locale.js';
+import { Banner, EmptyPanel, LoadingState } from './feedback.js';
 
-export type WorkspaceView = 'chat' | 'tasks' | 'providers' | 'packages';
+export type WorkspaceView = 'chat' | 'tasks' | 'providers' | 'packages' | 'schedules';
 export interface WorkspaceLocation { readonly view: WorkspaceView; readonly sessionId?: string; readonly taskId?: string; readonly packageId?: string }
 
 export function workspaceHref({ view, sessionId, taskId, packageId }: WorkspaceLocation): string {
@@ -37,26 +38,66 @@ export function ChatLanding({
   readonly fetcher?: WorkspaceFetch;
   readonly navigate?: (href: string) => void;
 }) {
-  const { t, formatDateTime } = useLocale();
+  const { t } = useLocale();
+  return <section className="workspace-page landing-page" aria-label={t('chat')}>
+    <div className="content-split">
+      <ChatSessionList fetcher={fetcher} navigate={navigate} />
+      <div className="content-pane chat-empty-pane"><span className="empty-orb" aria-hidden="true">✦</span><p>{t('selectConversation')}</p></div>
+    </div>
+  </section>;
+}
+
+/** 侧栏与列表栏共用的「新建对话」主操作：显式点击创建会话并跳转，guard 防重复提交。 */
+export function NewChatButton({ fetcher = fetch, navigate = defaultNavigate, className = 'button button-primary', onError }: {
+  readonly fetcher?: WorkspaceFetch;
+  readonly navigate?: (href: string) => void;
+  readonly className?: string;
+  readonly onError?: (message: string) => void;
+}) {
+  const { t } = useLocale();
+  const [creating, setCreating] = useState(false);
+  const createGuard = useRef(false);
+  const createSession = async () => {
+    if (createGuard.current) return;
+    createGuard.current = true; setCreating(true);
+    try {
+      const session = await workspaceJson<{ sessionId: string }>(fetcher, '/v1/chat/sessions', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({}) });
+      navigate(workspaceHref({ view: 'chat', sessionId: session.sessionId }));
+    } catch (cause) { createGuard.current = false; setCreating(false); onError?.(cause instanceof Error ? cause.message : t('createSessionFailed')); }
+  };
+  return <button className={className} disabled={creating} type="button" aria-label={t('newChat')} onClick={() => void createSession()}>{creating ? t('creating') : t('newChat')}</button>;
+}
+
+/** 会话列表栏：multica 三栏形态的第二栏（标题 + 新建、搜索/视图切换、会话行、加载更多）。 */
+export function ChatSessionList({
+  fetcher = fetch,
+  navigate = defaultNavigate
+}: {
+  readonly fetcher?: WorkspaceFetch;
+  readonly navigate?: (href: string) => void;
+}) {
+  const { locale, t, formatDateTime, formatCompact } = useLocale();
   const [items, setItems] = useState<readonly SessionHistoryItem[]>([]);
   const [nextCursor, setNextCursor] = useState<string>();
   const [status, setStatus] = useState<SessionHistoryStatus>('all');
   const [archivedView, setArchivedView] = useState(false);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string>();
   const [actionError, setActionError] = useState<string>();
   const [notice, setNotice] = useState<string>();
   const [confirmingId, setConfirmingId] = useState<string>();
   const [busyId, setBusyId] = useState<string>();
-  const createGuard = useRef(false);
+  // 当前内容区展示的会话（?session=…）：列表行据此渲染选中高亮与 aria-current。
+  const activeSessionId = typeof location === 'undefined' ? undefined : new URLSearchParams(location.search).get('session') ?? undefined;
   const load = async (append = false, cursor?: string) => {
     setLoading(true); setError(undefined); setActionError(undefined);
     try {
       const params = new URLSearchParams({ status, limit: '30' });
       if (archivedView) params.set('archived', 'true');
       if (query.trim()) params.set('q', query.trim());
+      // 未命名会话的搜索回退依赖 locale 对应的默认标题，cursor 绑定同一 locale 维度。
+      params.set('locale', locale);
       if (cursor) params.set('cursor', cursor);
       const page = await workspaceJson<ListSessionsResponse>(fetcher, `/v1/chat/sessions?${params.toString()}`);
       setItems((current) => append ? [...current, ...page.items] : page.items); setNextCursor(page.nextCursor);
@@ -81,20 +122,14 @@ export function ChatLanding({
       setActionError(cause instanceof Error ? cause.message : action === 'archive' ? t('archiveFailed') : action === 'unarchive' ? t('unarchiveFailed') : t('deleteSessionFailed'));
     } finally { setBusyId(undefined); }
   };
-  const createSession = async () => {
-    if (createGuard.current) return;
-    createGuard.current = true; setCreating(true); setError(undefined);
-    try { const session = await workspaceJson<{ sessionId: string }>(fetcher, '/v1/chat/sessions', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({}) }); navigate(workspaceHref({ view: 'chat', sessionId: session.sessionId })); }
-    catch (cause) { createGuard.current = false; setCreating(false); setError(cause instanceof Error ? cause.message : t('createSessionFailed')); }
-  };
-  return <section className="workspace-page landing-page">
-    <header className="page-heading"><div><p className="eyebrow">{t('conversationHistory')}</p><h1>{t('chatWorkspace')}</h1><p className="page-subtitle">{t('resumeConversation')}</p></div><button className="button button-primary" disabled={creating} type="button" onClick={() => void createSession()}>{creating ? t('creating') : t('newChat')}</button></header>
-    {error ? <div className="error-banner" role="alert"><span>!</span><div><strong>{t('chatHistoryUnavailable')}</strong><p>{error}</p></div></div> : <>
-      {actionError && <div className="error-banner" role="alert"><span>!</span><div><strong>{t('somethingNeedsAttention')}</strong><p>{actionError}</p></div><button className="icon-button" type="button" aria-label={t('dismissError')} onClick={() => setActionError(undefined)}>×</button></div>}
-      {notice && <div className="success-banner" role="status"><span>✓</span><p>{notice}</p><button className="icon-button" type="button" aria-label={t('dismissNotice')} onClick={() => setNotice(undefined)}>×</button></div>}
+  return <aside className="list-pane" aria-label={t('conversationHistory')}>
+    <div className="list-pane-head"><h1>{t('chat')}</h1><NewChatButton fetcher={fetcher} navigate={navigate} onError={setActionError} /></div>
+    {error ? <Banner kind="error" title={t('chatHistoryUnavailable')}>{error}</Banner> : <>
+      {actionError && <Banner kind="error" title={t('somethingNeedsAttention')} onDismiss={() => setActionError(undefined)} dismissLabel={t('dismissError')}>{actionError}</Banner>}
+      {notice && <Banner kind="success" onDismiss={() => setNotice(undefined)} dismissLabel={t('dismissNotice')}>{notice}</Banner>}
       <form className="history-toolbar" onSubmit={(event) => { event.preventDefault(); void load(); }}><div className="view-switch" role="group" aria-label={t('historyViewLabel')}><button className={archivedView ? '' : 'active'} type="button" aria-pressed={!archivedView} onClick={() => switchView(false)}>{t('conversationsTab')}</button><button className={archivedView ? 'active' : ''} type="button" aria-pressed={archivedView} onClick={() => switchView(true)}>{t('archiveTab')}</button></div><label className="search-field"><span>⌕</span><input aria-label={t('searchSessionTitles')} value={query} maxLength={100} onChange={(event) => setQuery(event.target.value)} placeholder={t('searchTitles')} /></label><label className="filter-field"><span>{t('status')}</span><select aria-label={t('status')} value={status} onChange={(event) => setStatus(event.target.value as SessionHistoryStatus)}><option value="all">{t('all')}</option><option value="open">{t('open')}</option><option value="closed">{t('closed')}</option></select></label><button className="button button-secondary" type="submit">{t('refresh')}</button></form>
-      {loading && items.length === 0 ? <div className="loading-state"><span className="loading-spinner" /><strong>{t('loadingRetainedSessions')}</strong></div> : items.length === 0 ? <div className="empty-panel"><span className="empty-orb">✦</span><h3>{archivedView ? t('noArchivedSessions') : t('noRetainedSessions')}</h3><p>{archivedView ? t('archiveEmptyHint') : t('startChatExplicit')}</p></div> : <section className="history-list" aria-label={archivedView ? t('archivedSessionHistory') : t('chatSessionHistory')}>{items.map((item) => <div className="history-entry" key={item.sessionId} data-archived={archivedView ? 'true' : undefined}>
-        <a className="history-row" href={workspaceHref({ view: 'chat', sessionId: item.sessionId })}><span className="history-copy"><strong>{item.title ?? t('untitledChat')}</strong><small>{item.preview ?? t('noPersistedMessages')}</small></span><span className={`status-badge status-${item.status === 'open' ? 'running' : 'neutral'}`}>{item.status}</span><time dateTime={item.updatedAt}>{formatDateTime(item.updatedAt)}</time><span aria-hidden="true">→</span></a>
+      {loading && items.length === 0 ? <LoadingState label={t('loadingRetainedSessions')} /> : items.length === 0 ? <EmptyPanel icon="✦" title={archivedView ? t('noArchivedSessions') : t('noRetainedSessions')} hint={archivedView ? t('archiveEmptyHint') : t('startChatExplicit')} /> : <section className="history-list" aria-label={archivedView ? t('archivedSessionHistory') : t('chatSessionHistory')}>{items.map((item) => <div className={`history-entry${item.sessionId === activeSessionId ? ' is-active' : ''}`} key={item.sessionId} data-archived={archivedView ? 'true' : undefined}>
+        <a className="history-row" href={workspaceHref({ view: 'chat', sessionId: item.sessionId })} {...(item.sessionId === activeSessionId ? { 'aria-current': 'page' as const } : {})}><span className="history-copy"><strong>{item.title ?? t('untitledChat')}</strong><small>{item.preview ?? t('noPersistedMessages')}</small></span><span className={`status-badge status-${item.status === 'open' ? 'running' : 'neutral'}`}>{item.status === 'open' ? t('open') : item.status === 'closed' ? t('closed') : item.status}</span><time dateTime={item.updatedAt} title={formatDateTime(item.updatedAt)}>{formatCompact(item.updatedAt)}</time><span aria-hidden="true">→</span></a>
         <span className="history-actions">
           {confirmingId === item.sessionId
             ? <span className="delete-confirm" role="alert"><span className="delete-confirm-text">{t('deleteConfirmWarning')}</span><button className="button button-danger" disabled={busyId === item.sessionId} type="button" onClick={() => void actOnSession(item.sessionId, 'delete')}>{t('confirmDelete')}</button><button className="button button-quiet" disabled={busyId === item.sessionId} type="button" onClick={() => setConfirmingId(undefined)}>{t('cancel')}</button></span>
@@ -105,5 +140,5 @@ export function ChatLanding({
       </div>)}</section>}
       {nextCursor && <button className="button button-secondary history-more" disabled={loading} type="button" onClick={() => void load(true, nextCursor)}>{loading ? t('loading') : t('loadMore')}</button>}
     </>}
-  </section>;
+  </aside>;
 }

@@ -15,26 +15,35 @@ web 界面 SHALL 提供包列表页（id、最新版本、描述、最近 releas
 - **THEN** 展示 manifest 摘要、资产预览与 release 历史（含 digest）
 
 ### Requirement: 从包发起运行并追踪
-详情页 SHALL 提供发起运行表单（必填用户输入文本）；提交成功后 SHALL 跳转到该运行的 task 视图并持续展示状态直至终态，终态后可查看 artifact。
+详情页 SHALL 提供发起运行表单：表单字段 SHALL 由该 App 归一化 manifest 的 `inputs` 声明渲染（文本/枚举控件 + 声明默认值），多任务 App SHALL 提供任务选择；界面 SHALL NOT 提供自由文本输入框或空输入警告/二次确认（输入闭环由声明与默认值保证）。提交时 SHALL 以 `{task, params}` 调用运行入口；提交成功后 SHALL 跳转到该运行的 task 视图并持续展示状态直至终态。终态后 SHALL 可查看 artifact，succeeded 且有 task-output 时 SHALL 内联渲染输出正文（markdown 渲染，如含残留 think 段则折叠展示），不要求用户离开页面下载原始 JSON。
 
 #### Scenario: 发起运行
-- **WHEN** 用户填写输入并提交发起运行
-- **THEN** 界面创建运行并导航到运行详情，展示运行中状态
+- **WHEN** 用户在声明参数表单（预填默认值）提交发起运行
+- **THEN** 界面以 {task, params} 创建运行并导航到运行详情，展示运行中状态
+
+#### Scenario: 参数校验错误内联展示
+- **WHEN** 提交的参数未通过声明校验（API 返回 `PACKAGE_PARAMS_INVALID`）
+- **THEN** 界面内联展示违规项，不跳转
 
 #### Scenario: 追踪至终态与查看产物
 - **WHEN** 运行达到 succeeded/failed 等终态
-- **THEN** 界面展示终态与失败原因（如有），succeeded 时可查看 artifact 内容
+- **THEN** 界面展示终态与失败原因（如有），succeeded 时可查看 artifact 内容且 task-output 正文内联渲染
 
 ### Requirement: 应用包管理界面
-web 界面 SHALL 在包管理域提供应用（App）的主体管理：列表页 SHALL 提供「新建 App」入口（填写 appId、name、description，含必填与格式校验）；详情页 SHALL 提供「上传/更新版本」表单（上传源包文件登记为新版本）与「删除 App」操作（二次确认并展示结果）；界面 SHALL 展示版本历史（倒序）并在上传/删除后刷新。空态、加载态与错误态 SHALL 有明确展示，新建/删除/上传操作 SHALL 提供双语文案与 aria 语义。
+
+web 界面 SHALL 在包管理域提供应用（App）的主体管理：列表页页面头 SHALL 为单行（名词标题 + 右侧「新建应用」「导入示例」动作）；「新建 App」与「导入示例」SHALL 以居中模态弹窗承载，弹窗以面包屑式标题（如「应用 › 新建应用」）标识上下文，字段保持极简（appId、name、description，含必填与格式校验）；详情页 SHALL 提供「上传/更新版本」表单（上传源包文件登记为新版本）与「删除 App」操作（二次确认并只陈述不可逆后果一行）；界面 SHALL 展示版本历史（倒序）并在上传/删除后刷新。空态、加载态与错误态 SHALL 有明确展示，新建/删除/上传操作 SHALL 提供双语文案与 aria 语义。空态引导 SHALL 为单行短句加动作按钮，SHALL NOT 以整段文字解释登记方式与系统行为。
 
 #### Scenario: 新建 App
-- **WHEN** 用户在列表页填写 appId、name、description 并提交新建
+- **WHEN** 用户在列表页通过「新建应用」弹窗填写 appId、name、description 并提交新建
 - **THEN** 界面创建 App，成功后列表出现该 App 或跳转其详情
 
 #### Scenario: 新建表单校验
 - **WHEN** 用户提交缺失必填项或非法 appId 的新建表单
-- **THEN** 界面阻止提交并展示内联校验错误
+- **THEN** 界面阻止提交并在弹窗内展示内联校验错误
+
+#### Scenario: 导入示例弹窗
+- **WHEN** 用户在列表页点击「导入示例」
+- **THEN** 打开模态弹窗展示示例清单与逐项导入动作；导入机制说明只以一行短句呈现
 
 #### Scenario: 上传新版本
 - **WHEN** 用户在详情页上传源包文件并提交
@@ -42,7 +51,7 @@ web 界面 SHALL 在包管理域提供应用（App）的主体管理：列表页
 
 #### Scenario: 删除 App
 - **WHEN** 用户在详情页触发删除并确认
-- **THEN** 界面删除该 App，之后列表不再显示该 App
+- **THEN** 确认框只陈述不可逆后果一行；确认后界面删除该 App，之后列表不再显示该 App
 
 #### Scenario: 版本历史展示
 - **WHEN** 用户查看某 App 详情
@@ -54,5 +63,25 @@ web 界面 SHALL 在包管理域提供应用（App）的主体管理：列表页
 
 #### Scenario: 空态引导
 - **WHEN** 当前没有任何 App
-- **THEN** 列表页展示空态并引导用户新建 App
+- **THEN** 列表页展示空态单行短句并引导用户新建 App
 
+#### Scenario: 列表页头单行
+- **WHEN** 渲染应用列表页
+- **THEN** 页头为一行（标题 + 动作），不出现 eyebrow 讲解词与整句副标题
+
+
+### Requirement: 应用详情卡与列表行的信息收敛
+
+应用详情页 manifest 卡 SHALL 隐藏空值字段（技能/能力/声明参数/数据源为空时不渲染该行），SHALL NOT 以「—」占位堆叠。发起运行卡在无声明参数时 SHALL NOT 渲染悬空的分隔线或空表单区域。应用列表行 SHALL 去除版本号的双写呈现（副标题与徽章只保留一处）。
+
+#### Scenario: 空值字段不占位
+- **WHEN** 打开某应用详情且其 manifest 的技能/能力/参数为空
+- **THEN** 对应字段行不渲染，不出现连续多行「—」
+
+#### Scenario: 无参数运行卡无悬空分隔线
+- **WHEN** 应用 manifest 未声明参数且打开详情
+- **THEN** 发起运行卡只含标题与提交按钮，无悬空分隔线
+
+#### Scenario: 版本号单处呈现
+- **WHEN** 浏览应用列表
+- **THEN** 每行的最新版本号只出现一次（徽章或副标题其一）

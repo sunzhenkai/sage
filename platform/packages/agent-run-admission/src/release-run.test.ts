@@ -130,12 +130,58 @@ describe('package run admission', () => {
     expect(second.envelope.specRef).toBe(first.envelope.specRef);
   });
 
+  it('replays the first admission when the same explicit request key is reused', async () => {
+    const shared = {
+      specStore: new MemorySpecStore(),
+      auditOutbox: new MemoryAuditOutbox(),
+      idempotencyStore: new MemoryIdempotencyStore(),
+    };
+    const first = await admitPackageRun(baseInput({ ...shared, requestIdempotencyKey: 'client-key-1' }));
+    const second = await admitPackageRun(baseInput({ ...shared, requestIdempotencyKey: 'client-key-1' }));
+    expect(first.status).toBe('admitted');
+    expect(second.status).toBe('existing');
+    expect(second.spec.taskId).toBe(first.spec.taskId);
+    expect(second.envelope.specRef).toBe(first.envelope.specRef);
+  });
+
+  it('rejects an explicit request key reused with a different input digest', async () => {
+    const shared = {
+      specStore: new MemorySpecStore(),
+      auditOutbox: new MemoryAuditOutbox(),
+      idempotencyStore: new MemoryIdempotencyStore(),
+    };
+    await admitPackageRun(baseInput({ ...shared, requestIdempotencyKey: 'client-key-1' }));
+    const mismatched = baseInput({ ...shared, requestIdempotencyKey: 'client-key-1', inputDigest: packageRunInputDigest('changed', release.releaseDigest, {}) });
+    await expect(admitPackageRun(mismatched)).rejects.toThrow('PACKAGE_RUN_ADMISSION_IDEMPOTENCY_CONFLICT');
+  });
+
+  it('admits distinct request keys independently even for identical inputs', async () => {
+    const shared = {
+      specStore: new MemorySpecStore(),
+      auditOutbox: new MemoryAuditOutbox(),
+      idempotencyStore: new MemoryIdempotencyStore(),
+    };
+    const first = await admitPackageRun(baseInput({ ...shared, requestIdempotencyKey: 'click-1' }));
+    // 对应 API 行为：每次点击生成新 taskId（runId/attemptId 随之派生）。
+    const second = await admitPackageRun(baseInput({
+      ...shared, requestIdempotencyKey: 'click-2',
+      taskId: 'pkg-task-2', runId: 'run-pkg-task-2', attemptId: 'attempt-pkg-task-2-1',
+    }));
+    expect(first.status).toBe('admitted');
+    expect(second.status).toBe('admitted');
+    expect(second.spec.taskId).not.toBe(first.spec.taskId);
+  });
+
   it('produces the expected idempotency key binding tenant + release + input', () => {
     const digest = packageRunInputDigest('hi', release.releaseDigest, {});
     const key = packageRunIdempotencyKey('tenant-local', release.releaseId, digest);
     expect(key).toMatch(/^[a-f0-9]{64}$/);
     expect(packageRunIdempotencyKey('tenant-local', release.releaseId, digest)).toBe(key);
     expect(packageRunIdempotencyKey('tenant-other', release.releaseId, digest)).not.toBe(key);
+    // 显式请求键只绑定 (tenant, key)：release/digest 不同不改变键，跨 tenant 仍隔离。
+    const keyed = packageRunIdempotencyKey('tenant-local', release.releaseId, digest, 'k');
+    expect(packageRunIdempotencyKey('tenant-local', 'other-release', 'sha256:' + '0'.repeat(64), 'k')).toBe(keyed);
+    expect(packageRunIdempotencyKey('tenant-other', release.releaseId, digest, 'k')).not.toBe(keyed);
   });
 });
 

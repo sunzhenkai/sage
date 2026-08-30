@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "AgentPackageRelease 准入工作流",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "viewBox": [930, 900],
+    "views": [
+      {
+        "id": "happy-path",
+        "label": "正常准入",
+        "focus": ["submit", "validate", "compile-sign", "check", "accept"],
+        "note": "从提交到 Registry 接受的完整路径。"
+      },
+      {
+        "id": "reject-path",
+        "label": "拒绝路径",
+        "focus": ["compile-sign", "check", "reject"],
+        "note": "签名失败、Conformance 失败或边界破坏均拒绝。"
+      }
+    ]
+  },
+  "lanes": [
+    { "id": "developer", "label": "开发者" },
+    { "id": "api", "label": "API 层" },
+    { "id": "release", "label": "Release 包" },
+    { "id": "check", "label": "准入校验" },
+    { "id": "registry", "label": "Registry" },
+    { "id": "exception", "label": "异常", "variant": "exception" }
+  ],
+  "phases": [
+    { "id": "intake", "label": "提交", "fromCol": 0, "toCol": 0 },
+    { "id": "build", "label": "编译签名", "fromCol": 1, "toCol": 2, "variant": "emphasis" },
+    { "id": "verify", "label": "校验", "fromCol": 3, "toCol": 3, "variant": "security" },
+    { "id": "record", "label": "登记", "fromCol": 4, "toCol": 4 }
+  ],
+  "mainPath": ["submit", "validate", "compile-sign", "check", "accept"],
+  "nodes": [
+    { "id": "submit", "lane": "developer", "col": 0, "type": "external", "label": "提交 Package", "sublabel": "/v1/agent-packages" },
+    { "id": "validate", "lane": "api", "col": 1, "type": "backend", "label": "校验输入", "sublabel": "schema / 权限" },
+    { "id": "compile-sign", "lane": "release", "col": 2, "type": "security", "label": "编译并签名", "sublabel": "hash + sign" },
+    { "id": "check", "lane": "check", "col": 3, "type": "security", "label": "准入校验", "sublabel": "admit / conformance / 治理", "width": 120 },
+    { "id": "accept", "lane": "registry", "col": 4, "type": "database", "label": "接受", "sublabel": "state=accepted" },
+    { "id": "reject", "lane": "exception", "col": 3, "type": "security", "label": "拒绝", "sublabel": "state=rejected" }
+  ],
+  "edges": [
+    { "id": "submit-validate", "from": "submit", "to": "validate", "role": "main" },
+    { "id": "validate-compile-sign", "from": "validate", "to": "compile-sign", "role": "main" },
+    { "id": "compile-sign-check", "from": "compile-sign", "to": "check", "role": "main" },
+    { "id": "check-accept", "from": "check", "to": "accept", "role": "main", "variant": "emphasis" },
+    { "id": "compile-sign-reject", "from": "compile-sign", "to": "reject", "label": "签名失败", "role": "error", "variant": "security", "route": "drop" },
+    { "id": "check-reject", "from": "check", "to": "reject", "label": "校验失败", "role": "error", "variant": "security", "route": "drop", "labelAt": [480, 580] }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "不可变供应链", "items": ["Package 编译后计算 content_hash 并签名", "Run 永远引用固定 release_id", "Registry 是 Package 的唯一 authority"] },
+    { "dot": "emerald", "title": "三层校验", "items": ["Run 准入：签名、依赖、Capability", "Conformance：行为一致性与确定性", "生产治理：引用、计费点、Telemetry 基数"] },
+    { "dot": "rose", "title": "拒绝与退役", "items": ["拒绝写入 state=rejected 与 rejection_reason", "后置审计发现漏洞可标记 retired", "后续 Run 必须迁到新 Release"] }
+  ]
+}
