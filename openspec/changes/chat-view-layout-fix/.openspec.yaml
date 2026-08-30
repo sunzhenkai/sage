@@ -1,0 +1,5 @@
+schema: spec-driven
+created: 2026-08-30
+goal: 修复 chat 视图的 4 个 ui-inspect 漏检问题：会话列表与对话区间隔线右侧无间隔、对话内容区最大宽度过窄、会话列表 item
+  点击前后 padding/高度不一致、选中背景色未覆盖整个 item
+skip_specs: true

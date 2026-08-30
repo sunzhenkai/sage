@@ -357,7 +357,7 @@ export function ChatApp({ sessionId, apiBase = '', fetcher = fetch }: ChatAppPro
   const copyEvents = async () => { const copied = await copyText(serializeEventStream(events)); if (copied) { setError(undefined); setNotice(t('eventStreamCopied', { count: events.length })); } else { setNotice(undefined); setError(t('copyFailedMessage')); } };
   const quickPrompt = (prompt: string) => { setText(prompt); document.querySelector<HTMLTextAreaElement>(`[aria-label="${t('message')}"]`)?.focus(); };
   if (recovery) return <section className="workspace-page recovery-page"><Banner kind="error" title={t('chatUnavailable')}>{t('chatRetention')}</Banner><ChatLanding fetcher={fetcher} /></section>;
-  return <section className="workspace-page chat-page">
+  return <section className="workspace-page content-pane chat-page">
     <header className="page-heading chat-heading">
       <div className="chat-heading-row">
         <a className="chat-back" href={workspaceHref({ view: 'chat' })} aria-label={t('backToConversations')} title={t('backToConversations')}>←</a>
