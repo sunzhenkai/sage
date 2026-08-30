@@ -803,3 +803,6 @@ export * from './supply-chain.js';
 export * from './source-manifest.js';
 export * from './source-loader.js';
 export * from './compiler.js';
+export * from './tar-codec.js';
+export * from './output-archive.js';
+export * from './source-archive.js';

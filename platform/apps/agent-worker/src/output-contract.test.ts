@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import { ApplicationFailure } from '@temporalio/activity';
 import {
-  enforceOutputContract,
-  OutputContractViolation,
   stripThinkSegments,
   unwrapJsonFence,
   validateJsonSchemaSubset,
+  enforceOutputContract
 } from './output-contract.js';
+import { classifySliceFailure } from './activities.js';
 
 describe('stripThinkSegments', () => {
   it('removes paired think segments and trims', () => {
@@ -62,30 +63,35 @@ describe('validateJsonSchemaSubset', () => {
   });
 });
 
-describe('enforceOutputContract', () => {
-  const contract = { task: 'digest', schema: JSON.stringify({ type: 'object', required: ['overview'], properties: { overview: { type: 'string' } } }), files: ['report.md'] };
-
-  it('strips reasoning, unwraps the fence, validates, and returns pretty JSON', () => {
-    const output = enforceOutputContract('<think>chain</think>\n\n```json\n{"overview":"ok"}\n```', contract);
-    expect(output).toBe(JSON.stringify({ overview: 'ok' }, null, 2));
+describe('enforceOutputContract remains a deterministic-artifact helper', () => {
+  it('still validates JSON when invoked directly, but worker no longer calls it on model text', () => {
+    const schema = JSON.stringify({ type: 'object', required: ['overview'], properties: { overview: { type: 'string' } } });
+    expect(enforceOutputContract('```json\n{"overview":"ok"}\n```', { schema })).toContain('overview');
+    expect(enforceOutputContract('plain markdown', { files: ['brief.md'] })).toBe('plain markdown');
   });
 
-  it('violates on missing required fields with actionable detail', () => {
-    expect(() => enforceOutputContract('```json\n{"other":1}\n```', contract)).toThrow(OutputContractViolation);
-    expect(() => enforceOutputContract('```json\n{"other":1}\n```', contract)).toThrow(/missing required property 'overview'/);
+  it('treats schema-present and schema-absent text as equivalent for materialization (no body gate)', () => {
+    const body = 'not json at all';
+    expect(enforceOutputContract(body, { files: ['brief.md'] })).toBe(body);
+    expect(enforceOutputContract(body, { files: ['brief.md'], schema: undefined })).toBe(body);
+  });
+});
+
+describe('classifySliceFailure', () => {
+  it('marks non-retryable ApplicationFailure as failed', () => {
+    const failure = ApplicationFailure.nonRetryable('missing provider', 'PROVIDER_DEPENDENCY_MISSING');
+    expect(classifySliceFailure(failure, 1)).toEqual({
+      kind: 'failed', failureCode: 'PROVIDER_DEPENDENCY_MISSING', detail: 'missing provider'
+    });
   });
 
-  it('violates when output is empty after stripping or not JSON at all', () => {
-    expect(() => enforceOutputContract('<think>only reasoning</think>', contract)).toThrow(/empty after stripping/);
-    expect(() => enforceOutputContract('plain markdown report', contract)).toThrow(/not valid JSON/);
+  it('retries retryable errors before the last attempt', () => {
+    expect(classifySliceFailure(new Error('timeout'), 2)).toEqual({ kind: 'retry' });
   });
 
-  it('violates when the declared schema itself is malformed', () => {
-    expect(() => enforceOutputContract('{"overview":"x"}', { schema: '{not-json' })).toThrow(/declared output schema is not valid JSON/);
-  });
-
-  it('returns the raw output untouched when no schema is declared', () => {
-    const raw = '<think>r</think>anything';
-    expect(enforceOutputContract(raw, { files: ['report.md'] })).toBe(raw);
+  it('marks the last retryable attempt as ACTIVITY_FAILED', () => {
+    expect(classifySliceFailure(new Error('timeout'), 5)).toEqual({
+      kind: 'failed', failureCode: 'ACTIVITY_FAILED', detail: 'timeout'
+    });
   });
 });

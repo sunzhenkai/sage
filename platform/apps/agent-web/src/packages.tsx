@@ -63,7 +63,7 @@ export interface PackageDetailView {
 export type PackageFetch = typeof fetch;
 export interface PackageRequestError extends Error { status?: number; code?: string }
 async function packageJson<T>(fetcher: PackageFetch, url: string, init: RequestInit = {}): Promise<T> {
-  const response = await fetcher(url, { ...init, credentials: 'include', headers: { ...(init.body === undefined ? {} : { 'content-type': 'application/json' }), ...init.headers } });
+  const response = await fetcher(url, { ...init, credentials: 'include', headers: { ...(init.body === undefined || init.body instanceof FormData ? {} : { 'content-type': 'application/json' }), ...init.headers } });
   if (!response.ok) {
     const body = await response.json().catch(() => ({ error: { code: `HTTP_${response.status}` } })) as { error?: { code?: string; message?: string } };
     const failure: PackageRequestError = new Error(body.error?.message ?? body.error?.code ?? `HTTP ${response.status}`);
@@ -152,7 +152,7 @@ export function PackageDetailView({ detail, loading, starting, error, runStarted
   readonly deleting: boolean;
   readonly deleteConfirm: boolean;
   readonly onStartRun: (request: { readonly task?: string; readonly params: Readonly<Record<string, string | number>> }) => void | Promise<void>;
-  readonly onUploadVersion: (files: Record<string, string>) => void | Promise<void>;
+  readonly onUploadVersion: (file: File) => void | Promise<void>;
   readonly onRequestDelete: () => void;
   readonly onCancelDelete: () => void;
   readonly onConfirmDelete: () => void | Promise<void>;
@@ -165,9 +165,11 @@ export function PackageDetailView({ detail, loading, starting, error, runStarted
   const effectiveTask = declaredTasks.find((task) => task.name === selectedTask)?.name ?? declaredTasks[0]?.name;
   const [paramValues, setParamValues] = useState<Record<string, string>>({});
   const [paramError, setParamError] = useState<string>();
-  const [uploadText, setUploadText] = useState('');
+  const [uploadFile, setUploadFile] = useState<File>();
   const [uploadError, setUploadError] = useState<string>();
   const [showUpload, setShowUpload] = useState(false);
+  const ARCHIVE_NAME = /\.(tar\.gz|tgz|tar|zip|gz)$/i;
+  const ARCHIVE_MAX_BYTES = 8 * 1024 * 1024;
   const submitRun = () => {
     const params: Record<string, string | number> = {};
     for (const input of declaredInputs) {
@@ -185,16 +187,11 @@ export function PackageDetailView({ detail, loading, starting, error, runStarted
     void onStartRun({ ...(effectiveTask === undefined ? {} : { task: effectiveTask }), params });
   };
   const submitUpload = () => {
-    const trimmed = uploadText.trim();
-    if (trimmed.length === 0) { setUploadError(t('uploadFilesRequired')); return; }
-    let parsed: unknown;
-    try { parsed = JSON.parse(trimmed); } catch { setUploadError(t('uploadFilesInvalid')); return; }
-    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) { setUploadError(t('uploadFilesInvalid')); return; }
-    const files = parsed as Record<string, unknown>;
-    if (Object.keys(files).length === 0 || files['app.yaml'] === undefined) { setUploadError(t('uploadFilesRequired')); return; }
-    for (const value of Object.values(files)) { if (typeof value !== 'string') { setUploadError(t('uploadFilesInvalid')); return; } }
+    if (uploadFile === undefined) { setUploadError(t('uploadArchiveRequired')); return; }
+    if (uploadFile.size > ARCHIVE_MAX_BYTES) { setUploadError(t('uploadArchiveTooLarge')); return; }
+    if (!ARCHIVE_NAME.test(uploadFile.name)) { setUploadError(t('uploadArchiveInvalid')); return; }
     setUploadError(undefined);
-    onUploadVersion(files as Record<string, string>);
+    onUploadVersion(uploadFile);
   };
   return <article className="task-detail">
     <header className="detail-heading"><div><a className="back-link" href={workspaceHref({ view: 'packages' })}>← {t('allPackages')}</a>
@@ -216,7 +213,9 @@ export function PackageDetailView({ detail, loading, starting, error, runStarted
         <div className="section-heading"><div><h3>{t('uploadVersion')}</h3></div></div>
         <p className="muted-copy">{t('uploadHint')}</p>
         <form className="form-grid" onSubmit={(event) => { event.preventDefault(); submitUpload(); }}>
-          <TextAreaField label={t('uploadFiles')} value={uploadText} rows={8} maxLength={600_000} onChange={setUploadText} placeholder={t('uploadFilesPlaceholder')} />
+          <Field label={t('uploadArchiveFile')} hint={t('uploadHint')}>
+            <input type="file" accept=".tar,.tar.gz,.tgz,.gz,.zip" aria-label={t('uploadArchiveFile')} onChange={(event) => setUploadFile(event.target.files?.[0])} />
+          </Field>
           {uploadError ? <InlineNotice error>{uploadError}</InlineNotice> : null}
           <div className="form-actions"><button className="button button-secondary" type="button" onClick={() => setShowUpload(false)}>{t('cancelAction')}</button><button className="button button-primary" type="submit" disabled={uploading}>{uploading ? t('uploadingVersion') : t('uploadVersion')}</button></div>
         </form>
@@ -370,15 +369,17 @@ interface AppSummaryResponse {
     finally { setImportingExample(undefined); }
   };
 
-  const uploadVersion = async (files: Record<string, string>) => {
+  const uploadVersion = async (file: File) => {
     if (detail === undefined) return;
     setUploading(true); setUploadMessage(undefined); setError(undefined);
     try {
+      const body = new FormData();
+      body.append('file', file);
       const result = await packageJson<{ packageVersion: string }>(fetcher, `${apiBase}/v1/apps/${encodeURIComponent(detail.packageId)}/releases`, {
-        method: 'POST', body: JSON.stringify({ files })
+        method: 'POST', body
       });
-      setUploadMessage({ kind: 'success', text: `${t('uploadSucceeded')} · ${result.packageVersion}` });
       await select(detail.packageId);
+      setUploadMessage({ kind: 'success', text: `${t('uploadSucceeded')} · ${result.packageVersion}` });
     } catch (cause) { setUploadMessage({ kind: 'error', text: cause instanceof Error ? cause.message : t('uploadFailed') }); }
     finally { setUploading(false); }
   };

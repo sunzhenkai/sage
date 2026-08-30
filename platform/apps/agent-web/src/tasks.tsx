@@ -5,7 +5,7 @@ import { Banner, EmptyPanel, LoadingState } from './feedback.js';
 import { Markdown } from './markdown.js';
 import { splitAssistantText } from './chat.js';
 
-export interface TaskViewModel { readonly taskId: string; readonly taskType: string; readonly workflowId: string; readonly targetId: string; readonly attempt: number; readonly status: string; readonly revision: number; readonly projectionUpdatedAt?: string; readonly freshness: 'fresh' | 'stale' | 'unavailable'; readonly staleReason?: string; readonly sessionId?: string; readonly runId?: string; readonly messageId?: string; readonly targetSnapshot: { readonly targetId: string; readonly environment: string; readonly namespace: string; readonly taskQueue: string; readonly region?: string; readonly targetProfileVersion?: string }; }
+export interface TaskViewModel { readonly taskId: string; readonly taskType: string; readonly workflowId: string; readonly targetId: string; readonly attempt: number; readonly status: string; readonly revision: number; readonly projectionUpdatedAt?: string; readonly freshness: 'fresh' | 'stale' | 'unavailable'; readonly staleReason?: string; readonly sessionId?: string; readonly runId?: string; readonly messageId?: string; readonly failureCode?: string; readonly failureDetail?: string; readonly targetSnapshot: { readonly targetId: string; readonly environment: string; readonly namespace: string; readonly taskQueue: string; readonly region?: string; readonly targetProfileVersion?: string }; }
 export interface TaskEventView { readonly eventId: string; readonly sequence: number; readonly kind: 'task' | 'agent'; readonly type: string; readonly occurredAt: string; readonly payload: Readonly<Record<string, unknown>>; }
 export interface TaskRunLogAttemptView { readonly runId: string; readonly attemptId: string; readonly eventCount: number; readonly firstSequence: number; readonly lastSequence: number; readonly lastWrittenAt: string; }
 export interface TaskRunLogEventView { readonly eventId: string; readonly sequence: number; readonly type: string; readonly payload: Readonly<Record<string, unknown>>; readonly receiptRefs?: readonly string[]; readonly artifactRefs?: readonly string[]; }
@@ -22,23 +22,30 @@ export function ProjectionFreshness({ task }: { readonly task: TaskViewModel }) 
 
 export function TaskList({ tasks, sessionId }: { readonly tasks: readonly TaskViewModel[]; readonly sessionId?: string }) { const { t } = useLocale(); return <section className="task-list-section" aria-label={t('tasks')}>{tasks.length === 0 ? <EmptyPanel icon="▣" title={t('noTasks')} hint={t('promoteImportant')} action={<a className="button button-secondary" href={workspaceHref({ view: 'chat', ...(sessionId ? { sessionId } : {}) })}>{t('goToChat')} <span>→</span></a>} /> : <div className="task-table">{tasks.map((task) => <a className="task-row" key={task.taskId} href={workspaceHref({ view: 'tasks', taskId: task.taskId, ...(sessionId ? { sessionId } : {}) })}><span className="task-row-icon">▣</span><span className="task-row-main"><strong className="task-id-link">{task.taskId}</strong><small>{task.taskType} · {task.targetSnapshot.environment} · {t('attempt')} {task.attempt}</small></span><span className={`status-badge status-${statusTone(task.status)}`}>{statusLabel(task.status, t)}</span><span className="task-row-target">{task.targetSnapshot.targetId}<small>{task.targetSnapshot.namespace}</small></span><span className="task-row-chevron">→</span><ProjectionFreshness task={task}/></a>)}</div>}</section>; }
 
-/** 终态 succeeded 时的内联输出：拉取 task-output 内容渲染 markdown，think 段折叠兜底。 */
-export function TaskOutputPreview({ fetcher = fetch, taskId, artifactId }: { readonly fetcher?: typeof fetch; readonly taskId: string; readonly artifactId: string }) {
+function isPreviewableArtifact(mediaType: string): boolean {
+  return mediaType.startsWith('text/') || mediaType === 'application/json';
+}
+
+/** 终态 succeeded 时：文本文件内联预览；二进制仅下载。 */
+export function TaskOutputPreview({ fetcher = fetch, taskId, artifact }: { readonly fetcher?: typeof fetch; readonly taskId: string; readonly artifact: TaskArtifactView }) {
   const { t } = useLocale();
   const [content, setContent] = useState<string>();
   const [failed, setFailed] = useState(false);
+  const previewable = isPreviewableArtifact(artifact.mediaType);
   useEffect(() => {
+    if (!previewable) return;
     let cancelled = false;
     void (async () => {
       try {
-        const response = await fetcher(`/v1/tasks/${encodeURIComponent(taskId)}/artifacts/${encodeURIComponent(artifactId)}`, { credentials: 'include' });
+        const response = await fetcher(`/v1/tasks/${encodeURIComponent(taskId)}/artifacts/${encodeURIComponent(artifact.artifactId)}`, { credentials: 'include' });
         if (!response.ok) throw new Error(`HTTP_${response.status}`);
-        const body = await response.json() as { content?: string };
-        if (!cancelled) setContent(body.content ?? '');
+        const body = await response.json() as { content?: string; encoding?: string };
+        if (!cancelled) setContent(body.encoding === 'base64' ? '' : body.content ?? '');
       } catch { if (!cancelled) setFailed(true); }
     })();
     return () => { cancelled = true; };
-  }, [fetcher, taskId, artifactId]);
+  }, [fetcher, taskId, artifact.artifactId, previewable]);
+  if (!previewable) return <p className="muted-copy"><a href={`/v1/tasks/${encodeURIComponent(taskId)}/artifacts/${encodeURIComponent(artifact.artifactId)}?download=1`}>{t('downloadFile')}</a></p>;
   if (failed) return <p className="muted-copy">{t('outputPreviewUnavailable')}</p>;
   if (content === undefined) return <LoadingState label={t('loading')} />;
   return <div className="task-output-preview">{splitAssistantText(content).map((segment, index) => segment.kind === 'thinking'
@@ -71,10 +78,20 @@ export function TaskDetail({ task, events, artifacts, runLogs, runLogsLoadingMor
   const controls: readonly [TaskControl, string][] = [['pause', 'pauseControl'], ['resume', 'resumeControl'], ['cancel', 'cancelControl'], ['retry', 'retryControl']];
   return <article className="task-detail"><header className="detail-heading"><div><a className="back-link" href={workspaceHref({ view: 'tasks', ...(sessionId ? { sessionId } : {}) })}>← {t('allTasks')}</a><div className="detail-title"><span className="task-row-icon">▣</span><h2>{task.taskId}</h2><span className={`status-badge status-${statusTone(task.status)}`}>{statusLabel(task.status, t)}</span></div></div><button className="button button-secondary" type="button" disabled={detailLoading} onClick={onRefresh}>↻ {t('refresh')}</button></header><div className="detail-banner"><ProjectionFreshness task={task}/><span>{t('revision')} {task.revision}</span></div>
     {task.status === 'effect_unknown' ? <details className="effect-unknown-banner"><summary>{t('effectUnknownTitle')}</summary><p>{t('effectUnknownBody')}</p><p>{t('effectUnknownGuidance')}</p></details> : null}
+    {task.status === 'failed' ? <details className="failure-banner" aria-label={t('failureDetail')} open><summary>{t('failureDetail')}</summary>{task.failureCode ? <p><code>{task.failureCode}</code></p> : null}{task.failureDetail ? <p>{task.failureDetail}</p> : null}</details> : null}
     <div className="detail-grid"><section className="detail-card"><dl><dt>{t('workflow')}</dt><dd>{task.workflowId}</dd><dt>{t('target')}</dt><dd>{task.targetSnapshot.targetId}</dd><dt>{t('namespace')}</dt><dd>{task.targetSnapshot.namespace}</dd><dt>{t('taskQueue')}</dt><dd>{task.targetSnapshot.taskQueue}</dd><dt>{t('attempt')}</dt><dd>{task.attempt}</dd></dl></section><section className="detail-card"><nav className="control-grid" aria-label={t('taskControls')} title={t('controlsAuthorized')}>{controls.map(([operation, label]) => <button className={`button ${operation === 'cancel' ? 'button-danger' : 'button-secondary'}`} disabled={!controlAllowed(task.status, operation)} type="button" key={operation} onClick={() => onControl?.(operation)}>{t(label as 'pauseControl' | 'resumeControl' | 'cancelControl' | 'retryControl')}</button>)}</nav></section></div>
     <section className="detail-card timeline-card" aria-label={t('taskTimeline')}><div className="section-heading"><div><h3>{t('timeline')}</h3></div><span className="badge badge-neutral">{t('eventsCount', { count: events.length })}</span></div>{events.length === 0 ? <p className="muted-copy" data-testid="timeline-empty">{task.freshness === 'fresh' ? t('noProjectionEvents') : t('timelineProjectionLagging')}</p> : <ol className="task-timeline">{events.map((event) => <li key={event.eventId}><span className={`timeline-marker marker-${event.kind}`} /><div><strong>{event.type}</strong><time>{formatDateTime(event.occurredAt)}</time></div><small>#{event.sequence}</small></li>)}</ol>}</section>
     <RunLogsPanel {...(runLogs === undefined ? {} : { runLogs })} {...(runLogsLoadingMore ? { loadingMore: runLogsLoadingMore } : {})} {...(runLogsError ? { error: runLogsError } : {})} {...(onSelectAttempt ? { onSelectAttempt } : {})} {...(onLoadMoreRunLogs ? { onLoadMore: onLoadMoreRunLogs } : {})} />
-    <section className="detail-card" aria-label={t('taskArtifacts')}><div className="section-heading"><div><h3>{t('artifacts')}</h3></div><span className="badge badge-neutral">{artifacts.length}</span></div>{artifacts.length === 0 ? <p className="muted-copy">{t('artifactsPending')}</p> : <><div className="artifact-list">{artifacts.map((artifact) => <a className="artifact-link" key={artifact.artifactId} href={`/v1/tasks/${encodeURIComponent(task.taskId)}/artifacts/${encodeURIComponent(artifact.artifactId)}`} title={artifact.mediaType}><span className="file-icon">↗</span>{artifact.name}<small>{artifact.mediaType} · {artifact.artifactRef}</small></a>)}</div>{task.status === 'succeeded' ? <TaskOutputPreview fetcher={fetcher} taskId={task.taskId} artifactId={(artifacts.find((artifact) => artifact.name === 'task-output') ?? artifacts[0])?.artifactId ?? ''} /> : null}</>}</section>
+    <section className="detail-card" aria-label={t('taskArtifacts')}><div className="section-heading"><div><h3>{t('artifacts')}</h3></div><span className="badge badge-neutral">{artifacts.length}</span></div>{artifacts.length === 0 ? <p className="muted-copy">{t('artifactsPending')}</p> : (() => {
+      const packageArtifact = artifacts.find((artifact) => artifact.name === 'output.tar.gz');
+      const fileArtifacts = artifacts.filter((artifact) => artifact.name !== 'output.tar.gz');
+      const previewArtifact = fileArtifacts.find((artifact) => isPreviewableArtifact(artifact.mediaType));
+      return <>
+        {packageArtifact ? <p className="muted-copy"><a href={`/v1/tasks/${encodeURIComponent(task.taskId)}/artifacts/${encodeURIComponent(packageArtifact.artifactId)}?download=1`}>{t('downloadPackage')}</a></p> : null}
+        {fileArtifacts.length > 0 ? <div className="artifact-list" aria-label={t('outputFiles')}>{fileArtifacts.map((artifact) => <a className="artifact-link" key={artifact.artifactId} href={`/v1/tasks/${encodeURIComponent(task.taskId)}/artifacts/${encodeURIComponent(artifact.artifactId)}${isPreviewableArtifact(artifact.mediaType) ? '' : '?download=1'}`} title={artifact.mediaType}><span className="file-icon">↗</span>{artifact.name}<small>{artifact.mediaType} · {artifact.artifactRef}</small></a>)}</div> : <div className="artifact-list">{artifacts.map((artifact) => <a className="artifact-link" key={artifact.artifactId} href={`/v1/tasks/${encodeURIComponent(task.taskId)}/artifacts/${encodeURIComponent(artifact.artifactId)}`} title={artifact.mediaType}><span className="file-icon">↗</span>{artifact.name}<small>{artifact.mediaType} · {artifact.artifactRef}</small></a>)}</div>}
+        {task.status === 'succeeded' && previewArtifact ? <TaskOutputPreview fetcher={fetcher} taskId={task.taskId} artifact={previewArtifact} /> : null}
+      </>;
+    })()}</section>
   </article>;
 }
 

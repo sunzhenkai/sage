@@ -1,3 +1,6 @@
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { activityInfo, cancellationSignal, CancelledFailure, ApplicationFailure, heartbeat } from '@temporalio/activity';
 import type { P6TelemetryRecorder } from '@sage/observability';
 import {
@@ -27,8 +30,12 @@ import {
 } from '@sage/task-domain';
 import type { SecretBackend } from '@sage/secret-vault';
 import { resolvePackageRunConnection } from '@sage/task-domain';
+import {
+  assertDeclaredFiles, injectOutputDirectory, listOutputFiles, packOutputDirectory, writeCompatOutput, OutputArchiveError
+} from '@sage/agent-package-release';
 import { runTaskAgentPath, type TaskCanonicalCompatibilityOptions } from './task-compatibility.js';
-import { enforceOutputContract, OutputContractViolation } from './output-contract.js';
+
+const ACTIVITY_RETRY_MAX_ATTEMPTS = 5;
 
 export interface TaskSliceInputResolver {
   resolve(inputRef: TaskInputRef, tenantId: string): Promise<string>;
@@ -122,25 +129,20 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
         ? []
         : await options.providerConnections.listProviderConnections(input.tenantId).catch(() => [] as const);
       const resolvedConnection = resolvePackageRunConnection(manifestRoute, registry, settings?.providerConnectionId);
-      if (resolvedConnection === undefined) {
-        throw ApplicationFailure.nonRetryable(
+      const providerFailure = resolvedConnection === undefined
+        ? ApplicationFailure.nonRetryable(
           manifestRoute === undefined
             ? `PROVIDER_DEPENDENCY_MISSING: run agent settings have no default provider connection. Add a workspace provider and select it in run agent settings.`
             : `PROVIDER_DEPENDENCY_MISSING: no enabled registry entry with a stored credential matches the manifest model route (${manifestRoute.model}${(manifestRoute.fallbacks ?? []).length > 0 ? ` or fallbacks ${(manifestRoute.fallbacks ?? []).join(', ')}` : ''}) and the run agent settings default is ${settings?.providerConnectionId === undefined ? 'unset' : 'unavailable'}.`,
           'PROVIDER_DEPENDENCY_MISSING'
-        );
-      }
-      const sliceClient = await resolveConnectionLiveClient(
-        options.providerConnections, options.secretBackend, options.liveClientFactory,
-        input.tenantId, resolvedConnection.connectionId, isPackageInput ? 'package' : 'chat',
-        // 声明预算直通 provider 请求上限：4096 缺省会把大输出（如 digest JSON）静默截断成契约违约。
-        ...(isPackageInput ? [input.limits.maxTokens] as const : [] as const)
-      );
+        )
+        : undefined;
       const idempotencyKey = `${input.workflowId}:attempt:${input.attempt}:slice:${input.sliceNumber}`;
       const ownerToken = `${info.activityId}:delivery:${info.attempt}`;
       const claim = await options.store.claimSlice(input, idempotencyKey, ownerToken, new Date(now().getTime() + leaseMs).toISOString());
       if (claim.status === 'committed') return { ...claim.result, duplicate: true };
       if (claim.status === 'effect_unknown') return { ...claim.result, duplicate: true };
+      if (claim.status === 'failed') return { ...claim.result, duplicate: true };
       if (claim.status === 'cancelled') throw new CancelledFailure('TASK_SLICE_CANCELLED');
       if (claim.status === 'in_progress') throw new Error('TASK_SLICE_ALREADY_IN_PROGRESS');
 
@@ -148,6 +150,7 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
       const signal = cancellationSignal();
       let execution: ReturnType<LocalAgentClient['run']> | undefined;
       let committed = false;
+      const outputDir = await mkdtemp(join(tmpdir(), `sage-out-${input.taskId.slice(0, 24)}-s${input.sliceNumber}-`));
       const cancelExecution = (): void => execution?.cancel();
       signal.addEventListener('abort', cancelExecution, { once: true });
       const heartbeatTimer = setInterval(() => {
@@ -155,8 +158,17 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
         catch { execution?.cancel(); }
       }, 50);
       try {
+        if (providerFailure !== undefined) throw providerFailure;
+        const sliceClient = await resolveConnectionLiveClient(
+          options.providerConnections, options.secretBackend, options.liveClientFactory,
+          input.tenantId, resolvedConnection!.connectionId, isPackageInput ? 'package' : 'chat',
+          ...(isPackageInput ? [input.limits.maxTokens] as const : [] as const)
+        );
         if (signal.aborted) throw new CancelledFailure('TASK_SLICE_CANCELLED');
-        const resolvedInput = await options.inputResolver.resolve(input.inputRef as TaskInputRef, input.tenantId);
+        const resolvedInput = injectOutputDirectory(
+          await options.inputResolver.resolve(input.inputRef as TaskInputRef, input.tenantId),
+          outputDir
+        );
         if (signal.aborted) throw new CancelledFailure('TASK_SLICE_CANCELLED');
         const startedAt = now().getTime();
         const runId = `task-${input.taskId.slice(0, 96)}-a${input.attempt}-s${input.sliceNumber}`;
@@ -197,20 +209,40 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
           throw new Error(`AGENT_SLICE_${outcome.status.toUpperCase()}`);
         }
 
-        // 输出契约强制（声明 schema 的 Task）：剥离→解包→校验；违约在 commit 前以稳定错误失败（可重试）。
         const outputContract = packageRecord?.runContract;
-        let materializedOutput = outcome.output;
-        if (outputContract?.schema !== undefined && outcome.output !== undefined && outcome.output.length > 0) {
+        const declaredFiles = outputContract?.files ?? [];
+        if ((await listOutputFiles(outputDir)).length === 0 && outcome.output !== undefined && outcome.output.length > 0) {
+          await writeCompatOutput(outputDir, outcome.output, declaredFiles);
+        }
+        if (declaredFiles.length > 0) {
           try {
-            materializedOutput = enforceOutputContract(outcome.output, outputContract);
+            await assertDeclaredFiles(outputDir, declaredFiles);
           } catch (cause) {
-            if (cause instanceof OutputContractViolation) throw new ApplicationFailure(cause.message, 'PACKAGE_OUTPUT_CONTRACT_VIOLATION');
+            if (cause instanceof OutputArchiveError) {
+              throw ApplicationFailure.nonRetryable(cause.message, cause.code);
+            }
             throw cause;
           }
         }
-
-        const artifactRef = (outcome.output === undefined || outcome.output.length === 0 ? undefined
-          : `artifact://tasks/${encodeURIComponent(input.taskId)}/attempt-${input.attempt}/slice-${input.sliceNumber}`) as TaskArtifactRef | undefined;
+        let packed: Awaited<ReturnType<typeof packOutputDirectory>>;
+        try {
+          packed = await packOutputDirectory(outputDir);
+        } catch (cause) {
+          if (cause instanceof OutputArchiveError) {
+            throw ApplicationFailure.nonRetryable(cause.message, cause.code);
+          }
+          throw cause;
+        }
+        const artifactRef = packed === undefined ? undefined
+          : `artifact://tasks/${encodeURIComponent(input.taskId)}/attempt-${input.attempt}/slice-${input.sliceNumber}` as TaskArtifactRef;
+        if (packed !== undefined && options.outputStore !== undefined && artifactRef !== undefined) {
+          await options.outputStore.writeRunOutput({
+            tenantId: input.tenantId, taskId: input.taskId, artifactRef,
+            packageBytes: packed.bytes, fileManifest: packed.manifest,
+            mediaType: 'application/gzip', createdAt: now().toISOString(),
+            files: packed.manifest.map((entry) => entry.name)
+          });
+        }
         const result: AgentSliceResult = {
           schemaVersion: '1', taskId: input.taskId, sliceNumber: input.sliceNumber, outcome: 'committed',
           done: outcome.status === 'succeeded', duplicate: false,
@@ -221,18 +253,6 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
         const projection = projectionOf(input, result, result.done ? 'succeeded' : 'running', input.sliceNumber, now().toISOString());
         await options.store.commitSlice(idempotencyKey, ownerToken, result, projection);
         committed = true;
-        if (artifactRef !== undefined && outcome.output !== undefined && outcome.output.length > 0 && options.outputStore !== undefined) {
-          // 输出物化是 best-effort：slice 已提交是权威终态，写失败不改变任务结果。
-          try {
-            await options.outputStore.writeRunOutput({
-              tenantId: input.tenantId, taskId: input.taskId, artifactRef,
-              output: materializedOutput ?? outcome.output, mediaType: 'text/plain', createdAt: now().toISOString(),
-              ...(outputContract?.files === undefined || outputContract.files.length === 0 ? {} : { files: [...outputContract.files] })
-            });
-          } catch (cause) {
-            process.stderr.write(`task run output materialization failed for ${input.taskId}: ${cause instanceof Error ? cause.message : String(cause)}\n`);
-          }
-        }
         heartbeat({ phase: 'committed', sliceNumber: input.sliceNumber });
         await options.afterCommit?.(result);
         return result;
@@ -243,24 +263,56 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
           await options.store.cancelSlice(idempotencyKey, ownerToken, cancelledProjectionOf(input, now().toISOString()));
           throw cause instanceof CancelledFailure ? cause : new CancelledFailure('TASK_SLICE_CANCELLED');
         }
-        if (cause instanceof Error && cause.message === 'TASK_EFFECT_CLAIM_LOST') throw cause;
+        if (cause instanceof Error && cause.message === 'TASK_EFFECT_CLAIM_LOST') {
+          const unknown: AgentSliceResult = {
+            schemaVersion: '1', taskId: input.taskId, sliceNumber: input.sliceNumber, outcome: 'effect_unknown', done: false,
+            duplicate: false, detail: 'Agent Slice ended without a known committed outcome'
+          };
+          await options.store.markEffectUnknown(idempotencyKey, ownerToken, unknown,
+            projectionOf(input, unknown, 'effect_unknown', input.sliceNumber - 1, now().toISOString())).catch(() => undefined);
+          throw cause;
+        }
         if (committed) throw cause;
-        // 观测：effect_unknown 的原始异常必须可见，否则裁决无据可查。
-        process.stderr.write(`agent slice effect-unknown cause for ${input.taskId}: ${cause instanceof Error ? cause.stack : String(cause)}\n`);
-        const result: AgentSliceResult = {
-          schemaVersion: '1', taskId: input.taskId, sliceNumber: input.sliceNumber, outcome: 'effect_unknown', done: false,
-          duplicate: false, detail: 'Agent Slice ended without a known committed outcome'
+        const classified = classifySliceFailure(cause, info.attempt);
+        if (classified.kind === 'retry') throw cause;
+        if (classified.kind === 'unknown') {
+          process.stderr.write(`agent slice effect-unknown cause for ${input.taskId}: ${cause instanceof Error ? cause.stack : String(cause)}\n`);
+          const result: AgentSliceResult = {
+            schemaVersion: '1', taskId: input.taskId, sliceNumber: input.sliceNumber, outcome: 'effect_unknown', done: false,
+            duplicate: false, detail: 'Agent Slice ended without a known committed outcome'
+          };
+          if(input.sessionId&&input.runId&&input.messageId)try{options.telemetry?.record('sage_task_effect_unknown_total',1,{tenant_id:input.tenantId,message_id:input.messageId,session_id:input.sessionId,run_id:input.runId,task_id:input.taskId,workflow_id:input.workflowId,target_id:input.targetId,attempt:input.attempt},{slice_number:input.sliceNumber});}catch{/* Telemetry cannot change Activity semantics. */}
+          await options.store.markEffectUnknown(idempotencyKey, ownerToken, result,
+            projectionOf(input, result, 'effect_unknown', input.sliceNumber - 1, now().toISOString()));
+          return result;
+        }
+        const detail = classified.detail.slice(0, 500);
+        const failed: AgentSliceResult = {
+          schemaVersion: '1', taskId: input.taskId, sliceNumber: input.sliceNumber, outcome: 'failed', done: true,
+          duplicate: false, detail, failureCode: classified.failureCode
         };
-        if(input.sessionId&&input.runId&&input.messageId)try{options.telemetry?.record('sage_task_effect_unknown_total',1,{tenant_id:input.tenantId,message_id:input.messageId,session_id:input.sessionId,run_id:input.runId,task_id:input.taskId,workflow_id:input.workflowId,target_id:input.targetId,attempt:input.attempt},{slice_number:input.sliceNumber});}catch{/* Telemetry cannot change Activity semantics. */}
-        await options.store.markEffectUnknown(idempotencyKey, ownerToken, result,
-          projectionOf(input, result, 'effect_unknown', input.sliceNumber - 1, now().toISOString()));
-        return result;
+        await options.store.markSliceFailed(idempotencyKey, ownerToken, failed,
+          projectionOf(input, failed, 'failed', input.sliceNumber, now().toISOString(), classified.failureCode, classified.detail));
+        throw cause;
       } finally {
         clearInterval(heartbeatTimer);
         signal.removeEventListener('abort', cancelExecution);
+        await rm(outputDir, { recursive: true, force: true }).catch(() => undefined);
       }
     }
   };
+}
+
+export function classifySliceFailure(cause: unknown, attempt: number):
+  | { readonly kind: 'failed'; readonly failureCode: string; readonly detail: string }
+  | { readonly kind: 'retry' }
+  | { readonly kind: 'unknown' } {
+  if (cause instanceof ApplicationFailure && cause.nonRetryable) {
+    return { kind: 'failed', failureCode: cause.type || 'ACTIVITY_FAILED', detail: cause.message };
+  }
+  if (attempt < ACTIVITY_RETRY_MAX_ATTEMPTS) return { kind: 'retry' };
+  const message = cause instanceof Error ? cause.message : String(cause);
+  return { kind: 'failed', failureCode: 'ACTIVITY_FAILED', detail: message };
 }
 
 function projectionOf(
@@ -268,13 +320,17 @@ function projectionOf(
   result: AgentSliceResult,
   status: TaskProjection['status'],
   revision: number,
-  timestamp: string
+  timestamp: string,
+  failureCode?: string,
+  failureDetail?: string
 ): TaskProjection {
   return {
     schemaVersion: '1', taskType: input.taskType, tenantId: input.tenantId, taskId: input.taskId, workflowId: input.workflowId,
     targetId: input.targetId, attempt: input.attempt, status, revision, projectionSource: 'writer', historyEventId: '0',
     ...(result.checkpointRef === undefined ? {} : { checkpointRef: result.checkpointRef }),
     ...(result.artifactRef === undefined ? {} : { artifactRef: result.artifactRef }),
+    ...(failureCode === undefined ? {} : { failureCode }),
+    ...(failureDetail === undefined ? {} : { failureDetail: failureDetail.slice(0, 2_048) }),
     projectionUpdatedAt: timestamp, historyObservedAt: timestamp
   };
 }

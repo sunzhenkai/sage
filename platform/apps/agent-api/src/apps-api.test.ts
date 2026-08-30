@@ -2,6 +2,7 @@ import Fastify from 'fastify';
 import { describe, expect, it } from 'vitest';
 import type { AuthenticatedPrincipal } from '@sage/app-contracts';
 import { InMemoryAgentReleaseStore } from '@sage/agent-release-registry';
+import { encodeTar, encodeTarGz } from '@sage/agent-package-release';
 import { registerAppsRoutes } from './apps-api.js';
 
 const registrar: AuthenticatedPrincipal = {
@@ -36,7 +37,22 @@ async function api(options: { readonly principal?: AuthenticatedPrincipal; reado
     authenticator: { authenticateRequest: () => options.principal },
     engineIds: ['engine-local']
   });
+  await app.ready();
   return { app, store };
+}
+
+function multipartPayload(filename: string, bytes: Uint8Array, contentType: string): { readonly payload: Buffer; readonly headers: Record<string, string> } {
+  const boundary = '----sage-archive-boundary';
+  const payload = Buffer.concat([
+    Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${filename}"\r\nContent-Type: ${contentType}\r\n\r\n`),
+    Buffer.from(bytes),
+    Buffer.from(`\r\n--${boundary}--\r\n`)
+  ]);
+  return { payload, headers: { 'content-type': `multipart/form-data; boundary=${boundary}` } };
+}
+
+function archiveEntries(id: string, version = '1.0.0') {
+  return Object.entries(filesFor(id, version)).map(([name, content]) => ({ name, bytes: Buffer.from(content) }));
 }
 
 describe('App management API', () => {
@@ -140,4 +156,62 @@ describe('App management API', () => {
     expect(response.json().error.code).toBe('APP_UPLOAD_UNTRUSTED_FIELD');
     await app.close();
   });
+
+  it('registers the same release digest for JSON files and a tar.gz archive', async () => {
+    const { app } = await api({ principal: registrar });
+    await app.inject({ method: 'POST', url: '/v1/apps', payload: { appId: 'demo-app', name: 'Demo App' } });
+    const jsonUpload = await app.inject({ method: 'POST', url: '/v1/apps/demo-app/releases', payload: { files: filesFor('demo-app') } });
+    expect(jsonUpload.statusCode).toBe(201);
+    const archive = encodeTarGz(archiveEntries('demo-app'));
+    const { payload, headers } = multipartPayload('demo-app.tar.gz', archive, 'application/gzip');
+    const multipartUpload = await app.inject({ method: 'POST', url: '/v1/apps/demo-app/releases', headers, payload });
+    expect(multipartUpload.statusCode).toBe(200);
+    expect(multipartUpload.json().contentDigest).toBe(jsonUpload.json().contentDigest);
+    expect(multipartUpload.json().packageVersion).toBe(jsonUpload.json().packageVersion);
+    await app.close();
+  });
+
+  it('accepts tar, zip, and gzip-wrapped tar archives', async () => {
+    const { app } = await api({ principal: registrar });
+    await app.inject({ method: 'POST', url: '/v1/apps', payload: { appId: 'demo-app', name: 'Demo App' } });
+    const cases = [
+      ['app.tar', encodeTar(archiveEntries('demo-app', '2.0.0')), 'application/x-tar'],
+      ['app.zip', encodeZipForTest(archiveEntries('demo-app', '3.0.0')), 'application/zip']
+    ] as const;
+    for (const [filename, bytes, type] of cases) {
+      const { payload, headers } = multipartPayload(filename, bytes, type);
+      const uploaded = await app.inject({ method: 'POST', url: '/v1/apps/demo-app/releases', headers, payload });
+      expect(uploaded.statusCode, filename).toBe(201);
+    }
+    await app.close();
+  });
+
+  it('rejects a multipart archive whose manifest.id does not match the path', async () => {
+    const { app } = await api({ principal: registrar });
+    await app.inject({ method: 'POST', url: '/v1/apps', payload: { appId: 'demo-app', name: 'Demo App' } });
+    const { payload, headers } = multipartPayload('other.tar.gz', encodeTarGz(archiveEntries('other-app')), 'application/gzip');
+    const response = await app.inject({ method: 'POST', url: '/v1/apps/demo-app/releases', headers, payload });
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error.code).toBe('APP_PACKAGE_ID_MISMATCH');
+    await app.close();
+  });
 });
+
+function encodeZipForTest(entries: readonly { readonly name: string; readonly bytes: Uint8Array }[]): Buffer {
+  const chunks: Buffer[] = [];
+  for (const entry of entries) {
+    const name = Buffer.from(entry.name, 'utf8');
+    const data = Buffer.from(entry.bytes);
+    const header = Buffer.alloc(30);
+    header.writeUInt32LE(0x04034b50, 0);
+    header.writeUInt16LE(20, 4);
+    header.writeUInt32LE(data.length, 18);
+    header.writeUInt32LE(data.length, 22);
+    header.writeUInt16LE(name.length, 26);
+    chunks.push(header, name, data);
+  }
+  const central = Buffer.alloc(4);
+  central.writeUInt32LE(0x02014b50, 0);
+  chunks.push(central);
+  return Buffer.concat(chunks);
+}

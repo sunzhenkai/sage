@@ -215,32 +215,34 @@ describe('PackagesApp example import', () => {
 });
 
 describe('PackageDetailView management', () => {
-  it('uploads a new version after filling files', async () => {
+  it('uploads a new version after choosing an archive', async () => {
     const onUploadVersion = vi.fn(async () => undefined);
     let tree!: ReturnType<typeof create>;
     await act(async () => { tree = create(<PackageDetailView {...detailProps({ onUploadVersion })} />); await flush(); });
     const toggle = tree.root.findAllByType('button').find((b) => b.props.children === 'Upload new version')!;
     await act(async () => { toggle.props.onClick(); await flush(); });
-    const textarea = tree.root.findByProps({ 'aria-label': 'Package files (one per line, path then content)' });
-    await act(async () => { textarea.props.onChange({ target: { value: JSON.stringify({ 'app.yaml': 'id: ops-analyst' }) } }); await flush(); });
-    const form = tree.root.findAllByType('form').find((node) => node.findAllByProps({ 'aria-label': 'Package files (one per line, path then content)' }).length > 0)!;
+    const file = new File([new Uint8Array([0x1f, 0x8b])], 'ops-analyst.tar.gz', { type: 'application/gzip' });
+    const input = tree.root.findByProps({ 'aria-label': 'Source package archive' });
+    await act(async () => { input.props.onChange({ target: { files: [file] } }); await flush(); });
+    const form = tree.root.findAllByType('form').find((node) => node.findAllByProps({ 'aria-label': 'Source package archive' }).length > 0)!;
     await act(async () => { form.props.onSubmit({ preventDefault: () => undefined }); await flush(); });
-    expect(onUploadVersion).toHaveBeenCalledWith({ 'app.yaml': 'id: ops-analyst' });
+    expect(onUploadVersion).toHaveBeenCalledWith(file);
     await act(async () => tree.unmount());
   });
 
-  it('rejects upload without app.yaml', async () => {
+  it('rejects an archive that is too large before calling the API', async () => {
     const onUploadVersion = vi.fn(async () => undefined);
     let tree!: ReturnType<typeof create>;
     await act(async () => { tree = create(<PackageDetailView {...detailProps({ onUploadVersion })} />); await flush(); });
     const toggle = tree.root.findAllByType('button').find((b) => b.props.children === 'Upload new version')!;
     await act(async () => { toggle.props.onClick(); await flush(); });
-    const textarea = tree.root.findByProps({ 'aria-label': 'Package files (one per line, path then content)' });
-    await act(async () => { textarea.props.onChange({ target: { value: JSON.stringify({ 'prompts/a.md': 'x' }) } }); await flush(); });
-    const form = tree.root.findAllByType('form').find((node) => node.findAllByProps({ 'aria-label': 'Package files (one per line, path then content)' }).length > 0)!;
+    const file = new File([new Uint8Array(8 * 1024 * 1024 + 1)], 'ops-analyst.tar.gz', { type: 'application/gzip' });
+    const input = tree.root.findByProps({ 'aria-label': 'Source package archive' });
+    await act(async () => { input.props.onChange({ target: { files: [file] } }); await flush(); });
+    const form = tree.root.findAllByType('form').find((node) => node.findAllByProps({ 'aria-label': 'Source package archive' }).length > 0)!;
     await act(async () => { form.props.onSubmit({ preventDefault: () => undefined }); await flush(); });
     expect(onUploadVersion).not.toHaveBeenCalled();
-    expect(tree.root.findByProps({ children: 'At least the app.yaml file is required' })).toBeTruthy();
+    expect(tree.root.findByProps({ children: 'Archive exceeds the 8 MiB upload limit.' })).toBeTruthy();
     await act(async () => tree.unmount());
   });
 
@@ -261,6 +263,43 @@ describe('PackageDetailView management', () => {
     const confirmBtn = banner.findAllByType('button').find((b) => b.props.children === 'Delete App')!;
     await act(async () => { confirmBtn.props.onClick(); await flush(); });
     expect(onConfirmDelete).toHaveBeenCalled();
+    await act(async () => tree.unmount());
+  });
+});
+
+describe('PackagesApp archive upload', () => {
+  it('posts multipart FormData and refreshes version history after success', async () => {
+    const file = new File([new Uint8Array([0x1f, 0x8b])], 'ops-analyst.tar.gz', { type: 'application/gzip' });
+    let uploaded = false;
+    const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (init?.method === 'POST' && url.endsWith('/releases')) {
+        expect(init.body).toBeInstanceOf(FormData);
+        uploaded = true;
+        return response({ schemaVersion: 'PackageReleaseResult.v1', status: 'stored', packageVersion: '2.0.0' }, 201);
+      }
+      if (url.endsWith('/v1/apps/ops-analyst')) {
+        return response({
+          ...detail,
+          appId: 'ops-analyst',
+          releases: uploaded
+            ? [{ packageVersion: '2.0.0', releaseRef: 'release://v2', releaseId: 'rel-2', contentDigest: 'sha256:' + 'f'.repeat(64), lockDigest: 'sha256:' + 'e'.repeat(64), compilerBuild: 'local-dev', createdAt: '2026-08-30T00:00:00.000Z' }, ...detail.releases]
+            : detail.releases
+        });
+      }
+      return response({}, 404);
+    }) as typeof fetch;
+    let tree!: ReturnType<typeof create>;
+    await act(async () => { tree = create(<PackagesApp fetcher={fetcher} packageId="ops-analyst" />); await flush(); await flush(); });
+    const toggle = tree.root.findAllByType('button').find((b) => b.props.children === 'Upload new version')!;
+    await act(async () => { toggle.props.onClick(); await flush(); });
+    const input = tree.root.findByProps({ 'aria-label': 'Source package archive' });
+    await act(async () => { input.props.onChange({ target: { files: [file] } }); await flush(); });
+    const form = tree.root.findAllByType('form').find((node) => node.findAllByProps({ 'aria-label': 'Source package archive' }).length > 0)!;
+    await act(async () => { form.props.onSubmit({ preventDefault: () => undefined }); await flush(); await flush(); await flush(); });
+    expect(uploaded).toBe(true);
+    expect(JSON.stringify(tree.toJSON())).toContain('2.0.0');
+    expect(JSON.stringify(tree.toJSON())).toContain('New version registered');
     await act(async () => tree.unmount());
   });
 });

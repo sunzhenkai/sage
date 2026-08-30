@@ -38,6 +38,26 @@ describe('P6 Task and Task Card UI',()=>{
     const control=vi.fn();const detail=renderToStaticMarkup(<TaskDetail task={task} events={[{eventId:'event-1',sequence:1,kind:'agent',type:'agent.task.running',occurredAt:'2026-08-12T00:00:01.000Z',payload:{}}]} artifacts={[{artifactId:'output',artifactRef:'artifact://tasks/task-p6/output',name:'output.txt',mediaType:'text/plain'}]} onControl={control}/>);
     for(const value of ['workflow-p6','target-original','prod-ns','queue-original','agent.task.running','artifact://tasks/task-p6/output','Pause','Resume','Cancel','Retry'])expect(detail).toContain(value);
   });
+  it('shows output.tar.gz download, file list, and text-only preview on succeeded tasks',()=>{
+    const detail=renderToStaticMarkup(<TaskDetail task={{...task,status:'succeeded'}} events={[]} artifacts={[
+      {artifactId:'pkg',artifactRef:'artifact://tasks/task-p6/output',name:'output.tar.gz',mediaType:'application/gzip'},
+      {artifactId:'brief',artifactRef:'artifact://tasks/task-p6/output#file/brief.md',name:'brief.md',mediaType:'text/markdown'},
+      {artifactId:'bin',artifactRef:'artifact://tasks/task-p6/output#file/data.bin',name:'data.bin',mediaType:'application/octet-stream'}
+    ]} onControl={vi.fn()}/>);
+    expect(detail).toContain('Download tar.gz');
+    expect(detail).toContain('aria-label="Output files"');
+    expect(detail).toContain('brief.md');
+    expect(detail).toContain('data.bin');
+    expect(detail).toContain('download=1');
+  });
+  it('shows failure code and keeps retry enabled',()=>{
+    const detail=renderToStaticMarkup(<TaskDetail task={{...task,status:'failed',failureCode:'PACKAGE_OUTPUT_MISSING_FILE',failureDetail:'missing brief.md'}} events={[]} artifacts={[]} onControl={vi.fn()}/>);
+    expect(detail).toContain('PACKAGE_OUTPUT_MISSING_FILE');
+    expect(detail).toContain('missing brief.md');
+    expect(detail).toContain('aria-label="Failure"');
+    expect(detail).toContain('Retry');
+    expect(detail).not.toMatch(/<button[^>]*disabled[^>]*>Retry/);
+  });
   it('explains effect_unknown in plain language, keeps controls locked, and translates the stale reason',()=>{
     const detail=renderToStaticMarkup(<TaskDetail task={{...task,status:'effect_unknown'}} events={[]} artifacts={[]} onControl={vi.fn()}/>);
     for(const value of ['Effect unknown — confirm the outcome before continuing','duplicate side effects','effect resolution process','start a new task','No projection update within the freshness threshold','disabled'])expect(detail).toContain(value);

@@ -3,10 +3,10 @@
   "caseId": "apgv/entry/v1/dependency-preflight",
   "status": "BLOCKED",
   "decision": "NO-GO",
-  "sourceRevision": "18c5c70c9a0fbbb6048e636dc00c6adbf4c06aec",
+  "sourceRevision": "6f9d1171a3d71eaa77bcf2fd7a98d0c728cd78f2",
   "sourceDigest": "sha256:a1d98de5122d95585e4854efe5f62ce82cba7c283fc006c9edce3b0e0cf93c66",
   "toolDigest": "sha256:3eb1ef94b5890ca727158b106142685c8733b0ace5bcb4cf3f0ac14f9f0643f4",
-  "checkedAt": "2026-08-30T08:21:36.277Z",
+  "checkedAt": "2026-08-30T12:14:36.598Z",
   "dependencies": [
     {
       "change": "agent-platform-contract-authority-foundation",
@@ -106,5 +106,5 @@
     "12.5"
   ],
   "promotionStarted": false,
-  "contentDigest": "sha256:ee94a8e5fea12c2ba964008d6b36c9d1eebe5f16273f14413e150b768d898107"
+  "contentDigest": "sha256:68633b60652e6e388e1a1bfc9e368393f77350ce5c97ce6f182c67eaa54ade17"
 }
