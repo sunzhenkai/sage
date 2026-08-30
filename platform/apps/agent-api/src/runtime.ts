@@ -245,10 +245,9 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
     });
     // P8：service token（配置即强认证）+ schedules 管理链路 + dispatcher 内部解析端点。
     const serviceToken = ServiceTokenAuthenticator.fromEnv(process.env, config.tenantId);
-    const serviceTokenRequired = serviceToken !== undefined;
-    if (!serviceTokenRequired) {
-      // 保持原注册参数的本地 stub 认证行为；这里仅以 patch 方式为三条链路声明强认证开关为 false。
-    }
+    // schedules 管理链路口径（与运行门「schedule 管理必须服务身份认证」一致）：
+    // 配置了 SAGE_SERVICE_TOKEN_HASHES 时只认 Bearer service token（stub 信任头不提权）；
+    // 未配置时对所有请求 fail closed（401）。浏览器侧凭据由 agent-web 同源代理在服务端注入（SAGE_SERVICE_TOKEN），不在浏览器持有。
     registerSchedulesRoutes(app, {
       tenantId: config.tenantId,
       store: new InMemoryScheduleControlStore(),

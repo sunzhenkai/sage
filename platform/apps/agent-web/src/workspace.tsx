@@ -38,7 +38,7 @@ export function ChatLanding({
   readonly fetcher?: WorkspaceFetch;
   readonly navigate?: (href: string) => void;
 }) {
-  const { t, formatDateTime } = useLocale();
+  const { locale, t, formatDateTime } = useLocale();
   const [items, setItems] = useState<readonly SessionHistoryItem[]>([]);
   const [nextCursor, setNextCursor] = useState<string>();
   const [status, setStatus] = useState<SessionHistoryStatus>('all');
@@ -58,6 +58,8 @@ export function ChatLanding({
       const params = new URLSearchParams({ status, limit: '30' });
       if (archivedView) params.set('archived', 'true');
       if (query.trim()) params.set('q', query.trim());
+      // 未命名会话的搜索回退依赖 locale 对应的默认标题，cursor 绑定同一 locale 维度。
+      params.set('locale', locale);
       if (cursor) params.set('cursor', cursor);
       const page = await workspaceJson<ListSessionsResponse>(fetcher, `/v1/chat/sessions?${params.toString()}`);
       setItems((current) => append ? [...current, ...page.items] : page.items); setNextCursor(page.nextCursor);
@@ -95,7 +97,7 @@ export function ChatLanding({
       {notice && <Banner kind="success" onDismiss={() => setNotice(undefined)} dismissLabel={t('dismissNotice')}>{notice}</Banner>}
       <form className="history-toolbar" onSubmit={(event) => { event.preventDefault(); void load(); }}><div className="view-switch" role="group" aria-label={t('historyViewLabel')}><button className={archivedView ? '' : 'active'} type="button" aria-pressed={!archivedView} onClick={() => switchView(false)}>{t('conversationsTab')}</button><button className={archivedView ? 'active' : ''} type="button" aria-pressed={archivedView} onClick={() => switchView(true)}>{t('archiveTab')}</button></div><label className="search-field"><span>⌕</span><input aria-label={t('searchSessionTitles')} value={query} maxLength={100} onChange={(event) => setQuery(event.target.value)} placeholder={t('searchTitles')} /></label><label className="filter-field"><span>{t('status')}</span><select aria-label={t('status')} value={status} onChange={(event) => setStatus(event.target.value as SessionHistoryStatus)}><option value="all">{t('all')}</option><option value="open">{t('open')}</option><option value="closed">{t('closed')}</option></select></label><button className="button button-secondary" type="submit">{t('refresh')}</button></form>
       {loading && items.length === 0 ? <LoadingState label={t('loadingRetainedSessions')} /> : items.length === 0 ? <EmptyPanel icon="✦" title={archivedView ? t('noArchivedSessions') : t('noRetainedSessions')} hint={archivedView ? t('archiveEmptyHint') : t('startChatExplicit')} /> : <section className="history-list" aria-label={archivedView ? t('archivedSessionHistory') : t('chatSessionHistory')}>{items.map((item) => <div className="history-entry" key={item.sessionId} data-archived={archivedView ? 'true' : undefined}>
-        <a className="history-row" href={workspaceHref({ view: 'chat', sessionId: item.sessionId })}><span className="history-copy"><strong>{item.title ?? t('untitledChat')}</strong><small>{item.preview ?? t('noPersistedMessages')}</small></span><span className={`status-badge status-${item.status === 'open' ? 'running' : 'neutral'}`}>{item.status}</span><time dateTime={item.updatedAt}>{formatDateTime(item.updatedAt)}</time><span aria-hidden="true">→</span></a>
+        <a className="history-row" href={workspaceHref({ view: 'chat', sessionId: item.sessionId })}><span className="history-copy"><strong>{item.title ?? t('untitledChat')}</strong><small>{item.preview ?? t('noPersistedMessages')}</small></span><span className={`status-badge status-${item.status === 'open' ? 'running' : 'neutral'}`}>{item.status === 'open' ? t('open') : item.status === 'closed' ? t('closed') : item.status}</span><time dateTime={item.updatedAt}>{formatDateTime(item.updatedAt)}</time><span aria-hidden="true">→</span></a>
         <span className="history-actions">
           {confirmingId === item.sessionId
             ? <span className="delete-confirm" role="alert"><span className="delete-confirm-text">{t('deleteConfirmWarning')}</span><button className="button button-danger" disabled={busyId === item.sessionId} type="button" onClick={() => void actOnSession(item.sessionId, 'delete')}>{t('confirmDelete')}</button><button className="button button-quiet" disabled={busyId === item.sessionId} type="button" onClick={() => setConfirmingId(undefined)}>{t('cancel')}</button></span>

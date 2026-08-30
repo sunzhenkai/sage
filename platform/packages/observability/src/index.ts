@@ -119,7 +119,8 @@ export type P6MetricName=
   |'sage_chat_task_promotions_total'|'sage_task_route_decisions_total'|'sage_task_worker_attempt_total'
   |'sage_task_projection_lag_ms'|'sage_task_reconcile_retryable_failure_total'
   |'sage_artifact_store_unavailable_total'|'sage_temporal_target_unavailable_total'
-  |'sage_task_effect_unknown_total'|'sage_task_projection_drift_total';
+  |'sage_task_effect_unknown_total'|'sage_task_projection_drift_total'
+  |'sage_task_projection_event_append_failed_total';
 export interface P6Correlation{readonly tenant_id:string;readonly message_id:string;readonly session_id:string;readonly run_id:string;readonly task_id:string;readonly workflow_id:string;readonly target_id:string;readonly attempt:number}
 export interface P6TelemetryRecorder{record(name:P6MetricName,value:number,correlation:P6Correlation,fields?:Readonly<Record<string,unknown>>):void}
 export class OtlpP6TelemetryRecorder implements P6TelemetryRecorder{

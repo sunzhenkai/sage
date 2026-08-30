@@ -123,6 +123,8 @@ services:
       target: agent-web
     environment:
       SAGE_API_PROXY_TARGET: http://agent-api:9610
+      # P8：同源代理注入 schedule 管理凭据（浏览器不持有；未配置时 schedule UI 保持未认证错误态）。
+      SAGE_SERVICE_TOKEN: ${SAGE_SERVICE_TOKEN:-}
     depends_on:
       agent-api:
         condition: service_healthy

@@ -78,6 +78,9 @@ export interface PackageRunAdmissionInput {
   readonly release: PackageRunReleaseIdentity;
   readonly manifest: PackageRunManifestSummary;
   readonly inputDigest: ContentDigest;
+  /** 显式请求幂等键（HTTP Idempotency-Key）：提供时以 (tenant, key) 定界重试，同键跨输入即冲突；
+   *  缺省保持 (tenant, releaseId, inputDigest) 确定性派生（schedule 触发依赖该性质保证同 occurrence 幂等）。 */
+  readonly requestIdempotencyKey?: string;
   readonly admittedAt: string;
   readonly specStore: AgentTaskSpecStorePort;
   readonly auditOutbox: AdmissionAuditOutboxPortV1;
@@ -119,8 +122,13 @@ export function packageRunInputDigest(
   });
 }
 
-/** 幂等键：tenant + releaseId + input digest，覆盖同 Release 同输入的重试。 */
-export function packageRunIdempotencyKey(tenantId: string, releaseId: string, inputDigest: string): string {
+/** 幂等键：显式请求键（Idempotency-Key）按 (tenant, key) 全局定界——同键重试命中同一准入；
+ *  未提供时按 (tenant, releaseId, inputDigest) 确定性派生（schedule 触发依赖此性质）。
+ *  手动运行「每次请求即新任务」由调用方为无头请求传一次性请求键表达，输入摘要仅入 requestDigest 供审计/冲突校验。 */
+export function packageRunIdempotencyKey(tenantId: string, releaseId: string, inputDigest: string, requestKey?: string): string {
+  if (requestKey !== undefined) {
+    return createHash('sha256').update(`${tenantId}\u0000release-run:request\u0000${requestKey}`).digest('hex');
+  }
   return createHash('sha256').update(`${tenantId}\u0000${releaseId}\u0000${inputDigest}`).digest('hex');
 }
 
@@ -165,11 +173,15 @@ function existingResponse(
 }
 
 export async function admitPackageRun(input: PackageRunAdmissionInput): Promise<PackageRunAdmissionResult> {
-  const idempotencyKey = packageRunIdempotencyKey(input.tenantId, input.release.releaseId, input.inputDigest);
+  const idempotencyKey = packageRunIdempotencyKey(input.tenantId, input.release.releaseId, input.inputDigest, input.requestIdempotencyKey);
   const admissionId = `admission-${input.taskId}-${input.attemptId}`;
+  // 显式请求键跨输入复用即冲突（同键必须绑定同一解析输入）；确定性键本身已含 digest，不会出现该分叉。
+  const keyedDigestMismatch = (record: AdmissionIdempotencyRecordV1): boolean =>
+    input.requestIdempotencyKey !== undefined && record.requestDigest !== input.inputDigest;
 
   const existing = await input.idempotencyStore.get({ tenantId: input.tenantId, idempotencyKey });
   if (existing !== undefined) {
+    if (keyedDigestMismatch(existing)) throw new Error('PACKAGE_RUN_ADMISSION_IDEMPOTENCY_CONFLICT');
     if (existing.status === 'admitted' && isPackageRunSpec(existing.spec)) return existingResponse(existing, input.inputDigest);
     throw new Error('PACKAGE_RUN_ADMISSION_IDEMPOTENCY_CONFLICT');
   }
@@ -180,6 +192,7 @@ export async function admitPackageRun(input: PackageRunAdmissionInput): Promise<
   };
   const claimed = await input.idempotencyStore.putIfAbsent({ record: processing });
   if (claimed.status === 'existing') {
+    if (keyedDigestMismatch(claimed.record)) throw new Error('PACKAGE_RUN_ADMISSION_IDEMPOTENCY_CONFLICT');
     if (claimed.record.status === 'admitted' && isPackageRunSpec(claimed.record.spec)) return existingResponse(claimed.record, input.inputDigest);
     throw new Error('PACKAGE_RUN_ADMISSION_IDEMPOTENCY_CONFLICT');
   }

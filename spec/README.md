@@ -5,9 +5,9 @@
 | 项 | 值 |
 |----|-----|
 | 粒度 | concise |
-| 分支 | main |
-| 同步 commit | 尚未同步 |
-| 源 | （见 `.mirror.json`） |
+| 分支 | ai-app-self-contained-runs（默认分支 main 落后本分支,见 [changelog](changelog.md)） |
+| 同步 commit | `9c26a54` |
+| 源 | git |
 
 ## 怎么读
 

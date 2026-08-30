@@ -146,6 +146,16 @@ export function registerPackageRunsRoutes(app: FastifyInstance, options: Registe
       }
       const principal = await principalFor(request, options);
       if (!principal) return sendError(reply, 401, 'PACKAGE_RUN_AUTHENTICATION_REQUIRED', 'Package run API requires authentication');
+      // 幂等语义：显式 Idempotency-Key 以 (tenant, key) 定界重试——同键重放首次准入、跨输入复用即 409；
+      // 未携带时以一次性请求键独立准入，每次点击都是新运行。输入摘要仅入 requestDigest 供审计/冲突校验，不参与去重。
+      const headerKey = request.headers['idempotency-key'];
+      let requestKey: string | undefined;
+      if (headerKey !== undefined) {
+        if (typeof headerKey !== 'string' || headerKey.trim().length === 0 || headerKey.trim().length > 255) {
+          return sendError(reply, 400, 'IDEMPOTENCY_KEY_INVALID', 'Idempotency-Key must be a single string of 1-255 characters (after trimming)');
+        }
+        requestKey = headerKey.trim();
+      }
       try {
         const resolved = await options.releaseResolver.resolveRelease(options.tenantId, request.params.releaseId);
         if (resolved === undefined) return sendError(reply, 404, 'RELEASE_NOT_FOUND', 'Release not found');
@@ -240,6 +250,8 @@ export function registerPackageRunsRoutes(app: FastifyInstance, options: Registe
           taskId,
           runId,
           attemptId,
+          // 无头请求传一次性键：每次请求独立准入、新 taskId 新运行；显式键的重复请求由幂等机重放/拒绝。
+          requestIdempotencyKey: requestKey ?? randomUUID(),
           release: {
             releaseRef: release.releaseRef,
             releaseId: release.releaseId,
@@ -298,6 +310,7 @@ export function registerPackageRunsRoutes(app: FastifyInstance, options: Registe
         const effectiveInputRef = admitted.status === 'admitted' ? inputRef
           : `task-input://package/${encodeURIComponent(options.tenantId)}/${encodeURIComponent(effectiveTaskId)}` as const;
 
+        if (admitted.status === 'existing') reply.header('idempotent-replayed', 'true');
         return reply.code(admitted.status === 'admitted' ? 202 : 200).send({
           schemaVersion: 'PackageRunResult.v1',
           status: admitted.status,

@@ -330,7 +330,14 @@ interface AppSummaryResponse {
   };
   useEffect(() => {
     const selected = packageId ?? (typeof window === 'undefined' ? undefined : new URLSearchParams(window.location.search).get('package') ?? undefined);
-    if (selected) void select(selected);
+    if (selected === undefined) {
+      // URL 已无 package（←全部应用 / 侧栏导航 / 浏览器后退）：组件复用时必须作废弃中的详情请求并清空详情态，否则旧详情会残留到下一次打开其他应用。
+      ++requestToken.current;
+      requestController.current?.abort();
+      setDetail(undefined); setDeleteConfirm(false); setUploadMessage(undefined); setRunStartedTaskId(undefined);
+      return;
+    }
+    void select(selected);
     return () => requestController.current?.abort();
   }, [apiBase, fetcher, packageId]);
 

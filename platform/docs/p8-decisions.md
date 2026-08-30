@@ -21,6 +21,16 @@ FIXED：创建时固化 digest（resolved digest ≠ pinned 即稳定失败，�
 ## D7 认证
 pilot 链路静态 service token（`SAGE_SERVICE_TOKEN_HASHES`，哈希 + 常量时间比较 + 可轮换）；配置生效时 stub 信任头在 packages/apps/runs/schedules/resolutions 五条链路停止提权。本地开发用 `SAGE_SERVICE_TOKEN` 注入 dev token（见 compose）。
 
+本地 dev token 配置（Schedule 管理 UI 可用的前置；浏览器不持有凭据，由 agent-web 同源代理在服务端为 `/v1` 管理请求注入 `Authorization: Bearer`）：
+
+```bash
+cd platform
+TOKEN=$(openssl rand -hex 32)
+printf 'SAGE_SERVICE_TOKEN=%s\nSAGE_SERVICE_TOKEN_HASHES=%s\n' "$TOKEN" "$(printf '%s' "$TOKEN" | sha256sum | cut -d' ' -f1)" >> .env
+```
+
+未配置时 schedules 管理链路对所有请求 fail closed（401），agent-web 不注入任何凭据，Schedule UI 显示未认证错误态（不回退 stub 信任头，与运行门一致）。
+
 ## D8 schedule 预算账户
 Ledger 内新聚合维度：schedule 触发的 run 以 `schedule:<scheduleId>` 为 accountRef（余额即声明上限），reserve 天然执行跨 run 聚合硬上限；`agent_schedule_budget_accounts` 记录窗口与累加（commit 同事务累加 `agent_schedule_budget_accruals`）；窗口滚动由 check 触发重置。
 

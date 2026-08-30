@@ -39,9 +39,10 @@ Sage 的执行内核:Agent Library、PiHarness、Model Broker、Tool Runtime、C
 
 | 文件 | 职责 | 核心 |
 |------|------|------|
-| `index.ts` | Tool/MCP 注册入口 | `registerTool` |
+| `index.ts` | Tool/MCP 注册入口;P8 re-export 受控快照出口 | `registerTool` |
 | `sandbox.ts` | 工具执行沙箱 | `runSandboxed` |
 | `egress.ts` | 出站白名单 | `checkEgress` |
+| `snapshot-egress.ts` | P8 包运行输入快照受控出口:`SAGE_PACKAGE_SNAPSHOT_EGRESS_ALLOWLIST`(default-deny)解析为 connector,供 admission/dataSource 抓取共用 | `parseSnapshotEgressAllowlist`、`buildSnapshotEgressConnector` |
 | `effect-ledger.integration.test.ts` 等 | 测试 | — |
 
 ## 文件(context-resolver)
@@ -79,9 +80,9 @@ Sage 的执行内核:Agent Library、PiHarness、Model Broker、Tool Runtime、C
 
 | 文件 | 职责 | 核心 |
 |------|------|------|
-| `index.ts` | Port 接口聚合 | — |
+| `index.ts` | Port 接口聚合;P8 新增 `ScheduleControlStore` Port 与 `assertScheduleSnapshot` | `assertScheduleSnapshot` |
 | `runtime.ts` | RuntimeCorrelation | `runtimeCorrelation` |
-| `schedule.ts` | 调度抽象 | — |
+| `schedule.ts` | 调度抽象(canonical Schedule 契约,不泄漏 Temporal 类型) | `ScheduleControlStore` |
 | `coordinator-conformance.ts` | 协调器一致性 | `conform` |
 | `production-governance.ts` | Production Governance Port | `govern` |
 

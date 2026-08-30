@@ -46,6 +46,10 @@ pnpm test:p3:integration                        # Postgres-backed
 pnpm test:p4:integration                        # Postgres + Temporal
 pnpm test:p5:integration                        # Postgres + Temporal
 pnpm test:p6:e2e                                # Postgres + Temporal
+pnpm test:p7:unit                               # Pilot Admission
+pnpm test:p8:unit                               # P8 调度面单元(contracts/fakes/迁移)
+pnpm test:p8:integration                        # 真实 Temporal Schedules adapter 集成
+pnpm test:p8:exercises                          # P8 压缩时钟 soak 演练(产出 evidence/p8)
 pnpm test:production-governance:unit            # 生产治理单元
 pnpm test:production-governance:postgres        # Postgres-backed(可重入)
 pnpm test:production-governance:postgres:ephemeral  # 临时 Postgres
@@ -57,7 +61,7 @@ pnpm smoke:local                                # 本地全栈冒烟
 ## 边界检查
 
 ```bash
-pnpm check:deps                                 # 依赖/边界
+pnpm check:deps                                 # 依赖/边界(已并入 check-p8-boundaries:canonical 契约不泄漏 Temporal 类型)
 pnpm check:production-governance                # 生产治理总开关
 pnpm check:agent-platform-final                 # 终版架构合规
 pnpm scan:agent-platform-final                  # 边界 + System Model + Runtime Projection 校验
@@ -72,7 +76,7 @@ pnpm test:production-governance:postgres        # 含 migration-preflight
 node scripts/production-governance/migration-preflight.mjs
 ```
 
-迁移目录:`platform/packages/postgres-migrations/`。
+迁移目录:按包存放 — `platform/packages/agent-state-postgres/migrations/`(001–009,应用启动/测试时由 `agent-state-postgres/src/index.ts` 有序装配执行;全新库先跑 004 RLS 引导)与 `platform/packages/task-domain/migrations/`(任务面 001–007,由 task-store-postgres 引用)。runner 在 `platform/packages/postgres-migrations/`。
 
 ## 启动
 

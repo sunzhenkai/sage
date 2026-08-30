@@ -28,7 +28,7 @@ import {
   deriveSessionTitle,
   encodeSessionCursor,
   normalizeSessionFilters,
-  safeHistoryPreview,
+  safeHistoryPreviewFromParts,
   sessionFilterHash
 } from './history.js';
 
@@ -59,9 +59,7 @@ interface SessionHistoryRow extends SessionRow {
   retention_eligible_at: Date | string;
   last_message_role: 'user' | 'assistant' | null;
   last_message_at: Date | string | null;
-  preview_kind: 'text' | 'artifact' | null;
-  preview_text: string | null;
-  preview_artifact_name: string | null;
+  preview_candidate_parts: unknown;
 }
 interface PartRow extends QueryResultRow { message_id: string; part_index: number; kind: 'text' | 'artifact'; text_content: string | null; artifact_ref: ArtifactReference | null }
 interface RunRow extends QueryResultRow { run_id: string; session_id: string; user_message_id: string; attempt: number; status: 'active' | 'paused' | 'succeeded' | 'failed'; retry_of_run_id: string | null; error: ChatError | null; started_at: Date | string; completed_at: Date | string | null }
@@ -131,6 +129,19 @@ const toAssociation = (row: AssociationRow): ChatTaskAssociation => ({
 });
 const toTimeline = (row: TimelineRow): TimelineEvent => ({ schemaVersion: '1', sessionId: row.session_id, runId: row.run_id, sequence: Number(row.sequence), occurredAt: iso(row.occurred_at), payload: row.payload });
 
+/** listSessions 的 preview 候选 parts 来自 json_agg，宽松解析为受控形状（异常时按空处理）。 */
+const parsePreviewCandidateParts = (value: unknown): readonly { kind: string; text: string | null; artifactName: string | null }[] => {
+  if (!Array.isArray(value)) return [];
+  return value.map((entry) => {
+    const part = entry as { kind?: unknown; text?: unknown; artifactName?: unknown };
+    return {
+      kind: typeof part.kind === 'string' ? part.kind : '',
+      text: typeof part.text === 'string' ? part.text : null,
+      artifactName: typeof part.artifactName === 'string' ? part.artifactName : null
+    };
+  });
+};
+
 export interface AcceptMessageInput {
   readonly tenantId: string;
   readonly sessionId: string;
@@ -146,6 +157,8 @@ export interface ListSessionsInput {
   readonly q?: string;
   readonly archived?: boolean;
   readonly cursor?: string;
+  /** BCP-47 形态的请求 locale；仅影响 NULL title 的搜索回退匹配（并入 cursor filter hash）。 */
+  readonly locale?: string;
 }
 
 export class ChatStore {
@@ -224,7 +237,7 @@ export class ChatStore {
     const limit = input.limit ?? 30;
     if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new ChatStoreError('CHAT_INVALID_REQUEST', 'limit must be between 1 and 100');
     if ([...(input.q ?? '')].length > 100) throw new ChatStoreError('CHAT_INVALID_REQUEST', 'q must be at most 100 code points');
-    const filters = normalizeSessionFilters(input.status, input.q, input.archived);
+    const filters = normalizeSessionFilters(input.status, input.q, input.archived, input.locale);
     const filterHash = sessionFilterHash(filters);
     let cursor: ReturnType<typeof decodeSessionCursor> | undefined;
     if (input.cursor !== undefined) {
@@ -238,7 +251,7 @@ export class ChatStore {
       FROM chat_sessions s
       WHERE s.tenant_id=$1
         AND ($2::text='all' OR s.status=$2)
-        AND ($3::text='' OR s.title ILIKE ('%' || $4 || '%') ESCAPE '\\')
+        AND ($3::text='' OR COALESCE(s.title, $9::text) ILIKE ('%' || $4 || '%') ESCAPE '\\')
         AND (s.archived_at IS NOT NULL) = $5::boolean
         AND ($6::timestamptz IS NULL OR (s.updated_at,s.session_id) < ($6::timestamptz,$7::text))
       ORDER BY s.updated_at DESC,s.session_id DESC
@@ -248,31 +261,24 @@ export class ChatStore {
       p.updated_at + make_interval(days => p.retention_days) AS retention_eligible_at,
       latest.role AS last_message_role,
       latest.created_at AS last_message_at,
-      latest.kind AS preview_kind,
-      latest.text_content AS preview_text,
-      latest.artifact_name AS preview_artifact_name
+      latest.candidate_parts AS preview_candidate_parts
     FROM session_page p
     LEFT JOIN LATERAL (
-      SELECT m.role,m.created_at,part.kind,part.text_content,part.artifact_name
+      SELECT m.role,m.created_at,
+        (SELECT COALESCE(json_agg(json_build_object('kind', mp.kind, 'text', mp.text_content, 'artifactName', mp.artifact_ref->>'name') ORDER BY mp.part_index), '[]'::json)
+         FROM chat_message_parts mp
+         WHERE mp.tenant_id=m.tenant_id AND mp.message_id=m.message_id
+           AND (mp.kind='artifact' OR btrim(mp.text_content) <> '')) AS candidate_parts
       FROM chat_messages m
-      LEFT JOIN LATERAL (
-        SELECT mp.kind,mp.text_content,mp.artifact_ref->>'name' AS artifact_name
-        FROM chat_message_parts mp
-        WHERE mp.tenant_id=m.tenant_id AND mp.message_id=m.message_id
-          AND (mp.kind='artifact' OR btrim(mp.text_content) <> '')
-        ORDER BY mp.part_index
-        LIMIT 1
-      ) part ON true
       WHERE m.tenant_id=p.tenant_id AND m.session_id=p.session_id
       ORDER BY m.turn DESC
       LIMIT 1
     ) latest ON true
     ORDER BY p.updated_at DESC,p.session_id DESC`, [
-      tenantId, filters.status, filters.q, escapedQuery, filters.archived, cursor?.sortTime ?? null, cursor?.sessionId ?? '', limit + 1
-    ])).rows;
+      tenantId, filters.status, filters.q, escapedQuery, filters.archived, cursor?.sortTime ?? null, cursor?.sessionId ?? '', limit + 1, filters.untitledFallback])).rows;
     const page = rows.slice(0, limit);
     const items = page.map((row): SessionHistoryItem => {
-      const preview = safeHistoryPreview(row.preview_kind, row.preview_text, row.preview_artifact_name);
+      const preview = safeHistoryPreviewFromParts(parsePreviewCandidateParts(row.preview_candidate_parts));
       return {
         schemaVersion: '1', sessionId: row.session_id, status: row.status,
         ...(row.title === null ? {} : { title: row.title }),

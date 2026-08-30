@@ -69,7 +69,7 @@ const v2Manifest = {
 };
 
 interface Harness {
-  inject(payload: unknown): Promise<{ statusCode: number; json(): Record<string, unknown> }>;
+  inject(payload: unknown, headers?: Record<string, string>): Promise<{ statusCode: number; json(): Record<string, unknown> }>;
   // fastify inject 需要 InjectPayload；测试侧统一收窄为对象 payload。
 
   storedInputs: readonly TaskPackageInputRecord[];
@@ -126,7 +126,7 @@ async function harness(manifest: Record<string, unknown>, connector?: Controlled
   const url = `/v1/releases/${'a'.repeat(64)}/runs`;
   return {
     storedInputs,
-    inject: (payload: unknown) => app.inject({ method: 'POST', url, payload: payload as Record<string, unknown> })
+    inject: (payload: unknown, headers?: Record<string, string>) => app.inject({ method: 'POST', url, payload: payload as Record<string, unknown>, ...(headers === undefined ? {} : { headers }) })
   };
 }
 
@@ -246,15 +246,28 @@ describe('package runs v2 admission', () => {
     expect(errorOf(response).message).toContain('unset');
   });
 
-  it('is idempotent for repeated v2 submissions with identical snapshot content', async () => {
+  it('replays the original admission when the same Idempotency-Key repeats a v2 submission', async () => {
     const connector = new FakeConnector(() => textResponse(200, '{"fixed":true}'));
     const h = await harness(v2Manifest, connector);
-    const first = await h.inject({ task: 'digest', taskId: 'pkg-v2fixed' });
-    const second = await h.inject({ task: 'digest', taskId: 'pkg-v2fixed' });
+    const headers = { 'idempotency-key': 'client-retry-key' };
+    const first = await h.inject({ task: 'digest', taskId: 'pkg-v2fixed' }, headers);
+    const second = await h.inject({ task: 'digest', taskId: 'pkg-v2fixed' }, headers);
     expect(first.statusCode).toBe(202);
     expect(second.statusCode).toBe(200);
     expect((second.json() as { status: string }).status).toBe('existing');
-    expect((second.json() as { taskId: string }).taskId).toBe('pkg-v2fixed');
+    expect((second.json() as { taskId: string }).taskId).toBe(first.json().taskId);
     expect(h.storedInputs).toHaveLength(1);
+  });
+
+  it('starts independent v2 runs for headerless repeats with identical snapshot content', async () => {
+    const connector = new FakeConnector(() => textResponse(200, '{"fixed":true}'));
+    const h = await harness(v2Manifest, connector);
+    const first = await h.inject({ task: 'digest' });
+    const second = await h.inject({ task: 'digest' });
+    expect(first.statusCode).toBe(202);
+    expect(second.statusCode).toBe(202);
+    expect((second.json() as { status: string }).status).toBe('admitted');
+    expect((second.json() as { taskId: string }).taskId).not.toBe((first.json() as { taskId: string }).taskId);
+    expect(h.storedInputs).toHaveLength(2);
   });
 });

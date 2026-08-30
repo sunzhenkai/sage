@@ -3,12 +3,12 @@
   "project": "sage",
   "placement": "in-project",
   "source": "..",
-  "branch": "main",
+  "branch": "ai-app-self-contained-runs",
   "mode": "concise",
   "detail_level": "important",
   "scope": [],
   "hotspots": [],
-  "synced_commit": "8f56bf8646d0463a39e600b8ddb25d15b6e0949d",
-  "synced_at": "2026-08-29T02:02:26Z",
-  "updated_at": "2026-08-29T02:02:26Z"
+  "synced_commit": "9c26a54c1217aa7a1d1c602ed4cc1758820f4380",
+  "synced_at": "2026-08-29T16:09:01Z",
+  "updated_at": "2026-08-29T16:09:01Z"
 }

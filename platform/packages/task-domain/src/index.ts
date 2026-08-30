@@ -217,6 +217,8 @@ export interface TaskProjectionStore {
   getProjection(tenantId: string, taskId: string): Promise<TaskProjection | undefined>;
   writeProjection(projection: TaskProjection): Promise<void>;
   backfillProjection(limit?: number): Promise<number>;
+  /** 常规投影推进的 Timeline 事件追加；可选——实现方未提供时写入方跳过，不改变投影语义。 */
+  appendProjectionEvents?(events: readonly TaskProjectionEvent[]): Promise<number>;
 }
 export interface TaskStartClaim {
   readonly status: 'claimed' | 'already_claimed' | 'owner_conflict';

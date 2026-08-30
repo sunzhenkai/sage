@@ -1,6 +1,6 @@
 # sage
 
-通用 Agent 平台 — 一份 TypeScript 单仓,既承载可嵌入的 **Agent Library**(供 Chat Service 与 Temporal Activity 复用同一份 Agent Loop),也承载 **Agent Application**(Chat UI、Task UI、Temporal 编排与多环境路由)。当前实现基线为 v1.1,长期目标态见 [终版架构](../docs/design/_cross/generic-agent-platform-final-architecture.md)。
+通用 Agent 平台 — 一份 TypeScript 单仓,既承载可嵌入的 **Agent Library**(供 Chat Service 与 Temporal Activity 复用同一份 Agent Loop),也承载 **Agent Application**(Chat UI、Task UI、Temporal 编排与多环境路由)。在 v1.1 基线上,P8 已落地 **AI App 自闭环运行 + 无人值守定时调度 pilot**(manifest v2、Schedule Plane、EFFECT_UNKNOWN 裁决、pilot 运行门)。长期目标态见 [终版架构](../docs/design/_cross/generic-agent-platform-final-architecture.md)。
 
 ## 背景与目标
 
@@ -28,7 +28,7 @@
 | [apps](modules/apps/README.md) | 三个部署单元:agent-api、agent-worker、agent-web | `platform/apps/*` |
 | [agent-lib-runtime](modules/agent-lib-runtime/README.md) | Agent Run、Harness、Model/Tool/Context/Provider 的执行内核 | `platform/packages/agent-lib` |
 | [chat-domain](modules/chat-domain/README.md) | Chat Session、流式消息、Tool/Artifact 流、Chat 持久化 | `platform/packages/chat-domain` |
-| [task-domain](modules/task-domain/README.md) | Temporal Task Router、Workflows、Worker Activity、跨环境路由 | `platform/packages/task-domain` 等 |
+| [task-domain](modules/task-domain/README.md) | Temporal Task Router、Workflows、Worker Activity、跨环境路由、Schedule Plane adapter | `platform/packages/task-domain` 等 |
 | [state-persistence](modules/state-persistence/README.md) | Agent State、Task Projection、Chat 历史的 Postgres 与 Migration | `platform/packages/agent-state-postgres` 等 |
 | [contracts-and-policy](modules/contracts-and-policy/README.md) | TypeBox Contracts、Platform Ports、Production Governance、Secret Vault | `platform/packages/agent-contracts` 等 |
 | [release-and-admission](modules/release-and-admission/README.md) | AgentPackageRelease、Release Registry、Run Admission、Conformance | `platform/packages/agent-package-release` 等 |
@@ -41,16 +41,18 @@
 - [Chat 短请求 Agent Run](flows/chat-short-run.md) — 用户在 Web 发起一条 Chat,Chat Service 同步走 Agent Library 完成 Run。
 - [Chat 长请求提升为 Temporal Task](flows/chat-elevated-task.md) — 超过阈值的长请求,Chat Service 把请求交 Task Router → Temporal Worker,UI 显示 Task Card。
 - [AgentPackageRelease 准入](flows/release-admission.md) — 新 AgentPackage 进入 Registry → Run Admission 校验 → Production Governance 审计。
+- [Schedule 定时触发运行](flows/schedule-triggered-run.md) — P8:schedule 绑定 Release+Task+固化参数,occurrence 触发走统一包运行准入,产出 durable Run。
+- [无人值守失败裁决](flows/unattended-failure-resolution.md) — P8:失败按 taxonomy 路由告警,`/v1/effects/resolutions` 裁决 retry/replay/terminate。
 
 ## 主切片
 
 - [Agent Library 双 Host 复用](facets/slices/agent-lib-dual-host.md) — Chat 与 Temporal Activity 共用同一份 Agent Loop,切片核对 Loop 不被复制。
 - [AgentPackageRelease 单一 authority](facets/slices/release-registry-authority.md) — Release Registry 作为唯一 Package 来源,切 Run 校验链。
 
-## 关键概念与实体
+## 关键实体与概念
 
-- 概念：[Agent Library](concepts/agent-library.md) · [AgentPackageRelease](concepts/agent-package-release.md) · [AgentTaskSpec](concepts/agent-task-spec.md) · [AgentExecutionEnvelope](concepts/agent-execution-envelope.md) · [Effect Ledger](concepts/effect-ledger.md) · [Task Router](concepts/task-router.md) · [PiHarness](concepts/pi-harness.md)
-- 实体：[ChatSession](entities/chat-session.md) · [TaskProjection](entities/task-projection.md) · [AgentRun](entities/agent-run.md) · [AgentPackageRelease 实体](entities/agent-package-release-record.md) · [ConsumptionLedger](entities/consumption-ledger.md) · [EffectLedger](entities/effect-ledger-record.md)
+- 概念:[Agent Library](concepts/agent-library.md) · [AgentPackageRelease](concepts/agent-package-release.md) · [AgentTaskSpec](concepts/agent-task-spec.md) · [AgentExecutionEnvelope](concepts/agent-execution-envelope.md) · [Effect Ledger](concepts/effect-ledger.md) · [Task Router](concepts/task-router.md) · [PiHarness](concepts/pi-harness.md) · [App Manifest v2](concepts/app-manifest-v2.md) · [Schedule Plane](concepts/schedule-plane.md) · [Pilot Gate](concepts/pilot-gate.md)
+- 实体:[ChatSession](entities/chat-session.md) · [TaskProjection](entities/task-projection.md) · [AgentRun](entities/agent-run.md) · [AgentPackageRelease 实体](entities/agent-package-release-record.md) · [ConsumptionLedger](entities/consumption-ledger.md) · [EffectLedger](entities/effect-ledger-record.md) · [Schedule 记录](entities/schedule-record.md)
 
 ## 图
 

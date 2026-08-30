@@ -12,5 +12,6 @@
 | Release 准入工作流 | workflow | submit → compile-sign → check → registry → run | [release-admission-workflow.html](release-admission-workflow.html) |
 | Effect Ledger 数据流 | dataflow | Effect → Ledger → Consumption → 计费 | [effect-ledger-dataflow.html](effect-ledger-dataflow.html) |
 | Run 状态机 | lifecycle | `queued → running → awaiting_input → succeeded/failed/cancelled` | [agent-run-lifecycle.html](agent-run-lifecycle.html) |
+| Schedule 定时触发时序（P8） | sequence | 创建控制面 → occurrence 触发 → 统一准入 → durable run → 回写/对账 | [schedule-trigger-run-sequence.html](schedule-trigger-run-sequence.html) |
 
 > 注：`release-admission-workflow` 把原多个节点收敛为 `compile-sign` 与 `check` 两个语义节点，以保持工作流可读性。

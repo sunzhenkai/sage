@@ -46,6 +46,9 @@ describe('SchedulesApp', () => {
     expect(missed).toContain('MISSED');
     const codes = detail.findAllByProps({ className: 'badge badge-danger' }).map(badge => badge.children).flat();
     expect(codes).toContain('SCHEDULE_TRIGGER_MISSED');
+    // 触发历史里的任务链接必须直达任务详情（携带 task 参数），而不是只回到任务列表。
+    const taskLink = detail.findAllByType('a').find((node) => node.props.className === 'task-workspace-link');
+    expect(taskLink?.props.href).toBe('/?view=tasks&task=pkg-sched-1');
   });
 
   it('shows a stable error banner when the schedule API is unavailable', async () => {
@@ -54,5 +57,49 @@ describe('SchedulesApp', () => {
     await act(async () => { tree = create(<SchedulesApp fetcher={fetcher} />); });
     await flush(); await flush();
     expect(JSON.stringify(tree.toJSON())).toContain('SCHEDULE_UNAVAILABLE');
+  });
+
+  it('replaces the loading note with the service-token guidance on 401 responses', async () => {
+    let tree!: ReactTestRenderer;
+    const fetcher = makeFetcher(() => ({ status: 401, body: { error: { code: 'SCHEDULE_AUTHENTICATION_REQUIRED', message: 'Schedule management requires a service token' } } }));
+    await act(async () => { tree = create(<SchedulesApp fetcher={fetcher} />); });
+    await flush(); await flush();
+    const rendered = JSON.stringify(tree.toJSON());
+    expect(rendered).toContain('SAGE_SERVICE_TOKEN');
+    expect(rendered).not.toContain('Loading schedules…');
+  });
+
+  it('shows the trigger history error inside the detail panel without a hanging loading note', async () => {
+    let tree!: ReactTestRenderer;
+    const fetcher = makeFetcher((url) => url.endsWith('/v1/schedules') ? {
+      status: 200, body: { schemaVersion: 'ScheduleListResult.v1', schedules: [{ schemaVersion: '1', definition, revision: 1, state: 'ACTIVE', nextFireAtMs: 1756419600000 }] }
+    } : { status: 401, body: { error: { code: 'SCHEDULE_AUTHENTICATION_REQUIRED', message: 'Schedule management requires a service token' } } });
+    await act(async () => { tree = create(<SchedulesApp fetcher={fetcher} />); });
+    await flush(); await flush();
+    await act(async () => { tree.root.findByProps({ 'data-testid': 'schedule-daily-brief' }).props.onClick(); });
+    await flush(); await flush();
+    const rendered = JSON.stringify(tree.toJSON());
+    expect(rendered).toContain('SAGE_SERVICE_TOKEN');
+    expect(rendered).not.toContain('Loading trigger history…');
+  });
+
+  it('allows retrying after a failure via the refresh control', async () => {
+    let tree!: ReactTestRenderer;
+    let attempts = 0;
+    const fetcher = makeFetcher(() => {
+      attempts += 1;
+      return attempts === 1
+        ? { status: 503, body: { error: { code: 'SCHEDULE_UNAVAILABLE', message: 'SCHEDULE_UNAVAILABLE: facility down' } } }
+        : { status: 200, body: { schemaVersion: 'ScheduleListResult.v1', schedules: [{ schemaVersion: '1', definition, revision: 1, state: 'ACTIVE', nextFireAtMs: 1756419600000 }] } };
+    });
+    await act(async () => { tree = create(<SchedulesApp fetcher={fetcher} />); });
+    await flush(); await flush();
+    expect(JSON.stringify(tree.toJSON())).toContain('SCHEDULE_UNAVAILABLE');
+    const refresh = tree.root.findAllByProps({ type: 'button' }).find((node) => String(node.props.children).includes('↻'));
+    expect(refresh).toBeDefined();
+    await act(async () => { refresh?.props.onClick(); });
+    await flush(); await flush();
+    expect(tree.root.findByProps({ 'data-testid': 'schedule-list' })).toBeDefined();
+    expect(JSON.stringify(tree.toJSON())).not.toContain('SCHEDULE_UNAVAILABLE');
   });
 });

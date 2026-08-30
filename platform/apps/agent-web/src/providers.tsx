@@ -84,7 +84,7 @@ export function ProvidersApp({ fetcher = fetch }: { readonly fetcher?: typeof fe
           : <span className="badge badge-warning">{t('connectionUnavailable', { name: runAgent.providerConnectionId ?? '' })}</span>;
       })()}
     </section>
-    <WorkspaceProvidersCard fetcher={fetcher} connections={connections} connectionsLoaded={connectionsLoaded} onConnectionsChanged={() => void reloadConnections()} onNotice={setNotice} />
+    <WorkspaceProvidersCard fetcher={fetcher} connections={connections} connectionsLoaded={connectionsLoaded} {...(runAgent?.providerConnectionId === undefined ? {} : { defaultConnectionId: runAgent.providerConnectionId })} onConnectionsChanged={() => void reloadConnections()} onNotice={setNotice} />
     {notice && <InlineNotice>{notice}</InlineNotice>}
   </section>;
 }

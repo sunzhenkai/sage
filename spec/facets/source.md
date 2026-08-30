@@ -8,7 +8,7 @@
 | 配置 | `platform/compose.yaml` `platform/Dockerfile` `platform/package.json` `platform/pnpm-workspace.yaml` `platform/tsconfig*.json` | 编排与构建 |
 | Schema | `platform/packages/postgres-migrations` `platform/packages/*/migrations.ts` | 数据库 schema |
 | 测试 | `platform/packages/*/*.test.ts` `platform/examples/*/src/*.test.ts` `platform/spikes/*` | Vitest |
-| 证据 | `platform/evidence/*` `evidence/agent-platform-final/*` | Exit Review、Acceptance |
+| 证据 | `platform/evidence/*`(含 `evidence/p8/latest/soak-exercise.json`) `evidence/agent-platform-final/*` | Exit Review、Acceptance、P8 soak 工程证据 |
 | 脚本 | `platform/scripts/*` `platform/scripts/agent-platform-final/*` | 边界、scan、preflight、validate |
 | 文档 | `docs/design/*` `platform/docs/*` | 架构与运维 |
 | 变更 | `openspec/changes/*` `openspec/specs/*` | 可执行契约 |

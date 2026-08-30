@@ -7,4 +7,5 @@
 | AgentRun | `run_id`(UUID) | 启动 → Loop 推进 → 完成(成功/失败/超时) | [agent-run.md](agent-run.md) |
 | AgentPackageRelease 记录 | `(package_id, version)` | 打包 → 签名 → Registry 登记 → 拒绝/接受 | [agent-package-release-record.md](agent-package-release-record.md) |
 | ConsumptionLedger | `consumption_id` | 与 Effect 同步派生 | [consumption-ledger.md](consumption-ledger.md) |
-| EffectLedger | `effect_id` | 提交 → 应用 → 不可改 | [effect-ledger-record.md](effect-ledger-record.md) |
+| EffectLedger | `effect_id` | 提交 → 应用 → 不可改(EFFECT_UNKNOWN 经裁决,不复活终态) | [effect-ledger-record.md](effect-ledger-record.md) |
+| Schedule 记录 | `(tenant_id, schedule_id)` | 创建(ACTIVE) ⇄ 暂停 → 删除;触发事件 append-only | [schedule-record.md](schedule-record.md) |

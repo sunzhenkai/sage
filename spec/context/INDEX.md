@@ -10,6 +10,8 @@ Sage 在私有环境内为多产品(Chat、Task、未来其它)提供共享 Agen
 |------|--------|
 | 终端用户(Chat) | 通过浏览器访问 agent-web,经 agent-api 提交对话 |
 | 终端用户(自动化) | 通过 HTTP/SSE 直接打 agent-api |
+| 无人值守调度(P8) | Temporal Schedules 按 cron/interval 触发 occurrence,经 dispatcher → 统一准入产生 Run,无需人工在场 |
+| Oncall 响应人(P8) | 接收 failure-taxonomy 映射的告警,经 `/v1/effects/resolutions` 裁决 retry/replay/terminate |
 | 内部开发者 | 通过 OpenSpec change 与 pnpm task 提交变更 |
 | Temporal Worker | 通过 Task Queue 与 agent-worker 连接 |
 | 模型 Provider | 通过 HTTPS 出站调用模型 API,密钥由 Secret Vault 注入 |
@@ -29,10 +31,11 @@ Sage 在私有环境内为多产品(Chat、Task、未来其它)提供共享 Agen
 ## 信任边界
 
 - agent-api、agent-worker、agent-web 默认内网部署;对外只暴露 Web/HTTP(SSE)。
-- 多租户通过 `SAGE_TENANT_ID` 区分,数据按租户隔离。
-- Agent 工具执行在 Sandbox 中,出站受 egress 限制,只允许在白名单 Provider/MCP 后端。
-- Temporal Namespace 按租户/环境划分,Workflow 一旦启动固定 Cluster。
-- 模型 API Key、Bootstrap Provider Key、Master Key 等秘密字段由 Secret Vault 注入;Spec 仅记录「存在」与「注入方式」,值一律 `<REDACTED>`。
+- 多租户通过 `SAGE_TENANT_ID` 区分,数据按租户隔离(P8 起调度面四张表同样 FORCE RLS)。
+- P8 service token:`SAGE_SERVICE_TOKEN_HASHES` 配置后,packages/apps/runs/schedules/resolutions 五条链路要求 Bearer 强认证(哈希存储 + 常量时间比较 + 可轮换),`x-authentication-id` stub 停止提权;未配置(本地开发)保持 stub 行为。
+- Agent 工具执行在 Sandbox 中,出站受 egress 限制,只允许在白名单 Provider/MCP 后端;P8 包运行输入快照另受 `SAGE_PACKAGE_SNAPSHOT_EGRESS_ALLOWLIST` default-deny 白名单约束。
+- Temporal Namespace 按租户/环境划分,Workflow 一旦启动固定 Cluster;Schedule 控制面由 agent-api 直连 Temporal Schedules。
+- 模型 API Key、Bootstrap Provider Key、Master Key、service token 等秘密字段由 Secret Vault/环境注入;Spec 仅记录「存在」与「注入方式」,值一律 `<REDACTED>`。
 
 ## 质量属性
 

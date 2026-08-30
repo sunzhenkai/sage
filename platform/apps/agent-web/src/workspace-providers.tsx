@@ -33,18 +33,24 @@ const emptyDraft: WorkspaceProviderDraft = { name: '', adapterKind: 'openai-comp
 /** Catalog 无协议字段：中性的 adapter 缺省（纯 UI 缺省，可改写，不进入任何服务端路由逻辑）。 */
 const defaultAdapterKind = (providerId: string): WorkspaceProviderDraft['adapterKind'] => providerId === 'anthropic' ? 'anthropic' : 'openai-compatible';
 
-export function WorkspaceProvidersCard({ fetcher, connections, connectionsLoaded, onConnectionsChanged, onNotice }: {
+export function WorkspaceProvidersCard({ fetcher, connections, connectionsLoaded, defaultConnectionId, onConnectionsChanged, onNotice }: {
   readonly fetcher: typeof fetch;
   readonly connections: readonly WorkspaceProviderView[];
   readonly connectionsLoaded: boolean;
+  /** 当前「默认模型」引用的 provider connection id；删除确认时用于默认模型警告。 */
+  readonly defaultConnectionId?: string;
   readonly onConnectionsChanged: () => void;
   readonly onNotice: (message: string | undefined) => void;
 }): React.JSX.Element {
   const { t } = useLocale();
   const [draft, setDraft] = useState<WorkspaceProviderDraft | undefined>();
   const [saving, setSaving] = useState(false);
+  // 弹窗内错误反馈：校验/API 失败渲染在弹窗表单内可见位置，不依赖被遮罩遮挡的页面级 notice。
+  const [dialogError, setDialogError] = useState<string | undefined>();
+  // 删除两段式确认：第一次点击仅进入就地确认态，显式确认后才真正删除。
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | undefined>();
 
-  const startCreate = () => { setDraft({ ...emptyDraft }); onNotice(undefined); };
+  const startCreate = () => { setDraft({ ...emptyDraft }); setDialogError(undefined); onNotice(undefined); };
   const startEdit = (connection: WorkspaceProviderView) => {
     setDraft({
       id: connection.id, name: connection.name, adapterKind: connection.adapterKind,
@@ -52,13 +58,14 @@ export function WorkspaceProvidersCard({ fetcher, connections, connectionsLoaded
       ...(connection.providerName === undefined ? {} : { providerName: connection.providerName }),
       ...(connection.modelName === undefined ? {} : { modelName: connection.modelName })
     });
+    setDialogError(undefined);
     onNotice(undefined);
   };
 
   const save = async () => {
     if (draft === undefined || saving) return;
     if (!draft.name.trim() || !draft.baseUrl.trim() || !draft.modelId.trim() || (!draft.id && !draft.apiKey)) {
-      onNotice(t('workspaceProviderRequired'));
+      setDialogError(t('workspaceProviderRequired'));
       return;
     }
     setSaving(true);
@@ -75,10 +82,11 @@ export function WorkspaceProvidersCard({ fetcher, connections, connectionsLoaded
       const body = await response.json().catch(() => undefined) as { error?: { message?: string } } | undefined;
       if (!response.ok) throw new Error(body?.error?.message ?? `Provider connection ${response.status}`);
       setDraft(undefined);
+      setDialogError(undefined);
       onNotice(t('workspaceProviderSaved'));
       onConnectionsChanged();
     } catch (cause) {
-      onNotice(cause instanceof Error ? cause.message : t('workspaceProviderSaveFailed'));
+      setDialogError(cause instanceof Error ? cause.message : t('workspaceProviderSaveFailed'));
     } finally {
       setSaving(false);
     }
@@ -91,9 +99,11 @@ export function WorkspaceProvidersCard({ fetcher, connections, connectionsLoaded
       const response = await fetcher(`/v1/provider-connections/${encodeURIComponent(connection.id)}`, { method: 'DELETE', credentials: 'include' });
       const body = await response.json().catch(() => undefined) as { error?: { message?: string } } | undefined;
       if (!response.ok) throw new Error(body?.error?.message ?? `Provider connection ${response.status}`);
+      setConfirmingDeleteId(undefined);
       onNotice(t('workspaceProviderDeleted'));
       onConnectionsChanged();
     } catch (cause) {
+      setConfirmingDeleteId(undefined);
       onNotice(cause instanceof Error ? cause.message : t('workspaceProviderDeleteFailed'));
     } finally {
       setSaving(false);
@@ -121,8 +131,16 @@ export function WorkspaceProvidersCard({ fetcher, connections, connectionsLoaded
           </span>
           {connection.source === 'user' && <>
             <button className="icon-button" type="button" aria-label={t('editWorkspaceProvider', { name: connection.name })} onClick={() => startEdit(connection)}>✎</button>
-            <button className="icon-button" type="button" aria-label={t('deleteWorkspaceProvider', { name: connection.name })} disabled={saving} onClick={() => void remove(connection)}>✕</button>
+            <button className="icon-button" type="button" aria-label={t('deleteWorkspaceProvider', { name: connection.name })} disabled={saving} aria-expanded={confirmingDeleteId === connection.id} onClick={() => setConfirmingDeleteId(confirmingDeleteId === connection.id ? undefined : connection.id)}>✕</button>
           </>}
+          {confirmingDeleteId === connection.id && <div className="delete-confirm-row" role="alertgroup" data-testid={`delete-confirm-${connection.id}`}>
+            <p>{t('deleteWorkspaceProviderConfirm')}</p>
+            {connection.id === defaultConnectionId && <p className="delete-confirm-warning">{t('deleteDefaultModelWarning')}</p>}
+            <div className="delete-confirm-actions">
+              <button className="button button-danger" type="button" disabled={saving} onClick={() => void remove(connection)}>{t('deleteWorkspaceProviderConfirmAction')}</button>
+              <button className="button button-secondary" type="button" onClick={() => setConfirmingDeleteId(undefined)}>{t('deleteWorkspaceProviderCancel')}</button>
+            </div>
+          </div>}
         </div>)}
       </div>
       {connectionsLoaded && connections.length === 0 && <p className="muted-copy">{t('noWorkspaceProviders')}</p>}
@@ -130,7 +148,7 @@ export function WorkspaceProvidersCard({ fetcher, connections, connectionsLoaded
         <button className="button button-secondary" type="button" onClick={startCreate}>{t('addWorkspaceProvider')}</button>
       </div>
       {draft !== undefined && <WorkspaceProviderDialog
-        fetcher={fetcher} draft={draft} saving={saving}
+        fetcher={fetcher} draft={draft} saving={saving} {...(dialogError === undefined ? {} : { error: dialogError })}
         onDraftChange={setDraft} onSubmit={() => void save()} onClose={() => setDraft(undefined)}
       />}
     </div>
@@ -140,10 +158,11 @@ export function WorkspaceProvidersCard({ fetcher, connections, connectionsLoaded
 type CatalogAvailability = 'loading' | 'available' | 'unavailable';
 
 /** 添加/编辑工作区 provider 的 modal：Catalog（models.dev 快照）辅助选择 provider/model 并预填，目录不可用时降级手工录入。 */
-function WorkspaceProviderDialog({ fetcher, draft, saving, onDraftChange, onSubmit, onClose }: {
+function WorkspaceProviderDialog({ fetcher, draft, saving, error, onDraftChange, onSubmit, onClose }: {
   readonly fetcher: typeof fetch;
   readonly draft: WorkspaceProviderDraft;
   readonly saving: boolean;
+  readonly error?: string;
   readonly onDraftChange: (draft: WorkspaceProviderDraft) => void;
   readonly onSubmit: () => void;
   readonly onClose: () => void;
@@ -374,6 +393,7 @@ function WorkspaceProviderDialog({ fetcher, draft, saving, onDraftChange, onSubm
             onDraftChange({ ...rest, modelId: value });
           }} />
           <TextField wide type="password" label={t('apiKeyServer')} value={draft.apiKey} placeholder={draft.id === undefined ? t('apiKeyRequiredPlaceholder') : t('apiKeyRotatePlaceholder')} onChange={(value) => patch({ apiKey: value })} />
+          {error && <InlineNotice error className="field-wide provider-dialog-error">{error}</InlineNotice>}
           <div className="form-actions field-wide">
             <button className="button" type="submit" disabled={saving}>{saving ? t('saving') : t('saveWorkspaceProvider')}</button>
             <button className="button button-secondary" type="button" onClick={onClose}>{t('cancel')}</button>

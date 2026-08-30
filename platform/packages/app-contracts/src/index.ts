@@ -201,7 +201,8 @@ export const ListSessionsQuerySchema = Type.Object({
   status: Type.Optional(SessionHistoryStatusSchema),
   q: Type.Optional(Type.String({ maxLength: 100 })),
   archived: Type.Optional(Type.Union([Type.Literal('true'), Type.Literal('false')])),
-  cursor: Type.Optional(SessionHistoryCursorSchema)
+  cursor: Type.Optional(SessionHistoryCursorSchema),
+  locale: Type.Optional(Type.String({ maxLength: 35 }))
 }, { $id: 'ListSessionsQuery.v1', additionalProperties: false });
 export type ListSessionsQuery = Static<typeof ListSessionsQuerySchema>;
 

@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { WorkflowExecutionAlreadyStartedError, WorkflowNotFoundError, type WorkflowClient } from '@temporalio/client';
 import type { CredentialProvider } from '@sage/platform-ports';
 import {
-  TASK_CONTROL_SIGNAL, TASK_TYPE, type AgentTaskWorkflowInput, type RouteDecision, type TaskRoutingRecord,
-  type TaskRoutingStore, type TaskWorkflowState, type WorkflowTargetSnapshot
+  TASK_CONTROL_SIGNAL, TASK_TYPE, type AgentTaskWorkflowInput, type RouteDecision, type TaskProjectionEvent,
+  type TaskRoutingRecord, type TaskRoutingStore, type TaskWorkflowState, type WorkflowTargetSnapshot
 } from '@sage/task-domain';
 import { createDevRegistryBundle, publishDevRegistry, type VersionedTemporalRegistry } from '@sage/temporal-registry';
 import {
@@ -378,5 +378,85 @@ describe('snapshot-bound multi-target controller', () => {
     await expect(subject.create({ ...request, taskId: 'task-snapshot-persist-failure' })).rejects.toBeInstanceOf(TargetSnapshotCommitError);
     expect(target.startAttempts).toHaveLength(0);
     expect(await store.getTaskRouting('tenant-p5', 'task-snapshot-persist-failure')).toBeUndefined();
+  });
+});
+
+describe('常规投影推进写入 Timeline 事件', () => {
+  class MemoryProjectionStore {
+    readonly written: unknown[] = [];
+    readonly appended: TaskProjectionEvent[][] = [];
+    appendFailures = 0;
+    async getProjection() { return undefined; }
+    async writeProjection(projection: unknown) { this.written.push(projection); }
+    async backfillProjection() { return 0; }
+    async appendProjectionEvents(events: readonly TaskProjectionEvent[]): Promise<number> {
+      if (this.appendFailures > 0) { this.appendFailures -= 1; throw new Error('INJECTED_EVENT_APPEND_FAILURE'); }
+      this.appended.push([...events]);
+      return events.length;
+    }
+  }
+
+  it('control 推进后追加对应 projection 事件，sourceEventId 稳定幂等', async () => {
+    const registry = publishDevRegistry();
+    const routing = new MemoryRoutingStore();
+    const projections = new MemoryProjectionStore();
+    const us = new FakeTargetClient('sage-dev');
+    const subject = new TrustedMultiTargetTaskController({
+      router: new TrustedTemporalRouter({ registry }), clientFactory: new TemporalClientFactory({ credentials, connector: new MapConnector(new Map([['sage-dev-us', us]])), tenantId: 'tenant-p5' }),
+      routingStore: routing, projectionStore: projections, tenantId: 'tenant-p5', actorId: 'api-service', contextId: 'authenticated-request',
+      environment: 'development', region: 'us-east', residency: 'us'
+    });
+    await subject.create(request);
+    await subject.signal(request.taskId, 'pause', 'pause-1');
+
+    const controlEvents = projections.appended.at(-1)!;
+    expect(controlEvents).toHaveLength(1);
+    expect(controlEvents[0]!).toMatchObject({
+      schemaVersion: '1', tenantId: 'tenant-p5', taskId: request.taskId, workflowId: us.state?.workflowId,
+      kind: 'task', type: 'projection.pause', sequence: 1,
+      payload: { status: 'paused', revision: 0, controlId: 'pause-1' }
+    });
+    expect(controlEvents[0]!.sourceEventId).toBe('projection-writer-pause-1');
+
+    // 同一 controlId 再次推进 → sourceEventId 不变（store 端 ON CONFLICT 幂等）。
+    await subject.signal(request.taskId, 'pause', 'pause-1');
+    expect(projections.appended.at(-1)![0]!.sourceEventId).toBe('projection-writer-pause-1');
+
+    await subject.signal(request.taskId, 'resume', 'resume-1');
+    expect(projections.appended.at(-1)![0]!).toMatchObject({ type: 'projection.resume', payload: { status: 'running', controlId: 'resume-1' } });
+  });
+
+  it('事件追加失败不阻断控制推进，也不回滚投影', async () => {
+    const registry = publishDevRegistry();
+    const routing = new MemoryRoutingStore();
+    const projections = new MemoryProjectionStore();
+    projections.appendFailures = 1;
+    const us = new FakeTargetClient('sage-dev');
+    const subject = new TrustedMultiTargetTaskController({
+      router: new TrustedTemporalRouter({ registry }), clientFactory: new TemporalClientFactory({ credentials, connector: new MapConnector(new Map([['sage-dev-us', us]])), tenantId: 'tenant-p5' }),
+      routingStore: routing, projectionStore: projections, tenantId: 'tenant-p5', actorId: 'api-service', contextId: 'authenticated-request',
+      environment: 'development', region: 'us-east', residency: 'us'
+    });
+    await subject.create(request);
+    const paused = await subject.signal(request.taskId, 'pause', 'pause-fail-1');
+    expect(paused.workflow.status).toBe('paused');
+    expect(us.signals.at(-1)?.control.controlId).toBe('pause-fail-1');
+    // 后续控制恢复正常追加。
+    await subject.signal(request.taskId, 'resume', 'resume-after-fail');
+    expect(projections.appended.at(-1)![0]!.type).toBe('projection.resume');
+  });
+
+  it('projection store 未提供事件追加能力时静默跳过', async () => {
+    const registry = publishDevRegistry();
+    const routing = new MemoryRoutingStore();
+    const us = new FakeTargetClient('sage-dev');
+    const subject = new TrustedMultiTargetTaskController({
+      router: new TrustedTemporalRouter({ registry }), clientFactory: new TemporalClientFactory({ credentials, connector: new MapConnector(new Map([['sage-dev-us', us]])), tenantId: 'tenant-p5' }),
+      routingStore: routing, tenantId: 'tenant-p5', actorId: 'api-service', contextId: 'authenticated-request',
+      environment: 'development', region: 'us-east', residency: 'us'
+    });
+    await subject.create(request);
+    const paused = await subject.signal(request.taskId, 'pause', 'pause-no-store');
+    expect(paused.workflow.status).toBe('paused');
   });
 });

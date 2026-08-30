@@ -1,0 +1,262 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Schedule 定时触发运行时序",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1040,
+      820
+    ],
+    "views": [
+      {
+        "id": "create",
+        "label": "创建控制面",
+        "focus": [
+          "web",
+          "api",
+          "store",
+          "temporal"
+        ],
+        "note": "创建即校验绑定合法性，快照权威落库并登记原生 Schedule。"
+      },
+      {
+        "id": "dispatch",
+        "label": "触发与准入",
+        "focus": [
+          "temporal",
+          "dispatcher",
+          "admission",
+          "store"
+        ],
+        "note": "occurrence 以幂等键触发，经统一包运行准入产出新 attempt。"
+      },
+      {
+        "id": "reconcile",
+        "label": "回写与对账",
+        "focus": [
+          "dispatcher",
+          "store",
+          "temporal"
+        ],
+        "note": "触发事件 append-only，missed 由对账按差集补记。"
+      }
+    ]
+  },
+  "participants": [
+    {
+      "id": "web",
+      "type": "frontend",
+      "label": "agent-web",
+      "sublabel": "Schedules 视图"
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "agent-api",
+      "sublabel": "控制面 :9610"
+    },
+    {
+      "id": "temporal",
+      "type": "messagebus",
+      "label": "Temporal",
+      "sublabel": "调度设施"
+    },
+    {
+      "id": "dispatcher",
+      "type": "backend",
+      "label": "Dispatcher.v1",
+      "sublabel": "sage-dispatcher-v1"
+    },
+    {
+      "id": "admission",
+      "type": "backend",
+      "label": "触发准入"
+    },
+    {
+      "id": "store",
+      "type": "database",
+      "label": "Postgres",
+      "sublabel": "agent_schedules 等"
+    }
+  ],
+  "segments": [
+    {
+      "from": 150,
+      "to": 320,
+      "label": "创建控制面"
+    },
+    {
+      "from": 335,
+      "to": 535,
+      "label": "触发与准入"
+    },
+    {
+      "from": 550,
+      "to": 770,
+      "label": "回写与对账"
+    }
+  ],
+  "messages": [
+    {
+      "id": "create-schedule",
+      "from": "web",
+      "to": "api",
+      "y": 170,
+      "label": "POST /v1/schedules(releaseRef+task+params)",
+      "variant": "emphasis"
+    },
+    {
+      "id": "persist-snapshot",
+      "from": "api",
+      "to": "store",
+      "y": 210,
+      "label": "快照+revision+digest → agent_schedules"
+    },
+    {
+      "id": "register-native",
+      "from": "api",
+      "to": "temporal",
+      "y": 250,
+      "label": "TemporalScheduleAdapter 登记原生 Schedule",
+      "variant": "emphasis"
+    },
+    {
+      "id": "audit-create",
+      "from": "api",
+      "to": "web",
+      "y": 290,
+      "label": "201 scheduleId(已审计)",
+      "variant": "return"
+    },
+    {
+      "id": "due-trigger",
+      "from": "temporal",
+      "to": "dispatcher",
+      "y": 350,
+      "label": "到期触发 occurrence(workflow ID=幂等键)",
+      "variant": "emphasis"
+    },
+    {
+      "id": "admit",
+      "from": "dispatcher",
+      "to": "admission",
+      "y": 390,
+      "label": "admitScheduleTrigger(固化 task/params)",
+      "variant": "emphasis"
+    },
+    {
+      "id": "reserve-budget",
+      "from": "admission",
+      "to": "store",
+      "y": 430,
+      "label": "预算 reserve(超限 fail closed)"
+    },
+    {
+      "id": "admit-result",
+      "from": "admission",
+      "to": "dispatcher",
+      "y": 458,
+      "label": "AgentTaskSpec + 新 attempt",
+      "variant": "return"
+    },
+    {
+      "id": "start-run",
+      "from": "dispatcher",
+      "to": "temporal",
+      "y": 510,
+      "label": "启动 durable coordinator run"
+    },
+    {
+      "id": "record-event",
+      "from": "dispatcher",
+      "to": "store",
+      "y": 575,
+      "label": "触发事件 append-only(SUCCEEDED/FAILED)"
+    },
+    {
+      "id": "reconcile-scan",
+      "from": "temporal",
+      "to": "dispatcher",
+      "y": 615,
+      "label": "对账 activity 推算期望 occurrence 差集",
+      "variant": "dashed"
+    },
+    {
+      "id": "record-missed",
+      "from": "dispatcher",
+      "to": "store",
+      "y": 655,
+      "label": "补记 MISSED(仅差集)",
+      "variant": "dashed"
+    }
+  ],
+  "activations": [
+    {
+      "participant": "api",
+      "from": 164,
+      "to": 296,
+      "type": "backend"
+    },
+    {
+      "participant": "store",
+      "from": 204,
+      "to": 296,
+      "type": "database"
+    },
+    {
+      "participant": "dispatcher",
+      "from": 344,
+      "to": 596,
+      "type": "backend"
+    },
+    {
+      "participant": "admission",
+      "from": 384,
+      "to": 476,
+      "type": "backend"
+    },
+    {
+      "participant": "store",
+      "from": 424,
+      "to": 656,
+      "type": "database"
+    },
+    {
+      "participant": "temporal",
+      "from": 504,
+      "to": 616,
+      "type": "messagebus"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "创建即校验",
+      "items": [
+        "releaseBinding(pinned|follow) 按当时 Release 校验",
+        "FIXED 固化 digest 不漂移；FOLLOW 记锚点 Release",
+        "创建/pause/resume/delete 全部进审计"
+      ]
+    },
+    {
+      "dot": "orange",
+      "title": "零静默重复",
+      "items": [
+        "workflow ID = schedule:{id}:occ:{n} 幂等键",
+        "admission 幂等键 + task store 唯一约束兜底",
+        "对账只补 MISSED 差集，不重放已记录 occurrence"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Fail Closed 可观测",
+      "items": [
+        "预算超限拒绝执行，自动重试不绕过 Ledger",
+        "FOLLOW 不兼容稳定失败并告警，不静默跳过",
+        "sage_schedule_trigger_total 低基数 + 事件 append-only"
+      ]
+    }
+  ]
+}

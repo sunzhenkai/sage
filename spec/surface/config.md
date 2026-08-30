@@ -38,6 +38,16 @@
 | `SAGE_BOOTSTRAP_PROVIDER_BASE_URL` | Provider Base URL | 空 | 同上 |
 | `SAGE_BOOTSTRAP_PROVIDER_MODEL` | Provider 模型 | 空 | 同上 |
 | `SAGE_MODELS_DEV_LIVE_SMOKE` | live smoke 开关 | `0` | 仅 `smoke:models-dev-live` 用 |
+| `SAGE_SERVICE_TOKEN_HASHES` | P8 service token 的 sha256 hex 列表(逗号分隔可轮换);非空即对 packages/apps/runs/schedules/resolutions 五链路强认证 | 空(stub 信任头仍提权) | prod 必配;agent-api 读 |
+| `SAGE_SERVICE_TOKEN` | P8 dev token 明文(worker 内部调 agent-api 解析端点用;脚本 `register-package.ts` 同) | `<REDACTED>` | 仅 local;值不进镜像 |
+
+## P8 调度与快照
+
+| 键 | 语义 | 默认 | 环境差 |
+|----|------|------|--------|
+| `SAGE_SCHEDULE_DISPATCH_ENABLED` | agent-worker 是否启动 Schedule Dispatcher Worker(`sage-schedule-dispatcher-v1`) | `0`(compose 显式 `1`) | prod 按部署开启 |
+| `SAGE_API_BASE_URL` | dispatcher → agent-api 内部解析端点地址 | `http://agent-api:9610` | prod 同构 |
+| `SAGE_PACKAGE_SNAPSHOT_EGRESS_ALLOWLIST` | 包运行输入快照受控出口白名单(逗号分隔 host,default-deny) | 空(全拒) | local 放行 GitHub Search/Frankfurter/Yahoo Finance |
 
 ## Feature Flag
 

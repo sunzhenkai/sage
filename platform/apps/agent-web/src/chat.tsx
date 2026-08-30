@@ -176,7 +176,7 @@ function EventStreamPanel({ events, sessionId, terminal, onCopy }: { readonly ev
       <div className="event-stream-meta">
         <span><span className="overview-label">{t('session')}</span><code>{sessionId}</code></span>
         <span><span className="overview-label">{t('events')}</span><strong>{events.length}</strong></span>
-        <span><span className="overview-label">{t('run')}</span><strong>{terminal?.status ?? t('ready')}</strong></span>
+        <span><span className="overview-label">{t('run')}</span><strong>{terminal === undefined ? t('ready') : runStatusLabel(terminal.status, t)}</strong></span>
       </div>
       <button className="button button-secondary" type="button" onClick={onCopy}>{t('copyEventStream')}</button>
     </div>
@@ -192,12 +192,16 @@ class ChatRequestError extends Error {
 }
 async function chatJson<T>(fetcher: ChatFetch, url: string, init: RequestInit = {}): Promise<T> { const response = await fetcher(url, { ...init, credentials: 'include', headers: { ...(init.body === undefined ? {} : { 'content-type': 'application/json' }), ...init.headers } }); if (!response.ok) { const body = await response.json().catch(() => ({ error: { code: `HTTP_${response.status}` } })) as { error?: { code?: string; message?: string } }; throw new ChatRequestError(response.status, body.error?.code ?? `HTTP_${response.status}`, body.error?.message ?? body.error?.code ?? `HTTP ${response.status}`); } return response.json() as Promise<T>; }
 export interface ChatAppProps { readonly sessionId: string; readonly apiBase?: string; readonly fetcher?: ChatFetch; }
+/** SSE onerror 后显式重建的延迟：规避浏览器沿用旧 URL cursor 的整段重放。 */
+const EVENT_SOURCE_RECONNECT_DELAY_MS = 1_000;
 
 export function ChatApp({ sessionId, apiBase = '', fetcher = fetch }: ChatAppProps) {
   const { t } = useLocale();
-  const [events, setEvents] = useState<readonly TimelineEvent[]>([]); const [text, setText] = useState(''); const [submitting, setSubmitting] = useState(false); const [loading, setLoading] = useState(true); const [sessionStatus, setSessionStatus] = useState<'open' | 'closed'>(); const [archived, setArchived] = useState(false); const [recovery, setRecovery] = useState(false); const [connection, setConnection] = useState<'connecting' | 'live' | 'offline'>('connecting'); const [error, setError] = useState<string>(); const [notice, setNotice] = useState<string>(); const [streamOpen, setStreamOpen] = useState(false);
+  const [events, setEvents] = useState<readonly TimelineEvent[]>([]); const [text, setText] = useState(''); const [submitting, setSubmitting] = useState(false); const [loading, setLoading] = useState(true); const [sessionStatus, setSessionStatus] = useState<'open' | 'closed'>(); const [archived, setArchived] = useState(false); const [recovery, setRecovery] = useState(false); const [connection, setConnection] = useState<'connecting' | 'live' | 'offline'>('connecting'); const [error, setError] = useState<string>(); const [notice, setNotice] = useState<string>(); const [noticeAction, setNoticeAction] = useState<React.ReactNode>(); const [streamOpen, setStreamOpen] = useState(false);
   const submitGuard = useRef(false); const composition = useRef(false); const terminal = useMemo(() => terminalRun(events.flatMap((event) => event.payload.kind === 'run' ? [{ status: event.payload.status, attempt: event.payload.attempt } as ChatRun] : [])), [events]); const hasTask = useMemo(() => events.some((event) => event.payload.kind === 'task' && event.payload.taskId !== undefined), [events]); const sessionWritable = sessionStatus === 'open' && !archived;
   const [runtimeId, setRuntimeId] = useState<string>(() => browserLocalStorage()?.getItem(CHAT_RUNTIME_STORAGE_KEY) ?? '');
+  // 最新已应用 timeline sequence：快照加载、SSE 推送与发送后补拉共用，保证合并幂等且重连不重放。
+  const timelineCursorRef = useRef(0);
   const [workspaceConnections, setWorkspaceConnections] = useState<readonly WorkspaceProviderView[]>([]);
   const [connectionsLoaded, setConnectionsLoaded] = useState(false);
   const [defaultConnectionId, setDefaultConnectionId] = useState<string | undefined>();
@@ -266,7 +270,57 @@ export function ChatApp({ sessionId, apiBase = '', fetcher = fetch }: ChatAppPro
     if (atBottomRef.current) element.scrollTop = element.scrollHeight;
   };
   useEffect(() => { scrollToBottom(); }, [events, loading, streamOpen]);
-  useEffect(() => { let source: EventSource | undefined; let active = true; setLoading(true); setRecovery(false); setSessionStatus(undefined); setArchived(false); setError(undefined); setConnection('connecting'); const recover = async () => { const detail = await chatJson<{ session: { status: 'open' | 'closed'; archivedAt?: string } }>(fetcher, `${apiBase}/v1/chat/sessions/${encodeURIComponent(sessionId)}`); if (!active) return; setSessionStatus(detail.session.status); setArchived(detail.session.archivedAt !== undefined); const snapshot = await chatJson<{ events: TimelineEvent[] }>(fetcher, `${apiBase}/v1/chat/sessions/${encodeURIComponent(sessionId)}/events?afterSequence=0`); if (!active) return; const persisted = deduplicate(snapshot.events); setEvents(persisted); setLoading(false); const cursor = persisted.at(-1)?.sequence ?? 0; if (typeof EventSource === 'undefined') { setConnection('offline'); return; } source = new EventSource(`${apiBase}/v1/chat/sessions/${encodeURIComponent(sessionId)}/timeline?afterSequence=${cursor}`); source.addEventListener('timeline', (raw) => { const event = JSON.parse((raw as MessageEvent<string>).data) as TimelineEvent; setEvents((current) => deduplicate([...current, event])); setConnection('live'); }); source.onopen = () => { if (active) setConnection('live'); }; source.onerror = () => { if (active) setConnection('offline'); }; }; void recover().catch((cause) => { if (!active) return; setLoading(false); setConnection('offline'); if (cause instanceof ChatRequestError && cause.status === 404) setRecovery(true); else setError(cause instanceof Error ? cause.message : t('recoveryFailed')); }); return () => { active = false; source?.close(); }; }, [apiBase, sessionId, fetcher]);
+  useEffect(() => {
+    let source: EventSource | undefined;
+    let active = true;
+    let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+    let generation = 0;
+    setLoading(true); setRecovery(false); setSessionStatus(undefined); setArchived(false); setError(undefined); setConnection('connecting');
+    const connect = (fromSequence: number) => {
+      source = new EventSource(`${apiBase}/v1/chat/sessions/${encodeURIComponent(sessionId)}/timeline?afterSequence=${fromSequence}`);
+      source.addEventListener('timeline', (raw) => {
+        const event = JSON.parse((raw as MessageEvent<string>).data) as TimelineEvent;
+        if (event.sequence > timelineCursorRef.current) timelineCursorRef.current = event.sequence;
+        setEvents((current) => deduplicate([...current, event]));
+        setConnection('live');
+      });
+      source.onopen = () => { if (active) setConnection('live'); };
+      source.onerror = () => {
+        if (!active) return;
+        setConnection('offline');
+        // 浏览器自动重连会沿用旧 URL 的初始 cursor 造成重放，这里显式关闭并用最新 cursor 重建。
+        source?.close();
+        const attempt = ++generation;
+        reconnectTimer = setTimeout(() => { if (active && attempt === generation) connect(timelineCursorRef.current); }, EVENT_SOURCE_RECONNECT_DELAY_MS);
+      };
+    };
+    const recover = async () => {
+      const detail = await chatJson<{ session: { status: 'open' | 'closed'; archivedAt?: string } }>(fetcher, `${apiBase}/v1/chat/sessions/${encodeURIComponent(sessionId)}`);
+      if (!active) return;
+      setSessionStatus(detail.session.status);
+      setArchived(detail.session.archivedAt !== undefined);
+      const snapshot = await chatJson<{ events: TimelineEvent[] }>(fetcher, `${apiBase}/v1/chat/sessions/${encodeURIComponent(sessionId)}/events?afterSequence=0`);
+      if (!active) return;
+      const persisted = deduplicate(snapshot.events);
+      setEvents(persisted);
+      setLoading(false);
+      timelineCursorRef.current = persisted.at(-1)?.sequence ?? 0;
+      if (typeof EventSource === 'undefined') { setConnection('offline'); return; }
+      connect(timelineCursorRef.current);
+    };
+    void recover().catch((cause) => { if (!active) return; setLoading(false); setConnection('offline'); if (cause instanceof ChatRequestError && cause.status === 404) setRecovery(true); else setError(cause instanceof Error ? cause.message : t('recoveryFailed')); });
+    return () => { active = false; if (reconnectTimer !== undefined) clearTimeout(reconnectTimer); source?.close(); };
+  }, [apiBase, sessionId, fetcher]);
+  /** 发送路径兜底：POST 202 后立即按最新 cursor 增量补拉并合并，自身消息不依赖 SSE 到达即可见。失败静默，不打扰既有订阅。 */
+  const catchUpEvents = async () => {
+    try {
+      const snapshot = await chatJson<{ events: TimelineEvent[] }>(fetcher, `${apiBase}/v1/chat/sessions/${encodeURIComponent(sessionId)}/events?afterSequence=${timelineCursorRef.current}`);
+      const merged = deduplicate(snapshot.events);
+      if (merged.length === 0) return;
+      timelineCursorRef.current = merged.at(-1)?.sequence ?? timelineCursorRef.current;
+      setEvents((current) => deduplicate([...current, ...merged]));
+    } catch { /* 补拉失败保持既有事件与订阅不变 */ }
+  };
   const submitDraft = async () => {
     const draft = text.trim();
     if (!sessionWritable || !draft || submitGuard.current) return;
@@ -277,6 +331,7 @@ export function ChatApp({ sessionId, apiBase = '', fetcher = fetch }: ChatAppPro
       setError(undefined); setNotice(undefined);
       await chatJson(fetcher, `${apiBase}/v1/chat/sessions/${encodeURIComponent(sessionId)}/messages`, { method: 'POST', body: JSON.stringify({ parts: [{ kind: 'text', text: draft }], ...(route.provider === undefined ? {} : { provider: route.provider }) }) });
       setText('');
+      void catchUpEvents();
       scrollToBottom(true);
     } catch (cause) { setError(cause instanceof Error ? cause.message : t('messageFailed')); } finally { submitGuard.current = false; setSubmitting(false); }
   };
@@ -289,9 +344,20 @@ export function ChatApp({ sessionId, apiBase = '', fetcher = fetch }: ChatAppPro
       setError(undefined);
       await chatJson(fetcher, `${apiBase}/v1/chat/runs/${encodeURIComponent(runId)}/retry`, { method: 'POST', ...(route.provider === undefined ? {} : { body: JSON.stringify({ provider: route.provider }) }) });
       setNotice(t('retryRequested'));
+      void catchUpEvents();
     } catch (cause) { setError(cause instanceof Error ? cause.message : t('retryFailed')); }
   };
-  const promote = async (messageId: string) => { if (!sessionWritable) return; try { setError(undefined); await chatJson(fetcher, `${apiBase}/v1/chat/messages/${encodeURIComponent(messageId)}/promotions`, { method: 'POST', body: JSON.stringify({ mode: 'explicit', taskType: 'sage.agent-task.v1' }) }); setNotice(t('promotionAccepted')); } catch (cause) { setError(cause instanceof Error ? cause.message : t('promotionFailed')); } };
+  const promote = async (messageId: string) => {
+    if (!sessionWritable) return;
+    try {
+      setError(undefined);
+      const result = await chatJson<{ association?: { taskId?: string } }>(fetcher, `${apiBase}/v1/chat/messages/${encodeURIComponent(messageId)}/promotions`, { method: 'POST', body: JSON.stringify({ mode: 'explicit', taskType: 'sage.agent-task.v1' }) });
+      const taskId = result.association?.taskId;
+      setNotice(t('promotionAccepted'));
+      setNoticeAction(taskId === undefined ? undefined : <a className="task-workspace-link" href={workspaceHref({ view: 'tasks', taskId })}>{t('viewCreatedTask')} <span aria-hidden="true">→</span></a>);
+      void catchUpEvents();
+    } catch (cause) { setNoticeAction(undefined); setError(cause instanceof Error ? cause.message : t('promotionFailed')); }
+  };
   const copyEvents = async () => { const copied = await copyText(serializeEventStream(events)); if (copied) { setError(undefined); setNotice(t('eventStreamCopied', { count: events.length })); } else { setNotice(undefined); setError(t('copyFailedMessage')); } };
   const quickPrompt = (prompt: string) => { setText(prompt); document.querySelector<HTMLTextAreaElement>(`[aria-label="${t('message')}"]`)?.focus(); };
   if (recovery) return <section className="workspace-page recovery-page"><Banner kind="error" title={t('chatUnavailable')}>{t('chatRetention')}</Banner><ChatLanding fetcher={fetcher} /></section>;
@@ -301,10 +367,10 @@ export function ChatApp({ sessionId, apiBase = '', fetcher = fetch }: ChatAppPro
         <a className="chat-back" href={workspaceHref({ view: 'chat' })} aria-label={t('backToConversations')} title={t('backToConversations')}>←</a>
         <div><p className="eyebrow">{t('liveConversation')}</p><h1>{t('chat')}</h1></div>
       </div>
-      <div className="chat-heading-meta"><div className="session-info-bar"><span><span className="overview-label">{t('session')}</span><code>{sessionId}</code></span><span><span className="overview-label">{t('events')}</span><strong>{events.length}</strong></span><span><span className="overview-label">{t('run')}</span><strong>{terminal?.status ?? t('ready')}</strong></span><a className="task-workspace-link" href={workspaceHref({ view: 'tasks', sessionId })}>{t('openTaskWorkspace')} <span aria-hidden="true">→</span></a></div><div className="chat-heading-actions"><span className={`connection-status connection-${connection}`}><span className="status-dot" />{connection === 'live' ? t('liveStreamConnected') : connection === 'connecting' ? t('connecting') : t('streamReconnecting')}</span><label className="runtime-picker"><span className="overview-label">{t('runtime')}</span><select aria-label={t('chatRuntime')} value={runtimeId} onChange={(event) => selectRuntime(event.target.value)}><option value="">{t('runtimeUnconfigured')}</option>{workspaceConnections.length > 0 && <optgroup label={t('workspaceProviders')}>{workspaceConnections.map((connection) => <option key={`${WS_RUNTIME_PREFIX}${connection.id}`} value={`${WS_RUNTIME_PREFIX}${connection.id}`}>{connection.name}{connection.modelName === undefined ? '' : ` · ${connection.modelName}`}</option>)}</optgroup>}</select></label>{workspaceConnections.length === 0 && <a className="task-workspace-link" href={workspaceHref({ view: 'providers', sessionId })}>+ {t('addWorkspaceProvider')}</a>}{events.length > 0 && !hasTask && <a className="button button-secondary task-card-link" href={workspaceHref({ view: 'tasks', sessionId })} title={t('taskCardBody')}><span aria-hidden="true">▣</span>{t('taskCardTitle')}</a>}<button className="button button-secondary stream-toggle" type="button" aria-expanded={streamOpen} aria-controls="chat-event-stream" onClick={() => setStreamOpen((open) => !open)}>{t('eventStream')}</button></div></div>
+      <div className="chat-heading-meta"><div className="session-info-bar"><span><span className="overview-label">{t('session')}</span><code>{sessionId}</code></span><span><span className="overview-label">{t('events')}</span><strong>{events.length}</strong></span><span><span className="overview-label">{t('run')}</span><strong>{terminal === undefined ? t('ready') : runStatusLabel(terminal.status, t)}</strong></span><a className="task-workspace-link" href={workspaceHref({ view: 'tasks', sessionId })}>{t('openTaskWorkspace')} <span aria-hidden="true">→</span></a></div><div className="chat-heading-actions"><span className={`connection-status connection-${connection}`}><span className="status-dot" />{connection === 'live' ? t('liveStreamConnected') : connection === 'connecting' ? t('connecting') : t('streamReconnecting')}</span><label className="runtime-picker"><span className="overview-label">{t('runtime')}</span><select aria-label={t('chatRuntime')} value={runtimeId} onChange={(event) => selectRuntime(event.target.value)}><option value="">{t('runtimeUnconfigured')}</option>{workspaceConnections.length > 0 && <optgroup label={t('workspaceProviders')}>{workspaceConnections.map((connection) => <option key={`${WS_RUNTIME_PREFIX}${connection.id}`} value={`${WS_RUNTIME_PREFIX}${connection.id}`}>{connection.name}{connection.modelName === undefined ? '' : ` · ${connection.modelName}`}</option>)}</optgroup>}</select></label>{workspaceConnections.length === 0 && <a className="task-workspace-link" href={workspaceHref({ view: 'providers', sessionId })}>+ {t('addWorkspaceProvider')}</a>}{events.length > 0 && !hasTask && <a className="button button-secondary task-card-link" href={workspaceHref({ view: 'tasks', sessionId })} title={t('taskCardBody')}><span aria-hidden="true">▣</span>{t('taskCardTitle')}</a>}<button className="button button-secondary stream-toggle" type="button" aria-expanded={streamOpen} aria-controls="chat-event-stream" onClick={() => setStreamOpen((open) => !open)}>{t('eventStream')}</button></div></div>
     </header>
     {error && <Banner kind="error" title={t('somethingNeedsAttention')} onDismiss={() => setError(undefined)} dismissLabel={t('dismissError')}>{error}</Banner>}
-    {notice && <Banner kind="success" onDismiss={() => setNotice(undefined)} dismissLabel={t('dismissNotice')}>{notice}</Banner>}
+    {notice && <Banner kind="success" {...(noticeAction === undefined ? {} : { action: noticeAction })} onDismiss={() => { setNotice(undefined); setNoticeAction(undefined); }} dismissLabel={t('dismissNotice')}>{notice}</Banner>}
     <div className="chat-scroll" ref={scrollRef} onScroll={onScroll}>
       {streamOpen && <EventStreamPanel events={events} sessionId={sessionId} {...(terminal === undefined ? {} : { terminal })} onCopy={() => void copyEvents()} />}
       {loading ? <LoadingState label={t('recoveringConversation')} detail={t('loadingEvents')} /> : <ChatTimeline events={events} sessionId={sessionId} {...(sessionWritable ? { onRetry: (runId: string) => void retry(runId), onPromote: (messageId: string) => void promote(messageId) } : {})} />}
@@ -315,3 +381,8 @@ export function ChatApp({ sessionId, apiBase = '', fetcher = fetch }: ChatAppPro
 
 export function deduplicate(events: readonly TimelineEvent[]): readonly TimelineEvent[] { return [...new Map(events.map((event) => [event.sequence, event])).values()].sort((left, right) => left.sequence - right.sequence); }
 export function terminalRun(runs: readonly ChatRun[]): ChatRun | undefined { return [...runs].reverse().find((run) => run.status !== 'active'); }
+/** Chat 头部 RUN 状态的本地化标签：字典缺失时回退枚举原文。 */
+export function runStatusLabel(status: string, t: (key: never) => string): string {
+  const key = ({ active: 'statusRunning', paused: 'statusPaused', failed: 'statusFailed', succeeded: 'statusSucceeded' } as Record<string, Parameters<ReturnType<typeof useLocale>['t']>[0]>)[status];
+  return key ? (t as (k: string) => string)(key) : status;
+}

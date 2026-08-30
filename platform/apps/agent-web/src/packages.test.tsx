@@ -103,6 +103,29 @@ describe('PackagesApp list', () => {
     expect(mockFetch.mock.calls.filter((c) => (c[1] as RequestInit | undefined)?.method === 'POST')).toHaveLength(0);
     await act(async () => tree.unmount());
   });
+  it('clears the stale detail when the package param leaves the URL, so the next detail never flashes the previous app', async () => {
+    let resolveSlow!: (value: Response) => void;
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/v1/apps')) return response({ apps: [{ appId: 'ops-analyst', name: 'Ops Analyst', latestVersion: '1.0.0', releaseCount: 1, updatedAt: '2026-08-17T00:00:00.000Z', createdAt: '2026-08-17T00:00:00.000Z' }] });
+      if (url.endsWith('/v1/apps/ops-analyst')) return response({ ...detail, appId: 'ops-analyst' });
+      if (url.endsWith('/v1/apps/slow-app')) return new Promise<Response>((resolve) => { resolveSlow = resolve; });
+      return response({}, 404);
+    }) as typeof fetch;
+    let tree!: ReturnType<typeof create>;
+    await act(async () => { tree = create(<PackagesApp fetcher={fetcher} packageId="ops-analyst" />); await flush(); await flush(); });
+    expect(tree.root.findAllByType(PackageDetailView)).toHaveLength(1);
+    // ← 全部应用：摘掉 package 参数回到列表。
+    await act(async () => { tree.update(<PackagesApp fetcher={fetcher} />); await flush(); await flush(); });
+    expect(tree.root.findAllByType(PackageDetailView)).toHaveLength(0);
+    expect(tree.root.findAllByProps({ href: '/?view=packages&package=ops-analyst' }).length).toBeGreaterThan(0);
+    // 再打开其他应用：旧详情已清空，加载期间不得渲染上一个应用的内容。
+    await act(async () => { tree.update(<PackagesApp fetcher={fetcher} packageId="slow-app" />); await flush(); });
+    expect(tree.root.findAllByProps({ children: 'Ops Analyst' })).toHaveLength(0);
+    await act(async () => { resolveSlow(response({ ...detail, appId: 'slow-app', packageId: 'slow-app', name: 'Slow App' })); await flush(); });
+    expect(tree.root.findByProps({ children: 'Slow App' })).toBeTruthy();
+    await act(async () => tree.unmount());
+  });
 });
 
 describe('PackagesApp example import', () => {

@@ -6,7 +6,8 @@
 
 | 路径前缀 | 角色 |
 |----------|------|
-| `docs/design/` | 架构与 MVP 设计文档 |
+| `docs/design/` | 架构与 MVP 设计文档(含 `docs/design/ai-app/` App/Task/Run 自闭环模型) |
+| `docs/adr/` | 架构决策记录(如 Task=声明入口、Run=执行实例) |
 | `openspec/` | OpenSpec 变更与 spec 演进 |
 | `tasks/` | 任务交付台账与归档 |
 | `.agents/` | Agent Skills(`openspec-*`、`project-spec-mirror` 等) |
@@ -23,9 +24,12 @@
 | `docs/design/_cross/generic-agent-platform-final.system-model.json` | 终版 System Model | — |
 | `docs/design/_cross/generic-agent-platform-final.runtime.dsl.yaml` | 终版 Runtime DSL | — |
 | `docs/design/agent-application/` | Agent Application 子设计 | — |
+| `docs/design/ai-app/app-task-run-model.md` | App/Task/Run 自闭环模型主设计(manifest v2、输出契约、调度绑定) | — |
+| `docs/design/ai-app/phasing-and-migration.md` | 自闭环模型分阶段迁移 | — |
+| `docs/adr/2026-08-29-task-as-declared-entry.md` | ADR:Task 是声明入口,Run 才是执行实例 | — |
 | `openspec/config.yaml` | OpenSpec 配置 | — |
 | `openspec/specs/` | 当前 spec 源 | — |
-| `openspec/changes/` | 进行中与归档的 change | — |
+| `openspec/changes/` | 进行中与归档的 change(`ai-app-self-contained-runs-*` 六子变更、`sage-p8-unattended-schedule-pilot` 等) | — |
 | `tasks/` | 任务台账 + `archive/` | — |
 | `.agents/skills/openspec-*/` | OpenSpec Skill | — |
 | `.agents/skills/project-spec-mirror/` | 本镜像 Skill | — |

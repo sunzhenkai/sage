@@ -10,9 +10,9 @@
 
 ## 流程
 
-1. 开发者 `POST /v1/agent-packages`,提交 Package;
+1. 开发者 `POST /v1/agent-packages`,提交 Package;P8 起为 [manifest v2](../concepts/app-manifest-v2.md)(inputs/dataSources/tasks/output 全声明入 digest),链路要求 service token 强认证;
 2. `agent-package-release` 计算 `content_hash`、打签名、生成不可变产物;
-3. `agent-run-admission` 校验签名、依赖、Capability、Conformance;
+3. `agent-run-admission` 校验签名、依赖、Capability、Conformance;包运行准入按 inputs 声明校验参数、按 dataSources 受控抓取快照;
 4. Production Governance 跑边界检查(引用、计费点、Telemetry 基数);
 5. 全部通过 → `agent-release-registry` 写入 `state=accepted`;
 6. 失败 → 写 `state=rejected`,附 `rejection_reason`;不进入 Registry,Run 不可引用。

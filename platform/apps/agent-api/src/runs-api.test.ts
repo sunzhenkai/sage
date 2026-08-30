@@ -94,10 +94,19 @@ class FakeController implements TaskControllerPort {
   async retry(): Promise<TaskQueryResult> { return this.#result; }
 }
 
+// 第二个 Release：contentDigest 不同，用于验证同一 Idempotency-Key 跨输入复用即冲突。
+const releasePayloadB = {
+  ...releasePayload,
+  releaseRef: 'release://sha256:' + 'b'.repeat(64),
+  releaseId: 'sha256:' + 'b'.repeat(64),
+  contentDigest: 'sha256:' + '9'.repeat(64),
+};
+
 const resolver: PackageReleaseResolver = {
   async resolveRelease(tenantId, releaseId) {
-    if (releaseId !== 'a'.repeat(64)) return undefined;
-    return { release: releasePayload, lockPayload };
+    if (releaseId === 'a'.repeat(64)) return { release: releasePayload, lockPayload };
+    if (releaseId === 'b'.repeat(64)) return { release: releasePayloadB, lockPayload };
+    return undefined;
   },
 };
 
@@ -202,31 +211,60 @@ describe('Package run API boundaries', () => {
     await app.close();
   });
 
-  it('is idempotent for the same release and input', async () => {
+  it('starts a new run on every headerless request even for the same release and input', async () => {
     const { app, controller } = await api({ principal: operator });
-    const first = await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: { taskId: 'pkg-fixed' } });
-    const second = await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: { taskId: 'pkg-fixed' } });
-    expect(first.statusCode).toBe(202);
-    expect(second.statusCode).toBe(200);
-    expect(second.json().status).toBe('existing');
-    expect(second.json().taskId).toBe('pkg-fixed');
-    expect(controller.created).toHaveLength(1);
-    await app.close();
-  });
-
-  it('returns the original run ids on idempotent replay with auto-generated taskId', async () => {
-    const { app, controller } = await api({ principal: operator });
-    // 不传 taskId：首次请求生成随机 id；重放必须回填首次准入的 id，而不是新生成的幻影 id。
+    // 无 Idempotency-Key：每次点击独立准入、新 taskId 新运行——输入摘要不参与去重。
     const first = await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: {} });
     const second = await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: {} });
     expect(first.statusCode).toBe(202);
+    expect(second.statusCode).toBe(202);
+    expect(second.json().status).toBe('admitted');
+    expect(second.json().taskId).not.toBe(first.json().taskId);
+    expect(controller.created).toHaveLength(2);
+    expect(controller.created[1]?.taskId).toBe(second.json().taskId);
+    await app.close();
+  });
+
+  it('replays the original admission when the same Idempotency-Key is reused', async () => {
+    const { app, controller } = await api({ principal: operator });
+    const headers = { 'idempotency-key': 'client-retry-key' };
+    const first = await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: {}, headers });
+    const second = await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: {}, headers });
+    expect(first.statusCode).toBe(202);
+    expect(first.json().status).toBe('admitted');
     expect(second.statusCode).toBe(200);
+    expect(second.headers['idempotent-replayed']).toBe('true');
     expect(second.json().status).toBe('existing');
+    // 重放必须回填首次准入的 id，而不是新请求生成的幻影 id。
     expect(second.json().taskId).toBe(first.json().taskId);
     expect(second.json().runId).toBe(first.json().runId);
     expect(second.json().attemptId).toBe(first.json().attemptId);
     expect(second.json().inputRef).toBe(first.json().inputRef);
     expect(controller.created).toHaveLength(1);
+    await app.close();
+  });
+
+  it('rejects with 409 when the same Idempotency-Key is reused with a different input', async () => {
+    const { app, controller } = await api({ principal: operator });
+    const headers = { 'idempotency-key': 'client-retry-key' };
+    // 同键换 Release（contentDigest 不同 → inputDigest 不同）：标准幂等语义下必须冲突而不是静默重放。
+    const first = await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: {}, headers });
+    const second = await app.inject({ method: 'POST', url: `/v1/releases/${'b'.repeat(64)}/runs`, payload: {}, headers });
+    expect(first.statusCode).toBe(202);
+    expect(second.statusCode).toBe(409);
+    expect(second.json().error.code).toBe('PACKAGE_RUN_ADMISSION_IDEMPOTENCY_CONFLICT');
+    expect(controller.created).toHaveLength(1);
+    await app.close();
+  });
+
+  it('rejects an invalid Idempotency-Key header with 400', async () => {
+    const { app } = await api({ principal: operator });
+    const blank = await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: {}, headers: { 'idempotency-key': '   ' } });
+    expect(blank.statusCode).toBe(400);
+    expect(blank.json().error.code).toBe('IDEMPOTENCY_KEY_INVALID');
+    const oversized = await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: {}, headers: { 'idempotency-key': 'k'.repeat(256) } });
+    expect(oversized.statusCode).toBe(400);
+    expect(oversized.json().error.code).toBe('IDEMPOTENCY_KEY_INVALID');
     await app.close();
   });
 

@@ -361,10 +361,13 @@ export class SingleTargetTaskController {
   }
   async #control(taskId: string, control: TaskControl): Promise<TaskQueryResult> {
     const state = await sendControl(this.#workflow, this.workflowId(taskId), control, this.#controlTimeoutMs);
-    await this.#tryProjection(projectionFromWorkflow(this.#tenantId, state, this.#now().toISOString(), control.controlId));
+    await this.#tryProjection(projectionFromWorkflow(this.#tenantId, state, this.#now().toISOString(), control.controlId), control.kind);
     return this.query(taskId);
   }
-  async #tryProjection(projection: TaskProjection): Promise<void> { try { await this.#projectionStore?.writeProjection(projection); } catch { /* non-authoritative */ } }
+  async #tryProjection(projection: TaskProjection, controlKind?: string): Promise<void> {
+    try { await this.#projectionStore?.writeProjection(projection); } catch { /* non-authoritative */ return; }
+    await appendProjectionTimelineEvent(this.#projectionStore, projection, controlKind);
+  }
 }
 
 export interface TrustedMultiTargetTaskControllerOptions {
@@ -601,7 +604,11 @@ export class TrustedMultiTargetTaskController {
   }
   async #controlBound(record: TaskRoutingRecord, workflow: WorkflowClient, control: TaskControl): Promise<TaskQueryResult> {
     const state = await sendControl(workflow, record.workflowId, control, this.#options.controlTimeoutMs ?? 5_000);
-    try { await this.#options.projectionStore?.writeProjection(projectionFromWorkflow(record.tenantId, state, this.#now().toISOString(), control.controlId)); } catch { /* non-authoritative */ }
+    const projection = projectionFromWorkflow(record.tenantId, state, this.#now().toISOString(), control.controlId);
+    try { await this.#options.projectionStore?.writeProjection(projection); }
+    catch { /* non-authoritative */ return this.query(record.taskId); }
+    await appendProjectionTimelineEvent(this.#options.projectionStore, projection, control.kind, this.#options.telemetry);
+    return this.query(record.taskId);
     return this.query(record.taskId);
   }
 }
@@ -644,6 +651,36 @@ function projectionFromState(input: AgentTaskWorkflowInput, state: TaskWorkflowS
     projectionSource: 'writer', historyEventId: '0',
     projectionUpdatedAt: timestamp, historyObservedAt: timestamp };
 }
+/**
+ * 常规投影推进对应的 Timeline 事件：一次 control/state 推进一条 task 事件。
+ * sourceEventId 稳定（controlId 或状态转移签名），配合 store 的 ON CONFLICT 幂等。
+ */
+function projectionTimelineEvent(projection: TaskProjection, controlKind?: string): TaskProjectionEvent {
+  const sourceEventId = projection.lastControlId !== undefined
+    ? `projection-writer-${projection.lastControlId}`
+    : `projection-writer-${projection.taskId}-${projection.attempt}-${projection.status}-${projection.revision}`;
+  return {
+    schemaVersion: '1', eventId: `projection-event-${projection.taskId}-${projection.attempt}-${projection.revision}-${projection.status}`,
+    sourceEventId, tenantId: projection.tenantId, taskId: projection.taskId, workflowId: projection.workflowId,
+    targetId: projection.targetId, attempt: projection.attempt, sequence: Math.max(1, projection.revision + 1),
+    kind: 'task', type: `projection.${controlKind ?? projection.status}`, occurredAt: projection.projectionUpdatedAt,
+    payload: { status: projection.status, revision: projection.revision, ...(projection.lastControlId === undefined ? {} : { controlId: projection.lastControlId }) }
+  };
+}
+
+/** 投影推进成功后的 Timeline 事件追加：best-effort，失败仅可观测，不回滚投影。 */
+async function appendProjectionTimelineEvent(store: TaskProjectionStore | undefined, projection: TaskProjection, controlKind?: string, telemetry?: P6TelemetryRecorder): Promise<void> {
+  if (store?.appendProjectionEvents === undefined) return;
+  try { await store.appendProjectionEvents([projectionTimelineEvent(projection, controlKind)]); }
+  catch {
+    try {
+      telemetry?.record('sage_task_projection_event_append_failed_total', 1,
+        { tenant_id: projection.tenantId, message_id: '', session_id: '', run_id: '', task_id: projection.taskId, workflow_id: projection.workflowId, target_id: projection.targetId, attempt: projection.attempt },
+        { status: projection.status, revision: projection.revision });
+    } catch { /* Telemetry cannot change Task semantics. */ }
+  }
+}
+
 function projectionFromWorkflow(tenantId: string, state: TaskWorkflowState, timestamp: string, controlId?: string): TaskProjection {
   return { schemaVersion: '1', taskType: state.taskType, tenantId, taskId: state.taskId, workflowId: state.workflowId,
     targetId: state.targetId, attempt: state.attempt, status: state.status, revision: state.committedSlices,
