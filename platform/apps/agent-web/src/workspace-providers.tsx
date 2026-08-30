@@ -359,7 +359,7 @@ function WorkspaceProviderDialog({ fetcher, draft, saving, error, onDraftChange,
             </div>
           </div>
           <div className="field field-wide combobox-field">
-            <span>{t('model')}</span>
+            <span>{t('catalogModel')}</span>
             <div className="combobox-control">
               <input role="combobox" aria-label={t('modelSearch')} aria-controls="model-options" aria-expanded={modelOpen && selectedProviderId !== undefined} aria-autocomplete="list" disabled={selectedProviderId === undefined} value={modelQuery} onChange={(event) => { setModelQuery(event.target.value); setModelOpen(true); }} onFocus={() => setModelOpen(true)} onBlur={() => setModelOpen(false)} onKeyDown={(event) => keyboard(event, models, modelIndex, setModelIndex, selectModel, () => { if (!modelOpen) return false; setModelOpen(false); return true; })} placeholder={t('selectModelPlaceholder')} />
               <span className="combobox-chevron" aria-hidden="true">▾</span>
@@ -378,7 +378,7 @@ function WorkspaceProviderDialog({ fetcher, draft, saving, error, onDraftChange,
           <option value="openai-compatible">{t('openAiCompatible')}</option>
         </SelectField>
         <TextField label={t('baseUrl')} value={draft.baseUrl} placeholder="https://api.example.com" onChange={(value) => { baseUrlDirty.current = true; patch({ baseUrl: value }); }} />
-        <TextField wide label={t('model')} value={draft.modelId} onChange={(value) => {
+        <TextField wide label={t('customModelId')} value={draft.modelId} onChange={(value) => {
           if (value === draft.modelId) { patch({}); return; }
           const { modelName: _stale, ...rest } = draft; void _stale;
           onDraftChange({ ...rest, modelId: value });

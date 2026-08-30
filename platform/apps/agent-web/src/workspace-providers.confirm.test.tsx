@@ -84,7 +84,7 @@ describe('workspace provider dialog and delete confirmation', () => {
     };
     await fill('Display name', 'ZTest Dummy');
     await fill('Base URL', 'http://localhost:1234/v1');
-    await fill('Model', 'dummy-model');
+    await fill('Custom model ID', 'dummy-model');
     await fill('API key (sealed server-side, write-only)', 'sk-dummy');
     await act(async () => { findDialog(tree).findByType('form').props.onSubmit({ preventDefault() {} }); await wait(); });
     const alerts = dialogAlert(tree);

@@ -1,0 +1,4 @@
+schema: spec-driven
+created: 2026-08-30
+goal: 基于 dotf-ui-design 对 platform 前端应用（agent-web）现有页面做 ui-inspect 空间细节检查，确认后走优雅重构
+skip_specs: true

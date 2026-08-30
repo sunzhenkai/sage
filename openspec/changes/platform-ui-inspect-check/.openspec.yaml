@@ -1,0 +1,5 @@
+schema: spec-driven
+created: 2026-08-30
+goal: 对 agent-web 五个视图（chat/tasks/packages/schedules/providers）做 ui-inspect
+  空间细节检查，截图取证并产出 P0-Pn 检查报告
+skip_specs: true

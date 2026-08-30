@@ -90,11 +90,12 @@ export function ProvidersApp({ fetcher = fetch }: { readonly fetcher?: typeof fe
             if (runAgent === undefined || runAgent.unset) {
               return <span className="badge badge-warning">{t('runAgentUnsetWarning')}</span>;
             }
+            // badge 在卡片内容盒内省略时，title 保留完整状态文案
             return selected !== undefined
-              ? <span className={selected.available ? 'badge badge-success' : 'badge badge-warning'}>
+              ? <span className={selected.available ? 'badge badge-success' : 'badge badge-warning'} title={selected.available ? t('connectionReady', { name: selected.name ?? selected.id }) : t('connectionUnavailable', { name: selected.name ?? selected.id })}>
                   {selected.available ? t('connectionReady', { name: selected.name ?? selected.id }) : t('connectionUnavailable', { name: selected.name ?? selected.id })}
                 </span>
-              : <span className="badge badge-warning">{t('connectionUnavailable', { name: runAgent.providerConnectionId ?? '' })}</span>;
+              : <span className="badge badge-warning" title={t('connectionUnavailable', { name: runAgent.providerConnectionId ?? '' })}>{t('connectionUnavailable', { name: runAgent.providerConnectionId ?? '' })}</span>;
           })()}
         </section>
         <section id="providers-connections">

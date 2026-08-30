@@ -1,0 +1,4 @@
+schema: spec-driven
+created: 2026-08-30
+goal: 按已确认的 ui-inspect 检查清单对 agent-web 做优雅重构（token 内处方），完成后截图验收
+skip_specs: true

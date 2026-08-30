@@ -52,9 +52,10 @@ function runLogPayloadSummary(payload: Readonly<Record<string, unknown>>): strin
 
 /** 任务运行日志面板：canonical 引擎事件（run/attempt 粒度），只读。 */
 export function RunLogsPanel({ runLogs, loadingMore, error, onSelectAttempt, onLoadMore }: { readonly runLogs?: TaskRunLogsView; readonly loadingMore?: boolean; readonly error?: boolean; readonly onSelectAttempt?: (runId: string, attemptId: string) => void; readonly onLoadMore?: () => void }) {
-  const { t, formatDateTime } = useLocale();
+  // 尝试下拉时间用列表行同一紧凑格式（MM-DD HH:mm），避免长格式在定宽 select 内被裁
+  const { t, formatCompact } = useLocale();
   const attempts = runLogs?.attempts ?? [];
-  return <section className="detail-card run-logs-card" aria-label={t('runLogs')}><div className="section-heading"><div><h3>{t('runLogs')}</h3></div>{attempts.length > 1 && runLogs?.selected ? <label className="run-log-attempt-field"><span>{t('attempt')}</span><select aria-label={t('selectAttempt')} value={`${runLogs.selected.runId}|${runLogs.selected.attemptId}`} onChange={(event) => { const [runId, attemptId] = event.target.value.split('|'); if (runId && attemptId) onSelectAttempt?.(runId, attemptId); }}>{attempts.map((attempt, index) => <option key={attempt.attemptId} value={`${attempt.runId}|${attempt.attemptId}`}>{t('runLogAttemptOption', { index: attempts.length - index, time: formatDateTime(attempt.lastWrittenAt) })}</option>)}</select></label> : null}</div>
+  return <section className="detail-card run-logs-card" aria-label={t('runLogs')}><div className="section-heading"><div><h3>{t('runLogs')}</h3></div>{attempts.length > 1 && runLogs?.selected ? <label className="run-log-attempt-field"><span>{t('attempt')}</span><select aria-label={t('selectAttempt')} value={`${runLogs.selected.runId}|${runLogs.selected.attemptId}`} onChange={(event) => { const [runId, attemptId] = event.target.value.split('|'); if (runId && attemptId) onSelectAttempt?.(runId, attemptId); }}>{attempts.map((attempt, index) => <option key={attempt.attemptId} value={`${attempt.runId}|${attempt.attemptId}`}>{t('runLogAttemptOption', { index: attempts.length - index, time: formatCompact(attempt.lastWrittenAt) })}</option>)}</select></label> : null}</div>
     {error ? <p className="muted-copy" data-testid="run-logs-unavailable">{t('runLogsUnavailable')}</p>
       : attempts.length === 0 ? <p className="muted-copy" data-testid="run-logs-empty">{t('runLogsEmpty')}</p>
         : <ol className="run-log-list" data-testid="run-log-list">{(runLogs?.events ?? []).map((event) => {
