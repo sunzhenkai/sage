@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { workspaceHref } from './workspace.js';
 import { useLocale } from './locale.js';
-import { Field, SelectField, TextAreaField, TextField } from './fields.js';
+import { Field, Modal, SelectField, TextAreaField, TextField } from './fields.js';
 import { Banner, EmptyPanel, InlineNotice, LoadingState } from './feedback.js';
 import { EXAMPLE_APPS, type ExampleApp } from './example-apps.js';
 
@@ -92,7 +92,7 @@ export function PackageList({ packages, loading, creating, importing, importErro
   readonly onCreateApp: (input: { appId: string; name: string; description?: string }) => void | Promise<void>;
   readonly onImportExample: (example: ExampleApp) => void | Promise<void>;
 }) {
-  const { t, formatDateTime } = useLocale();
+  const { t, formatDateTime, formatCompact } = useLocale();
   const [showForm, setShowForm] = useState(false);
   const [appId, setAppId] = useState('');
   const [name, setName] = useState('');
@@ -110,11 +110,9 @@ export function PackageList({ packages, loading, creating, importing, importErro
     onCreateApp({ appId: trimmedId, name: trimmedName, ...(trimmedDescription === '' ? {} : { description: trimmedDescription }) });
   };
   return <section className="package-list-section" aria-label={t('packages')}>
-    <div className="task-list-heading"><div><p className="eyebrow">{t('durableExecution')}</p><h2>{packages.length} {packages.length === 1 ? t('asset') : t('packages')}</h2></div>
-      <div className="task-list-heading-actions"><span className="muted-copy">{t('mostRecentFirst')}</span><button className="button button-secondary" type="button" onClick={() => { setShowExamples((value) => !value); setFormError(undefined); }}>{t('importExamples')}</button><button className="button button-primary" type="button" onClick={() => { setShowForm((value) => !value); setFormError(undefined); }}>{t('newApp')}</button></div></div>
+    <header className="page-heading"><h1>{t('packages')}</h1><div className="page-heading-actions"><button className="button button-secondary" type="button" onClick={() => { setShowExamples(true); setFormError(undefined); }}>{t('importExamples')}</button><button className="button button-primary" type="button" onClick={() => { setShowForm(true); setFormError(undefined); }}>{t('newApp')}</button></div></header>
     {error ? <Banner kind="error" title={t('packageDataUnavailable')}>{error}</Banner> : null}
-    {showExamples ? <section className="detail-card app-create-card" aria-label={t('importExamples')}>
-      <div className="section-heading"><div><span className="eyebrow">{t('importExamples')}</span><h3>{t('importExamplesTitle')}</h3></div></div>
+    <Modal open={showExamples} breadcrumb={`${t('packages')} › ${t('importExamples')}`} title={t('importExamplesTitle')} onClose={() => setShowExamples(false)} closeLabel={t('cancelAction')}>
       <p className="muted-copy">{t('importExamplesHint')}</p>
       {importError ? <InlineNotice error>{importError}</InlineNotice> : null}
       <div className="example-app-list">
@@ -124,9 +122,8 @@ export function PackageList({ packages, loading, creating, importing, importErro
           <button className="button button-secondary example-import-button" type="button" disabled={importing !== undefined} onClick={() => onImportExample(example)}>{importing === example.appId ? t('importingExample') : t('importExampleAction')}</button>
         </div>)}
       </div>
-    </section> : null}
-    {showForm ? <section className="detail-card app-create-card" aria-label={t('createApp')}>
-      <div className="section-heading"><div><span className="eyebrow">{t('newApp')}</span><h3>{t('createApp')}</h3></div></div>
+    </Modal>
+    <Modal open={showForm} breadcrumb={`${t('packages')} › ${t('newApp')}`} title={t('createApp')} onClose={() => setShowForm(false)} closeLabel={t('cancelAction')}>
       <form className="form-grid" onSubmit={(event) => { event.preventDefault(); submit(); }}>
         <TextField label={t('appId')} value={appId} maxLength={128} onChange={setAppId} placeholder="my-app" hint={t('appIdHint')} />
         <TextField label={t('appName')} value={name} maxLength={128} onChange={setName} />
@@ -134,12 +131,12 @@ export function PackageList({ packages, loading, creating, importing, importErro
         {formError ? <InlineNotice error>{formError}</InlineNotice> : null}
         <div className="form-actions"><button className="button button-secondary" type="button" onClick={() => setShowForm(false)}>{t('cancelAction')}</button><button className="button button-primary" type="submit" disabled={creating}>{creating ? t('creatingApp') : t('createApp')}</button></div>
       </form>
-    </section> : null}
-    {loading && packages.length === 0 ? <LoadingState label={t('loadingTaskProjections')} />
+    </Modal>
+    {loading && packages.length === 0 ? <LoadingState label={t('loading')} />
       : packages.length === 0 ? <EmptyPanel icon="▤" title={t('noPackages')} hint={t('noPackagesHint')} action={<button className="button button-primary" type="button" onClick={() => { setShowForm(true); setFormError(undefined); }}>{t('newApp')}</button>} />
       : <div className="task-table">{packages.map((item) => <a className="task-row" key={item.packageId} href={workspaceHref({ view: 'packages', packageId: item.packageId })}>
-        <span className="task-row-icon">▤</span><span className="task-row-main"><strong className="task-id-link">{item.name ?? item.packageId}</strong><small>{item.name ? <>{item.packageId} · </> : null}{t('latestVersion')} · {item.latestVersion} · {t('releaseCount', { count: item.releaseCount })}</small></span>
-        <span className="status-badge status-neutral">{item.latestVersion}</span><span className="task-row-target"><time dateTime={item.updatedAt}>{formatDateTime(item.updatedAt)}</time></span><span className="task-row-chevron">→</span>
+        <span className="task-row-icon">▤</span><span className="task-row-main"><strong className="task-id-link">{item.name ?? item.packageId}</strong><small>{item.name ? <>{item.packageId} · </> : null}{t('releaseCount', { count: item.releaseCount })}</small></span>
+        <span className="status-badge status-neutral">{item.latestVersion}</span><span className="task-row-target"><time dateTime={item.updatedAt} title={formatDateTime(item.updatedAt)}>{formatCompact(item.updatedAt)}</time></span><span className="task-row-chevron">→</span>
       </a>)}</div>}
   </section>;
 }
@@ -201,7 +198,7 @@ export function PackageDetailView({ detail, loading, starting, error, runStarted
   };
   return <article className="task-detail">
     <header className="detail-heading"><div><a className="back-link" href={workspaceHref({ view: 'packages' })}>← {t('allPackages')}</a>
-      <div className="detail-title"><span className="task-row-icon">▤</span><div><p className="eyebrow">{t('packageDetail')}</p><h2>{detail?.name ?? detail?.packageId ?? ''}</h2></div>{detail && <span className="status-badge status-neutral">{manifest?.version ?? detail.releases[0]?.packageVersion ?? ''}</span>}</div>
+      <div className="detail-title"><span className="task-row-icon">▤</span><h2>{detail?.name ?? detail?.packageId ?? ''}</h2>{detail && <span className="status-badge status-neutral">{manifest?.version ?? detail.releases[0]?.packageVersion ?? ''}</span>}</div>
     </div>
     <div className="detail-heading-actions">
       <button className="button button-secondary" type="button" disabled={loading} onClick={() => window.location.reload()}>↻ {t('refresh')}</button>
@@ -214,9 +211,9 @@ export function PackageDetailView({ detail, loading, starting, error, runStarted
     {runStartedTaskId ? <Banner kind="success" action={<a className="button button-primary" href={workspaceHref({ view: 'tasks', taskId: runStartedTaskId })}>{t('viewRun')} <span>→</span></a>}>{t('runStarted')}</Banner> : null}
     {uploadMessage ? <Banner kind={uploadMessage.kind === 'success' ? 'success' : 'error'}>{uploadMessage.text}</Banner> : null}
     {deleteConfirm ? <Banner kind="error" title={t('deleteApp')} action={<div className="form-actions"><button className="button button-secondary" type="button" onClick={onCancelDelete}>{t('cancelAction')}</button><button className="button button-danger" type="button" disabled={deleting} onClick={() => onConfirmDelete()}>{deleting ? t('deletingApp') : t('deleteAppConfirmAction')}</button></div>}>{t('deleteAppConfirm')}</Banner> : null}
-    {loading && !detail ? <LoadingState label={t('loadingTaskProjections')} /> : detail === undefined ? null : <>
+    {loading && !detail ? <LoadingState label={t('loading')} /> : detail === undefined ? null : <>
       {showUpload ? <section className="detail-card" aria-label={t('uploadNewVersion')}>
-        <div className="section-heading"><div><span className="eyebrow">{t('uploadNewVersion')}</span><h3>{t('uploadVersion')}</h3></div></div>
+        <div className="section-heading"><div><h3>{t('uploadVersion')}</h3></div></div>
         <p className="muted-copy">{t('uploadHint')}</p>
         <form className="form-grid" onSubmit={(event) => { event.preventDefault(); submitUpload(); }}>
           <TextAreaField label={t('uploadFiles')} value={uploadText} rows={8} maxLength={600_000} onChange={setUploadText} placeholder={t('uploadFilesPlaceholder')} />
@@ -224,20 +221,20 @@ export function PackageDetailView({ detail, loading, starting, error, runStarted
           <div className="form-actions"><button className="button button-secondary" type="button" onClick={() => setShowUpload(false)}>{t('cancelAction')}</button><button className="button button-primary" type="submit" disabled={uploading}>{uploading ? t('uploadingVersion') : t('uploadVersion')}</button></div>
         </form>
       </section> : null}
-      {manifest ? <div className="detail-grid"><section className="detail-card"><span className="eyebrow">{t('manifest')}</span>
+      {manifest ? <div className="detail-grid"><section className="detail-card"><h3>{t('manifest')}</h3>
         <dl>
           <dt>{t('latestVersion')}</dt><dd>{manifest.version}</dd>
           <dt>{t('manifestEntry')}</dt><dd>{manifest.entry}</dd>
           <dt>{t('modelRoute')}</dt><dd>{manifest.modelRoute.provider} / {manifest.modelRoute.model}</dd>
-          <dt>{t('skills')}</dt><dd>{manifest.skillRefs.length === 0 ? '—' : manifest.skillRefs.join(', ')}</dd>
-          <dt>{t('capabilities')}</dt><dd>{manifest.capabilityRefs.length === 0 ? '—' : manifest.capabilityRefs.join(', ')}</dd>
-          {manifest.inputs === undefined ? null : <><dt>{t('declaredInputs')}</dt><dd>{manifest.inputs.length === 0 ? '—' : manifest.inputs.map((input) => `${input.name} (${input.type}${input.default === undefined ? '' : `=${String(input.default)}`})`).join(', ')}</dd></>}
-          {manifest.dataSources === undefined ? null : <><dt>{t('declaredDataSources')}</dt><dd>{manifest.dataSources.length === 0 ? '—' : manifest.dataSources.map((source) => source.name).join(', ')}</dd></>}
-          {manifest.tasks === undefined ? null : <><dt>{t('declaredTasks')}</dt><dd>{manifest.tasks.length === 0 ? '—' : manifest.tasks.map((task) => task.name).join(', ')}</dd></>}
+          {manifest.skillRefs.length === 0 ? null : <><dt>{t('skills')}</dt><dd>{manifest.skillRefs.join(', ')}</dd></>}
+          {manifest.capabilityRefs.length === 0 ? null : <><dt>{t('capabilities')}</dt><dd>{manifest.capabilityRefs.join(', ')}</dd></>}
+          {manifest.inputs === undefined || manifest.inputs.length === 0 ? null : <><dt>{t('declaredInputs')}</dt><dd>{manifest.inputs.map((input) => `${input.name} (${input.type}${input.default === undefined ? '' : `=${String(input.default)}`})`).join(', ')}</dd></>}
+          {manifest.dataSources === undefined || manifest.dataSources.length === 0 ? null : <><dt>{t('declaredDataSources')}</dt><dd>{manifest.dataSources.map((source) => source.name).join(', ')}</dd></>}
+          {manifest.tasks === undefined || manifest.tasks.length === 0 ? null : <><dt>{t('declaredTasks')}</dt><dd>{manifest.tasks.map((task) => task.name).join(', ')}</dd></>}
         </dl>
         {manifest.description ? <p className="muted-copy">{manifest.description}</p> : null}
       </section>
-      <section className="detail-card"><span className="eyebrow">{t('startRun')}</span><p className="muted-copy">{t('startRunHint')}</p>
+      <section className="detail-card"><h3>{t('startRun')}</h3><p className="muted-copy">{t('startRunHint')}</p>
         <form className="form-grid" onSubmit={(event) => { event.preventDefault(); submitRun(); }}>
           {declaredTasks.length > 1
             ? <Field label={t('taskChoice')}><select aria-label={t('taskChoice')} value={effectiveTask ?? ''} onChange={(event) => setSelectedTask(event.target.value)}>{declaredTasks.map((task) => <option key={task.name} value={task.name}>{task.name}</option>)}</select></Field>
@@ -249,16 +246,18 @@ export function PackageDetailView({ detail, loading, starting, error, runStarted
               </SelectField>
             : <TextField key={input.name} label={input.name} value={paramValues[input.name] ?? ''} maxLength={2_048} onChange={(value) => setParamValues((current) => ({ ...current, [input.name]: value }))} placeholder={input.type === 'number' ? '0' : ''} />)}
           {paramError ? <InlineNotice error>{paramError}</InlineNotice> : null}
-          <div className="form-actions"><button className="button button-primary" type="submit" disabled={starting}>{starting ? t('startingRun') : t('startRunAction')}</button></div>
+          {declaredInputs.length > 0 || declaredTasks.length > 1
+            ? <div className="form-actions"><button className="button button-primary" type="submit" disabled={starting}>{starting ? t('startingRun') : t('startRunAction')}</button></div>
+            : <button className="button button-primary" type="submit" disabled={starting}>{starting ? t('startingRun') : t('startRunAction')}</button>}
         </form>
       </section></div> : null}
-      <section className="detail-card"><div className="section-heading"><div><span className="eyebrow">{t('assets')}</span><h3>{t('assets')}</h3></div><span className="badge badge-neutral">{detail.assets?.length ?? 0}</span></div>
+      <section className="detail-card"><div className="section-heading"><div><h3>{t('assets')}</h3></div><span className="badge badge-neutral">{detail.assets?.length ?? 0}</span></div>
         {!detail.assets || detail.assets.length === 0 ? <p className="muted-copy">{t('noAssets')}</p> : <div className="artifact-list">{detail.assets.map((asset) => <details className="package-asset" key={asset.relativePath}>
           <summary><span className="file-icon">↗</span><strong>{asset.relativePath}</strong><small>{asset.kind} · {formatBytes(asset.bytes)} · {asset.digest}</small></summary>
           {asset.preview ? <pre className="asset-preview">{asset.preview}</pre> : <p className="muted-copy">{t('noAssets')}</p>}
         </details>)}</div>}
       </section>
-      <section className="detail-card"><div className="section-heading"><div><span className="eyebrow">{t('versionHistory')}</span><h3>{t('releases')}</h3></div><span className="badge badge-neutral">{detail.releases.length}</span></div>
+      <section className="detail-card"><div className="section-heading"><div><h3>{t('releases')}</h3></div><span className="badge badge-neutral">{detail.releases.length}</span></div>
         <ol className="task-timeline">{detail.releases.map((release) => <li key={release.releaseId}><span className="timeline-marker marker-task" /><div><strong>{release.packageVersion}</strong><small>{release.compilerBuild} · {t('contentDigest')} {release.contentDigest}</small></div><time>{formatDateTime(release.createdAt)}</time></li>)}</ol>
       </section>
     </>}
@@ -407,8 +406,7 @@ interface AppSummaryResponse {
     finally { startGuard.current = false; setStarting(false); }
   };
 
-  return <section className="workspace-page packages-page">
-    <header className="page-heading"><div><p className="eyebrow">{t('durableExecution')}</p><h1>{t('packages')}</h1><p className="page-subtitle">{t('packagesSubtitle')}</p></div></header>
+  return <section className="workspace-page packages-page" aria-label={t('packages')}>
     {packageId || (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('package'))
       ? <PackageDetailView detail={detail} loading={loading} starting={starting} error={error} runStartedTaskId={runStartedTaskId} uploading={uploading} uploadMessage={uploadMessage} deleting={deleting} deleteConfirm={deleteConfirm} onStartRun={startRun} onUploadVersion={uploadVersion} onRequestDelete={() => setDeleteConfirm(true)} onCancelDelete={() => setDeleteConfirm(false)} onConfirmDelete={confirmDelete} />
       : <PackageList packages={packages} loading={loading} creating={creating} importing={importingExample} importError={importError} error={error} onCreateApp={createApp} onImportExample={importExample} />}

@@ -23,7 +23,7 @@ TBD - synchronized from change workspace-usability. Update Purpose when the capa
 - **THEN** 系统展示其历史内容但禁止发送新消息，且不提供隐式 reopen
 
 ### Requirement: Tenant-scoped enriched history API
-系统 SHALL 提供 tenant-scoped `GET /v1/chat/sessions`，返回 moderate enriched item：`sessionId`、`status`、可选 `title`、可选 `preview`、可选 `lastMessageRole`、可选 `lastMessageAt`、可选 `archivedAt`、`createdAt`、`updatedAt`、`retentionEligibleAt`；response SHALL NOT 嵌入 transcript、runs、summaries 或 message count。`limit` SHALL 默认 30 且范围为 1–100，`status` SHALL 支持 `all|open|closed`，`q` SHALL 最多 100 code points且仅按 title 做 case-insensitive literal contains，`archived` SHALL 仅接受 `true|false` 且缺省为 `false`，所有 query schema SHALL 拒绝额外字段。缺省与 `archived=false` SHALL 只返回 `archived_at IS NULL` 的 session；`archived=true` SHALL 只返回已归档 session；`archived` SHALL 与 `status` 正交组合并参与 cursor 的 normalized filter 绑定。
+系统 SHALL 提供 tenant-scoped `GET /v1/chat/sessions`，返回 moderate enriched item：`sessionId`、`status`、可选 `title`、可选 `preview`、可选 `lastMessageRole`、可选 `lastMessageAt`、可选 `archivedAt`、`createdAt`、`updatedAt`、`retentionEligibleAt`；response SHALL NOT 嵌入 transcript、runs、summaries 或 message count。`limit` SHALL 默认 30 且范围为 1–100，`status` SHALL 支持 `all|open|closed`，`q` SHALL 最多 100 code points且按 effective title 做 case-insensitive literal contains——effective title 为存储 `title`，`title IS NULL` 时回退为该 session 在当前 locale 下的默认显示标题（en 为 `Untitled Chat`，zh-CN 为 `未命名对话`），使搜索词与列表展示的兜底标题一致，`archived` SHALL 仅接受 `true|false` 且缺省为 `false`，所有 query schema SHALL 拒绝额外字段。缺省与 `archived=false` SHALL 只返回 `archived_at IS NULL` 的 session；`archived=true` SHALL 只返回已归档 session；`archived` SHALL 与 `status` 正交组合并参与 cursor 的 normalized filter 绑定。
 
 #### Scenario: History tenant isolation
 - **WHEN** authenticated principal 请求 session history
@@ -49,6 +49,14 @@ TBD - synchronized from change workspace-usability. Update Purpose when the capa
 - **WHEN** 用户持续请求有效 `nextCursor` 直到末页
 - **THEN** 所有 retention 范围内仍存在、未彻底删除且匹配筛选（含归档维度）的 session 均可被发现，但已删除记录和 transcript 全文检索不属于该承诺
 
+#### Scenario: 搜索命中未命名会话的默认标题
+- **WHEN** `title IS NULL` 的 session 以 `Untitled Chat` 展示，client 以 `q=Untitled` 请求 history
+- **THEN** 该 session 出现在结果中，且 locale 为 zh-CN 时 `q=未命名对话` 同样命中、`q=Untitled` 不命中
+
+#### Scenario: 有 title 的会话不受回退影响
+- **WHEN** session 存储了显式或派生 title，client 以该 title 的子串搜索
+- **THEN** 匹配行为与回退引入前一致，不额外匹配默认标题
+
 ### Requirement: 无损 keyset continuation consistency
 History SHALL 按 `(updated_at DESC, session_id DESC)` 排序，并使用包含 version、PostgreSQL UTC 六位微秒 `sortTime`、`sessionId` 与 `filterHash` 的 opaque base64url cursor。Cursor 的时间 SHALL 直接由 PostgreSQL 无损排序值产生并以 `timestamptz` 比较，不得由 JavaScript 毫秒时间重建。分页 SHALL 提供 continuation consistency：排序键未变化的记录不得重复或跳项；并发 create/update 移到 cursor 之前的记录 SHALL 通过刷新首屏收敛，系统不得宣称跨请求 strict snapshot。
 
@@ -69,7 +77,7 @@ History SHALL 按 `(updated_at DESC, session_id DESC)` 排序，并使用包含 
 - **THEN**当前 continuation 不保证返回该记录，刷新第一页后 SHALL 返回它，UI 不得将此行为描述为 strict snapshot
 
 ### Requirement: 安全且可辨识的 title 与 preview
-Workspace显式New Chat调用`POST /v1/chat/sessions`时，Web request body SHALL省略`title`且API/store SHALL以SQL `NULL` title创建session，不得发送或注入占位title。首条persisted user message SHALL在message/run/event的同一事务中为`NULL` title派生最多80 code points的标题，且不得覆盖显式title。History preview SHALL只使用最新persisted message的首个非空text或sanitized artifact label，最多160 code points；SHALL NOT读取Artifact body。Preview SHALL NOT参与v1 search。
+Workspace显式New Chat调用`POST /v1/chat/sessions`时，Web request body SHALL省略`title`且API/store SHALL以SQL `NULL` title创建session，不得发送或注入占位title。首条persisted user message SHALL在message/run/event的同一事务中为`NULL` title派生最多80 code points的标题，且不得覆盖显式title。History preview SHALL只使用最新persisted message的首个非空text或sanitized artifact label，且在归一化与截断前 SHALL 剔除该 text 中的 `<think>…</think>` 推理区间（含未闭合 `<think>` 时剔除其后全部内容）；剔除后无剩余可展示文本时，preview SHALL 回退到该 message 的下一可用非空 text part，仍无则该字段缺省，SHALL NOT 以空白或推理原文充当 preview。Preview 最多160 code points；SHALL NOT读取Artifact body。Preview SHALL NOT参与v1 search。
 
 #### Scenario: 首条 user text 派生标题
 - **WHEN** open session 的首条 persisted user message 含有非空 text且 title 为 `NULL`
@@ -90,6 +98,10 @@ Workspace显式New Chat调用`POST /v1/chat/sessions`时，Web request body SHAL
 #### Scenario: Legacy 占位标题回填
 - **WHEN**一次性 migration 遇到 `NULL` 或精确 `Local Sage Chat` 的 legacy title并存在首条 persisted user text
 - **THEN** migration 幂等回填安全标题；其他显式 title与无可用文本的记录保持不变
+
+#### Scenario: Preview 剔除 think 推理区间
+- **WHEN** 最新 persisted message 的首个非空 text 为 `<think>…</think>可见回复` 或以未闭合 `<think>` 开头
+- **THEN** history item 的 preview 不含 `<think>` 标签或推理原文，只展示可见回复（未闭合时 preview 为空并按缺省处理），详情页的折叠推理渲染不受影响
 
 ### Requirement: Ordered PostgreSQL migration ledger
 系统 SHALL 使用 `sage_schema_migrations(component, version, checksum_sha256, applied_at)` 和显式排序 manifest 执行 component-scoped migration。Runner SHALL 使用 dedicated connection 与 advisory lock，按顺序执行 pending migration并记录 checksum；已应用 version checksum变化 SHALL fail fast，已发布 migration SHALL NOT 被静默重写。

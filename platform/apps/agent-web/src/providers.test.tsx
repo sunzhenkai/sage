@@ -47,7 +47,25 @@ describe('unified provider page', () => {
     expect(tree.root.findByProps({ 'aria-label': 'Run agent' })).toBeTruthy();
     const select = tree.root.findByProps({ 'aria-label': 'Default model' });
     expect(select.props.value).toBe('');
-    expect(tree.root.findByProps({ children: 'No default model set — package runs are rejected; select a workspace provider below' })).toBeTruthy();
+    expect(tree.root.findByProps({ children: 'No default model set; package runs are rejected' })).toBeTruthy();
+    await act(async () => tree.unmount());
+  });
+
+  it('marks the current settings section in the sub-navigation with aria-current', async () => {
+    const localStorage = new MemoryStorage(); vi.stubGlobal('window', { localStorage, sessionStorage: new MemoryStorage() });
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/provider-connections')) return response({ schemaVersion: 'ProviderConnections.v1', connections: [] });
+      if (url.endsWith('/run-agent/settings')) return response(runAgentSettings(undefined));
+      throw new Error(url);
+    }) as typeof fetch;
+    let tree!: ReturnType<typeof create>; await act(async () => { tree = create(<ProvidersApp fetcher={fetcher} />); await wait(); });
+    const links = () => tree.root.findByProps({ className: 'settings-nav' }).findAllByType('a');
+    expect(links().map((link) => link.props['aria-current'])).toEqual(['location', undefined, undefined]);
+    expect(links()[0]!.props.className).toBe('is-active');
+    await act(async () => { links()[1]!.props.onClick(); await wait(); });
+    expect(links().map((link) => link.props['aria-current'])).toEqual([undefined, 'location', undefined]);
+    expect(links()[1]!.props.className).toBe('is-active');
     await act(async () => tree.unmount());
   });
 
@@ -185,7 +203,7 @@ describe('unified provider page', () => {
     const modelOptions = tree.root.findByProps({ id: 'model-options' });
     await act(async () => { modelOptions.findByProps({ role: 'option' }).props.onClick(); await wait(); });
     // 预填：baseUrl ← effectiveBaseUrl、modelId、显示名建议 {provider} · {model}、adapter 缺省 anthropic。
-    const form = tree.root.findByProps({ className: 'workspace-provider-form provider-editor panel' });
+    const form = tree.root.findByProps({ className: 'workspace-provider-form provider-editor' });
     const hostInputsWithValue = (value: string) => form.findAllByType('input').filter((node) => node.props.value === value);
     expect(hostInputsWithValue('https://api.anthropic.com')).toHaveLength(1);
     expect(hostInputsWithValue('claude-sonnet-4')).toHaveLength(1);
@@ -224,7 +242,7 @@ describe('unified provider page', () => {
     // 目录不可用：展示作用域化提示并收起选择区，手工字段仍在且可完成添加。
     expect(tree.root.findByProps({ children: 'Model catalog unavailable — fill in the fields manually; adding still works.' })).toBeTruthy();
     expect(tree.root.findAllByProps({ id: 'provider-options' })).toHaveLength(0);
-    const form = tree.root.findByProps({ className: 'workspace-provider-form provider-editor panel' });
+    const form = tree.root.findByProps({ className: 'workspace-provider-form provider-editor' });
     // 降级模式下文本输入顺序固定：显示名、baseUrl、模型。
     const textInputs = () => form.findAllByType('input').filter((node) => node.props.type !== 'password');
     await act(async () => { textInputs()[0]!.props.onChange({ target: { value: '手工条目' } }); await wait(); });
@@ -257,7 +275,7 @@ describe('unified provider page', () => {
     await act(async () => { await waitDebounce(); });
     await act(async () => { await waitDebounce(); });
     expect(providerCalls).toBeGreaterThanOrEqual(2);
-    expect(tree.root.findByProps({ children: 'The model catalog changed while browsing; the lists were reloaded from the new snapshot.' })).toBeTruthy();
+    expect(tree.root.findByProps({ children: 'Catalog changed; lists were reloaded.' })).toBeTruthy();
     const providerOptions = tree.root.findByProps({ id: 'provider-options' });
     expect(providerOptions.findAllByProps({ role: 'option' }).map((node) => node.props.children[0])).toEqual(['OpenAI']);
     await act(async () => tree.unmount());
@@ -279,7 +297,7 @@ describe('unified provider page', () => {
     await act(async () => { tree.root.findByProps({ id: 'provider-options' }).findByProps({ role: 'option' }).props.onClick(); });
     await act(async () => { await waitDebounce(); });
     await act(async () => { tree.root.findByProps({ id: 'model-options' }).findByProps({ role: 'option' }).props.onClick(); await wait(); });
-    const form = tree.root.findByProps({ className: 'workspace-provider-form provider-editor panel' });
+    const form = tree.root.findByProps({ className: 'workspace-provider-form provider-editor' });
     // 选定后 adapter 为缺省 anthropic；用户改写为 openai-compatible。
     expect(form.findAllByType('select')[0]!.props.value).toBe('anthropic');
     await act(async () => { form.findAllByType('select')[0]!.props.onChange({ target: { value: 'openai-compatible' } }); await wait(); });
@@ -290,7 +308,7 @@ describe('unified provider page', () => {
     // 重新选择同一 provider：adapter 保持用户改写值，不被缺省启发覆盖。
     await act(async () => { tree.root.findByProps({ id: 'provider-options' }).findByProps({ role: 'option' }).props.onClick(); });
     await act(async () => { await wait(); });
-    expect(tree.root.findByProps({ className: 'workspace-provider-form provider-editor panel' }).findAllByType('select')[0]!.props.value).toBe('openai-compatible');
+    expect(tree.root.findByProps({ className: 'workspace-provider-form provider-editor' }).findAllByType('select')[0]!.props.value).toBe('openai-compatible');
     await act(async () => tree.unmount());
   });
 
@@ -360,7 +378,7 @@ describe('unified provider page', () => {
     await act(async () => { await waitDebounce(); });
     await act(async () => { tree.root.findByProps({ id: 'model-options' }).findByProps({ role: 'option' }).props.onClick(); await wait(); });
     expect(focus.mock.calls).toHaveLength(0);
-    const form = tree.root.findByProps({ className: 'workspace-provider-form provider-editor panel' });
+    const form = tree.root.findByProps({ className: 'workspace-provider-form provider-editor' });
     await act(async () => { form.findAllByType('select')[0]!.props.onChange({ target: { value: 'openai-compatible' } }); await wait(); });
     expect(focus.mock.calls).toHaveLength(0);
     expect(providerSearch().props['aria-expanded']).toBe(false);
@@ -420,7 +438,7 @@ describe('unified provider page', () => {
     await act(async () => { await wait(1400); });
     await act(async () => { await waitDebounce(); });
     expect(providerLoads).toBeGreaterThanOrEqual(2);
-    expect(tree.root.findByProps({ children: 'Catalog refreshed; the lists were reloaded from the latest snapshot.' })).toBeTruthy();
+    expect(tree.root.findByProps({ children: 'Catalog refreshed; lists reloaded.' })).toBeTruthy();
     expect(tree.root.findAllByProps({ children: 'Refresh catalog' })).toHaveLength(1);
     await act(async () => tree.unmount());
   });
@@ -465,7 +483,7 @@ describe('unified provider page', () => {
     for (const [index, key] of ['sk-key-1', 'sk-key-2'].entries()) {
       await act(async () => { tree.root.findByProps({ children: '+ Add workspace provider' }).props.onClick(); });
       await act(async () => { await waitDebounce(); });
-      const form = tree.root.findByProps({ className: 'workspace-provider-form provider-editor panel' });
+      const form = tree.root.findByProps({ className: 'workspace-provider-form provider-editor' });
       const textInputs = () => form.findAllByType('input').filter((node) => node.props.type !== 'password');
       await act(async () => { textInputs()[0]!.props.onChange({ target: { value: `Anthropic ${index + 1}` } }); await wait(); });
       await act(async () => { textInputs()[1]!.props.onChange({ target: { value: 'https://api.anthropic.com' } }); await wait(); });

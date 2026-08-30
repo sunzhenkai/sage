@@ -48,6 +48,8 @@ describe('PackagesApp list', () => {
     expect(tree.root.findAllByProps({ children: 'Ops Analyst' }).length).toBeGreaterThan(0);
     const row = tree.root.findAllByProps({ href: '/?view=packages&package=ops-analyst' })[0];
     expect(row).toBeTruthy();
+    // 版本号单处呈现：徽章保留，副标题不再重复「最新版本 · vX」
+    expect(JSON.stringify(tree.toJSON())).not.toContain('Latest version');
     await act(async () => tree.unmount());
   });
 
@@ -272,6 +274,24 @@ describe('PackageDetailView', () => {
     expect(markup).toContain('你是运维助手。');
     expect(markup).toContain('local-dev');
     expect(markup).toContain('sha256:' + 'd'.repeat(64));
+    // 空值字段不占位：capabilityRefs 为空 → 不渲染该行、不出现「—」
+    expect(markup).not.toContain('Capabilities');
+    expect(markup).not.toContain('>—<');
+  });
+
+  it('hides all empty manifest rows and renders the run card without a dangling divider when no params are declared', () => {
+    const bare: PackageDetailType = {
+      ...detail,
+      manifest: { ...detail.manifest!, skillRefs: [], capabilityRefs: [], inputs: [], dataSources: [], tasks: [{ name: 'triage', entry: 'prompts/system.md' }] }
+    };
+    const markup = renderToStaticMarkup(<PackageDetailView {...detailProps({ detail: bare })} />);
+    expect(markup).not.toContain('>—<');
+    expect(markup).not.toContain('Skills');
+    expect(markup).not.toContain('Declared parameters');
+    expect(markup).not.toContain('Data sources');
+    expect(markup).toContain('Start run');
+    // 无参数无多任务选择：提交按钮直接呈现，无悬空 form-actions 分隔线
+    expect(markup).not.toContain('form-actions');
   });
 
   it('starts a run with declared params: blanks use defaults, enum selects pass through, numbers validate', async () => {

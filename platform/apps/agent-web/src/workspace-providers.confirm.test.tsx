@@ -36,6 +36,25 @@ const dialogAlert = (tree: ReturnType<typeof create>) => findDialog(tree).findAl
 describe('workspace provider dialog and delete confirmation', () => {
   afterEach(() => vi.unstubAllGlobals());
 
+  it('renders the dialog through the shared Modal primitive with breadcrumb and cancel-left/save-right actions', async () => {
+    vi.stubGlobal('window', { localStorage: new MemoryStorage(), sessionStorage: new MemoryStorage() });
+    const fetcher = makeFetcher(() => undefined);
+    const tree = await mount(fetcher);
+    await act(async () => { tree.root.findByProps({ children: '+ Add workspace provider' }).props.onClick(); await wait(); });
+    const dialog = findDialog(tree);
+    // Modal 原语：面包屑式上下文标题 + aria-modal
+    expect(dialog.props['aria-modal']).toBe('true');
+    expect(dialog.findByProps({ className: 'app-modal-breadcrumb' }).props.children).toBe('Providers › Add workspace provider');
+    // 操作主序：取消在左（secondary）、保存在右（primary）
+    const actions = dialog.findAllByProps({ className: 'form-actions field-wide' });
+    expect(actions).toHaveLength(1);
+    const buttons = actions[0]!.findAllByType('button');
+    expect(buttons.map((button) => button.props.children)).toEqual(['Cancel', 'Save workspace provider']);
+    expect(buttons[0]!.props.className).toContain('button-secondary');
+    expect(buttons[1]!.props.className).toContain('button-primary');
+    await act(async () => tree.unmount());
+  });
+
   it('renders the required-fields error inside the dialog on empty submit', async () => {
     vi.stubGlobal('window', { localStorage: new MemoryStorage(), sessionStorage: new MemoryStorage() });
     const fetcher = makeFetcher(() => undefined);
@@ -46,7 +65,7 @@ describe('workspace provider dialog and delete confirmation', () => {
     // 直接走 form onSubmit
     const alerts = dialogAlert(tree);
     expect(alerts.length).toBe(1);
-    expect(alerts[0]!.props.children).toBe('Name, public HTTPS base URL, model, and an API key (on create) are required.');
+    expect(alerts[0]!.props.children).toBe('Name, base URL, model required; API key on create.');
     // 校验失败不发起任何保存请求
     expect(fetcher).not.toHaveBeenCalledWith(expect.stringContaining('/provider-connections'), expect.objectContaining({ method: 'POST' }));
     await act(async () => tree.unmount());
@@ -111,7 +130,7 @@ describe('workspace provider dialog and delete confirmation', () => {
     const tree = await mount(fetcher);
     await act(async () => { tree.root.findByProps({ 'aria-label': 'Delete workspace provider 条目一' }).props.onClick(); await wait(); });
     const confirmRow = tree.root.findByProps({ 'data-testid': 'delete-confirm-conn-1' });
-    expect(confirmRow.findAll((node) => node.props.children === 'This entry is the current default model for package runs; package runs will be rejected until a new default is set.').length).toBe(1);
+    expect(confirmRow.findAll((node) => node.props.children === 'Default model entry; set a new one after deleting.').length).toBe(1);
     await act(async () => tree.unmount());
   });
 });

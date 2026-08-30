@@ -20,8 +20,9 @@ describe('Local Web runtime boundaries', () => {
     const main = await readFile(new URL('./main.tsx', import.meta.url), 'utf8');
     expect(main).not.toContain('ensureChatSession');
     expect(main).not.toContain('Local Sage Chat');
-    expect(main).toContain('<ChatLanding />');
-    expect(main).toContain('<ChatApp sessionId={sessionId} />');
+    expect(main).toContain('<ChatWorkspaceView');
+    expect(main).toContain('<ChatApp sessionId={sessionId}');
+    expect(main).toContain('<ChatWorkspaceView');
   });
 
   it('uses scoped health wording only', async () => {

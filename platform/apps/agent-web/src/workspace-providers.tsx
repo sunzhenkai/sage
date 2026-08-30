@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import type { ModelCatalogItem, ModelCatalogPage, ProviderCatalogItem, ProviderCatalogPage } from '@sage/app-contracts';
 import { useLocale } from './locale.js';
-import { SelectField, TextField } from './fields.js';
+import { Modal, SelectField, TextField } from './fields.js';
 import { InlineNotice } from './feedback.js';
 
 /** GET/POST/PUT/DELETE /v1/provider-connections 的视图模型：元数据 + 凭据在场布尔，永不携带密文或 key。 */
@@ -112,9 +112,7 @@ export function WorkspaceProvidersCard({ fetcher, connections, connectionsLoaded
 
   return <section className="panel system-runtime workspace-providers" aria-label={t('workspaceProviders')}>
     <div>
-      <p className="eyebrow">{t('workspaceSettings')}</p>
       <h2>{t('workspaceProviders')}</h2>
-      <small>{t('workspaceProvidersSubtitle')}</small>
       <div className="profile-stack">
         {connections.map((connection) => <div className="profile-card" key={connection.id}>
           <span className="provider-mark">{connection.source === 'deployment-env' ? '⚙' : '◆'}</span>
@@ -337,69 +335,61 @@ function WorkspaceProviderDialog({ fetcher, draft, saving, error, onDraftChange,
     else if (event.key === 'Escape') { event.preventDefault(); close(); }
   };
 
-  return <div className="provider-modal-backdrop" role="presentation" onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-    <div className="provider-modal" role="dialog" aria-modal="true" aria-label={draft.id === undefined ? t('providerDialogAddTitle') : t('providerDialogEditTitle')} onKeyDown={(event) => { if (event.key === 'Escape') { event.preventDefault(); onClose(); } }}>
-      <form className="workspace-provider-form provider-editor panel" onSubmit={(event) => { event.preventDefault(); onSubmit(); }}>
-        <div className="panel-heading">
-          <div>
-            <span className="eyebrow">{t('workspaceSettings')}</span>
-            <h2>{draft.id === undefined ? t('providerDialogAddTitle') : t('providerDialogEditTitle')}</h2>
-          </div>
-        </div>
-        <div className="form-grid">
-          {snapshotChanged && <InlineNotice className="field-wide">{t('catalogUpdatedNotice')}</InlineNotice>}
-          {refreshNotice && <InlineNotice className="field-wide">{refreshNotice}</InlineNotice>}
-          {catalog === 'unavailable' && <InlineNotice className="field-wide">{t('catalogUnavailableManual')}</InlineNotice>}
-          {catalog !== 'unavailable' && <>
-            <div className="field field-wide combobox-field">
-              <div className="catalog-refresh-row">
-                <span>{t('providers')}</span>
-                <button className="button button-secondary catalog-refresh-button" type="button" disabled={syncing} onClick={() => void refreshCatalog()}>{syncing ? t('catalogSyncing') : t('refreshCatalog')}</button>
-              </div>
-              <div className="combobox-control">
-                <input role="combobox" aria-label={t('providerSearch')} aria-controls="provider-options" aria-expanded={providerOpen} aria-autocomplete="list" value={providerQuery} onChange={(event) => { setProviderQuery(event.target.value); setProviderOpen(true); }} onFocus={() => setProviderOpen(true)} onBlur={() => setProviderOpen(false)} onKeyDown={(event) => keyboard(event, providers, providerIndex, setProviderIndex, selectProvider, () => { if (!providerOpen) return false; setProviderOpen(false); return true; })} placeholder={t('searchProvidersPlaceholder')} />
-                <span className="combobox-chevron" aria-hidden="true">▾</span>
-              </div>
-              <div id="provider-options" role="listbox" className="catalog-options" hidden={!providerOpen} onMouseDown={(event) => event.preventDefault()}>
-                {providerLoading && <p className="catalog-empty">{t('loading')}</p>}
-                {!providerLoading && providers.length === 0 && <p className="catalog-empty">{t('noProviders')}</p>}
-                {providers.map((provider, index) => <button role="option" aria-selected={index === providerIndex} type="button" key={provider.providerId} onClick={() => selectProvider(provider)}>{provider.name}<small>{provider.providerId}</small></button>)}
-                {providerNextCursor !== undefined && !providerLoading && <button type="button" className="catalog-empty" onClick={loadMoreProviders}>{t('loadMore')}</button>}
-              </div>
+  return <Modal open breadcrumb={`${t('providers')} › ${draft.id === undefined ? t('providerDialogAddTitle') : t('providerDialogEditTitle')}`} title={draft.id === undefined ? t('providerDialogAddTitle') : t('providerDialogEditTitle')} onClose={onClose} closeLabel={t('cancel')}>
+    <form className="workspace-provider-form provider-editor" onSubmit={(event) => { event.preventDefault(); onSubmit(); }}>
+      <div className="form-grid">
+        {snapshotChanged && <InlineNotice className="field-wide">{t('catalogUpdatedNotice')}</InlineNotice>}
+        {refreshNotice && <InlineNotice className="field-wide">{refreshNotice}</InlineNotice>}
+        {catalog === 'unavailable' && <InlineNotice className="field-wide">{t('catalogUnavailableManual')}</InlineNotice>}
+        {catalog !== 'unavailable' && <>
+          <div className="field field-wide combobox-field">
+            <div className="catalog-refresh-row">
+              <span>{t('providers')}</span>
+              <button className="button button-secondary catalog-refresh-button" type="button" disabled={syncing} onClick={() => void refreshCatalog()}>{syncing ? t('catalogSyncing') : t('refreshCatalog')}</button>
             </div>
-            <div className="field field-wide combobox-field">
-              <span>{t('model')}</span>
-              <div className="combobox-control">
-                <input role="combobox" aria-label={t('modelSearch')} aria-controls="model-options" aria-expanded={modelOpen && selectedProviderId !== undefined} aria-autocomplete="list" disabled={selectedProviderId === undefined} value={modelQuery} onChange={(event) => { setModelQuery(event.target.value); setModelOpen(true); }} onFocus={() => setModelOpen(true)} onBlur={() => setModelOpen(false)} onKeyDown={(event) => keyboard(event, models, modelIndex, setModelIndex, selectModel, () => { if (!modelOpen) return false; setModelOpen(false); return true; })} placeholder={t('selectModelPlaceholder')} />
-                <span className="combobox-chevron" aria-hidden="true">▾</span>
-              </div>
-              <div id="model-options" role="listbox" className="catalog-options" hidden={!modelOpen || selectedProviderId === undefined} onMouseDown={(event) => event.preventDefault()}>
-                {modelLoading && <p className="catalog-empty">{t('loading')}</p>}
-                {!modelLoading && models.length === 0 && <p className="catalog-empty">{t('noModels')}</p>}
-                {models.map((model, index) => <button role="option" aria-selected={index === modelIndex} type="button" key={model.modelId} onClick={() => selectModel(model)}>{model.name}<small>{model.modelId} · {model.status}</small></button>)}
-                {modelNextCursor !== undefined && !modelLoading && <button type="button" className="catalog-empty" onClick={loadMoreModels}>{t('loadMore')}</button>}
-              </div>
+            <div className="combobox-control">
+              <input role="combobox" aria-label={t('providerSearch')} aria-controls="provider-options" aria-expanded={providerOpen} aria-autocomplete="list" value={providerQuery} onChange={(event) => { setProviderQuery(event.target.value); setProviderOpen(true); }} onFocus={() => setProviderOpen(true)} onBlur={() => setProviderOpen(false)} onKeyDown={(event) => keyboard(event, providers, providerIndex, setProviderIndex, selectProvider, () => { if (!providerOpen) return false; setProviderOpen(false); return true; })} placeholder={t('searchProvidersPlaceholder')} />
+              <span className="combobox-chevron" aria-hidden="true">▾</span>
             </div>
-          </>}
-          <TextField wide label={t('displayName')} value={draft.name} onChange={(value) => { nameDirty.current = true; patch({ name: value }); }} />
-          <SelectField label={t('adapterKind')} value={draft.adapterKind} onChange={(value) => { adapterDirty.current = true; patch({ adapterKind: value as WorkspaceProviderDraft['adapterKind'] }); }}>
-            <option value="anthropic">{t('anthropic')}</option>
-            <option value="openai-compatible">{t('openAiCompatible')}</option>
-          </SelectField>
-          <TextField label={t('baseUrl')} value={draft.baseUrl} placeholder="https://api.example.com" onChange={(value) => { baseUrlDirty.current = true; patch({ baseUrl: value }); }} />
-          <TextField label={t('model')} value={draft.modelId} onChange={(value) => {
-            if (value === draft.modelId) { patch({}); return; }
-            const { modelName: _stale, ...rest } = draft; void _stale;
-            onDraftChange({ ...rest, modelId: value });
-          }} />
-          <TextField wide type="password" label={t('apiKeyServer')} value={draft.apiKey} placeholder={draft.id === undefined ? t('apiKeyRequiredPlaceholder') : t('apiKeyRotatePlaceholder')} onChange={(value) => patch({ apiKey: value })} />
-          {error && <InlineNotice error className="field-wide provider-dialog-error">{error}</InlineNotice>}
-          <div className="form-actions field-wide">
-            <button className="button" type="submit" disabled={saving}>{saving ? t('saving') : t('saveWorkspaceProvider')}</button>
-            <button className="button button-secondary" type="button" onClick={onClose}>{t('cancel')}</button>
+            <div id="provider-options" role="listbox" className="catalog-options" hidden={!providerOpen} onMouseDown={(event) => event.preventDefault()}>
+              {providerLoading && <p className="catalog-empty">{t('loading')}</p>}
+              {!providerLoading && providers.length === 0 && <p className="catalog-empty">{t('noProviders')}</p>}
+              {providers.map((provider, index) => <button role="option" aria-selected={index === providerIndex} type="button" key={provider.providerId} onClick={() => selectProvider(provider)}>{provider.name}<small>{provider.providerId}</small></button>)}
+              {providerNextCursor !== undefined && !providerLoading && <button type="button" className="catalog-empty" onClick={loadMoreProviders}>{t('loadMore')}</button>}
+            </div>
           </div>
+          <div className="field field-wide combobox-field">
+            <span>{t('model')}</span>
+            <div className="combobox-control">
+              <input role="combobox" aria-label={t('modelSearch')} aria-controls="model-options" aria-expanded={modelOpen && selectedProviderId !== undefined} aria-autocomplete="list" disabled={selectedProviderId === undefined} value={modelQuery} onChange={(event) => { setModelQuery(event.target.value); setModelOpen(true); }} onFocus={() => setModelOpen(true)} onBlur={() => setModelOpen(false)} onKeyDown={(event) => keyboard(event, models, modelIndex, setModelIndex, selectModel, () => { if (!modelOpen) return false; setModelOpen(false); return true; })} placeholder={t('selectModelPlaceholder')} />
+              <span className="combobox-chevron" aria-hidden="true">▾</span>
+            </div>
+            <div id="model-options" role="listbox" className="catalog-options" hidden={!modelOpen || selectedProviderId === undefined} onMouseDown={(event) => event.preventDefault()}>
+              {modelLoading && <p className="catalog-empty">{t('loading')}</p>}
+              {!modelLoading && models.length === 0 && <p className="catalog-empty">{t('noModels')}</p>}
+              {models.map((model, index) => <button role="option" aria-selected={index === modelIndex} type="button" key={model.modelId} onClick={() => selectModel(model)}>{model.name}<small>{model.modelId} · {model.status}</small></button>)}
+              {modelNextCursor !== undefined && !modelLoading && <button type="button" className="catalog-empty" onClick={loadMoreModels}>{t('loadMore')}</button>}
+            </div>
+          </div>
+        </>}
+        <TextField wide label={t('displayName')} value={draft.name} onChange={(value) => { nameDirty.current = true; patch({ name: value }); }} />
+        <SelectField label={t('adapterKind')} value={draft.adapterKind} onChange={(value) => { adapterDirty.current = true; patch({ adapterKind: value as WorkspaceProviderDraft['adapterKind'] }); }}>
+          <option value="anthropic">{t('anthropic')}</option>
+          <option value="openai-compatible">{t('openAiCompatible')}</option>
+        </SelectField>
+        <TextField label={t('baseUrl')} value={draft.baseUrl} placeholder="https://api.example.com" onChange={(value) => { baseUrlDirty.current = true; patch({ baseUrl: value }); }} />
+        <TextField wide label={t('model')} value={draft.modelId} onChange={(value) => {
+          if (value === draft.modelId) { patch({}); return; }
+          const { modelName: _stale, ...rest } = draft; void _stale;
+          onDraftChange({ ...rest, modelId: value });
+        }} />
+        <TextField wide type="password" label={t('apiKeyServer')} value={draft.apiKey} placeholder={draft.id === undefined ? t('apiKeyRequiredPlaceholder') : t('apiKeyRotatePlaceholder')} onChange={(value) => patch({ apiKey: value })} />
+        {error && <InlineNotice error className="field-wide provider-dialog-error">{error}</InlineNotice>}
+        <div className="form-actions field-wide">
+          <button className="button button-secondary" type="button" onClick={onClose}>{t('cancel')}</button>
+          <button className="button button-primary" type="submit" disabled={saving}>{saving ? t('saving') : t('saveWorkspaceProvider')}</button>
         </div>
-      </form>
-    </div>
-  </div>;
+      </div>
+    </form>
+  </Modal>;
 }

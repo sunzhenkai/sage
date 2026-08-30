@@ -57,6 +57,10 @@ describe('SchedulesApp', () => {
     await act(async () => { tree = create(<SchedulesApp fetcher={fetcher} />); });
     await flush(); await flush();
     expect(JSON.stringify(tree.toJSON())).toContain('SCHEDULE_UNAVAILABLE');
+    // 错误态走全局 Banner 组件（error-banner + role=alert），不再是无样式类名的裸文本
+    const alert = tree.root.findByProps({ role: 'alert' });
+    expect(alert.props.className).toBe('error-banner');
+    expect(JSON.stringify(tree.toJSON())).not.toContain('banner-error');
   });
 
   it('replaces the loading note with the service-token guidance on 401 responses', async () => {

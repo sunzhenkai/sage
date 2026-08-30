@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocale } from './locale.js';
 import { workspaceHref } from './workspace.js';
+import { Banner, InlineNotice } from './feedback.js';
 
 /**
  * P8 Schedule 管理视图（spec: ai-app-schedule-plane「Schedule API 与 UI」「Schedule UI 凭据接入与状态反馈」）：
@@ -57,7 +58,7 @@ async function scheduleJson<T>(fetcher: ScheduleFetch, url: string, init: Reques
 }
 
 export function SchedulesApp({ apiBase = '', fetcher = fetch }: { readonly apiBase?: string; readonly fetcher?: ScheduleFetch }) {
-  const { t, locale, formatDateTime } = useLocale();
+  const { t, formatDateTime } = useLocale();
   const [schedules, setSchedules] = useState<readonly ScheduleView[] | undefined>(undefined);
   const [error, setError] = useState<RequestFailure | undefined>(undefined);
   const [selected, setSelected] = useState<string | undefined>(undefined);
@@ -106,12 +107,12 @@ export function SchedulesApp({ apiBase = '', fetcher = fetch }: { readonly apiBa
 
   const rows = useMemo(() => schedules ?? [], [schedules]);
 
-  return <section className="workspace-page schedules-page">
+  return <section className="workspace-page schedules-page" aria-label={t('schedules')}>
     <header className="page-heading">
-      <div><p className="eyebrow">{t('schedulesEyebrow')}</p><h1>{t('schedules')}</h1><p className="page-subtitle">{t('schedulesSubtitle')}</p></div>
+      <h1>{t('schedules')}</h1>
       <div className="page-heading-actions"><button className="button button-secondary" type="button" onClick={() => void load()}>↻ {t('refresh')}</button></div>
     </header>
-    {error !== undefined && <div className="banner banner-error" role="alert">{error.authRequired ? t('scheduleAuthRequired') : (error.message || t('scheduleDataUnavailable'))}</div>}
+    {error !== undefined && <Banner kind="error" title={t('scheduleDataUnavailable')}>{error.authRequired ? t('scheduleAuthRequired') : (error.message || t('scheduleDataUnavailable'))}</Banner>}
     {schedules === undefined
       ? (error === undefined ? <p className="loading-note">{t('loadingSchedules')}</p> : null)
       : rows.length === 0
@@ -137,7 +138,7 @@ export function SchedulesApp({ apiBase = '', fetcher = fetch }: { readonly apiBa
     {selected !== undefined && <div className="panel schedule-detail" data-testid="schedule-detail">
       <h2>{t('scheduleTriggerHistory')} · {selected}</h2>
       {historyError !== undefined
-        ? <p className="empty-note" role="alert">{historyError.authRequired ? t('scheduleAuthRequired') : historyError.message}</p>
+        ? <InlineNotice error>{historyError.authRequired ? t('scheduleAuthRequired') : historyError.message}</InlineNotice>
         : history === undefined
           ? <p className="loading-note">{t('loadingTriggerHistory')}</p>
           : history.length === 0
@@ -152,6 +153,5 @@ export function SchedulesApp({ apiBase = '', fetcher = fetch }: { readonly apiBa
               </li>)}
             </ul>}
     </div>}
-    <p className="page-subtitle">{locale === 'zh-CN' ? '管理操作需要 service token 认证；UI 凭据由同源代理注入。' : 'Management operations require service token auth; credentials are injected by the same-origin proxy.'}</p>
   </section>;
 }

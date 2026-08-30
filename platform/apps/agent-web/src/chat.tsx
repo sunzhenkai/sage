@@ -77,7 +77,7 @@ export function splitAssistantText(text: string): readonly AssistantSegment[] {
 
 export function ChatTimeline({ events, onRetry, onPromote }: ChatTimelineProps) {
   const { t } = useLocale();
-  if (events.length === 0) return <section className="timeline-empty"><span className="empty-orb">✦</span><h2>{t('startOutcome')}</h2><p>{t('chatPrompt')}</p></section>;
+  if (events.length === 0) return <section className="timeline-empty"><span className="empty-orb">✦</span><p>{t('timelineEmpty')}</p></section>;
   const turns = buildTurns(events);
   return <section className="timeline conversation" aria-live="polite">
     {turns.map((turn) => <ConversationTurn key={turn.runId} turn={turn} {...(onRetry === undefined ? {} : { onRetry })} {...(onPromote === undefined ? {} : { onPromote })} />)}
@@ -169,15 +169,10 @@ function legacyCopy(text: string): boolean {
   return copied;
 }
 
-function EventStreamPanel({ events, sessionId, terminal, onCopy }: { readonly events: readonly TimelineEvent[]; readonly sessionId: string; readonly terminal?: ChatRun; readonly onCopy: () => void }) {
+function EventStreamPanel({ events, onCopy }: { readonly events: readonly TimelineEvent[]; readonly onCopy: () => void }) {
   const { t, formatTime } = useLocale();
   return <section className="event-stream-panel" id="chat-event-stream" aria-label={t('eventStream')}>
     <div className="event-stream-head">
-      <div className="event-stream-meta">
-        <span><span className="overview-label">{t('session')}</span><code>{sessionId}</code></span>
-        <span><span className="overview-label">{t('events')}</span><strong>{events.length}</strong></span>
-        <span><span className="overview-label">{t('run')}</span><strong>{terminal === undefined ? t('ready') : runStatusLabel(terminal.status, t)}</strong></span>
-      </div>
       <button className="button button-secondary" type="button" onClick={onCopy}>{t('copyEventStream')}</button>
     </div>
     <ul className="event-stream-list">
@@ -197,7 +192,7 @@ const EVENT_SOURCE_RECONNECT_DELAY_MS = 1_000;
 
 export function ChatApp({ sessionId, apiBase = '', fetcher = fetch }: ChatAppProps) {
   const { t } = useLocale();
-  const [events, setEvents] = useState<readonly TimelineEvent[]>([]); const [text, setText] = useState(''); const [submitting, setSubmitting] = useState(false); const [loading, setLoading] = useState(true); const [sessionStatus, setSessionStatus] = useState<'open' | 'closed'>(); const [archived, setArchived] = useState(false); const [recovery, setRecovery] = useState(false); const [connection, setConnection] = useState<'connecting' | 'live' | 'offline'>('connecting'); const [error, setError] = useState<string>(); const [notice, setNotice] = useState<string>(); const [noticeAction, setNoticeAction] = useState<React.ReactNode>(); const [streamOpen, setStreamOpen] = useState(false);
+  const [events, setEvents] = useState<readonly TimelineEvent[]>([]); const [text, setText] = useState(''); const [submitting, setSubmitting] = useState(false); const [loading, setLoading] = useState(true); const [sessionStatus, setSessionStatus] = useState<'open' | 'closed'>(); const [sessionTitle, setSessionTitle] = useState<string>(); const [archived, setArchived] = useState(false); const [recovery, setRecovery] = useState(false); const [connection, setConnection] = useState<'connecting' | 'live' | 'offline'>('connecting'); const [error, setError] = useState<string>(); const [notice, setNotice] = useState<string>(); const [noticeAction, setNoticeAction] = useState<React.ReactNode>(); const [streamOpen, setStreamOpen] = useState(false);
   const submitGuard = useRef(false); const composition = useRef(false); const terminal = useMemo(() => terminalRun(events.flatMap((event) => event.payload.kind === 'run' ? [{ status: event.payload.status, attempt: event.payload.attempt } as ChatRun] : [])), [events]); const hasTask = useMemo(() => events.some((event) => event.payload.kind === 'task' && event.payload.taskId !== undefined), [events]); const sessionWritable = sessionStatus === 'open' && !archived;
   const [runtimeId, setRuntimeId] = useState<string>(() => browserLocalStorage()?.getItem(CHAT_RUNTIME_STORAGE_KEY) ?? '');
   // 最新已应用 timeline sequence：快照加载、SSE 推送与发送后补拉共用，保证合并幂等且重连不重放。
@@ -275,7 +270,7 @@ export function ChatApp({ sessionId, apiBase = '', fetcher = fetch }: ChatAppPro
     let active = true;
     let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
     let generation = 0;
-    setLoading(true); setRecovery(false); setSessionStatus(undefined); setArchived(false); setError(undefined); setConnection('connecting');
+    setLoading(true); setRecovery(false); setSessionStatus(undefined); setSessionTitle(undefined); setArchived(false); setError(undefined); setConnection('connecting');
     const connect = (fromSequence: number) => {
       source = new EventSource(`${apiBase}/v1/chat/sessions/${encodeURIComponent(sessionId)}/timeline?afterSequence=${fromSequence}`);
       source.addEventListener('timeline', (raw) => {
@@ -295,9 +290,10 @@ export function ChatApp({ sessionId, apiBase = '', fetcher = fetch }: ChatAppPro
       };
     };
     const recover = async () => {
-      const detail = await chatJson<{ session: { status: 'open' | 'closed'; archivedAt?: string } }>(fetcher, `${apiBase}/v1/chat/sessions/${encodeURIComponent(sessionId)}`);
+      const detail = await chatJson<{ session: { status: 'open' | 'closed'; archivedAt?: string; title?: string } }>(fetcher, `${apiBase}/v1/chat/sessions/${encodeURIComponent(sessionId)}`);
       if (!active) return;
       setSessionStatus(detail.session.status);
+      setSessionTitle(detail.session.title);
       setArchived(detail.session.archivedAt !== undefined);
       const snapshot = await chatJson<{ events: TimelineEvent[] }>(fetcher, `${apiBase}/v1/chat/sessions/${encodeURIComponent(sessionId)}/events?afterSequence=0`);
       if (!active) return;
@@ -365,17 +361,18 @@ export function ChatApp({ sessionId, apiBase = '', fetcher = fetch }: ChatAppPro
     <header className="page-heading chat-heading">
       <div className="chat-heading-row">
         <a className="chat-back" href={workspaceHref({ view: 'chat' })} aria-label={t('backToConversations')} title={t('backToConversations')}>←</a>
-        <div><p className="eyebrow">{t('liveConversation')}</p><h1>{t('chat')}</h1></div>
+        <h1>{sessionTitle ?? t('chat')}</h1>
+        <span className={`connection-status connection-${connection}`}><span className="status-dot" />{connection === 'live' ? t('liveStreamConnected') : connection === 'connecting' ? t('connecting') : t('streamReconnecting')}</span>
       </div>
-      <div className="chat-heading-meta"><div className="session-info-bar"><span><span className="overview-label">{t('session')}</span><code>{sessionId}</code></span><span><span className="overview-label">{t('events')}</span><strong>{events.length}</strong></span><span><span className="overview-label">{t('run')}</span><strong>{terminal === undefined ? t('ready') : runStatusLabel(terminal.status, t)}</strong></span><a className="task-workspace-link" href={workspaceHref({ view: 'tasks', sessionId })}>{t('openTaskWorkspace')} <span aria-hidden="true">→</span></a></div><div className="chat-heading-actions"><span className={`connection-status connection-${connection}`}><span className="status-dot" />{connection === 'live' ? t('liveStreamConnected') : connection === 'connecting' ? t('connecting') : t('streamReconnecting')}</span><label className="runtime-picker"><span className="overview-label">{t('runtime')}</span><select aria-label={t('chatRuntime')} value={runtimeId} onChange={(event) => selectRuntime(event.target.value)}><option value="">{t('runtimeUnconfigured')}</option>{workspaceConnections.length > 0 && <optgroup label={t('workspaceProviders')}>{workspaceConnections.map((connection) => <option key={`${WS_RUNTIME_PREFIX}${connection.id}`} value={`${WS_RUNTIME_PREFIX}${connection.id}`}>{connection.name}{connection.modelName === undefined ? '' : ` · ${connection.modelName}`}</option>)}</optgroup>}</select></label>{workspaceConnections.length === 0 && <a className="task-workspace-link" href={workspaceHref({ view: 'providers', sessionId })}>+ {t('addWorkspaceProvider')}</a>}{events.length > 0 && !hasTask && <a className="button button-secondary task-card-link" href={workspaceHref({ view: 'tasks', sessionId })} title={t('taskCardBody')}><span aria-hidden="true">▣</span>{t('taskCardTitle')}</a>}<button className="button button-secondary stream-toggle" type="button" aria-expanded={streamOpen} aria-controls="chat-event-stream" onClick={() => setStreamOpen((open) => !open)}>{t('eventStream')}</button></div></div>
+      <div className="chat-heading-actions"><div className="chat-heading-info"><div className="session-info-bar"><span><span className="overview-label">{t('session')}</span><code>{sessionId}</code></span><span><span className="overview-label">{t('events')}</span><strong>{events.length}</strong></span><span><span className="overview-label">{t('run')}</span><strong>{terminal === undefined ? t('ready') : runStatusLabel(terminal.status, t)}</strong></span><a className="task-workspace-link" href={workspaceHref({ view: 'tasks', sessionId })}>{t('openTaskWorkspace')} <span aria-hidden="true">→</span></a></div></div><div className="chat-heading-tools"><label className="runtime-picker"><span className="overview-label">{t('runtime')}</span><select aria-label={t('chatRuntime')} value={runtimeId} onChange={(event) => selectRuntime(event.target.value)}><option value="">{t('runtimeUnconfigured')}</option>{workspaceConnections.length > 0 && <optgroup label={t('workspaceProviders')}>{workspaceConnections.map((connection) => <option key={`${WS_RUNTIME_PREFIX}${connection.id}`} value={`${WS_RUNTIME_PREFIX}${connection.id}`}>{connection.name}{connection.modelName === undefined ? '' : ` · ${connection.modelName}`}</option>)}</optgroup>}</select></label>{workspaceConnections.length === 0 && <a className="task-workspace-link" href={workspaceHref({ view: 'providers', sessionId })}>+ {t('addWorkspaceProvider')}</a>}{events.length > 0 && !hasTask && <a className="button button-secondary task-card-link" href={workspaceHref({ view: 'tasks', sessionId })} title={t('taskCardBody')}><span aria-hidden="true">▣</span>{t('promoteTask')}</a>}<button className="button button-secondary stream-toggle" type="button" aria-expanded={streamOpen} aria-controls="chat-event-stream" onClick={() => setStreamOpen((open) => !open)}>{t('eventStream')}</button></div></div>
     </header>
     {error && <Banner kind="error" title={t('somethingNeedsAttention')} onDismiss={() => setError(undefined)} dismissLabel={t('dismissError')}>{error}</Banner>}
     {notice && <Banner kind="success" {...(noticeAction === undefined ? {} : { action: noticeAction })} onDismiss={() => { setNotice(undefined); setNoticeAction(undefined); }} dismissLabel={t('dismissNotice')}>{notice}</Banner>}
     <div className="chat-scroll" ref={scrollRef} onScroll={onScroll}>
-      {streamOpen && <EventStreamPanel events={events} sessionId={sessionId} {...(terminal === undefined ? {} : { terminal })} onCopy={() => void copyEvents()} />}
+      {streamOpen && <EventStreamPanel events={events} onCopy={() => void copyEvents()} />}
       {loading ? <LoadingState label={t('recoveringConversation')} detail={t('loadingEvents')} /> : <ChatTimeline events={events} sessionId={sessionId} {...(sessionWritable ? { onRetry: (runId: string) => void retry(runId), onPromote: (messageId: string) => void promote(messageId) } : {})} />}
     </div>
-    {sessionWritable ? <div className="composer-wrap chat-dock">{workspaceConnections.length === 0 && <InlineNotice className="composer-guard"><strong>{t('chatNeedsProviderTitle')}</strong><p>{t('chatNeedsProvider')}</p><a className="task-workspace-link" href={workspaceHref({ view: 'providers', sessionId })}>+ {t('addWorkspaceProvider')} →</a></InlineNotice>}<div className="quick-prompts"><span>{t('tryAsking')}</span><button type="button" onClick={() => quickPrompt('Summarize the current project context')}>{t('summarizeProject')}</button><button type="button" onClick={() => quickPrompt('Turn this idea into a durable Task')}>{t('createTask')}</button><button type="button" onClick={() => quickPrompt('Explore the riskiest open question')}>{t('exploreRisk')}</button></div><form className="composer" onSubmit={(event) => void submit(event)}><span className="composer-mark">✦</span><textarea aria-label={t('message')} value={text} onChange={(event) => setText(event.target.value)} onKeyDown={composerKeyDown} onCompositionStart={() => { composition.current = true; }} onCompositionEnd={() => { composition.current = false; }} disabled={submitting} placeholder={t('askAnything')} rows={2} /><div className="composer-footer"><span>{t('enterToSend')}</span><button className="button button-primary send-button" disabled={submitting || !text.trim() || runtimeId === ''} type="submit">{submitting ? t('sending') : t('send')} <span>↗</span></button></div></form></div> : sessionStatus === 'closed' ? <InlineNotice className="chat-dock"><strong>{t('closedReadOnly')}</strong><p>{t('closedExplanation')}</p></InlineNotice> : archived ? <InlineNotice className="chat-dock"><strong>{t('archivedReadOnly')}</strong><p>{t('archivedReadOnlyExplanation')}</p></InlineNotice> : error ? <InlineNotice className="chat-dock"><strong>{t('composerReadOnly')}</strong><p>{t('composerReadOnlyExplanation')}</p></InlineNotice> : null}
+    {sessionWritable ? <div className="composer-wrap chat-dock">{workspaceConnections.length === 0 && <InlineNotice className="composer-guard"><strong>{t('chatNeedsProviderTitle')}</strong><p>{t('chatNeedsProvider')}</p><a className="task-workspace-link" href={workspaceHref({ view: 'providers', sessionId })}>+ {t('addWorkspaceProvider')} →</a></InlineNotice>}<div className="quick-prompts"><span>{t('tryAsking')}</span><button type="button" onClick={() => quickPrompt('Summarize the current project context')}>{t('summarizeProject')}</button><button type="button" onClick={() => quickPrompt('Turn this idea into a durable Task')}>{t('createTask')}</button><button type="button" onClick={() => quickPrompt('Explore the riskiest open question')}>{t('exploreRisk')}</button></div><form className="composer" onSubmit={(event) => void submit(event)}><span className="composer-mark">✦</span><textarea aria-label={t('message')} value={text} onChange={(event) => setText(event.target.value)} onKeyDown={composerKeyDown} onCompositionStart={() => { composition.current = true; }} onCompositionEnd={() => { composition.current = false; }} disabled={submitting} placeholder={t('askAnything')} rows={2} /><div className="composer-footer"><span>{t('enterToSend')}</span><button className="button button-primary send-button" disabled={submitting || !text.trim() || runtimeId === ''} type="submit">{submitting ? t('sending') : t('send')} <span>↗</span></button></div></form></div> : sessionStatus === 'closed' ? <InlineNotice className="chat-dock"><strong>{t('closedReadOnly')}</strong></InlineNotice> : archived ? <InlineNotice className="chat-dock"><strong>{t('archivedReadOnly')}</strong></InlineNotice> : error ? <InlineNotice className="chat-dock"><strong>{t('composerReadOnly')}</strong></InlineNotice> : null}
   </section>;
 }
 

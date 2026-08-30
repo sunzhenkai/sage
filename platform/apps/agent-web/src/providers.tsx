@@ -12,12 +12,19 @@ interface RunAgentSettingsView {
 }
 
 export function ProvidersApp({ fetcher = fetch }: { readonly fetcher?: typeof fetch }): React.JSX.Element {
-  const { t } = useLocale();
+  const { locale, setLocale, t } = useLocale();
   const [runAgent, setRunAgent] = useState<RunAgentSettingsView>();
   const [runAgentSaving, setRunAgentSaving] = useState(false);
   const [notice, setNotice] = useState<string | undefined>();
   const [connections, setConnections] = useState<readonly WorkspaceProviderView[]>([]);
   const [connectionsLoaded, setConnectionsLoaded] = useState(false);
+  // 设置子导航的当前位置：锚点跳转不触发路由，active 态由点击显式登记。
+  const [activeSection, setActiveSection] = useState('providers-run-agent');
+  const navItem = (section: string) => ({
+    className: activeSection === section ? 'is-active' : undefined,
+    ...(activeSection === section ? { 'aria-current': 'location' as const } : {}),
+    onClick: () => setActiveSection(section)
+  });
 
   useEffect(() => { void fetcher('/v1/run-agent/settings', { credentials: 'include' }).then(async (response) => {
     if (!response.ok) throw new Error(`Run agent settings ${response.status}`);
@@ -59,32 +66,45 @@ export function ProvidersApp({ fetcher = fetch }: { readonly fetcher?: typeof fe
     return `${name ?? id}${model === undefined ? '' : ` · ${model}`}`;
   };
 
-  return <section className="workspace-page providers-page">
-    <header className="page-heading"><div><p className="eyebrow">{t('workspaceSettings')}</p><h1>{t('providers')}</h1><p className="page-subtitle">{t('providersSubtitleUnified')}</p></div></header>
-    <section className="panel system-runtime" aria-label={t('runAgent')}>
-      <div>
-        <p className="eyebrow">{t('workspaceSettings')}</p>
-        <h2>{t('runAgent')}</h2>
-        <small>{t('runAgentSubtitle')}</small>
-        <SelectField className="field-standalone" label={t('defaultModelLabel')} value={runAgent?.providerConnectionId ?? ''} disabled={runAgentSaving || runAgent === undefined} onChange={(value) => void saveRunAgent(value)}>
-          <option value="">{t('runAgentUnset')}</option>
-          {(runAgent?.providers ?? []).map((provider) => (
-            <option key={provider.id} value={provider.id}>{`${modelLabel(provider.id, provider.name)}${provider.available ? '' : ` · ${t('workspaceProviderUnavailableOption')}`}`}</option>
-          ))}
-        </SelectField>
-      </div>
-      {(() => {
-        if (runAgent === undefined || runAgent.unset) {
-          return <span className="badge badge-warning">{t('runAgentUnsetWarning')}</span>;
-        }
-        return selected !== undefined
-          ? <span className={selected.available ? 'badge badge-success' : 'badge badge-warning'}>
-              {selected.available ? t('connectionReady', { name: selected.name ?? selected.id }) : t('connectionUnavailable', { name: selected.name ?? selected.id })}
-            </span>
-          : <span className="badge badge-warning">{t('connectionUnavailable', { name: runAgent.providerConnectionId ?? '' })}</span>;
-      })()}
-    </section>
-    <WorkspaceProvidersCard fetcher={fetcher} connections={connections} connectionsLoaded={connectionsLoaded} {...(runAgent?.providerConnectionId === undefined ? {} : { defaultConnectionId: runAgent.providerConnectionId })} onConnectionsChanged={() => void reloadConnections()} onNotice={setNotice} />
+  return <section className="workspace-page providers-page" aria-label={t('providers')}>
+    <header className="page-heading"><h1>{t('providers')}</h1></header>
     {notice && <InlineNotice>{notice}</InlineNotice>}
+    <div className="settings-layout">
+      <nav className="settings-nav" aria-label={t('configuration')}>
+        <a href="#providers-run-agent" {...navItem('providers-run-agent')}>{t('runAgent')}</a>
+        <a href="#providers-connections" {...navItem('providers-connections')}>{t('workspaceProviders')}</a>
+        <a href="#providers-preferences" {...navItem('providers-preferences')}>{t('language')}</a>
+      </nav>
+      <div className="settings-content">
+        <section id="providers-run-agent" className="panel system-runtime" aria-label={t('runAgent')}>
+          <div>
+            <h2>{t('runAgent')}</h2>
+            <SelectField className="field-standalone" label={t('defaultModelLabel')} value={runAgent?.providerConnectionId ?? ''} disabled={runAgentSaving || runAgent === undefined} onChange={(value) => void saveRunAgent(value)}>
+              <option value="">{t('runAgentUnset')}</option>
+              {(runAgent?.providers ?? []).map((provider) => (
+                <option key={provider.id} value={provider.id}>{`${modelLabel(provider.id, provider.name)}${provider.available ? '' : ` · ${t('workspaceProviderUnavailableOption')}`}`}</option>
+              ))}
+            </SelectField>
+          </div>
+          {(() => {
+            if (runAgent === undefined || runAgent.unset) {
+              return <span className="badge badge-warning">{t('runAgentUnsetWarning')}</span>;
+            }
+            return selected !== undefined
+              ? <span className={selected.available ? 'badge badge-success' : 'badge badge-warning'}>
+                  {selected.available ? t('connectionReady', { name: selected.name ?? selected.id }) : t('connectionUnavailable', { name: selected.name ?? selected.id })}
+                </span>
+              : <span className="badge badge-warning">{t('connectionUnavailable', { name: runAgent.providerConnectionId ?? '' })}</span>;
+          })()}
+        </section>
+        <section id="providers-connections">
+          <WorkspaceProvidersCard fetcher={fetcher} connections={connections} connectionsLoaded={connectionsLoaded} {...(runAgent?.providerConnectionId === undefined ? {} : { defaultConnectionId: runAgent.providerConnectionId })} onConnectionsChanged={() => void reloadConnections()} onNotice={setNotice} />
+        </section>
+        <section id="providers-preferences" className="panel preferences-card" aria-label={t('language')}>
+          <h2>{t('language')}</h2>
+          <label className="locale-control"><span className="locale-copy">{t('language')}</span><select aria-label={t('languageSwitcher')} value={locale} onChange={(event) => setLocale(event.target.value as 'zh-CN' | 'en')}><option value="zh-CN">{t('chinese')}</option><option value="en">{t('english')}</option></select></label>
+        </section>
+      </div>
+    </div>
   </section>;
 }

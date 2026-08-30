@@ -27,6 +27,12 @@ describe('P8 Task run logs panel',()=>{
   });
 });
 describe('P6 Task and Task Card UI',()=>{
+  it('renders a jargon-free timeline empty state when the projection is fresh',()=>{
+    const {staleReason:_drop,...freshBase}=task;void _drop;
+    const html=renderToStaticMarkup(<TaskDetail task={{...freshBase,freshness:'fresh'}} events={[]} artifacts={[]} onControl={vi.fn()}/>);
+    expect(html).toContain('No timeline events yet.');
+    expect(html).not.toContain('projection events');
+  });
   it('renders list/detail stale timestamp, persisted target, Timeline, Artifact refs and authorized control affordances',()=>{
     const list=renderToStaticMarkup(<TaskList tasks={[task]}/>);expect(list).toContain('task-p6');expect(list).toContain('stale');expect(list).toContain('2026-08-12T00:00:00.000Z');
     const control=vi.fn();const detail=renderToStaticMarkup(<TaskDetail task={task} events={[{eventId:'event-1',sequence:1,kind:'agent',type:'agent.task.running',occurredAt:'2026-08-12T00:00:01.000Z',payload:{}}]} artifacts={[{artifactId:'output',artifactRef:'artifact://tasks/task-p6/output',name:'output.txt',mediaType:'text/plain'}]} onControl={control}/>);

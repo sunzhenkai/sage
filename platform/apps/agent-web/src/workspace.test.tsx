@@ -27,6 +27,26 @@ describe('Workspace landing and canonical links', () => {
     await act(async () => tree.unmount());
   });
 
+  it('highlights the session open in the content pane with aria-current and compact row time', async () => {
+    vi.stubGlobal('location', { search: '?session=session-a' });
+    const fetcher = vi.fn(async () => response({ schemaVersion: '1', items: [
+      { schemaVersion: '1', sessionId: 'session-a', status: 'open', title: 'Active one', createdAt: '2026-08-14T00:00:00.000Z', updatedAt: '2026-08-14T01:00:00.000Z', retentionEligibleAt: '2026-09-13T01:00:00.000Z' },
+      { schemaVersion: '1', sessionId: 'session-b', status: 'closed', title: 'Other one', createdAt: '2026-08-14T00:00:00.000Z', updatedAt: '2026-08-14T02:00:00.000Z', retentionEligibleAt: '2026-09-13T02:00:00.000Z' }
+    ] })) as typeof fetch;
+    let tree!: ReturnType<typeof create>;
+    await act(async () => { tree = create(<ChatLanding fetcher={fetcher} navigate={vi.fn()} />); await flush(); });
+    const activeRow = tree.root.findByProps({ href: '/?session=session-a' });
+    expect(activeRow.props['aria-current']).toBe('page');
+    expect(tree.root.findByProps({ href: '/?session=session-b' }).props['aria-current']).toBeUndefined();
+    expect(tree.root.findAllByProps({ className: 'history-entry is-active' })).toHaveLength(1);
+    // 紧凑时间（MM-DD HH:mm）定宽呈现；完整时间戳退到 hover title
+    const time = activeRow.findByType('time');
+    expect(String(time.props.children)).toMatch(/^\d{2}-\d{2} \d{2}:\d{2}$/);
+    expect(time.props.title).toContain('2026');
+    vi.unstubAllGlobals();
+    await act(async () => tree.unmount());
+  });
+
   it('creates exactly once with an empty body and navigates canonically', async () => {
     const calls: { url: string; init?: RequestInit }[] = [];
     const navigate = vi.fn();
@@ -90,7 +110,7 @@ describe('Workspace landing and canonical links', () => {
     await act(async () => { tree.root.findByProps({ children: 'Archive', className: 'button button-quiet' }).props.onClick(); await flush(); });
     const archiveCall = calls.find((call) => call.url.endsWith('/session-a/archive'));
     expect(archiveCall?.init?.method).toBe('POST');
-    expect(tree.root.findByProps({ children: 'Conversation archived.' })).toBeTruthy();
+    expect(tree.root.findByProps({ children: 'Archived.' })).toBeTruthy();
     expect(tree.root.findAllByProps({ href: '/?session=session-a' })).toHaveLength(0);
     await act(async () => tree.unmount());
   });
@@ -117,7 +137,7 @@ describe('Workspace landing and canonical links', () => {
     await act(async () => { tree.root.findByProps({ children: 'Delete forever' }).props.onClick(); await flush(); });
     const deleteCall = calls.find((call) => call.init?.method === 'DELETE');
     expect(deleteCall?.url.endsWith('/v1/chat/sessions/session-doomed')).toBe(true);
-    expect(tree.root.findByProps({ children: 'Conversation permanently deleted.' })).toBeTruthy();
+    expect(tree.root.findByProps({ children: 'Deleted.' })).toBeTruthy();
     expect(tree.root.findAllByProps({ href: '/?session=session-doomed' })).toHaveLength(0);
     await act(async () => tree.unmount());
   });
