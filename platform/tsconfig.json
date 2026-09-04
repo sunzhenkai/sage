@@ -32,7 +32,6 @@
     { "path": "packages/temporal-schedules" },
     { "path": "apps/agent-worker" },
     { "path": "apps/agent-api" },
-    { "path": "apps/agent-web" },
     { "path": "examples/p3-integration" },
     { "path": "examples/p4-integration" },
     { "path": "examples/p5-integration" },
