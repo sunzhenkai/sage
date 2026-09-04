@@ -9,7 +9,7 @@ const conn={id:'conn-ws',name:'ZTest WS',source:'user',adapterKind:'anthropic',b
 
 describe('promotion success notice links to the created task',()=>{
   afterEach(()=>{vi.unstubAllGlobals();});
-  it('renders a View task action pointing at the promoted task and localizes the run status',async()=>{
+  it('renders a View task action pointing at the promoted task',async()=>{
     vi.stubGlobal('EventSource',FakeEventSource);
     const fetcher=vi.fn(async(input:RequestInfo|URL)=> {
       const url=String(input);
@@ -21,8 +21,6 @@ describe('promotion success notice links to the created task',()=>{
     }) as typeof fetch;
     let tree!:ReturnType<typeof create>;
     await act(async()=>{tree=create(<ChatApp sessionId="session-ui" fetcher={fetcher}/>);await flush();});
-    // run 状态徽章本地化：succeeded → Succeeded（en 缺省 locale）
-    expect(tree.root.findAll((node)=>node.props&&node.props.children==='Succeeded').length).toBe(1);
     await act(async()=>{tree.root.findByProps({children:'Promote to Task'}).props.onClick();await flush();});
     const banner=tree.root.find((node)=>node.props.className==='success-banner');
     const link=banner.findAll((node)=>node.props.href!==undefined&&String(node.props.href).includes('view=tasks'));

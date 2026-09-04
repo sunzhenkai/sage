@@ -81,7 +81,7 @@ describe('chat runtime quick selector', () => {
     await act(async () => { tree.root.findByType('form').props.onSubmit({ preventDefault: () => undefined }); await flush(); });
     expect(posts).toEqual([]);
     const markup = JSON.stringify(tree.toJSON());
-    expect(markup).toContain('No workspace provider configured');
+    expect(markup).toContain('A workspace provider is required before chatting');
     expect(markup).toContain('+ Add workspace provider');
     await act(async () => { tree.unmount(); });
   });

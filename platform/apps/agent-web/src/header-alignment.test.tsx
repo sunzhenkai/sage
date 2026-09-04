@@ -67,7 +67,7 @@ describe('workspace header alignment', () => {
     await act(async () => { tree.unmount(); });
   });
 
-  it('shows stream status, runtime, and session info in the chat page header', async () => {
+  it('shows stream status and runtime in the compact single-row chat header', async () => {
     vi.stubGlobal('document', { documentElement: { lang: '' } });
     vi.stubGlobal('EventSource', FakeEventSource);
     const fetcher = vi.fn(async (input: RequestInfo | URL) => {
@@ -84,10 +84,10 @@ describe('workspace header alignment', () => {
     const tokens = classTokens(tree.root.findAll(() => true));
     expect(tokens).toContain('connection-status');
     expect(tokens).toContain('runtime-picker');
-    expect(tokens).toContain('session-info-bar');
     expect(tokens).toContain('chat-back');
-    // 动作区分组：信息条与工具组各自成组，换行时不出现单一控件孤行
-    expect(tokens).toContain('chat-heading-info');
+    // 精简单行头部：会话信息条退场，工具组右聚一行
+    expect(tokens).not.toContain('session-info-bar');
+    expect(tokens).not.toContain('chat-heading-info');
     expect(tokens).toContain('chat-heading-tools');
     const markup = JSON.stringify(tree.toJSON());
     expect(markup).toContain('session-1');

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { ListSessionsResponse, SessionHistoryItem, SessionHistoryStatus } from '@sage/app-contracts';
 import { navigate } from './routing.js';
 import { useLocale } from './locale.js';
-import { Banner, EmptyPanel, LoadingState } from './feedback.js';
+import { Banner, LoadingState } from './feedback.js';
 
 export type WorkspaceView = 'chat' | 'tasks' | 'providers' | 'packages' | 'schedules';
 export interface WorkspaceLocation { readonly view: WorkspaceView; readonly sessionId?: string; readonly taskId?: string; readonly packageId?: string }
@@ -42,16 +42,17 @@ export function ChatLanding({
   return <section className="workspace-page landing-page" aria-label={t('chat')}>
     <div className="content-split">
       <ChatSessionList fetcher={fetcher} navigate={navigate} />
-      <div className="content-pane chat-empty-pane"><span className="empty-orb" aria-hidden="true">✦</span><p>{t('selectConversation')}</p></div>
+      <div className="content-pane chat-empty-pane"><p className="empty-title">{t('chatEmptyTitle')}</p><p>{t('selectConversation')}</p></div>
     </div>
   </section>;
 }
 
-/** 侧栏与列表栏共用的「新建对话」主操作：显式点击创建会话并跳转，guard 防重复提交。 */
-export function NewChatButton({ fetcher = fetch, navigate = defaultNavigate, className = 'button button-primary', onError }: {
+/** 侧栏与列表栏共用的「新建对话」主操作：显式点击创建会话并跳转，guard 防重复提交。icon 形态渲染为列表栏头部的 + 图标按钮。 */
+export function NewChatButton({ fetcher = fetch, navigate = defaultNavigate, className = 'button button-primary', icon = false, onError }: {
   readonly fetcher?: WorkspaceFetch;
   readonly navigate?: (href: string) => void;
   readonly className?: string;
+  readonly icon?: boolean;
   readonly onError?: (message: string) => void;
 }) {
   const { t } = useLocale();
@@ -65,7 +66,7 @@ export function NewChatButton({ fetcher = fetch, navigate = defaultNavigate, cla
       navigate(workspaceHref({ view: 'chat', sessionId: session.sessionId }));
     } catch (cause) { createGuard.current = false; setCreating(false); onError?.(cause instanceof Error ? cause.message : t('createSessionFailed')); }
   };
-  return <button className={className} disabled={creating} type="button" aria-label={t('newChat')} onClick={() => void createSession()}>{creating ? t('creating') : t('newChat')}</button>;
+  return <button className={className} disabled={creating} type="button" aria-label={t('newChat')} onClick={() => void createSession()}>{creating ? (icon ? '…' : t('creating')) : icon ? '+' : t('newChat')}</button>;
 }
 
 /** 会话列表栏：multica 三栏形态的第二栏（标题 + 新建、搜索/视图切换、会话行、加载更多）。 */
@@ -123,13 +124,13 @@ export function ChatSessionList({
     } finally { setBusyId(undefined); }
   };
   return <aside className="list-pane" aria-label={t('conversationHistory')}>
-    <div className="list-pane-head"><h1>{t('chat')}</h1><NewChatButton fetcher={fetcher} navigate={navigate} onError={setActionError} /></div>
+    <div className="list-pane-head"><h1>{t('chat')}</h1><NewChatButton className="new-chat-icon" icon fetcher={fetcher} navigate={navigate} onError={setActionError} /></div>
     {error ? <Banner kind="error" title={t('chatHistoryUnavailable')}>{error}</Banner> : <>
       {actionError && <Banner kind="error" title={t('somethingNeedsAttention')} onDismiss={() => setActionError(undefined)} dismissLabel={t('dismissError')}>{actionError}</Banner>}
       {notice && <Banner kind="success" onDismiss={() => setNotice(undefined)} dismissLabel={t('dismissNotice')}>{notice}</Banner>}
-      <form className="history-toolbar" onSubmit={(event) => { event.preventDefault(); void load(); }}><div className="view-switch" role="group" aria-label={t('historyViewLabel')}><button className={archivedView ? '' : 'active'} type="button" aria-pressed={!archivedView} onClick={() => switchView(false)}>{t('conversationsTab')}</button><button className={archivedView ? 'active' : ''} type="button" aria-pressed={archivedView} onClick={() => switchView(true)}>{t('archiveTab')}</button></div><label className="search-field"><span>⌕</span><input aria-label={t('searchSessionTitles')} value={query} maxLength={100} onChange={(event) => setQuery(event.target.value)} placeholder={t('searchTitles')} /></label><label className="filter-field"><span>{t('status')}</span><select aria-label={t('status')} value={status} onChange={(event) => setStatus(event.target.value as SessionHistoryStatus)}><option value="all">{t('all')}</option><option value="open">{t('open')}</option><option value="closed">{t('closed')}</option></select></label><button className="button button-secondary" type="submit">{t('refresh')}</button></form>
-      {loading && items.length === 0 ? <LoadingState label={t('loadingRetainedSessions')} /> : items.length === 0 ? <EmptyPanel icon="✦" title={archivedView ? t('noArchivedSessions') : t('noRetainedSessions')} hint={archivedView ? t('archiveEmptyHint') : t('startChatExplicit')} /> : <section className="history-list" aria-label={archivedView ? t('archivedSessionHistory') : t('chatSessionHistory')}>{items.map((item) => <div className={`history-entry${item.sessionId === activeSessionId ? ' is-active' : ''}`} key={item.sessionId} data-archived={archivedView ? 'true' : undefined}>
-        <a className="history-row" href={workspaceHref({ view: 'chat', sessionId: item.sessionId })} {...(item.sessionId === activeSessionId ? { 'aria-current': 'page' as const } : {})}><span className="history-copy"><strong>{item.title ?? t('untitledChat')}</strong><small>{item.preview ?? t('noPersistedMessages')}</small></span><span className={`status-badge status-${item.status === 'open' ? 'running' : 'neutral'}`}>{item.status === 'open' ? t('open') : item.status === 'closed' ? t('closed') : item.status}</span><time dateTime={item.updatedAt} title={formatDateTime(item.updatedAt)}>{formatCompact(item.updatedAt)}</time><span aria-hidden="true">→</span></a>
+      <form className="history-toolbar" onSubmit={(event) => { event.preventDefault(); void load(); }}><div className="view-switch" role="group" aria-label={t('historyViewLabel')}><button className={archivedView ? '' : 'active'} type="button" aria-pressed={!archivedView} onClick={() => switchView(false)}>{t('conversationsTab')}</button><button className={archivedView ? 'active' : ''} type="button" aria-pressed={archivedView} onClick={() => switchView(true)}>{t('archiveTab')}</button></div>{(query.trim() !== '' || items.length > 0) && <><label className="search-field"><span>⌕</span><input aria-label={t('searchSessionTitles')} value={query} maxLength={100} onChange={(event) => setQuery(event.target.value)} placeholder={t('searchTitles')} /></label><label className="filter-field"><span>{t('status')}</span><select aria-label={t('status')} value={status} onChange={(event) => setStatus(event.target.value as SessionHistoryStatus)}><option value="all">{t('all')}</option><option value="open">{t('open')}</option><option value="closed">{t('closed')}</option></select></label><button className="button button-secondary" type="submit">{t('refresh')}</button></>}</form>
+      {loading && items.length === 0 ? <LoadingState label={t('loadingRetainedSessions')} /> : items.length === 0 ? <p className="list-empty-text">{archivedView ? t('noArchivedSessions') : t('noRetainedSessions')}</p> : <section className="history-list" aria-label={archivedView ? t('archivedSessionHistory') : t('chatSessionHistory')}>{items.map((item) => <div className={`history-entry${item.sessionId === activeSessionId ? ' is-active' : ''}`} key={item.sessionId} data-archived={archivedView ? 'true' : undefined}>
+        <a className="history-row" href={workspaceHref({ view: 'chat', sessionId: item.sessionId })} {...(item.sessionId === activeSessionId ? { 'aria-current': 'page' as const } : {})}><span className="history-copy"><strong>{item.title ?? t('untitledChat')}</strong><small>{item.preview ?? t('noPersistedMessages')}</small></span><span className={`status-badge status-${item.status === 'open' ? 'running' : 'neutral'}`}>{item.status === 'open' ? t('open') : item.status === 'closed' ? t('closed') : item.status}</span><time dateTime={item.updatedAt} title={formatDateTime(item.updatedAt)}>{formatCompact(item.updatedAt)}</time></a>
         <span className="history-actions">
           {confirmingId === item.sessionId
             ? <span className="delete-confirm" role="alert"><span className="delete-confirm-text">{t('deleteConfirmWarning')}</span><button className="button button-danger" disabled={busyId === item.sessionId} type="button" onClick={() => void actOnSession(item.sessionId, 'delete')}>{t('confirmDelete')}</button><button className="button button-quiet" disabled={busyId === item.sessionId} type="button" onClick={() => setConfirmingId(undefined)}>{t('cancel')}</button></span>

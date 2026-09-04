@@ -56,7 +56,7 @@ describe('Workspace landing and canonical links', () => {
     }) as typeof fetch;
     let tree!: ReturnType<typeof create>;
     await act(async () => { tree = create(<ChatLanding fetcher={fetcher} navigate={navigate} />); await flush(); });
-    const button = tree.root.findByProps({ children: '+ New Chat' });
+    const button = tree.root.findByProps({ 'aria-label': '+ New Chat' });
     await act(async () => { button.props.onClick(); button.props.onClick(); await flush(); });
     const posts = calls.filter((call) => call.init?.method === 'POST');
     expect(posts).toHaveLength(1);

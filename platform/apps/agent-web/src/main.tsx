@@ -70,7 +70,7 @@ function BootError({ cause }: { readonly cause: unknown }) {
 function ChatWorkspaceView({ sessionId, fetcher }: { readonly sessionId?: string; readonly fetcher?: WorkspaceFetch }) {
   const { t } = useLocale();
   const pane = sessionId === undefined
-    ? <div className="content-pane chat-empty-pane"><span className="empty-orb" aria-hidden="true">✦</span><p>{t('selectConversation')}</p></div>
+    ? <div className="content-pane chat-empty-pane"><p className="empty-title">{t('chatEmptyTitle')}</p><p>{t('selectConversation')}</p></div>
     : <ChatApp sessionId={sessionId} {...(fetcher === undefined ? {} : { fetcher })} />;
   return <div className="content-split"><ChatSessionList {...(fetcher === undefined ? {} : { fetcher })} />{pane}</div>;
 }

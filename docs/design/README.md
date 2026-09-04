@@ -170,6 +170,7 @@ Session / Task / Checkpoint -X-> 明文 Secret
 - [第一版 Architecture Review](./first-version-system.architecture-review.yaml)
 - [MVP 1：通用 Agent Library](./agent-library-mvp.md)
 - [MVP 2：独立 Agent Application](./long-running-agent-app-mvp.md)
+- [Agent Application：Agent Web 功能规格](./agent-application/agent-web-functional-specification.md)
 - [Agent Application：Chat session history 与导航设计](./agent-application/session-history-and-navigation.md)
 - [Agent Application：Provider/Model Catalog 同步设计](./agent-application/provider-catalog-sync.md)
 - [Agent Application：Provider profile 与 Catalog UX 设计](./agent-application/provider-profile-catalog-ux.md)

@@ -9,7 +9,7 @@ const DENSITY_EXEMPT: Readonly<Record<string, '安全语义' | '可操作错误'
   scheduleAuthRequired: '可操作错误', chatNeedsProvider: '可操作错误',
   catalogSyncRateLimited: '可操作错误', catalogSyncForbidden: '可操作错误', catalogUnavailableManual: '可操作错误',
   appIdHint: '字段hint', apiKeyServer: '字段hint', apiKeyRequiredPlaceholder: '字段hint', apiKeyRotatePlaceholder: '字段hint',
-  uploadFilesPlaceholder: '字段hint', enterToSend: '字段hint',
+  uploadFilesPlaceholder: '字段hint', uploadHint: '字段hint', uploadArchiveInvalid: '可操作错误',
 };
 const stripPlaceholders = (value: string): string => value.replace(/\{\w+\}/g, '');
 const zhLength = (value: string): number => Array.from(stripPlaceholders(value)).length;
