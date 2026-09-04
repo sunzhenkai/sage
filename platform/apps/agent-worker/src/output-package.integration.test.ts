@@ -79,11 +79,11 @@ function activitiesOf(store: TaskCommitStore, options: {
   return createAgentTaskActivities({
     liveClientFactory: () => succeedClient(options.writeFiles ?? (() => undefined)) as never,
     store,
-    outputStore: { async writeRunOutput(record) { written.push(record); } },
+    outputStore: { async writeRunOutput(record) { written.push(record); return { status: 'stored' as const }; }, async getRunOutput() { return undefined; } },
     inputResolver: { async resolve() { return '# finance-briefing\nwrite brief.md'; } },
     settingsStore: {
       async getRunAgentSettings() {
-        return options.missingProvider ? undefined : { providerConnectionId: 'conn-1', updatedAt: '2026-08-30T00:00:00.000Z', updatedBy: 'test' };
+        return options.missingProvider ? undefined : { tenantId: 'tenant-local', providerConnectionId: 'conn-1', updatedAt: '2026-08-30T00:00:00.000Z', updatedBy: 'test' };
       }
     },
     ...(options.missingProvider ? {} : {

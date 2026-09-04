@@ -36,3 +36,5 @@ platform/.evidence/
 *.keystore
 
 gui-test-screenshots
+
+.kiro

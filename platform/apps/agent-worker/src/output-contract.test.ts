@@ -73,7 +73,7 @@ describe('enforceOutputContract remains a deterministic-artifact helper', () => 
   it('treats schema-present and schema-absent text as equivalent for materialization (no body gate)', () => {
     const body = 'not json at all';
     expect(enforceOutputContract(body, { files: ['brief.md'] })).toBe(body);
-    expect(enforceOutputContract(body, { files: ['brief.md'], schema: undefined })).toBe(body);
+    expect(enforceOutputContract(body, { files: ['brief.md'], ...({ schema: undefined } as unknown as { schema?: string }) })).toBe(body);
   });
 });
 
