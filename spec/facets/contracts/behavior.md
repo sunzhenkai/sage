@@ -4,7 +4,7 @@
 
 | 契约 | 测试 | 备注 |
 |------|------|------|
-| Chat 短请求流式返回完整事件序列 | `platform/packages/chat-domain/src/history.test.ts` `platform/apps/agent-web/src/chat.runtime.test.tsx` | 含 `done` 终态 |
+| Chat 短请求流式返回完整事件序列 | `platform/packages/chat-domain/src/history.test.ts` `platform/examples/p3-integration/src/p3.integration.test.ts` | 含 `done` 终态 |
 | Chat 长请求提升后 Workflow 启动 + 状态可查 | `platform/examples/p4-integration/src/p4.integration.test.ts` | p4 集成 |
 | Multi-env Router 选 Cluster 后 Workflow 固定 | `platform/packages/temporal-routing/src/p5-routing.test.ts` | p5 |
 | Replay 一致性:Coordinator 重放得到同样决策 | `platform/packages/temporal-workflows/src/replay-corpus.test.ts` `coordinator-workflow.replay.test.ts` | p5/终版 |

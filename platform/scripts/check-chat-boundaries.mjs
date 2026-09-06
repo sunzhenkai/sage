@@ -2,7 +2,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 
 const root = new URL('..', import.meta.url).pathname;
-const targets = ['packages/chat-domain', 'apps/agent-api', 'apps/agent-web'];
+const targets = ['packages/chat-domain', 'apps/agent-api'];
 const forbiddenImports = ['@mariozechner/pi-', '@sage/agent-lib', '@sage/harness-pi'];
 const failures = [];
 

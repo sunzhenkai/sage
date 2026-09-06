@@ -15,7 +15,7 @@
 | `postgres` | Chat、Task Projection、Agent State 数据库 | Docker named volume `postgres-data`；自身无上游依赖 | `127.0.0.1:15432` |
 | `temporal` | Workflow、Timer、Signal、Activity Retry 运行时 | 依赖 `postgres` 健康；Namespace 为 `sage-dev` | `127.0.0.1:17233` |
 | `artifact-store` | 本地 S3-compatible Artifact 存储及控制台 | Docker named volume `artifact-data`；独立于 PostgreSQL/Temporal | API `127.0.0.1:19000`；控制台 `127.0.0.1:19001` |
-| `agent-api` / `agent-worker` / `agent-web` | 应用 API、Temporal Worker、React/Vite Web | 依赖 PostgreSQL/Temporal；由本地 Dockerfile 和 Compose 启动并健康检查 | API `127.0.0.1:9610`；Worker health `127.0.0.1:9611`；Web `127.0.0.1:14173` |
+| `agent-api` / `agent-worker` | 应用 API、Temporal Worker | 依赖 PostgreSQL/Temporal；由本地 Dockerfile 和 Compose 启动并健康检查 | API `127.0.0.1:9610`；Worker health `127.0.0.1:9611` |
 
 ### 资源依赖
 
@@ -69,7 +69,6 @@ Compose 当前启动六个服务：
 | `artifact-store` | `quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z` | 9000/9001 | 19000/19001 | 本地 S3-compatible Artifact Store 与控制台 |
 | `agent-api` | 本地 `Dockerfile` target `agent-api` | 9610 | 9610 | Fastify Chat/Task API；`/livez`、`/readyz` |
 | `agent-worker` | 本地 `Dockerfile` target `agent-worker` | 9611 | 9611 | Temporal Worker health；固定 `sage-dev`/`sage-agent-task-v1` |
-| `agent-web` | 本地 `Dockerfile` target `agent-web` | 4173 | 14173 | Vite preview；`/v1` 代理到 API |
 
 数据卷为：
 
@@ -78,11 +77,10 @@ Compose 当前启动六个服务：
 
 ### 1.2 本地应用运行边界
 
-`agent-api`、`agent-worker`、`agent-web` 现在提供本地/联调 runtime，但不是生产部署单元：
+`agent-api`、`agent-worker` 现在提供本地/联调 runtime，但不是生产部署单元：
 
 - `agent-api`：`dev`/`start` 入口，使用本地 `PiHarness`、PostgreSQL Store 和可信本地 routing；健康端点为 `/livez`、`/readyz`。
 - `agent-worker`：`dev`/`start` 入口，连接 `sage-dev` Namespace 的 `sage-agent-task-v1` Task Queue；health server 为 `/livez`、`/readyz`。
-- `agent-web`：`dev`/`preview` 入口，Vite `server.proxy`/`preview.proxy` 将 `/v1` 转发到 API；preview 仅用于本地/联调，不是生产静态服务器。
 
 本地 API 的固定 principal、Pi harness 和空 credential 仅在 `SAGE_DEPLOYMENT_MODE=local` 下启用；MinIO 当前仍是独立基础设施，未被声称为 API/Worker 的 Artifact Adapter。生产镜像、负载均衡、生产身份、Secret Manager、Artifact backend 和发布审批仍不在本任务范围，P7 生产状态保持 **NO-GO**。
 
@@ -222,7 +220,7 @@ make smoke-local
 
 # 仅查看状态和应用日志
 docker compose ps
-docker compose logs --tail=100 agent-api agent-worker agent-web
+docker compose logs --tail=100 agent-api agent-worker
 
 # 应用健康端点
 curl --fail http://127.0.0.1:${SAGE_API_HOST_PORT:-9610}/livez
@@ -482,8 +480,8 @@ corepack pnpm install --frozen-lockfile
 先检查应用日志和配置：
 
 ```bash
-docker compose ps agent-api agent-worker agent-web
-docker compose logs --tail=200 agent-api agent-worker agent-web
+docker compose ps agent-api agent-worker
+docker compose logs --tail=200 agent-api agent-worker
 curl --fail http://127.0.0.1:${SAGE_API_HOST_PORT:-9610}/readyz
 curl --fail http://127.0.0.1:${SAGE_WORKER_HEALTH_HOST_PORT:-9611}/readyz
 ```

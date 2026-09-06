@@ -21,9 +21,6 @@
 | Component | Version | Purpose |
 |---|---:|---|
 | Fastify | 5.11.3 | Chat REST and SSE API |
-| React / React DOM | 19.2.8 | Minimum Chat UI and server-rendered integration evidence |
-| Vite | 8.2.1 | Browser application build |
-| `@vitejs/plugin-react` | 6.0.5 | React/Vite compilation |
 | PostgreSQL `pg` | 8.23.0 | Real ChatStore transactions and integration tests |
 
 All P3 manifests use exact versions; `pnpm-lock.yaml` is validated with `pnpm install --frozen-lockfile`.

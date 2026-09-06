@@ -23,7 +23,6 @@
 | `POST /v1/schedules/:id/:action`、`DELETE /v1/schedules/:id` | HTTP | agent-api :9610 | P8 pause/resume/delete(审计) | [schedule-triggered-run](../flows/schedule-triggered-run.md) |
 | `POST /v1/effects/resolutions` | HTTP | agent-api :9610 | P8 EFFECT_UNKNOWN 统一裁决:未提交+继续 → retry 新 attempt;已提交+继续 → Ledger replay 幂等;终止 → cancel;append-only 审计 | [unattended-failure-resolution](../flows/unattended-failure-resolution.md) |
 | Temporal Task Queue | gRPC :7233 | Temporal Namespace `sage-dev` | Agent Run 入口(由 Worker 订阅) | [chat-elevated-task](../flows/chat-elevated-task.md) |
-| `GET /` | HTTP | agent-web :4173 | Chat/Tasks/Schedules Web UI 入口 | [runtime](../runtime/INDEX.md) |
 | agent-worker `/readyz` | HTTP | :9611 | Worker 就绪探活 | [runtime](../runtime/INDEX.md) |
 
 完整路由表见 [apps README](../modules/apps/README.md)。

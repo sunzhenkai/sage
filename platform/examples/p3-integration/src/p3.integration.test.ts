@@ -1,12 +1,10 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Pool } from 'pg';
-import { renderToStaticMarkup } from 'react-dom/server';
 import type { FastifyInstance } from 'fastify';
 import type { AgentEvent, AgentRunOutcome, AgentRunSpec, HarnessPort, HarnessTurnRequest, HarnessTurnResult } from '@sage/agent-contracts';
 import { LocalAgentClient } from '@sage/agent-client';
 import { createChatApi, type ChatMetricContext, type ChatMetricRecorder, type SequencingEvidence } from '@sage/agent-api';
-import { ChatTimeline } from '@sage/agent-web/chat';
 import type { TimelineEvent } from '@sage/app-contracts';
 import { ChatStore } from '@sage/chat-domain';
 
@@ -110,7 +108,7 @@ class CapturingMetrics implements ChatMetricRecorder {
   record(name: Parameters<ChatMetricRecorder['record']>[0], value: number, context: ChatMetricContext & Readonly<Record<string, unknown>>): void { this.records.push({ name, value, context }); }
 }
 
-integration('P3 real PostgreSQL + API + UI vertical slice', () => {
+integration('P3 real PostgreSQL + API vertical slice', () => {
   let store: ChatStore;
   let inspector: Pool;
   const apps: FastifyInstance[] = [];
@@ -174,10 +172,9 @@ integration('P3 real PostgreSQL + API + UI vertical slice', () => {
     expect(new Set([...all.filter((event) => event.sequence <= midpoint), ...resumed].map((event) => event.sequence)).size).toBe(all.length);
     expect((await app.inject({ method: 'GET', url: `/v1/chat/sessions/${sessionId}/events?afterSequence=${all.at(-1)?.sequence}` })).json()).toEqual({ events: [] });
 
-    const html = renderToStaticMarkup(<ChatTimeline events={all} onRetry={() => undefined} />);
-    expect(html).toContain('question-1');
-    expect(html).toContain('Tool: agent-tool');
-    expect(html).toContain('Task Card');
+    expect(all.some((event) => event.payload.kind === 'text' && event.payload.text.includes('question-1'))).toBe(true);
+    expect(all.some((event) => event.payload.kind === 'tool' && event.payload.toolName === 'agent-tool')).toBe(true);
+    expect(all.some((event) => event.payload.kind === 'task')).toBe(true);
     for (const record of metrics.records.filter((item) => !item.name.startsWith('chat.sse'))) {
       expect(record.context).toMatchObject({ tenant_id: tenantId, session_id: sessionId, run_id: expect.stringMatching(/^run-/), attempt: 1 });
     }
@@ -280,11 +277,7 @@ integration('P3 real PostgreSQL + API + UI vertical slice', () => {
       SELECT payload::text AS value FROM chat_timeline_events UNION ALL SELECT coalesce(text_content,'') FROM chat_message_parts
     ) persisted WHERE value LIKE $1`, ['%TOOL_RESULT_BODY_MUST_NOT_PERSIST%']);
     expect(leaked.rows[0]?.count).toBe(0);
-    const html = renderToStaticMarkup(<ChatTimeline events={timeline} />);
-    expect(html).toContain('Tool: fetch');
-    expect(html).toContain('artifact://tool/safe-result');
-    expect(html).toContain('tool-result.json');
-    expect(html).not.toContain('TOOL_RESULT_BODY_MUST_NOT_PERSIST');
+    expect(JSON.stringify(timeline)).not.toContain('TOOL_RESULT_BODY_MUST_NOT_PERSIST');
   });
 
   it('marks active Runs failed on restart with exactly-once terminal metrics, retains input, and Retry creates a new successful Run', async () => {
@@ -314,15 +307,13 @@ integration('P3 real PostgreSQL + API + UI vertical slice', () => {
     await waitFor(async () => (await store.getRun(tenantId, retry.runId))?.status === 'succeeded');
     expect(await store.getRun(tenantId, oldRunId)).toMatchObject({ status: 'failed' });
     const timeline = (await app.inject({ method: 'GET', url: `/v1/chat/sessions/${sessionId}/events?afterSequence=0` })).json<{ events: TimelineEvent[] }>().events;
-    const html = renderToStaticMarkup(<ChatTimeline events={timeline} onRetry={() => undefined} />);
-    expect(html).toContain('CHAT_API_RESTARTED');
-    expect(html).toContain('Retry');
-    expect(html).toContain('retried successfully');
+    expect(timeline.some((event) => event.payload.kind === 'error' && event.payload.error.code === 'CHAT_API_RESTARTED')).toBe(true);
+    expect(timeline.some((event) => event.payload.kind === 'text' && event.payload.text.includes('retried successfully'))).toBe(true);
     expect(restartMetrics.records.filter((record) => record.context.run_id === oldRunId && record.name === 'chat.run_failure_ratio')).toHaveLength(1);
     expect(restartMetrics.records.filter((record) => record.context.run_id === oldRunId && record.name === 'chat.completion_ms')).toHaveLength(1);
   });
 
-  it('uses the standard UI SSE URL, derives real Run correlation, and emits only a strictly later sequence without duplicate or gap', async () => {
+  it('uses the standard SSE URL, derives real Run correlation, and emits only a strictly later sequence without duplicate or gap', async () => {
     const metrics = new CapturingMetrics();
     const { app } = await api(['sse-base'], [], metrics);
     const sessionId = (await app.inject({ method: 'POST', url: '/v1/chat/sessions', payload: {} })).json<{ sessionId: string }>().sessionId;

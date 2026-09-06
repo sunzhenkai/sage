@@ -18,7 +18,6 @@ flowchart LR
 
   subgraph manager["Manager"]
     direction TB
-    agent_web_ui["Agent Web UI<br/>Chat + Tasks"]
     temporal_target_registry["Temporal Target Registry<br/>task type / env / namespace / queue"]
   end
 

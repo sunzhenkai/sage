@@ -1,6 +1,6 @@
 # chat-domain
 
-Chat 领域:ChatSession、流式消息、Tool/Artifact 流、Chat 持久化。负责把 StreamEvent 落库与读回,不写 Web UI(UI 在 `apps/agent-web`)。
+Chat 领域:ChatSession、流式消息、Tool/Artifact 流、Chat 持久化。负责把 StreamEvent 落库与读回,不写呈现层。
 
 ## 根
 
@@ -21,7 +21,7 @@ Chat 领域:ChatSession、流式消息、Tool/Artifact 流、Chat 持久化。�
 
 - `history.appendEvent(sessionId, event)` — 落 StreamEvent(同事务内);
 - `history.readHistory(sessionId, opts)` — 拉流;
-- `chat-domain` 暴露给 `apps/agent-api` 与 `apps/agent-web`。
+- `chat-domain` 暴露给 `apps/agent-api`。
 
 ## 核心符号
 
@@ -34,4 +34,4 @@ Chat 领域:ChatSession、流式消息、Tool/Artifact 流、Chat 持久化。�
 
 - 模块 [state-persistence](../state-persistence/README.md) — Postgres 适配;
 - 模块 [agent-lib-runtime](../agent-lib-runtime/README.md) — StreamEvent 类型与 ReferenceEnvelope;
-- 模块 [apps](../apps/README.md) — agent-api、agent-web 装配。
+- 模块 [apps](../apps/README.md) — agent-api、agent-worker 装配。

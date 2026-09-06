@@ -45,7 +45,7 @@
 |------|------|
 | Effect Ledger 单一 authority | `agent-state-postgres/effect-ledger.integration.test.ts` |
 | Reference Envelope 不内联 >8 KiB | `agent-state-postgres/index.test.ts` 的 `assertReferenceOnly` |
-| Chat 流式事件顺序 | `chat-domain/history.test.ts`、`apps/agent-web/chat.runtime.test.tsx` |
+| Chat 流式事件顺序 | `chat-domain/history.test.ts`、`examples/p3-integration/p3.integration.test.ts` |
 | 长请求 Temporal 提升 | `examples/p4-integration/src/p4.integration.test.ts` |
 | 多环境 Router | `temporal-routing/p5-routing.test.ts` |
 | 可恢复/可重放/可审计 | `examples/p6-integration/src/p6.e2e.test.tsx` + `task-store-postgres/p6-projection.integration.test.ts` + `chat-domain/p6-immutability.integration.test.ts` |

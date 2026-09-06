@@ -247,7 +247,7 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
     const serviceToken = ServiceTokenAuthenticator.fromEnv(process.env, config.tenantId);
     // schedules 管理链路口径（与运行门「schedule 管理必须服务身份认证」一致）：
     // 配置了 SAGE_SERVICE_TOKEN_HASHES 时只认 Bearer service token（stub 信任头不提权）；
-    // 未配置时对所有请求 fail closed（401）。浏览器侧凭据由 agent-web 同源代理在服务端注入（SAGE_SERVICE_TOKEN），不在浏览器持有。
+    // 未配置时对所有请求 fail closed（401）。调用方需自行持有凭据并注入 Bearer service token。
     registerSchedulesRoutes(app, {
       tenantId: config.tenantId,
       store: new InMemoryScheduleControlStore(),

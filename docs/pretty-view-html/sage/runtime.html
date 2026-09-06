@@ -104,7 +104,6 @@
       <tr><th>部署单元</th><th>内容</th><th>位置</th></tr>
     </thead>
     <tbody>
-      <tr><td><code>agent-web</code></td><td>Chat / Task SPA</td><td>控制面环境</td></tr>
       <tr><td><code>agent-api</code></td><td>Fastify、Chat Service、Task Service、Task Router、Temporal clients</td><td>控制面环境</td></tr>
       <tr><td><code>agent-worker-general</code></td><td>通用 Workflow/Activity、Agent Library、PiHarness</td><td>通用执行环境</td></tr>
       <tr><td><code>agent-worker-prod</code></td><td>生产只读 / 受控 Tool Worker</td><td>生产网络环境</td></tr>
@@ -170,7 +169,7 @@
   <div class="runway" aria-label="运行时 ownership 分层">
     <div class="runway-row">
       <div class="lane">Edge / Manager</div>
-      <div class="body"><code>agent-web</code> · <code>agent-api</code>（Fastify） · Temporal Target Registry（在 api 进程中）</div>
+      <div class="body"><code>agent-api</code>（Fastify） · Temporal Target Registry（在 api 进程中）</div>
       <div class="tag">control plane</div>
     </div>
     <div class="runway-row">

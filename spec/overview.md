@@ -25,7 +25,7 @@
 
 | 模块 | 职责 | 入口 |
 |------|------|------|
-| [apps](modules/apps/README.md) | 三个部署单元:agent-api、agent-worker、agent-web | `platform/apps/*` |
+| [apps](modules/apps/README.md) | 两个部署单元:agent-api、agent-worker | `platform/apps/*` |
 | [agent-lib-runtime](modules/agent-lib-runtime/README.md) | Agent Run、Harness、Model/Tool/Context/Provider 的执行内核 | `platform/packages/agent-lib` |
 | [chat-domain](modules/chat-domain/README.md) | Chat Session、流式消息、Tool/Artifact 流、Chat 持久化 | `platform/packages/chat-domain` |
 | [task-domain](modules/task-domain/README.md) | Temporal Task Router、Workflows、Worker Activity、跨环境路由、Schedule Plane adapter | `platform/packages/task-domain` 等 |

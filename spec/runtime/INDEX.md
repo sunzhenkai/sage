@@ -11,14 +11,13 @@
 | `artifact-store` | MinIO,S3 兼容对象存储 | `9000` 数据 / `9001` 控制台 | 1(local);prod 多副本 |
 | `agent-api` | Fastify HTTP/SSE,Chat/Task/Agent Packages/Runs/Schedules/Resolutions 入口;P8 直连 Temporal Schedules 作控制面 | `9610` HTTP | 1(local);prod 多副本 |
 | `agent-worker` | Node Worker,Temporal Activity 订阅;P8 起 `SAGE_SCHEDULE_DISPATCH_ENABLED=1` 时并行运行 Schedule Dispatcher Worker(task queue `sage-schedule-dispatcher-v1`) | `9611` health | 1(local);prod 多 Worker |
-| `agent-web` | Vite 预览 + Node 反代 | `4173` Web | 1(local);prod 多副本 |
 
-外部端口映射(仅 local):`15432:5432` / `17233:7233` / `19000:9000` / `19001:9001` / `9610:9610` / `9611:9611` / `14173:4173`。
+外部端口映射(仅 local):`15432:5432` / `17233:7233` / `19000:9000` / `19001:9001` / `9610:9610` / `9611:9611`。
 
 ## 网络与依赖
 
 ```
-agent-web  ──HTTP──>  agent-api  ──SQL──>  postgres
+终端用户 ──HTTP/SSE──> agent-api ──SQL──> postgres
                             │                ▲
                             │                │
                             ▼                │
@@ -34,7 +33,6 @@ agent-web  ──HTTP──>  agent-api  ──SQL──>  postgres
 
 - agent-api → postgres、temporal(业务 workflow + Schedules 控制面)、agent-worker(Task Queue);
 - agent-worker → postgres、temporal、artifact-store、model provider;dispatcher worker 另调 agent-api 内部解析端点(`SAGE_API_BASE_URL`,service token 认证);
-- agent-web 只连 agent-api,不直连 Postgres/Temporal;
 - Temporal Namespace `sage-dev`(local),prod 按 tenant × env 切;
 - Task Router 根据可信 TaskType、环境、能力、隔离、数据驻留选择 Cluster;Workflow 启动后固定;
 - P8 service token 五链路(packages/apps/runs/schedules/resolutions):`SAGE_SERVICE_TOKEN_HASHES` 配置即强认证,否则保持本地 stub 行为。
@@ -45,7 +43,6 @@ agent-web  ──HTTP──>  agent-api  ──SQL──>  postgres
 2. `temporal`(健康检查通过);
 3. `artifact-store`(MinIO `/minio/health/live` 通过);
 4. `agent-api` 与 `agent-worker`(依赖前三个 healthy);
-5. `agent-web`(依赖 agent-api healthy)。
 
 compose 用 `condition: service_healthy` 串接,`--wait` 强制等待。
 
@@ -55,7 +52,6 @@ compose 用 `condition: service_healthy` 串接,`--wait` 强制等待。
 |------|------|------|
 | agent-api | `/readyz` | `fetch('http://127.0.0.1:9610/readyz')` |
 | agent-worker | `/readyz` | `fetch('http://127.0.0.1:9611/readyz')` |
-| agent-web | `/` | `fetch('http://127.0.0.1:4173/')` |
 | postgres | `pg_isready` | 容器内置 |
 | temporal | `temporal operator cluster health` | 容器内置 |
 | artifact-store | `/minio/health/live` | curl |

@@ -2,7 +2,7 @@
 
 ## 背景
 
-终端用户在 agent-web 提交一条短 Chat;agent-api 判定为短请求(在阈值内),同步经 LocalAgentClient 走 Agent Library。
+终端用户经 HTTP/SSE 提交一条短 Chat;agent-api 判定为短请求(在阈值内),同步经 LocalAgentClient 走 Agent Library。
 
 ## 目标
 
@@ -34,5 +34,5 @@ SSE 流式返回 `message.start` / `message.delta` / `tool.start` / `tool.end` /
 ## 失败
 
 - Provider 失败 → SSE `error` 事件,AgentRun `state=failed`,已发生的 Effect 保留;
-- DB 不可用 → `AGENT_STATE_BACKEND_UNAVAILABLE`,前端提示重试;
+- DB 不可用 → `AGENT_STATE_BACKEND_UNAVAILABLE`,客户端提示重试;
 - 重复投递 → `IdempotencyClaim` + Fence 双判丢弃。

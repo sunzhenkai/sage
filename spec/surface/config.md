@@ -17,8 +17,6 @@
 | `SAGE_HTTP_PORT` | agent-api 监听端口 | `9610` | 由 compose 注入 `SAGE_API_HOST_PORT` |
 | `SAGE_HEALTH_HOST` | agent-worker 健康监听 | `0.0.0.0` | prod 同上 |
 | `SAGE_HEALTH_PORT` | agent-worker 健康端口 | `9611` | 由 compose 注入 `SAGE_WORKER_HEALTH_HOST_PORT` |
-| `SAGE_WEB_HOST_PORT` | agent-web 外部端口 | `14173` | 由 compose 注入 |
-| `SAGE_API_PROXY_TARGET` | agent-web 反代目标 | `http://agent-api:9610` | prod 替换为网关地址 |
 
 ## 存储与依赖
 

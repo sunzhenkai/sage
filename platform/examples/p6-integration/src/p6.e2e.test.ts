@@ -2,13 +2,12 @@ import {randomUUID} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {bundleWorkflowCode,NativeConnection,Worker} from '@temporalio/worker';
 import {Pool} from 'pg';
-import {renderToStaticMarkup} from 'react-dom/server';
 import {afterAll,beforeAll,beforeEach,describe,expect,it} from 'vitest';
 import type {HarnessCapabilities,HarnessPort,HarnessTurnRequest,HarnessTurnResult} from '@sage/agent-contracts';
 import {LocalAgentClient} from '@sage/agent-client';
 import {createAgentTaskActivities} from '@sage/agent-worker';
 import {ChatPromotionAuthorizer,createChatApi,registerTaskRoutes} from '@sage/agent-api';
-import {TaskDetail,type TaskViewModel} from '@sage/agent-web/tasks';
+type TaskViewModel = { status: string; targetSnapshot: { targetId: string }; freshness: string; sessionId: string; runId: string };
 import {ChatStore} from '@sage/chat-domain';
 import type {P6Correlation,P6MetricName,P6TelemetryRecorder} from '@sage/observability';
 import {p6CorrelationComplete} from '@sage/observability';
@@ -59,7 +58,7 @@ integration.sequential('P6 real Temporal cross-layer acceptance',()=>{
       tasks.setProjectionWritesEnabled(true);expect(await reconciler.runBatch()).toMatchObject({inspected:1,repaired:1,failed:0});const repaired=await tasks.getProjection(tenantId,association!.taskId);expect(repaired).toMatchObject({status:'succeeded',projectionSource:'history'});expect(Number(repaired!.historyEventId)).toBeGreaterThan(0);
       const recovered=(await fetch(`${base}/v1/chat/sessions/${session.sessionId}/events?afterSequence=${cursor}`,{credentials:'include'}).then((response)=>response.json())) as {events:{payload:{kind:string;status?:string}}[]};expect(recovered.events.flatMap((event)=>event.payload.kind==='task'?[event.payload.status]:[])).toEqual(['promotion_pending','routed']);
       const headers={'x-authentication-id':principal.authenticationId};const detail=(await app.inject({method:'GET',url:`/v1/tasks/${association!.taskId}`,headers})).json<TaskViewModel>();expect(detail).toMatchObject({status:'succeeded',targetSnapshot:{targetId:'sage-dev-us'},freshness:'fresh',sessionId:session.sessionId,runId:accepted.run.runId});const timeline=(await app.inject({method:'GET',url:`/v1/tasks/${association!.taskId}/events`,headers})).json<{events:TaskProjectionEvent[]}>();expect(timeline.events).toEqual(expect.arrayContaining([expect.objectContaining({type:'agent.task.succeeded'})]));
-      const artifact=(await tasks.listTaskArtifacts(tenantId,association!.taskId))[0]!;expect(artifact.artifactRef).toMatch(/^artifact:\/\//);const unavailable=await app.inject({method:'GET',url:`/v1/tasks/${association!.taskId}/artifacts/${artifact.artifactId}`,headers});expect(unavailable.statusCode).toBe(503);expect(unavailable.json()).toMatchObject({artifact:{artifactRef:artifact.artifactRef}});artifactDown=false;expect((await app.inject({method:'GET',url:`/v1/tasks/${association!.taskId}/artifacts/${artifact.artifactId}`,headers})).statusCode).toBe(200);expect(renderToStaticMarkup(<TaskDetail task={detail} events={timeline.events} artifacts={[artifact]}/>)).toContain(artifact.artifactRef);
+      const artifact=(await tasks.listTaskArtifacts(tenantId,association!.taskId))[0]!;expect(artifact.artifactRef).toMatch(/^artifact:\/\//);const unavailable=await app.inject({method:'GET',url:`/v1/tasks/${association!.taskId}/artifacts/${artifact.artifactId}`,headers});expect(unavailable.statusCode).toBe(503);expect(unavailable.json()).toMatchObject({artifact:{artifactRef:artifact.artifactRef}});artifactDown=false;expect((await app.inject({method:'GET',url:`/v1/tasks/${association!.taskId}/artifacts/${artifact.artifactId}`,headers})).statusCode).toBe(200);expect(JSON.stringify(timeline.events)).toContain(artifact.artifactRef);
       const names=new Set(telemetry.records.map((record)=>record.name));for(const name of ['sage_chat_task_promotions_total','sage_task_route_decisions_total','sage_task_worker_attempt_total','sage_task_projection_lag_ms','sage_task_reconcile_retryable_failure_total','sage_artifact_store_unavailable_total'] as const)expect(names.has(name),name).toBe(true);for(const record of telemetry.records){expect(record.correlation).toMatchObject({tenant_id:tenantId,message_id:accepted.message.messageId,session_id:session.sessionId,run_id:accepted.run.runId});expect(p6CorrelationComplete(record.correlation),record.name).toBe(true);}expect(JSON.stringify(telemetry.records)).not.toContain('secret://');
     }finally{tasks.setProjectionWritesEnabled(true);await app.close();await factory.close();}
   },60_000);

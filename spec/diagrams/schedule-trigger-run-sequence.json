@@ -47,9 +47,9 @@
   "participants": [
     {
       "id": "web",
-      "type": "frontend",
-      "label": "agent-web",
-      "sublabel": "Schedules 视图"
+      "type": "external",
+      "label": "operator",
+      "sublabel": "Schedules API 调用方"
     },
     {
       "id": "api",

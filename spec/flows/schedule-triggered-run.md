@@ -12,7 +12,7 @@ P8 主处理线:一个已准入的 AI App Release 由 Schedule 定时驱动,无�
 
 ## 流程
 
-1. **创建**:用户经 agent-web [Schedules 视图](../modules/apps/README.md) 或 `POST /v1/schedules` 提交定义;`registerSchedulesRoutes` 校验 wire 契约(`ApiSchedule*.v1`)、releaseBinding 合法性与预算,写审计,经 `TemporalScheduleAdapter` 登记原生 Temporal Schedule,控制面快照落 `agent_schedules`(`PostgresScheduleStore`);
+1. **创建**:用户经 `POST /v1/schedules` 提交定义;`registerSchedulesRoutes` 校验 wire 契约(`ApiSchedule*.v1`)、releaseBinding 合法性与预算,写审计,经 `TemporalScheduleAdapter` 登记原生 Temporal Schedule,控制面快照落 `agent_schedules`(`PostgresScheduleStore`);
 2. **到期触发**:Temporal Schedule 按 cron/interval 启动 dispatcher workflow `ScheduleTriggerDispatcher.v1`(task queue `sage-schedule-dispatcher-v1`);occurrence 幂等键 `schedule:{scheduleId}:occ:{occurrenceId}` 即 workflow ID——重放/重复投递不会产生第二个 Run;
 3. **触发准入**:dispatcher 调 activity(见 [apps/agent-worker](../modules/apps/README.md))执行 `admitScheduleTrigger`——解析 releaseBinding(FIXED 校验 digest 不漂移;FOLLOW 解析锚点 Release 当前 active)、按 inputs 声明固化 params、经受控出口抓取 dataSources 快照(`onFailure` 语义)、reserve schedule 预算;产出 `AgentTaskSpec` 与新 attempt,进入既有 durable coordinator;
 4. **执行与记账**:Run 在 [task-domain](../modules/task-domain/README.md) workflow 内推进,输出在物化点按 `run_contract` 强制(见 [output-contract](../modules/apps/README.md));Effect 记账挂 `schedule:<scheduleId>` accountRef,commit 同事务累加预算;

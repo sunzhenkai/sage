@@ -37,11 +37,6 @@ Application 通过 [MVP 1：通用 Agent Library](./agent-library-mvp.md) 复用
 ## 逻辑架构
 
 ```text
-Agent Web UI
-├── Chat
-└── Tasks
-       │ HTTP/SSE
-       ▼
 Application API
 ├── Chat Service ──> Chat Store
 │      ├── short run ──> Agent Library
@@ -151,7 +146,6 @@ AgentTaskWorkflow
 
 ```text
 Control Plane
-├── Agent Web
 ├── Agent API / Task Router
 └── Target Registry
 

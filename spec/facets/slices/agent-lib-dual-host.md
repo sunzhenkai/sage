@@ -51,4 +51,4 @@ Chat Service(短/长请求)与 Temporal Activity(长请求)通过**同一个** A
 
 - 单元:`platform/packages/agent-lib/src/kernel.test.ts`、`platform/packages/agent-client/src/index.test.ts`;
 - 集成:`pnpm test:p4:integration` + `pnpm test:p6:e2e`;
-- 行为:`platform/apps/agent-web/src/chat.runtime.test.tsx`、`platform/apps/agent-worker/src/activities.coordinator.test.ts`。
+- 行为:`platform/examples/p3-integration/src/p3.integration.test.ts`、`platform/apps/agent-worker/src/activities.coordinator.test.ts`。

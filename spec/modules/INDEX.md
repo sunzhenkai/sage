@@ -2,7 +2,7 @@
 
 | 模块 | 根 | 一句话 | 页 |
 |------|-----|--------|-----|
-| apps | `platform/apps/{agent-api,agent-worker,agent-web}` | 三个部署单元:HTTP/SSE API、Temporal Worker、Vite Web | [apps/README.md](apps/README.md) |
+| apps | `platform/apps/{agent-api,agent-worker}` | 两个部署单元:HTTP/SSE API、Temporal Worker | [apps/README.md](apps/README.md) |
 | agent-lib-runtime | `platform/packages/{agent-lib,harness-pi,model-broker,tool-runtime,context-resolver,provider-catalog,agent-client,platform-ports}` | Agent Run、Harness、Model/Tool/Context/Provider 适配 | [agent-lib-runtime/README.md](agent-lib-runtime/README.md) |
 | chat-domain | `platform/packages/chat-domain` | Chat Session、流式消息、Tool/Artifact 流、Chat 持久化 | [chat-domain/README.md](chat-domain/README.md) |
 | task-domain | `platform/packages/{task-domain,task-store-postgres,temporal-registry,temporal-routing,temporal-workflows,temporal-schedules}` | Temporal Task Router、Workflows、Worker Activity、跨环境路由、Schedule Plane adapter | [task-domain/README.md](task-domain/README.md) |

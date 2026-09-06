@@ -83,7 +83,7 @@ node scripts/production-governance/migration-preflight.mjs
 ```bash
 cd platform
 docker compose up -d --wait postgres temporal artifact-store
-docker compose up -d --build --wait agent-api agent-worker agent-web
+docker compose up -d --build --wait agent-api agent-worker
 
 # 校验
 curl http://127.0.0.1:9610/readyz

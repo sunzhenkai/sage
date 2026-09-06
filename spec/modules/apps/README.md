@@ -1,6 +1,6 @@
 # apps
 
-三个部署单元:`agent-api`(Fastify HTTP/SSE)、`agent-worker`(Temporal Activity Worker + Schedule Dispatcher Worker)、`agent-web`(Vite + Node 反代)。不写业务规则,只做装配、路由、健康检查、Bootstrap。
+两个部署单元:`agent-api`(Fastify HTTP/SSE)、`agent-worker`(Temporal Activity Worker + Schedule Dispatcher Worker)。不写业务规则,只做装配、路由、健康检查、Bootstrap。
 
 ## 根
 
@@ -8,8 +8,7 @@
 |----------|------|
 | `platform/apps/agent-api` | HTTP/SSE API 入口 |
 | `platform/apps/agent-worker` | Temporal Worker 进程 |
-| `platform/apps/agent-web` | Vite Web 与反代 |
-| `platform/Dockerfile` | 三镜像构建入口 |
+| `platform/Dockerfile` | 镜像构建入口 |
 | `platform/compose.yaml` | 本地编排 |
 | `platform/Makefile` | 本地快捷命令 |
 
@@ -56,25 +55,6 @@
 | `reconcilers.ts` | TaskProjection 与 Agent State 的对账器 | `reconcile` |
 | `production-runtime.ts` | Worker 的 Production 运行时 | `createProductionWorkerRuntime` |
 
-## 文件(agent-web)
-
-| 文件 | 职责 | 核心 |
-|------|------|------|
-| `main.tsx` | 入口、装配路由 | `App` |
-| `chat.tsx` | Chat UI | `ChatView` |
-| `tasks.tsx` | Task UI | `TasksView` |
-| `packages.tsx` | Packages UI;应用页一键导入内嵌示例项目 | `PackagesView` |
-| `schedules.tsx` | P8 定时任务视图:列表/触发历史/暂停恢复删除 | `SchedulesApp` |
-| `example-apps.ts` | 内嵌示例源包(finance-briefing 等)与一键导入数据 | `EXAMPLE_APPS` |
-| `providers.tsx` | Providers UI | `ProvidersView` |
-| `composer.tsx` | 输入器 | `Composer` |
-| `markdown.tsx` | Markdown 渲染 | `Markdown` |
-| `feedback.tsx` | 横幅/行内提示/加载态/空态共享组件 | `Feedback` |
-| `fields.tsx` | 表单字段共享控件 | — |
-| `routing.ts` | 前端路由 | `routes` |
-| `workspace.tsx` | Workspace 容器 | `Workspace` |
-| `workspace-providers.tsx` | Workspace Provider 注入 | `WorkspaceProviders` |
-| `schedules.test.tsx`、`example-apps.test.ts`、`packages.test.tsx` 等 | 测试 | — |
 
 ## 对外入口
 
@@ -82,7 +62,6 @@
 |------|------|------|
 | agent-api `:9610` | HTTP/SSE | 详见 [surface/INDEX.md](../../surface/INDEX.md) |
 | agent-worker `:9611` | HTTP `/readyz` | 存活探活;dispatcher worker 同进程健康面 |
-| agent-web `:4173` | HTTP | Web UI |
 
 ## 核心符号
 
@@ -92,7 +71,6 @@
 - agent-worker `start` — 启动 Temporal Worker、订阅 Task Queue、注册 Activity;
 - agent-worker `runAgentActivity` — 把 Run 交给 Agent Library(输出契约在物化点强制);
 - agent-worker `createScheduleDispatcher` — 启动 Schedule Dispatcher Worker(触发→准入);
-- agent-web `App` — 路由 + 主题 + Provider 注入。
 
 ## 依赖
 
