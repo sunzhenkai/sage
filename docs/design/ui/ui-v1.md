@@ -2,11 +2,11 @@
 
 - 状态：implemented behavior baseline
 - 代码来源：`platform/apps/agent-web`
-- 更新日期：2026-09-02
+- 更新日期：2026-09-16
 - 范围：功能、状态机、前后端契约与可复现行为
-- 非范围：页面样式、视觉布局、配色、图标设计、响应式尺寸与 CSS 实现
+- 非范围：一切界面描述，包括页面结构、组件形态、布局、样式与视觉呈现
 
-本文目标是一个实现者在不阅读 `agent-web` 源码的情况下，能够重建出等价的 Web 功能；但不要求复刻具体视觉呈现。
+本文目标是一个实现者在不阅读 `agent-web` 源码的情况下，能够重建出等价的功能行为；呈现方式不属于本文约束范围。
 
 ## 1. 产品定位
 
@@ -80,29 +80,31 @@ corepack pnpm --filter @sage/agent-web build
 3. 同源且相同 path 的左键点击使用 `history.pushState` 和自定义导航事件完成客户端导航。
 4. 以下情况不拦截：修饰键或非左键点击、`target="_blank"`、下载链接、`#`、`mailto:`、`tel:`、data URL、外部 URL 或非当前 path 的链接。
 5. `popstate` 与自定义导航事件都会刷新路由状态。
-6. Chat、Tasks、Packages、Schedules 的活动实体变化会重建对应内容组件，避免旧请求或旧状态跨实体残留。
+6. Chat、Tasks、Packages、Schedules 的活动实体变化时，对应视图状态必须隔离，旧请求或旧状态不得跨实体残留。
 
-### 3.2 Workspace Shell
+### 3.2 应用壳层
 
 壳层提供跨视图稳定功能：
 
-1. 品牌链接回 Chat；若当前存在 `session`，首页链接保留该会话上下文。
-2. 主导航包含 Chat、Tasks、Packages、Schedules 与 Providers；当前视图有选中态，导航元素带可访问名称。
-3. 折叠/展开导航区的开关状态保存在 `localStorage` key `sage.web.sidebar.collapsed`，值为 `"true"` / `"false"`。读取或写入失败时静默降级。
-4. Shell 中提供全局“新建对话”动作。
-5. 搜索入口、system runtime 卡片和账号菜单是静态占位，不承担业务动作。
-6. 应用启动渲染异常时降级为错误页：显示工作区不可用、原始错误信息或默认运行时失败文案，并提供返回 `/` 的动作。
+1. 首页入口回到 Chat；若当前存在 `session`，保留该会话上下文。
+2. 提供 Chat、Tasks、Packages、Schedules、Providers 五个视图的导航；当前所在视图可辨识。
+3. 导航折叠状态保存在 `localStorage` key `sage.web.sidebar.collapsed`，值为 `"true"` / `"false"`。读取或写入失败时静默降级。
+4. 提供全局“新建对话”动作。
+5. 允许存在不承担业务动作的静态占位区域。
+6. 启动渲染异常时降级为错误提示：说明工作区不可用，给出原始错误信息或默认运行时失败文案，并提供返回 `/` 的入口。
 
-### 3.3 全局反馈原语
+### 3.3 全局反馈语义
 
-必须提供以下语义反馈组件：
+必须提供以下反馈语义（不规定呈现形态）：
 
-| 原语         | 行为                                                                                                  |
-| ------------ | ----------------------------------------------------------------------------------------------------- |
-| Banner       | 支持 success / error。错误使用断言式 live region；成功使用 status。可带标题、正文、动作和可关闭按钮。 |
-| InlineNotice | 行内提示；error 使用断言式 live region，普通提示使用 status。                                         |
-| LoadingState | 表示整区加载中，包含主文案和可选说明。                                                                |
-| EmptyPanel   | 表示可操作的空态，包含标题、说明和可选动作。                                                          |
+| 场景     | 语义要求                                                                 |
+| -------- | ------------------------------------------------------------------------ |
+| 成功反馈 | 以 status 方式宣布；可附带标题、正文、后续动作与可关闭能力。             |
+| 错误反馈 | 以断言式 live region（alert）宣布；可附带标题、正文、动作与可关闭能力。 |
+| 加载中   | 能明确表示某区域正在加载，包含主文案与可选说明。                         |
+| 空态     | 能明确表示可操作的空态，包含标题、说明与可选动作。                       |
+
+错误反馈区分全局与局部两级；局部失败不得覆盖整个页面的数据。
 
 ## 4. 本地化与格式化
 
@@ -122,7 +124,7 @@ corepack pnpm --filter @sage/agent-web build
 - 更新 `<html lang>`。
 - 尝试写入 localStorage；失败时静默降级。
 
-Provider 配置页必须暴露语言切换。
+Provider 配置功能必须提供语言切换入口。
 
 ### 4.2 文案与时间
 
@@ -130,7 +132,7 @@ Provider 配置页必须暴露语言切换。
 - 简单插值使用 `{name}` 占位符，例如 `Copied {count} events.`。
 - 完整时间使用当前 locale 的 medium date + short time。
 - 事件行等短时间使用当前 locale 的两位小时与分钟。
-- 列表行使用固定 `MM-DD HH:mm` 紧凑格式，完整时间通过 `dateTime` / title 或详情页表达。
+- 列表行使用固定 `MM-DD HH:mm` 紧凑格式；完整时间通过详情表达。
 
 ## 5. 通用 API 调用行为
 
@@ -169,7 +171,7 @@ Web 不假设错误一定会恢复；需要操作失败与列表失败分离展�
 1. 进入 Chat 或刷新列表时请求 `GET /v1/chat/sessions`。
 2. 默认参数：`limit=30`、`status=<当前状态>`、`locale=<当前语言>`。
 3. 归档视图追加 `archived=true`。
-4. 标题搜索框非空时追加 `q=<trimmed query>`。
+4. 标题搜索词非空时追加 `q=<trimmed query>`。
 5. 加载更多时追加 opaque `cursor`，并把返回 `items` 追加到现有列表。
 
 会话项字段来自 `SessionHistoryItem`：
@@ -186,15 +188,15 @@ Web 不假设错误一定会恢复；需要操作失败与列表失败分离展�
 1. 状态过滤支持 `all`、`open`、`closed`。
 2. 视图切换支持“Conversations”和“Archive”。
 3. 改变状态或归档视图会清空删除确认态并重新加载。
-4. 标题搜索输入不自动触发网络请求；提交过滤表单时重新加载第一页。
-5. 若有 `nextCursor`，提供“Load more”；请求期间禁止重复触发。
+4. 标题搜索输入不自动触发网络请求；提交过滤时重新加载第一页。
+5. 若有 `nextCursor`，支持加载更多；请求期间禁止重复触发。
 
 #### 新建会话
 
-1. 点击 New Chat 后请求 `POST /v1/chat/sessions`，body 为 `{}`。
+1. 触发 New Chat 后请求 `POST /v1/chat/sessions`，body 为 `{}`。
 2. 成功后使用返回 `sessionId` 跳到 `/?session=<sessionId>`。
 3. 用同步 guard 防止重复提交。
-4. 请求失败后恢复按钮可用，并在触发该动作的区域显示错误。
+4. 请求失败后允许重试，并在触发该动作的区域显示错误。
 
 #### 会话操作
 
@@ -207,9 +209,9 @@ Web 不假设错误一定会恢复；需要操作失败与列表失败分离展�
 规则：
 
 1. 删除必须两段确认：先进入确认态，再显式确认才删除。
-2. 同一时刻只允许一个会话操作；操作期间禁用对应动作。
+2. 同一时刻只允许一个会话操作；操作期间禁止重复触发。
 3. 删除确认在切换归档视图或重新加载时清空。
-4. 当前行是当前 `?session` 时，要有选中和当前页语义。
+4. 当前会话在列表中可辨识。
 
 ### 6.2 Chat 会话恢复与实时流
 
@@ -228,8 +230,8 @@ Web 不假设错误一定会恢复；需要操作失败与列表失败分离展�
 6. 连接状态至少有 `connecting`、`live`、`offline/reconnecting`。
 7. SSE `onerror` 时关闭旧连接，1 秒后以最新 cursor 重建连接；不使用浏览器原生自动重连，避免旧 URL cursor 造成整段重放。
 8. 不支持 `EventSource` 时进入 offline 状态，但保留快照。
-9. 详情接口 404 时显示 Chat 不再可用和 retention 说明，并渲染会话列表空态。
-10. 其他恢复失败显示错误；因状态不可写时输入区替换为只读提示。
+9. 详情接口 404 时提示 Chat 不再可用并说明 retention 语义，同时提供会话列表空态。
+10. 其他恢复失败显示错误；会话状态不可写时禁止发送并给出只读说明。
 
 SSE 服务端帧格式：
 
@@ -263,7 +265,7 @@ GET /v1/chat/sessions/:id/events?afterSequence=<cursor>
 1. Enter 发送。
 2. Shift+Enter 换行。
 3. IME composition 或 `isComposing` 中的 Enter 不发送。
-4. 发送中禁用输入和发送按钮。
+4. 发送期间禁止再次提交。
 
 提交：
 
@@ -281,7 +283,7 @@ Content-Type: application/json
 }
 ```
 
-成功返回 `202` 后清空草稿、触发增量补拉，并在用户已滚动到底部附近时强制滚动到底部。失败保留草稿并显示错误。
+成功返回 `202` 后清空草稿并触发增量补拉；失败保留草稿并显示错误。
 
 ### 6.4 Chat runtime 选择
 
@@ -300,10 +302,10 @@ sage.chat-runtime.v2
 
 1. 加载 `GET /v1/provider-connections`，只保留 `enabled === true && credentialPresent === true` 的连接供 Chat 使用。
 2. 加载 `GET /v1/run-agent/settings` 获取工作区默认 `providerConnectionId`。
-3. 仅当浏览器从未保存过 runtime key 且当前选择为空时，把默认连接作为初始 UI 选择；不得静默覆盖用户显式选择。
+3. 仅当浏览器从未保存过 runtime key 且当前选择为空时，把默认连接作为初始选择；不得静默覆盖用户显式选择。
 4. 用户手动选择时写入 localStorage。
 5. 若当前连接不再存在于可用连接集合中，运行时选择回落到未配置。
-6. 未配置或失效时禁用发送，并提示到 Provider 配置页添加连接。
+6. 未配置或失效时禁止发送，并引导到 Provider 配置添加连接。
 
 默认模型是 `providerConnectionId` 引用；浏览器不接收、不保存、不提交 API key。
 
@@ -333,17 +335,17 @@ interface TimelineEvent {
 | `error`    | `error.code`、`error.message`、`error.retryable`           | 可展示错误。                                             |
 | `task`     | `title`、`status`；可选 `taskId`、`messageId`、`reason` 等 | Task 卡片或提升状态。                                    |
 
-前端按 `runId` 分组成对话轮次：
+事件按 `runId` 分组成对话轮次：
 
 1. 同一轮中，第一条满足任一条件的 text 判定为用户消息：
    - `promotionEligibility === "explicit"`；
    - 或事件 sequence 早于本轮首个 `run` 事件的 sequence。
 2. 其余 text 是助手文本。
-3. 非 `run` 的其余事件按 sequence 与助手文本合并展示。
-4. 最后一个 `run` payload 决定状态和 attempt。
+3. 非 `run` 的其余事件按 sequence 与助手文本合并归组。
+4. 最后一个 `run` payload 决定轮次状态和 attempt。
 5. 若存在 error 且最后 run 缺失或仍是 active/paused，前端显示为 failed，避免 pending 指示符长期存活。
 6. active/paused 且尚无助手文本时显示 thinking pending。
-7. attempt 大于 1 时展示 attempt；failed 时展示重试入口，除非 error 活动行已经承载重试。
+7. attempt 大于 1 时展示 attempt；failed 时提供重试入口，除非 error 活动行已经承载重试。
 
 ### 6.6 助手文本渲染
 
@@ -359,7 +361,7 @@ Markdown 支持以下安全子集：
 | 类型                     | 行为                                                                               |
 | ------------------------ | ---------------------------------------------------------------------------------- |
 | Paragraph                | 保留软换行为换行。                                                                 |
-| Heading                  | `#` 到 `######`，渲染层级最高映射到 h4。                                           |
+| Heading                  | 支持 `#` 到 `######`。                                                             |
 | Fenced code              | 保留原文与语言标识。                                                               |
 | Blockquote               | 支持递归块解析。                                                                   |
 | Rule                     | 渲染分隔线。                                                                       |
@@ -376,19 +378,19 @@ Raw HTML 一律作为普通文本，不注入 DOM。
 
 #### Tool
 
-展示工具名与 started/completed 状态；若带 artifact，则展示 artifact 链接。
+提供工具名与 started/completed 状态；若带 artifact，则提供 artifact 链接。
 
 #### Artifact
 
-`artifact.artifactRef` 是链接；显示名称、media type 和 KB 大小。大小最小按 1 KB 展示。
+`artifact.artifactRef` 是链接；提供名称、media type 和 KB 大小。大小最小按 1 KB 展示。
 
 #### Error
 
-展示 `error.code` 和 `error.message`；`retryable === true` 时提供 Run 重试。
+提供 `error.code` 和 `error.message`；`retryable === true` 时提供 Run 重试。
 
-#### Task card
+#### Task
 
-展示任务标题、本地化 status 与可选 reason。若 payload 有 `taskId`，点击进入：
+提供任务标题、本地化 status 与可选 reason。若 payload 有 `taskId`，提供进入 Task 详情的入口：
 
 ```text
 /?view=tasks&task=<taskId>&session=<sessionId>
@@ -426,34 +428,34 @@ Content-Type: application/json
 成功后：
 
 1. 显示 accepted 提示。
-2. 若响应 `association.taskId` 存在，提供 `/?view=tasks&task=<taskId>` 链接。
-3. 触发 Chat timeline 增量补拉，让 task card 出现。
+2. 若响应 `association.taskId` 存在，提供 `/?view=tasks&task=<taskId>` 入口。
+3. 触发 Chat timeline 增量补拉，让 task 事件出现。
 
-若当前会话有事件但还没有 task 事件，页头可提供显式入口进入同一会话的 Task 工作区。
+若当前会话有事件但还没有 task 事件，可提供显式入口进入同一会话的 Task 工作区。
 
-### 6.8 Event stream 面板
+### 6.8 原始事件流查看与复制
 
-Chat 详情必须支持展开/收起原始事件流：
+必须支持查看会话的原始事件流：
 
-1. 每行显示 sequence、时间、payload kind 和 payload JSON。
-2. 提供复制全部事件按钮。
+1. 每条事件提供 sequence、时间、payload kind 和 payload JSON。
+2. 提供复制全部事件动作。
 3. 复制内容是按 sequence 升序的 JSON Lines：每行一个完整 `TimelineEvent` JSON。
 4. 优先使用 `navigator.clipboard.writeText`，失败后用隐藏 textarea + `execCommand("copy")` 兜底。
 5. 成功提示复制数量；失败显示剪贴板不可用。
 
 ### 6.9 快捷提示与可写性
 
-可写会话若无 provider，Composer 区域被替换为“需要 provider”的提示和跳转 Provider 配置链接。
+可写会话若无 provider，禁止发送，并提供前往 Provider 配置的引导。
 
-有 provider 时提供至少三个快捷提示按钮：
+有 provider 时提供至少三个快捷提示：
 
 1. Summarize project。
 2. Create a Task。
 3. Explore a risk。
 
-点击只填充输入框并聚焦，不自动发送。
+选择快捷提示只填充草稿，不自动发送。
 
-会话关闭或归档时 Composer 替换为只读提示；恢复失败时也禁止发送。关闭/归档会话中的 retry 和 promote 动作不可用。
+会话关闭或归档时禁止发送并给出只读说明；恢复失败时也禁止发送。关闭/归档会话中的 retry 和 promote 动作不可用。
 
 ## 7. Tasks
 
@@ -478,7 +480,7 @@ GET /v1/tasks?status=cancelled
 { "tasks": [TaskViewModel] }
 ```
 
-TaskViewModel 必须支持展示：
+TaskViewModel 必须支持消费以下字段：
 
 - `taskId`
 - `taskType`
@@ -499,9 +501,9 @@ TaskViewModel 必须支持展示：
 
 1. 状态过滤改变时重新加载。
 2. 客户端搜索对 `taskId + taskType + targetSnapshot.targetId` 做大小写不敏感子串过滤。
-3. 显示 running 数量。
+3. 提供 running 数量。
 4. 空列表提示先到 Chat 提升 Task，并提供跳转 Chat；若 URL 有 `session`，跳转保留会话。
-5. 点击任务进入 `/?view=tasks&task=<taskId>`，并尽量保留 `session`。
+5. 进入任务详情 `/?view=tasks&task=<taskId>`，并尽量保留 `session`。
 
 ### 7.2 Task 详情
 
@@ -517,13 +519,13 @@ GET /v1/tasks/:taskId/run-logs
 行为：
 
 1. 前三个失败时展示详情错误。
-2. Run logs 失败不拖垮详情，只把运行日志面板降级为暂时不可用。
+2. Run logs 失败不拖垮详情，只把运行日志降级为暂时不可用。
 3. 使用请求 token 和 AbortController 作废旧详情请求。
 4. 切换详情或离开详情时作废在途 run log 增量请求。
 5. URL 没有 `task` 时清空详情状态，而不是停留旧详情。
-6. 详情刷新期间显示刷新中状态，并禁用刷新按钮。
+6. 详情刷新期间显示刷新中状态，并禁止重复触发刷新。
 
-详情展示：
+详情提供以下信息：
 
 1. projection freshness：fresh / stale / unavailable、更新时间和 stale reason。
 2. revision。
@@ -532,9 +534,9 @@ GET /v1/tasks/:taskId/run-logs
 5. run logs。
 6. artifacts。
 
-`effect_unknown` 需要展开式说明，表达效果未知、不复活终态、需通过 effect resolution 裁决的语义。
+`effect_unknown` 需要提供展开式说明，表达效果未知、不复活终态、需通过 effect resolution 裁决的语义。
 
-`failed` 展开失败详情，显示 `failureCode` 和 `failureDetail`。
+`failed` 展开失败详情，提供 `failureCode` 和 `failureDetail`。
 
 ### 7.3 Task 控制
 
@@ -567,7 +569,7 @@ interface TaskEventView {
 }
 ```
 
-展示顺序按服务端返回；每项显示 type、完整时间和 sequence。fresh 但无事件提示尚无 projection event；stale/unavailable 且无事件提示 timeline 可能落后并建议刷新。
+展示顺序按服务端返回；每项提供 type、完整时间和 sequence。fresh 但无事件提示尚无 projection event；stale/unavailable 且无事件提示 timeline 可能落后并建议刷新。
 
 ### 7.5 Run logs
 
@@ -582,7 +584,7 @@ interface TaskRunLogsView {
 }
 ```
 
-默认展示第一个 attempt。若多于一个 attempt，提供 attempt 选择。
+默认消费第一个 attempt。若多于一个 attempt，提供 attempt 选择。
 
 切换 attempt：
 
@@ -599,10 +601,10 @@ GET /v1/tasks/:id/run-logs?runId=<runId>&attemptId=<attemptId>&fromSequence=<nex
 规则：
 
 1. 事件按 `eventId` 去重后追加。
-2. 加载中禁用“load more”。
+2. 加载中禁止重复触发 load more。
 3. 失败显示运行日志不可用，但不销毁已有 events。
-4. attempt 展示倒序序号和最后写入时间。
-5. 事件行显示 sequence、type、payload 标量摘要和 receipt/artifact 引用数量。
+4. attempt 提供倒序序号和最后写入时间。
+5. 每条事件提供 sequence、type、payload 标量摘要和 receipt/artifact 引用数量。
 6. 常见类型语义：`run.completed` 成功态，`run.failed` 失败态，`checkpoint.sealed` warning 态，`model.completed` / `tool.completed` info 态，其他 neutral。
 
 ### 7.6 Artifacts
@@ -621,10 +623,10 @@ interface TaskArtifactView {
 列表：
 
 1. 名称为 `output.tar.gz` 的 artifact 作为 package download，链接追加 `?download=1`。
-2. 其他文件展示名称、media type 和 `artifactRef`。
+2. 其他文件提供名称、media type 和 `artifactRef`。
 3. 文本类 `text/*` 或 `application/json` 使用普通链接；其他类型追加 `?download=1`。
 
-成功任务的第一个可预览文件进行内联预览：
+成功任务的第一个可预览文件提供内容预览：
 
 ```text
 GET /v1/tasks/:taskId/artifacts/:artifactId
@@ -641,7 +643,7 @@ GET /v1/tasks/:taskId/artifacts/:artifactId
 
 ### 8.1 Run Agent 默认模型
 
-进入 Provider 页后请求：
+进入 Provider 功能后请求：
 
 ```text
 GET /v1/run-agent/settings
@@ -665,9 +667,9 @@ GET /v1/run-agent/settings
 }
 ```
 
-交互：
+行为：
 
-1. 下拉显示 `unset` 与所有注册表 provider 状态。
+1. 可查看 `unset` 与所有注册表 provider 状态。
 2. `available = enabled && credentialPresent`；不可用项仍可见，但带 unavailable 标识。
 3. 当前未设置时显示 warning。
 4. 当前设置可用显示 ready；设置不可用显示 unavailable warning。
@@ -718,16 +720,16 @@ GET /v1/provider-connections
 }
 ```
 
-展示规则：
+消费规则：
 
-1. 显示名称、provider name/model name 或 model id、source、凭据在场状态。
+1. 提供名称、provider name/model name 或 model id、source、凭据在场状态。
 2. `deployment-env` 连接只读；不可编辑或删除。
 3. `user` 连接可编辑和删除。
-4. 永不显示 ciphertext 或 API key；只显示 `credentialPresent`。
+4. 永不显示 ciphertext 或 API key；只提供 `credentialPresent`。
 
 #### 创建或编辑
 
-表单字段：
+字段约束：
 
 | 字段                         | 创建                               | 编辑                       |
 | ---------------------------- | ---------------------------------- | -------------------------- |
@@ -761,7 +763,7 @@ Content-Type: application/json
 PUT /v1/provider-connections/:id
 ```
 
-body 同创建，但 `apiKey` 只有用户输入时才包含。保存成功后关闭弹窗、刷新连接列表、显示 saved。
+body 同创建，但 `apiKey` 只有用户输入时才包含。保存成功后刷新连接列表并显示 saved。
 
 服务端约束：
 
@@ -786,7 +788,7 @@ DELETE /v1/provider-connections/:id
 
 ### 8.3 Provider catalog 辅助选择
 
-添加/编辑弹窗优先使用 catalog：
+创建或编辑 connection 时优先使用 catalog 辅助选择：
 
 #### Provider 搜索
 
@@ -817,7 +819,6 @@ GET /v1/provider-catalog/models?limit=100&providerId=<providerId>&status=all&q=<
 1. 选择 provider 后：
    - 记录 selected provider id；
    - 清空 models / model query；
-   - 自动聚焦或打开 model 选择；
    - 若用户未改过 adapter，`anthropic` provider 默认 `anthropic`，其他默认 `openai-compatible`；
    - 若用户未改过名称，用 provider display name 预填。
 2. 选择 model 后：
@@ -830,7 +831,7 @@ GET /v1/provider-catalog/models?limit=100&providerId=<providerId>&status=all&q=<
 
 #### Catalog 刷新
 
-刷新按钮：
+刷新动作：
 
 ```http
 POST /v1/provider-catalog/sync
@@ -852,7 +853,7 @@ Content-Type: application/json
    最多 10 次；状态到达 `succeeded`、`not_modified`、`failed` 或 `cancelled` 即停止。
 
 4. 完成后重载 provider 第一页；若已选择 provider，也重载 model 第一页。
-5. 刷新期间禁用按钮。
+5. 刷新期间禁止重复触发。
 
 #### Snapshot changed
 
@@ -862,14 +863,14 @@ Catalog 查询返回 409 时表示 cursor / snapshot 已变化：
 2. 重新加载对应第一页。
 3. 不把 409 当作致命错误。
 
-#### Catalog combobox 键盘
+#### 键盘交互语义
 
-provider 与 model combobox 支持相同键盘语义：
+provider 与 model 选择支持相同键盘语义：
 
 - ArrowDown 选择下一项。
 - ArrowUp 选择上一项。
 - Enter 选择当前项。
-- Escape 关闭下拉。
+- Escape 关闭候选列表。
 
 ## 9. AI Apps / Packages
 
@@ -879,19 +880,19 @@ provider 与 model combobox 支持相同键盘语义：
 GET /v1/apps
 ```
 
-返回映射为 UI summary：
+响应字段映射为列表消费模型：
 
-| API 字段                        | UI 字段                         |
-| ------------------------------- | ------------------------------- |
-| `appId`                         | `packageId`                     |
-| `name`                          | `name`                          |
-| `description`                   | `description`                   |
-| `releaseCount`                  | `releaseCount`                  |
-| `latestVersion`                 | `latestVersion`，缺失显示 `—`   |
-| `latestContentDigest`           | `latestContentDigest`，缺失为空 |
-| `updatedAt`，缺失用 `createdAt` | `updatedAt`                     |
+| API 字段                        | 消费字段                          | 说明                            |
+| ------------------------------- | --------------------------------- | ------------------------------- |
+| `appId`                         | `packageId`                       |                                 |
+| `name`                          | `name`                            |                                 |
+| `description`                   | `description`                     |                                 |
+| `releaseCount`                  | `releaseCount`                    |                                 |
+| `latestVersion`                 | `latestVersion`                   | 缺失显示 `—`。                  |
+| `latestContentDigest`           | `latestContentDigest`             | 缺失为空。                      |
+| `updatedAt`，缺失用 `createdAt` | `updatedAt`                       |                                 |
 
-列表显示名称、package id、release 数量、最新版本和更新时间；点击进入：
+列表消费名称、package id、release 数量、最新版本和更新时间；进入详情：
 
 ```text
 /?view=packages&package=<appId>
@@ -899,7 +900,7 @@ GET /v1/apps
 
 ### 9.2 创建 App
 
-弹窗表单字段：
+创建 App 需要以下字段：
 
 | 字段        | 约束                                                                            |
 | ----------- | ------------------------------------------------------------------------------- |
@@ -937,7 +938,7 @@ GET /v1/apps/:appId
 
 #### Manifest summary
 
-可展示：
+可提供：
 
 - `version`
 - `description`
@@ -954,7 +955,7 @@ GET /v1/apps/:appId
 
 #### Assets
 
-每个 asset 显示：
+每个 asset 提供：
 
 - `relativePath`
 - `kind`
@@ -962,11 +963,11 @@ GET /v1/apps/:appId
 - `digest`
 - 可选 `preview`
 
-bytes 格式化：小于 1 KiB 显示 B；小于 1 MiB 显示 KB；否则显示 MB。有 preview 时以纯文本展示；无 preview 时说明不可预览。
+bytes 格式化：小于 1 KiB 显示 B；小于 1 MiB 显示 KB；否则显示 MB。有 preview 时以纯文本提供；无 preview 时说明不可预览。
 
 #### Releases
 
-每个 release 显示：
+每个 release 提供：
 
 - `packageVersion`
 - `compilerBuild`
@@ -977,7 +978,7 @@ bytes 格式化：小于 1 KiB 显示 B；小于 1 MiB 显示 KB；否则显示 
 
 ### 9.4 上传新版本
 
-详情页提供上传开关。前端验证：
+支持上传新版本 archive。前端验证：
 
 1. 必须选择文件。
 2. 文件最大 8 MiB。
@@ -1037,7 +1038,7 @@ DELETE /v1/apps/:appId
 规则：
 
 1. 两段确认。
-2. 删除中禁用确认按钮。
+2. 删除进行中禁止重复确认。
 3. 成功后跳回 Package 列表。
 4. 后端删除是软删除，不存在或已删除也返回成功。
 
@@ -1045,10 +1046,10 @@ DELETE /v1/apps/:appId
 
 必须存在至少一个 release；Web 使用详情中第一个 release 的 `releaseId`。
 
-表单：
+启动前按 manifest 收集输入：
 
 1. `manifest.tasks` 多于一个时提供 task 选择，缺省第一个。
-2. 按 `manifest.inputs` 生成输入控件。
+2. 按 `manifest.inputs` 生成输入项。
 3. `enum` 使用下拉，并带“使用默认值”空选项。
 4. `number` 输入转成 JS number；非有限数显示参数错误。
 5. 留空字段不提交，交由服务端使用声明默认值。
@@ -1070,7 +1071,7 @@ Content-Type: application/json
 规则：
 
 1. 启动使用 guard 防重复。
-2. 成功响应包含 `taskId`，Web 显示 run started 和 `/?view=tasks&task=<taskId>` 链接。
+2. 成功响应包含 `taskId`，Web 显示 run started 和 `/?view=tasks&task=<taskId>` 入口。
 3. `PROVIDER_DEPENDENCY_MISSING` 表示 manifest 模型路由和默认模型都无法解析到可用 provider connection；运行不会被创建。
 4. 服务端校验未知参数、类型、枚举、required 缺省；失败显示错误。
 5. 服务端按 manifest 声明抓取 data source 快照；`onFailure: fail` 的数据源失败会整体拒绝运行。
@@ -1108,9 +1109,9 @@ GET /v1/schedules
 }
 ```
 
-每个 schedule 显示：
+每个 schedule 提供：
 
-| 字段                         | 展示                                                   |
+| 字段                         | 内容                                                   |
 | ---------------------------- | ------------------------------------------------------ |
 | `definition.scheduleId`      | 可打开详情的 schedule 标识。                           |
 | `definition.invocation.task` | 绑定 task 名称。                                       |
@@ -1122,19 +1123,18 @@ GET /v1/schedules
 交互：
 
 1. 提供手动刷新。
-2. `ACTIVE` 显示 Pause；非 `ACTIVE` 显示 Resume。
-3. Pause / Resume：
+2. `ACTIVE` 状态可执行 Pause；非 `ACTIVE` 可执行 Resume：
    - `POST /v1/schedules/:id/pause`
    - `POST /v1/schedules/:id/resume`
-4. Delete：
+3. Delete：
    - `DELETE /v1/schedules/:id`
    - 必须原生确认或等价确认。
-5. 操作成功后刷新列表；若当前详情属于该 schedule 且未删除，同时刷新触发历史。
-6. 操作期间全局 busy 禁用 schedule 动作。
+4. 操作成功后刷新列表；若当前详情属于该 schedule 且未删除，同时刷新触发历史。
+5. 操作期间禁止重复触发 schedule 动作。
 
 ### 10.2 触发历史
 
-点击 schedule 请求：
+选中 schedule 请求：
 
 ```text
 GET /v1/schedules/:id/triggers
@@ -1158,11 +1158,11 @@ GET /v1/schedules/:id/triggers
 }
 ```
 
-展示：
+提供以下内容：
 
 1. occurrence id、时间、结果类型。
 2. 有 `taskId` 时链接到 `/?view=tasks&task=<taskId>`。
-3. 有 `errorCode` 时展示错误码。
+3. 有 `errorCode` 时提供错误码。
 4. 空历史显示 no trigger events。
 
 ### 10.3 认证失败
@@ -1282,20 +1282,7 @@ Schedule 管理依赖服务端注入 service token。
 8. SSE 断线后以最新 sequence 重建，而不是重放旧 URL 起点。
 9. 会话标题搜索依赖 locale；切换语言后重新请求时携带新 locale。
 
-## 14. 可访问性语义
-
-为保持功能可用性，重建时必须保留以下语义：
-
-1. 导航、列表、时间线、event stream、任务控制、provider 表单等区域有明确可访问名称。
-2. 当前导航、当前会话、当前设置位置有 current 状态。
-3. 错误 Banner / InlineNotice 使用 alert；成功或中性状态使用 status。
-4. Modal 打开时移动焦点，Escape 关闭，Tab 焦点循环，关闭后焦点归还。
-5. 表单控件有 label 或 aria-label。
-6. 删除确认使用 alert / alertgroup 语义。
-7. 图标或装饰字符不承载唯一信息。
-8. Composer 支持 IME 组合输入，不会在候选词确认时误发送。
-
-## 15. 功能验收清单
+## 14. 功能验收清单
 
 最小功能验收应覆盖：
 
@@ -1317,15 +1304,15 @@ Schedule 管理依赖服务端注入 service token。
 - [ ] 能发送文本、增量补拉并渲染 Markdown / thinking。
 - [ ] 可重试错误 run。
 - [ ] 能显式提升消息为 Task 并跳转。
-- [ ] 能展开 event stream 并复制 JSON Lines。
+- [ ] 能查看原始事件流并复制 JSON Lines。
 
 ### Tasks
 
 - [ ] 能按状态加载 Task 列表并客户端搜索。
 - [ ] 能打开详情、刷新、返回清空详情。
-- [ ] 状态控制按钮按当前状态启用/禁用。
+- [ ] 控制操作按当前状态正确启用/禁用。
 - [ ] Pause / Resume / Cancel / Retry 成功后列表与详情刷新。
-- [ ] Timeline、run logs、artifacts 正确展示。
+- [ ] Timeline、run logs、artifacts 正确提供。
 - [ ] Run logs 可切换 attempt 并增量加载。
 - [ ] 文本产物可预览，二进制/归档可下载。
 
@@ -1335,7 +1322,7 @@ Schedule 管理依赖服务端注入 service token。
 - [ ] 能创建、编辑、删除 user provider connection。
 - [ ] deployment-env connection 只读。
 - [ ] API key 不回显。
-- [ ] Catalog 能搜索 provider/model、分页、预填表单。
+- [ ] Catalog 能搜索 provider/model、分页、预填。
 - [ ] Catalog 不可用时可手工录入。
 - [ ] 手动 sync 能处理 loading、429、403、成功与失败。
 
@@ -1343,7 +1330,7 @@ Schedule 管理依赖服务端注入 service token。
 
 - [ ] 能列出、创建、打开、删除 App。
 - [ ] 能上传 archive 发布新版本。
-- [ ] manifest、assets、releases 正确展示。
+- [ ] manifest、assets、releases 正确提供。
 - [ ] 能按声明 task 和 inputs 启动 run。
 - [ ] run 成功后能跳转对应 Task。
 - [ ] 三个内置示例可导入且重复导入幂等。
