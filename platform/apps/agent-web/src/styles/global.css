@@ -28,7 +28,7 @@
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
   --rail: 208px;
-  --rail-collapsed: 52px;
+  --rail-collapsed: 32px;
   --shadow-pop: 0 10px 32px rgba(30, 37, 30, 0.16);
 }
 
@@ -87,6 +87,8 @@ button {
   display: grid;
   grid-template-columns: var(--rail) 1fr;
   height: 100%;
+  gap: 12px;
+  padding: 8px;
 }
 
 .shell.is-collapsed {
@@ -94,11 +96,8 @@ button {
 }
 
 .rail {
-  background: var(--surface-sunken);
-  border-right: 1px solid var(--line);
   display: flex;
   flex-direction: column;
-  padding: 12px 8px;
   gap: 2px;
   overflow-y: auto;
 }
@@ -134,6 +133,11 @@ button {
   align-items: center;
   gap: 10px;
   padding: 7px 10px;
+  border: none;
+  appearance: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
   border-radius: var(--radius-sm);
   color: var(--ink);
   white-space: nowrap;
@@ -171,11 +175,29 @@ button {
   display: none;
 }
 
+/* 折叠态：图标水平、垂直居中，占据整行点击区 */
+.shell.is-collapsed .rail-brand,
+.shell.is-collapsed .rail-link {
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
+  gap: 0;
+}
+
+.shell.is-collapsed .rail-brand {
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
 .shell-main {
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
 }
 
 .topbar {
@@ -184,7 +206,7 @@ button {
   gap: 10px;
   padding: 10px 18px;
   border-bottom: 1px solid var(--line);
-  background: var(--paper);
+  background: var(--surface);
 }
 
 .topbar-title {
@@ -828,10 +850,25 @@ table.data-table th {
 @media (max-width: 860px) {
   .shell, .shell.is-collapsed {
     grid-template-columns: var(--rail-collapsed) 1fr;
+    gap: 8px;
+    padding: 6px;
   }
 
   .rail-label, .rail-brand-text, .rail-tagline {
     display: none;
+  }
+
+  .rail-brand,
+  .rail-link {
+    justify-content: center;
+    padding-left: 0;
+    padding-right: 0;
+    gap: 0;
+  }
+
+  .rail-brand {
+    padding-top: 10px;
+    padding-bottom: 10px;
   }
 
   .kv {

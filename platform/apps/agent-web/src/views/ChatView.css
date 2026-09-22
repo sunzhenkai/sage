@@ -31,10 +31,16 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  scrollbar-width: none; /* Firefox 隐藏滚动条 */
+  -ms-overflow-style: none; /* IE/Edge 隐藏滚动条 */
   padding: 10px;
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+.chat-list-scroll::-webkit-scrollbar {
+  display: none; /* WebKit（Chrome/Safari/Edge）隐藏滚动条 */
 }
 
 .chat-session-list {
