@@ -1,0 +1,111 @@
+.schedules-view {
+  padding: 14px 18px;
+  gap: 12px;
+  overflow-y: auto;
+}
+
+.schedules-toolbar {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.schedules-body {
+  flex: 1;
+  min-height: 0;
+}
+
+.schedules-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.schedule-card.is-selected {
+  border-color: var(--sage);
+}
+
+.schedule-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.schedule-id {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--sage-deep);
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.schedule-id:hover {
+  text-decoration: underline;
+}
+
+.schedule-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.schedule-card-meta {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px 16px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.schedule-task {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.schedule-history {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.schedule-history h2 {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 10px;
+  color: var(--sage-deep);
+}
+
+.schedule-history-links {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.schedule-error-code {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.schedule-auth {
+  border-color: #ddd0a4;
+  background: var(--amber-wash);
+}
+
+.schedule-auth h2 {
+  color: var(--amber);
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.schedule-auth p {
+  font-size: 13px;
+  line-height: 1.5;
+}

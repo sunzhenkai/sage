@@ -1,0 +1,295 @@
+/* Packages（AI Apps）视图布局与样式。 */
+
+.packages-view {
+  padding: 16px 20px 32px;
+  overflow-y: auto;
+  gap: 14px;
+}
+
+/* ---------- 列表模式 ---------- */
+
+.pkg-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pkg-toolbar-spacer {
+  flex: 1;
+}
+
+.pkg-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pkg-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: inherit;
+}
+
+.pkg-row:hover {
+  border-color: var(--sage);
+  background: var(--surface-sunken);
+}
+
+.pkg-row-main {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+
+.pkg-row-name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pkg-row-id {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pkg-row-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.pkg-row-time {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- 内置示例 ---------- */
+
+.pkg-section-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--sage-deep);
+  margin: 6px 0 10px;
+}
+
+.pkg-example-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.pkg-example-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pkg-example-card .btn {
+  align-self: flex-start;
+}
+
+.pkg-example-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.pkg-example-id {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.pkg-example-desc {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  flex: 1;
+}
+
+/* ---------- 创建表单 ---------- */
+
+.pkg-modal-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+/* ---------- 详情模式 ---------- */
+
+.pkg-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 980px;
+}
+
+.pkg-back {
+  align-self: flex-start;
+  font-size: 13px;
+}
+
+.pkg-detail-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.pkg-detail-title {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-width: 0;
+}
+
+.pkg-detail-name {
+  margin: 0;
+  font-size: 18px;
+}
+
+.pkg-detail-id {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.pkg-detail-created {
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pkg-desc {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  max-width: 720px;
+}
+
+.pkg-panels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+.pkg-card h2 {
+  margin-bottom: 12px;
+}
+
+.pkg-subhead {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--sage-deep);
+  margin: 14px 0 6px;
+}
+
+.pkg-hint,
+.pkg-muted {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 8px 0 0;
+}
+
+.pkg-upload-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pkg-file-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+}
+
+.pkg-file-name {
+  margin: 8px 0 0;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.pkg-run-disabled {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--amber);
+}
+
+.pkg-run-actions {
+  margin-top: 12px;
+}
+
+/* ---------- assets ---------- */
+
+.pkg-asset {
+  padding: 8px 0;
+  border-bottom: 1px dotted var(--line);
+}
+
+.pkg-asset:last-child {
+  border-bottom: none;
+}
+
+.pkg-asset-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+
+.pkg-asset-path {
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.pkg-asset-bytes {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.pkg-digest {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 12px;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pkg-asset-preview summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 6px;
+}
+
+.pkg-asset-preview pre {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  overflow-x: auto;
+  font-family: var(--mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
