@@ -17,19 +17,17 @@ import {
 import { readStorage, STORAGE_KEYS, writeStorage } from './lib/storage'
 import { ChatView } from './views/ChatView'
 import { PackagesView } from './views/PackagesView'
-import { ProvidersView } from './views/ProvidersView'
 import { SchedulesView } from './views/SchedulesView'
 import { SettingsView } from './views/SettingsView'
 import { TasksView } from './views/TasksView'
 
-const VIEW_ORDER: readonly ViewName[] = ['chat', 'tasks', 'packages', 'schedules', 'providers', 'settings']
+const VIEW_ORDER: readonly ViewName[] = ['chat', 'tasks', 'packages', 'schedules', 'settings']
 
 const VIEW_TITLE_KEY: Record<ViewName, string> = {
   chat: 'chat.conversations',
   tasks: 'tasks.title',
   packages: 'packages.title',
   schedules: 'schedules.title',
-  providers: 'providers.title',
   settings: 'settings.title',
 }
 
@@ -98,8 +96,6 @@ function Shell({ api }: { api: ApiCtx }) {
         return <PackagesView api={api} packageId={route.package} />
       case 'schedules':
         return <SchedulesView api={api} />
-      case 'providers':
-        return <ProvidersView api={api} />
       case 'settings':
         return <SettingsView api={api} tab={route.tab ?? 'general'} />
       case 'chat':
@@ -203,7 +199,6 @@ function NavIcon({ view }: { view: ViewName }) {
     tasks: <path d="M5 6h14M5 12h14M5 18h9" />,
     packages: <path d="M12 3 4 7v10l8 4 8-4V7l-8-4ZM4 7l8 4m0 0 8-4m-8 4v10" />,
     schedules: <path d="M12 21a9 9 0 1 1 9-9 9 9 0 0 1-9 9Zm0-14v5l3.5 2" />,
-    providers: <path d="M9 7V3M15 7V3M7 7h10v5a5 5 0 0 1-10 0V7Zm5 10v4" />,
     settings: (
       <>
         <circle cx="12" cy="12" r="3" />

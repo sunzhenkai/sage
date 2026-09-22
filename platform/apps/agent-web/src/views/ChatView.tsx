@@ -760,7 +760,7 @@ function ConversationView({ api, session }: { api: ApiCtx; session: string }) {
             {writable && !explicitInvalid && runtimeLoaded && selectedId === null && (
               <p className="composer-note composer-warn">
                 {t('chat.composer.providerMissing')}{' '}
-                <a href={workspaceHref({ view: 'providers' })}>{t('chat.composer.goToProviders')}</a>
+                <a href={workspaceHref({ view: 'settings', tab: 'connections' })}>{t('chat.composer.goToProviders')}</a>
               </p>
             )}
 

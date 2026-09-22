@@ -1,16 +1,16 @@
 // 查询参数路由：不切换 path，只用当前 path 下的 query。
 // 内部链接统一由 workspaceHref 生成；点击拦截后走 pushState + 自定义导航事件。
 
-export type ViewName = 'chat' | 'tasks' | 'providers' | 'packages' | 'schedules' | 'settings'
+export type ViewName = 'chat' | 'tasks' | 'packages' | 'schedules' | 'settings'
 
-export const VIEW_NAMES: readonly ViewName[] = ['chat', 'tasks', 'providers', 'packages', 'schedules', 'settings']
+export const VIEW_NAMES: readonly ViewName[] = ['chat', 'tasks', 'packages', 'schedules', 'settings']
 
-export type SettingsTab = 'general' | 'model'
+export type SettingsTab = 'general' | 'connections'
 
-export const SETTINGS_TABS: readonly SettingsTab[] = ['general', 'model']
+export const SETTINGS_TABS: readonly SettingsTab[] = ['general', 'connections']
 
 export function parseSettingsTab(raw: string | null): SettingsTab {
-  return raw === 'model' ? 'model' : 'general'
+  return raw === 'connections' ? 'connections' : 'general'
 }
 
 export interface WorkspaceRoute {

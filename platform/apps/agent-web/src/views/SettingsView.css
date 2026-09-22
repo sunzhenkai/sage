@@ -51,69 +51,15 @@
   color: var(--muted);
 }
 
-/* ---------- 模型面板 ---------- */
+/* ---------- 模型与连接面板 ---------- */
 
-.settings-note {
-  margin: 8px 0;
-  font-size: 13px;
-}
-
-.settings-model-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.settings-model-option label {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 8px 10px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-
-.settings-model-option label:hover {
-  background: var(--sage-mist);
-}
-
-.settings-model-option input[type="radio"] {
+/* 该面板直接复用 ProvidersView，只抹掉它自带的 .view/.page 外层间距与滚动，
+   让卡片按 settings-body 的 gap 堆叠（三重类限定，压过 global.css 的 .page）。 */
+.settings-connections > .view {
   flex: none;
-  margin: 3px 0 0;
-  accent-color: var(--sage);
 }
 
-.settings-model-option input[type="radio"]:disabled + .settings-model-info {
-  opacity: 0.6;
-}
-
-.settings-model-info {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.settings-model-title {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.settings-model-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin-top: 4px;
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.settings-model-reason {
-  margin-top: 2px;
-  font-size: 12px;
-  color: var(--amber);
+.settings-connections > .view > .page {
+  padding: 0;
+  overflow: visible;
 }

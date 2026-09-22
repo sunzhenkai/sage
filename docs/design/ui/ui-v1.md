@@ -66,7 +66,6 @@ corepack pnpm --filter @sage/agent-web build
 | ------------------------ | -------------------------------------------------- |
 | 无 `view` 或 `view=chat` | Chat。                                             |
 | `view=tasks`             | Task 工作区。                                      |
-| `view=providers`         | Provider / 配置。                                  |
 | `view=packages`          | AI App / Package。                                 |
 | `view=schedules`         | Schedule。                                         |
 | `view=settings`          | 设置；面板由 `tab` 指定。                          |
@@ -76,7 +75,7 @@ corepack pnpm --filter @sage/agent-web build
 
 规则：
 
-1. 未知 `view` 一律回落到 Chat；`view=settings` 下 `tab` 取 `general`（默认）或 `model`，未知值一律回落到 `general`。
+1. 未知 `view` 一律回落到 Chat；`view=settings` 下 `tab` 取 `general`（默认）或 `connections`（模型与连接），未知值一律回落到 `general`。
 2. 内部链接由 `workspaceHref` 生成；Chat 不写入 `view`，其他视图写入 `view`。
 3. 同源且相同 path 的左键点击使用 `history.pushState` 和自定义导航事件完成客户端导航。
 4. 以下情况不拦截：修饰键或非左键点击、`target="_blank"`、下载链接、`#`、`mailto:`、`tel:`、data URL、外部 URL 或非当前 path 的链接。
@@ -88,7 +87,7 @@ corepack pnpm --filter @sage/agent-web build
 壳层提供跨视图稳定功能：
 
 1. 首页入口回到 Chat；若当前存在 `session`，保留该会话上下文。
-2. 提供 Chat、Tasks、Packages、Schedules、Providers、Settings 六个视图的导航；当前所在视图可辨识。
+2. 提供 Chat、Tasks、Packages、Schedules、Settings 五个视图的导航；当前所在视图可辨识。
 3. 导航折叠状态保存在 `localStorage` key `sage.web.sidebar.collapsed`，值为 `"true"` / `"false"`。读取或写入失败时静默降级。
 4. 提供全局“新建对话”动作。
 5. 允许存在不承担业务动作的静态占位区域。
@@ -125,7 +124,7 @@ corepack pnpm --filter @sage/agent-web build
 - 更新 `<html lang>`。
 - 尝试写入 localStorage；失败时静默降级。
 
-语言切换入口：rail 底部快捷切换、设置视图的「通用」面板、Provider 配置页各一处，共用同一 locale 状态。
+语言切换入口：rail 底部快捷切换、设置视图的「通用」面板、「模型与连接」面板各一处，共用同一 locale 状态。
 
 ### 4.2 文案与时间
 
@@ -644,7 +643,7 @@ GET /v1/tasks/:taskId/artifacts/:artifactId
 
 ### 8.1 Run Agent 默认模型
 
-进入 Provider 功能后请求：
+进入设置视图的「模型与连接」面板后请求：
 
 ```text
 GET /v1/run-agent/settings
@@ -686,7 +685,7 @@ GET /v1/run-agent/settings
 6. 保存中禁止重复选择。
 7. 成功使用响应更新状态并显示 saved。
 8. 空值选择不触发保存。
-9. 设置视图的「模型」面板提供同一入口：列出全部连接供单选，选中即按上面第 5 条保存；无连接时提示先到 Provider 配置添加。
+9. 该设置位于设置视图的「模型与连接」面板；该面板同时承载连接管理与目录辅助（§8.2、§8.3）。
 
 ### 8.2 Workspace provider connections
 
@@ -1290,7 +1289,7 @@ Schedule 管理依赖服务端注入 service token。
 
 ### Shell / 路由
 
-- [ ] 六个视图可通过 query 正确打开；设置视图的 tab 缺省或非法时显示「通用」。
+- [ ] 五个视图可通过 query 正确打开；设置视图的 tab 缺省或非法时显示「通用」。
 - [ ] 浏览器前进后退有效。
 - [ ] 内部链接客户端导航，外部与下载链接不受影响。
 - [ ] 语言、导航折叠、Chat runtime 偏好刷新后保留。

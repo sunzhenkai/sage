@@ -9,7 +9,6 @@ export const en = {
       tasks: 'Tasks',
       packages: 'Apps',
       schedules: 'Schedules',
-      providers: 'Models & Connections',
       collapse: 'Collapse navigation',
       expand: 'Expand navigation',
       home: 'Back to home',
@@ -219,7 +218,6 @@ export const en = {
     },
   },
   providers: {
-    title: 'Models & Connections',
     language: 'Interface language',
     defaultModel: {
       title: 'Default run model',
@@ -289,16 +287,10 @@ export const en = {
     title: 'Settings',
     nav: {
       general: 'General',
-      model: 'Model',
+      connections: 'Models & Connections',
     },
     general: {
       title: 'General',
-    },
-    model: {
-      title: 'Default run model',
-      description: 'The provider connection used by default for Chat and Task runs. Selecting one saves it immediately.',
-      emptyBody: 'Add a connection in Providers first, then come back to choose a default run model.',
-      emptyAction: 'Go to Providers',
     },
   },
   packages: {

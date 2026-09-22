@@ -9,7 +9,6 @@ export const zhCN = {
       tasks: '任务',
       packages: '应用',
       schedules: '计划任务',
-      providers: '模型与连接',
       collapse: '收起导航',
       expand: '展开导航',
       home: '回到首页',
@@ -219,7 +218,6 @@ export const zhCN = {
     },
   },
   providers: {
-    title: '模型与连接',
     language: '界面语言',
     defaultModel: {
       title: '默认运行模型',
@@ -289,16 +287,10 @@ export const zhCN = {
     title: '设置',
     nav: {
       general: '通用',
-      model: '模型',
+      connections: '模型与连接',
     },
     general: {
       title: '通用',
-    },
-    model: {
-      title: '默认运行模型',
-      description: 'Chat 与 Task 运行默认使用的 provider connection，选中即保存。',
-      emptyBody: '先到 Providers 添加连接，再回来选择默认运行模型。',
-      emptyAction: '前往 Providers',
     },
   },
   packages: {

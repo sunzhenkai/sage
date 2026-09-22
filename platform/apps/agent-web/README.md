@@ -21,14 +21,14 @@ corepack pnpm --filter @sage/agent-web preview
 
 - `src/lib/` — 路由（查询参数路由 + 客户端导航拦截）、API client（错误契约解析优先级）、领域 endpoint、storage（静默降级）、i18n、安全 Markdown 子集 + think 拆分、时间格式化。
 - `src/components/` — 反馈宿主（role=status / role=alert）、通用 primitives（两段确认、复制兜底、Modal、Badge 等）。
-- `src/views/` — Chat / Tasks / Providers / Packages / Schedules / Settings 六个视图，各带局部 CSS。
+- `src/views/` — Chat / Tasks / Packages / Schedules / Settings 五个视图，各带局部 CSS（Settings 内含模型与连接面板，复用 ProvidersView）。
 - `scripts/dev-mock.mjs` — 开发辅助 mock API（:9613），仅用于本地联调与视觉验证，不属于产品运行时。
 
 ## 实现说明（交付自检）
 
 ### 已实现范围
 
-规格第 3–13 章全部功能：查询路由与壳层、zh-CN/en 本地化（初始化顺序、`<html lang>`、localStorage 静默降级、三种时间格式）、通用 API 行为（JSON helper、错误契约、局部失败不覆盖全局）、Chat（列表分页/搜索/过滤/归档/两段删除、SSE 恢复与 1s cursor 重建、发送、runtime 选择、时间线分组状态机、安全 Markdown、活动行、retry/promote、原始事件 JSON Lines 复制、快捷提示）、Tasks（状态过滤/客户端搜索/running 计数、详情四请求并行与降级、控制 guard、effect_unknown 与失败详情、timeline、run logs attempt 切换与增量、artifact 预览/下载）、Providers（默认模型、connection CRUD、catalog 搜索/分页/预填/键盘语义/sync 轮询与 429/403/409）、Settings（通用=界面语言、模型=默认运行模型单选即存，tab 深链与非法回落）、Packages（列表/创建/详情 manifest/assets/releases、archive 上传校验、三个内置示例幂等导入、按声明 task/inputs 启动 run）、Schedules（列表/触发历史/pause/resume/删除、401 配置指引）。安全边界：API key 不回显、Markdown raw HTML 不执行、外链 noopener、凭据缺失 fail closed、仅三个约定 localStorage key。
+规格第 3–13 章全部功能：查询路由与壳层、zh-CN/en 本地化（初始化顺序、`<html lang>`、localStorage 静默降级、三种时间格式）、通用 API 行为（JSON helper、错误契约、局部失败不覆盖全局）、Chat（列表分页/搜索/过滤/归档/两段删除、SSE 恢复与 1s cursor 重建、发送、runtime 选择、时间线分组状态机、安全 Markdown、活动行、retry/promote、原始事件 JSON Lines 复制、快捷提示）、Tasks（状态过滤/客户端搜索/running 计数、详情四请求并行与降级、控制 guard、effect_unknown 与失败详情、timeline、run logs attempt 切换与增量、artifact 预览/下载）、Providers（默认模型、connection CRUD、catalog 搜索/分页/预填/键盘语义/sync 轮询与 429/403/409）、Settings（通用=界面语言；模型与连接=默认运行模型 + 连接 CRUD + 目录，tab 深链与非法回落）、Packages（列表/创建/详情 manifest/assets/releases、archive 上传校验、三个内置示例幂等导入、按声明 task/inputs 启动 run）、Schedules（列表/触发历史/pause/resume/删除、401 配置指引）。安全边界：API key 不回显、Markdown raw HTML 不执行、外链 noopener、凭据缺失 fail closed、仅三个约定 localStorage key。
 
 ### 与规格的偏差
 
@@ -40,7 +40,7 @@ corepack pnpm --filter @sage/agent-web preview
 
 ### 验收自检（规格 §14）
 
-- Shell/路由：六视图 query 打开、前进后退、内部链接客户端导航、外链/下载不拦截 — 已验证（Playwright 实测）。
+- Shell/路由：五视图 query 打开、前进后退、内部链接客户端导航、外链/下载不拦截 — 已验证（Playwright 实测）。
 - Chat：创建/进入、搜索/过滤/归档/两段删除、恢复后 SSE 实时与断线重建（代理修复后 `text/event-stream` 透传、`:ok` 帧即时到达）、发送 202 + 增量补拉、无 provider 禁发、Markdown/autolink/think、retry/promote、原始事件复制 — 已对真实 agent-api（:9610）与 mock 实测。
 - Tasks：状态过滤、搜索、详情、返回清空、控制按状态启停、timeline/logs/artifacts、run logs attempt 与增量 — 已验证。
 - Providers：默认模型保存、connection 增删改、catalog 搜索/预填/键盘、sync 流程 — 已验证（真实 catalog）。
