@@ -285,6 +285,22 @@ export const zhCN = {
       unavailable: '目录不可用，请手工录入',
     },
   },
+  settings: {
+    title: '设置',
+    nav: {
+      general: '通用',
+      model: '模型',
+    },
+    general: {
+      title: '通用',
+    },
+    model: {
+      title: '默认运行模型',
+      description: 'Chat 与 Task 运行默认使用的 provider connection，选中即保存。',
+      emptyBody: '先到 Providers 添加连接，再回来选择默认运行模型。',
+      emptyAction: '前往 Providers',
+    },
+  },
   packages: {
     title: 'AI Apps',
     create: '创建 App',

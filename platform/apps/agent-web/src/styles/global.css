@@ -29,6 +29,7 @@
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
   --rail: 208px;
   --rail-collapsed: 32px;
+  --submenu: 168px;
   --shadow-pop: 0 10px 32px rgba(30, 37, 30, 0.16);
 }
 
@@ -869,6 +870,20 @@ table.data-table th {
   .rail-brand {
     padding-top: 10px;
     padding-bottom: 10px;
+  }
+
+  /* 子菜单同款收成纯图标栏：文字已由上面的 .rail-label 规则隐藏，这里收窄到 rail
+     折叠宽度并居中图标（双类限定，压过 SettingsView.css 的 --submenu 宽度）。
+     手动折叠（.shell.is-collapsed）不影响子菜单，因此规则只挂在断点上。 */
+  .settings-page .settings-nav {
+    width: var(--rail-collapsed);
+  }
+
+  .settings-nav .rail-link {
+    justify-content: center;
+    padding-left: 0;
+    padding-right: 0;
+    gap: 0;
   }
 
   .kv {

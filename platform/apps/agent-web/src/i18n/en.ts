@@ -285,6 +285,22 @@ export const en = {
       unavailable: 'Catalog unavailable. Enter manually.',
     },
   },
+  settings: {
+    title: 'Settings',
+    nav: {
+      general: 'General',
+      model: 'Model',
+    },
+    general: {
+      title: 'General',
+    },
+    model: {
+      title: 'Default run model',
+      description: 'The provider connection used by default for Chat and Task runs. Selecting one saves it immediately.',
+      emptyBody: 'Add a connection in Providers first, then come back to choose a default run model.',
+      emptyAction: 'Go to Providers',
+    },
+  },
   packages: {
     title: 'AI Apps',
     create: 'Create App',

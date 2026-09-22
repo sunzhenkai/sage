@@ -1,12 +1,21 @@
 // 查询参数路由：不切换 path，只用当前 path 下的 query。
 // 内部链接统一由 workspaceHref 生成；点击拦截后走 pushState + 自定义导航事件。
 
-export type ViewName = 'chat' | 'tasks' | 'providers' | 'packages' | 'schedules'
+export type ViewName = 'chat' | 'tasks' | 'providers' | 'packages' | 'schedules' | 'settings'
 
-export const VIEW_NAMES: readonly ViewName[] = ['chat', 'tasks', 'providers', 'packages', 'schedules']
+export const VIEW_NAMES: readonly ViewName[] = ['chat', 'tasks', 'providers', 'packages', 'schedules', 'settings']
+
+export type SettingsTab = 'general' | 'model'
+
+export const SETTINGS_TABS: readonly SettingsTab[] = ['general', 'model']
+
+export function parseSettingsTab(raw: string | null): SettingsTab {
+  return raw === 'model' ? 'model' : 'general'
+}
 
 export interface WorkspaceRoute {
   view: ViewName
+  tab?: SettingsTab
   session?: string
   task?: string
   package?: string
@@ -14,6 +23,7 @@ export interface WorkspaceRoute {
 
 export interface WorkspaceLink {
   view?: ViewName
+  tab?: SettingsTab
   session?: string
   task?: string
   package?: string
@@ -24,6 +34,7 @@ export function parseRoute(search: string): WorkspaceRoute {
   const rawView = params.get('view')
   const view: ViewName = VIEW_NAMES.includes(rawView as ViewName) ? (rawView as ViewName) : 'chat'
   const route: WorkspaceRoute = { view }
+  if (view === 'settings') route.tab = parseSettingsTab(params.get('tab'))
   const session = params.get('session')
   if (session) route.session = session
   const task = params.get('task')
@@ -41,6 +52,7 @@ export function currentRoute(): WorkspaceRoute {
 export function workspaceHref(link: WorkspaceLink): string {
   const params = new URLSearchParams()
   if (link.view && link.view !== 'chat') params.set('view', link.view)
+  if (link.tab) params.set('tab', link.tab)
   if (link.session) params.set('session', link.session)
   if (link.task) params.set('task', link.task)
   if (link.package) params.set('package', link.package)
