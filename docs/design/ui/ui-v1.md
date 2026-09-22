@@ -125,7 +125,7 @@ corepack pnpm --filter @sage/agent-web build
 - 更新 `<html lang>`。
 - 尝试写入 localStorage；失败时静默降级。
 
-语言切换入口位于设置视图的「通用」面板；Provider 配置页保留同一入口。
+语言切换入口：rail 底部快捷切换、设置视图的「通用」面板、Provider 配置页各一处，共用同一 locale 状态。
 
 ### 4.2 文案与时间
 

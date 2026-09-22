@@ -46,7 +46,7 @@ export function App(options: ApiOptions = {}) {
 }
 
 function Shell({ api }: { api: ApiCtx }) {
-  const { t, locale } = useLocale()
+  const { t, locale, setLocale } = useLocale()
   const feedback = useFeedback()
   const [route, setRoute] = useState<WorkspaceRoute>(currentRoute)
   const [collapsed, setCollapsed] = useState(() => readStorage(STORAGE_KEYS.sidebarCollapsed) === 'true')
@@ -133,6 +133,15 @@ function Shell({ api }: { api: ApiCtx }) {
           <button type="button" className="rail-link" onClick={toggleCollapsed}>
             <PanelIcon collapsed={collapsed} />
             <span className="rail-label">{t(collapsed ? 'shell.nav.expand' : 'shell.nav.collapse')}</span>
+          </button>
+          <button
+            type="button"
+            className="rail-link"
+            onClick={() => setLocale(locale === 'zh-CN' ? 'en' : 'zh-CN')}
+            title={t('providers.language')}
+          >
+            <LangIcon />
+            <span className="rail-label">{locale === 'zh-CN' ? 'English' : '简体中文'}</span>
           </button>
         </div>
       </nav>
@@ -221,6 +230,15 @@ function PlusIcon() {
   return (
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
       <path d="M12 5v14M5 12h14" />
+    </svg>
+  )
+}
+
+function LangIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18M12 3c2.5 2.6 3.9 5.7 3.9 9S14.5 18.4 12 21c-2.5-2.6-3.9-5.7-3.9-9S9.5 5.6 12 3Z" />
     </svg>
   )
 }
