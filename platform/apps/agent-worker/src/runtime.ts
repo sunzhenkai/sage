@@ -189,7 +189,14 @@ export async function createWorkerRuntime(config = readWorkerRuntimeConfig()): P
     }
     const subject = worker;
     const server = createServer((request, response) => {
-      const path = new URL(request.url ?? '/', 'http://localhost').pathname;
+      let path = '/';
+      try {
+        path = new URL(request.url ?? '/', 'http://localhost').pathname;
+      } catch {
+        response.statusCode = 400;
+        response.end('bad request');
+        return;
+      }
       const send = (result: { statusCode: number; body: string }): void => {
         response.statusCode = result.statusCode;
         response.setHeader('content-type', 'application/json; charset=utf-8');

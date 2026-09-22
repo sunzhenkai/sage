@@ -3,10 +3,8 @@ import { spawnSync } from 'node:child_process';
 const root = new URL('..', import.meta.url).pathname;
 const apiPort = process.env.SAGE_API_HOST_PORT ?? '13000';
 const workerPort = process.env.SAGE_WORKER_HEALTH_HOST_PORT ?? '13001';
-const webPort = process.env.SAGE_WEB_HOST_PORT ?? '14173';
 const api = `http://127.0.0.1:${apiPort}`;
 const worker = `http://127.0.0.1:${workerPort}`;
-const web = `http://127.0.0.1:${webPort}`;
 
 function compose(args, options = {}) {
   const result = spawnSync('docker', ['compose', ...args], { cwd: root, encoding: 'utf8', stdio: options.quiet ? ['ignore', 'pipe', 'pipe'] : 'inherit' });
@@ -49,7 +47,7 @@ try {
   compose(['config', '--quiet']);
   compose(['up', '-d', '--build', '--wait']);
   const status = compose(['ps', '--format', 'json'], { quiet: true }).stdout.trim().split('\n').filter(Boolean).map((line) => JSON.parse(line));
-  const expected = new Set(['postgres', 'temporal', 'artifact-store', 'agent-api', 'agent-worker', 'agent-web']);
+  const expected = new Set(['postgres', 'temporal', 'artifact-store', 'agent-api', 'agent-worker']);
   if (status.length !== expected.size || status.some((service) => !expected.has(service.Service) || service.State !== 'running' || !service.Status.includes('(healthy)'))) {
     throw new Error(`Compose services are not all healthy: ${status.map((service) => `${service.Service}:${service.Status}`).join(', ')}`);
   }
@@ -57,7 +55,6 @@ try {
   await request(`${api}/readyz`);
   const workerReady = await request(`${worker}/readyz`);
   if (workerReady.namespace !== 'sage-dev' || workerReady.taskQueue !== 'sage-agent-task-v1') throw new Error('Worker readiness contract mismatch');
-  await request(`${web}/`);
 
   // seed 工作区 provider + 运行 agent 设置：chat 与包运行均硬要求 provider（引用形态，服务端解析）。
   const connection = await request(`${api}/v1/provider-connections`, {
@@ -101,15 +98,13 @@ try {
     if (task.targetSnapshot.taskQueue !== 'sage-agent-task-v1') throw new Error('Task queue contract mismatch');
   }
 
-  const proxied = await request(`${web}/v1/chat/sessions/${encodeURIComponent(session.sessionId)}/events?afterSequence=0`);
-  if (!Array.isArray(proxied.events)) throw new Error('Web API proxy response missing events');
   process.stdout.write(`local smoke passed: session=${session.sessionId}\n`);
 } catch (error) {
   failure = error;
   process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
   try {
     compose(['ps']);
-    compose(['logs', '--tail=80', 'agent-api', 'agent-worker', 'agent-web']);
+    compose(['logs', '--tail=80', 'agent-api', 'agent-worker']);
   } catch { /* preserve the original failure */ }
 } finally {
   if (process.env.SMOKE_KEEP_SERVICES !== '1') {

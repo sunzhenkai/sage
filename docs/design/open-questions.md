@@ -10,7 +10,6 @@
 | Agent Library 不依赖 Chat、Task、Temporal、UI 和数据库 | **已决定** | 保持可嵌入和可复用 |
 | 第一版使用 TypeScript + Node.js | **已决定** | 与 Pi 和 Temporal TS SDK 保持单语言 Runtime |
 | 第一版使用 PiHarness | **已决定** | Pi 只位于 Harness Adapter 内 |
-| 第一版使用 React/Vite + Fastify + SSE | **已决定** | 同时承载 Chat 和 Task UI |
 | Chat 是第一版核心能力 | **已决定** | 支持多轮 Session、流式 Run 和长请求提升 |
 | Temporal 是第一版核心 Task Runtime | **已决定** | 提供 Workflow、Signal、Retry、Cancel 和恢复 |
 | 支持多个 Temporal 环境/实例 | **已决定** | 满足环境、网络、隔离和数据驻留差异 |

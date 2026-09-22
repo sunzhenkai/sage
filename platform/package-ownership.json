@@ -91,12 +91,6 @@
         "production-governance"
       ]
     },
-    "agent-web": {
-      "owner": "Application",
-      "mayDependOn": [
-        "app-contracts"
-      ]
-    },
     "agent-worker": {
       "owner": "Task Runtime",
       "mayDependOn": [
@@ -199,7 +193,6 @@
         "agent-api",
         "agent-client",
         "agent-contracts",
-        "agent-web",
         "app-contracts",
         "chat-domain"
       ]
@@ -237,7 +230,6 @@
         "agent-contracts",
         "agent-package-release",
         "agent-release-registry",
-        "agent-web",
         "agent-worker",
         "app-contracts",
         "chat-domain",
@@ -635,7 +627,6 @@
     "agent-lib": {
       "forbiddenPackages": [
         "agent-api",
-        "agent-web",
         "agent-worker",
         "chat-domain",
         "task-domain",
@@ -662,16 +653,6 @@
     },
     "agent-api": {
       "forbiddenPackages": [
-        "harness-pi"
-      ],
-      "forbiddenExternalPrefixes": [
-        "@mariozechner/pi-"
-      ]
-    },
-    "agent-web": {
-      "forbiddenPackages": [
-        "agent-lib",
-        "agent-client",
         "harness-pi"
       ],
       "forbiddenExternalPrefixes": [

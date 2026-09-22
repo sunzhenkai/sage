@@ -77,6 +77,7 @@ class ClaimFailureStore implements TaskCommitStore {
   }
   commitSlice(...args: Parameters<TaskCommitStore['commitSlice']>): Promise<void> { return this.delegate.commitSlice(...args); }
   markEffectUnknown(...args: Parameters<TaskCommitStore['markEffectUnknown']>): Promise<void> { return this.delegate.markEffectUnknown(...args); }
+  markSliceFailed(...args: Parameters<TaskCommitStore['markSliceFailed']>): Promise<void> { return this.delegate.markSliceFailed(...args); }
   cancelSlice(...args: Parameters<TaskCommitStore['cancelSlice']>): Promise<void> { return this.delegate.cancelSlice(...args); }
 }
 
@@ -86,6 +87,7 @@ class CountingCommitStore implements TaskCommitStore {
   claimSlice(...args: Parameters<TaskCommitStore['claimSlice']>): Promise<SliceClaim> { this.claims += 1; return this.delegate.claimSlice(...args); }
   commitSlice(...args: Parameters<TaskCommitStore['commitSlice']>): Promise<void> { return this.delegate.commitSlice(...args); }
   markEffectUnknown(...args: Parameters<TaskCommitStore['markEffectUnknown']>): Promise<void> { return this.delegate.markEffectUnknown(...args); }
+  markSliceFailed(...args: Parameters<TaskCommitStore['markSliceFailed']>): Promise<void> { return this.delegate.markSliceFailed(...args); }
   cancelSlice(...args: Parameters<TaskCommitStore['cancelSlice']>): Promise<void> { return this.delegate.cancelSlice(...args); }
 }
 

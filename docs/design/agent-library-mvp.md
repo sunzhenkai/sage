@@ -25,7 +25,7 @@ Agent Library 是可被其他应用复用的 Agent 执行内核。它提供一�
 ### MVP 非目标
 
 - 同时支持多种编程语言或多个 Harness 实现；
-- HTTP Server、Web UI、Task API 和后台 Worker；
+- HTTP Server、Task API 和后台 Worker；
 - 数据库、定时调度、Temporal 或其他 Workflow Engine；
 - 用户、租户、RBAC 和管理后台；
 - 数据库、向量库、Artifact Store 的产品化实现；
@@ -273,7 +273,7 @@ MVP 只要求实现一种原生语言和 Local Binding。Remote Binding 与多�
 - deadline、取消、最大轮次和最大 Tool 数具有可验证路径；
 - AgentEvent 可重建一次 Run 的关键时间线；
 - 替换 Harness、Model、Session 或 Telemetry Adapter 不改变 Application 的 Task API；
-- Library 依赖中不存在 Task、Web UI、数据库或 Workflow Engine；
+- Library 依赖中不存在 Task、数据库或 Workflow Engine；
 - 未配置可选能力时的降级或拒绝行为明确。
 
 ## 主要取舍

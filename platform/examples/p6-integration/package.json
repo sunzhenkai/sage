@@ -14,7 +14,6 @@
     "@sage/agent-contracts": "workspace:*",
     "@sage/agent-package-release": "workspace:*",
     "@sage/agent-release-registry": "workspace:*",
-    "@sage/agent-web": "workspace:*",
     "@sage/agent-worker": "workspace:*",
     "@sage/app-contracts": "workspace:*",
     "@sage/chat-domain": "workspace:*",
@@ -29,13 +28,9 @@
     "@temporalio/client": "1.22.0",
     "@temporalio/worker": "1.22.0",
     "fastify": "5.11.3",
-    "pg": "8.23.0",
-    "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "pg": "8.23.0"
   },
   "devDependencies": {
-    "@types/pg": "8.21.0",
-    "@types/react": "19.2.18",
-    "@types/react-dom": "19.2.4"
+    "@types/pg": "8.21.0"
   }
 }

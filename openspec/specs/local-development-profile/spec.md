@@ -4,7 +4,7 @@
 TBD - created by archiving change sage-p0-engineering-foundation-and-spikes. Update Purpose after archive.
 ## Requirements
 ### Requirement: Local replaceable infrastructure profile
-The system SHALL provide a local profile that starts PostgreSQL, Temporal dev, and an S3-compatible Artifact Store with health checks and uses port-compatible fakes for Registry, Secret Manager, OIDC, and Artifact integrations. The profile SHALL additionally provide the local `agent-api`, `agent-worker`, and `agent-web` runtime services with dependency-aware readiness, while preserving replaceable adapter contracts and existing infrastructure ports/volumes.
+The system SHALL provide a local profile that starts PostgreSQL, Temporal dev, and an S3-compatible Artifact Store with health checks and uses port-compatible fakes for Registry, Secret Manager, OIDC, and Artifact integrations. The profile SHALL additionally provide the local `agent-api` and `agent-worker` runtime services with dependency-aware readiness, while preserving replaceable adapter contracts and existing infrastructure ports/volumes.
 
 #### Scenario: Healthy local bootstrap
 - **WHEN** a developer starts the documented local profile

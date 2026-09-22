@@ -100,6 +100,9 @@ export async function createScheduleDispatcher(config: ScheduleDispatcherConfig,
     activities,
     buildId: config.buildId
   });
+  void worker.run().catch((cause: unknown) => {
+    process.stdout.write(`[schedule-dispatcher] run failed ${cause instanceof Error ? cause.message : String(cause)}\n`);
+  });
   return {
     worker,
     ready: (status) => status.runState === 'RUNNING' && status.workflowPollerState === 'POLLING' && status.activityPollerState === 'POLLING',

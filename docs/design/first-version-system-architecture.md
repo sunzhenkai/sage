@@ -21,7 +21,6 @@
 | Agent Binding | LocalAgentClient | Chat Service 与环境 Worker 进程内调用 Library |
 | Contract | JSON Schema + TypeBox Binding | 公共 Contract 不暴露 Pi/Temporal 类型 |
 | Application API | Fastify + HTTP/JSON + SSE | Chat 与 Task 共用入口和断点续传事件 |
-| UI | React + Vite + TanStack Query | 同时提供 Chat 与 Task UI |
 | Chat State | PostgreSQL | Session、Message、MessagePart、Summary |
 | Task Runtime | Temporal TypeScript SDK | Workflow、Timer、Signal、Activity Retry 和恢复 |
 | Temporal Routing | Task Router + Target Registry | 按 TaskType/环境/能力选择并固化目标 |
@@ -87,7 +86,6 @@ platform/
 │   └── app-contracts/         # Chat/Task API schema 与客户端
 │
 ├── apps/
-│   ├── agent-web/             # React/Vite Chat + Task UI
 │   ├── agent-api/             # Fastify、Chat Service、Task Service/Router
 │   └── agent-worker/          # 各环境 Temporal Worker + Agent Library
 │
@@ -100,7 +98,6 @@ platform/
 关键依赖：
 
 ```text
-agent-web -> app-contracts
 agent-api -> chat-domain + task-domain + temporal-routing
 agent-worker -> temporal-workflows + agent-client + storage adapters
 agent-client -> agent-contracts + agent-lib
@@ -114,7 +111,6 @@ temporal Activity -> agent-client / database / artifact / credential-provider
 
 | 部署单元 | 内容 | 位置 |
 |----------|------|------|
-| `agent-web` | Chat/Task SPA | 控制面环境 |
 | `agent-api` | Fastify、Chat Service、Task Service、Task Router、Temporal clients | 控制面环境 |
 | `agent-worker-general` | 通用 Workflow/Activity、Agent Library、PiHarness | 通用执行环境 |
 | `agent-worker-prod` | 生产只读/受控 Tool Worker | 生产网络环境 |
@@ -411,7 +407,6 @@ correlation_id
 
 ```text
 控制面：
-  agent-web
   agent-api
   postgresql
   artifact-store

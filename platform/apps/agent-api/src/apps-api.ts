@@ -1,9 +1,13 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import multipart from '@fastify/multipart';
 import { Type, type Static } from 'typebox';
 import {
   compileSourcePackage,
+  SourceArchiveError,
   SourcePackageError,
   serializeAgentPackageReleaseV1,
+  sourceArchiveFilesRecord,
+  unpackSourceArchive,
 } from '@sage/agent-package-release';
 import {
   ReleaseRegistryError,
@@ -126,6 +130,7 @@ function rejectedUploadFields(body: unknown): string[] {
 }
 
 function mapped(reply: FastifyReply, cause: unknown): FastifyReply {
+  if (cause instanceof SourceArchiveError) return sendError(reply, 400, cause.code, cause.message);
   if (cause instanceof SourcePackageError) return sendError(reply, 400, cause.code, cause.detail);
   if (cause instanceof ReleaseRegistryError) {
     const status = cause.code === 'APP_NOT_FOUND' || cause.code === 'APP_DELETED' ? 404
@@ -137,9 +142,16 @@ function mapped(reply: FastifyReply, cause: unknown): FastifyReply {
   return sendError(reply, 503, 'APP_UNAVAILABLE', 'App API is temporarily unavailable', true);
 }
 
+async function readMultipartArchive(request: FastifyRequest): Promise<Uint8Array> {
+  const file = await request.file();
+  if (file === undefined) throw new SourceArchiveError('SOURCE_ARCHIVE_UNSUPPORTED', 'multipart must include a single archive file');
+  return file.toBuffer();
+}
+
 export function registerAppsRoutes(app: FastifyInstance, options: RegisterAppsRoutesOptions): void {
   const engineIds = options.engineIds ?? ['engine-local'];
   const kernelContractMajor = options.kernelContractMajor ?? 1;
+  void app.register(multipart, { limits: { fileSize: 8 * 1024 * 1024, files: 1 } });
 
   app.post<{ Body: CreateAppRequest }>(
     '/v1/apps',
@@ -205,8 +217,8 @@ export function registerAppsRoutes(app: FastifyInstance, options: RegisterAppsRo
   app.post<{ Params: { appId: string }; Body: UploadAppReleaseRequest }>(
     '/v1/apps/:appId/releases',
     {
-      schema: { body: UploadAppReleaseRequestSchema },
       preValidation: async (request, reply) => {
+        if ((request.headers['content-type'] ?? '').includes('multipart/form-data')) return;
         const rejected = rejectedUploadFields(request.body);
         if (rejected.length > 0) return sendError(reply, 400, 'APP_UPLOAD_UNTRUSTED_FIELD', `Untrusted fields rejected: ${rejected.join(',')}`);
       }
@@ -218,7 +230,10 @@ export function registerAppsRoutes(app: FastifyInstance, options: RegisterAppsRo
         // 前置校验：App 必须存在且为 active
         const existing = options.store.getApp(options.tenantId, request.params.appId);
         if (existing === undefined) return sendError(reply, 404, 'APP_NOT_FOUND', 'App not found');
-        const loaded = await loadSourcePackageFromFiles(request.body.files);
+        const files = (request.headers['content-type'] ?? '').includes('multipart/form-data')
+          ? sourceArchiveFilesRecord(unpackSourceArchive(await readMultipartArchive(request)))
+          : request.body.files;
+        const loaded = await loadSourcePackageFromFiles(files);
         // 一致性：manifest.id 必须与路径 appId 一致，防串主体
         if (loaded.manifest.id !== request.params.appId) {
           return sendError(reply, 409, 'APP_PACKAGE_ID_MISMATCH', `manifest.id '${loaded.manifest.id}' does not match appId '${request.params.appId}'`);

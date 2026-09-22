@@ -49,9 +49,9 @@ export function safeHistoryPreviewFromParts(parts: readonly PreviewCandidatePart
   return undefined;
 }
 
-/** 未命名会话的默认显示标题（与 Agent Web locale 文案一致），供 NULL title 的搜索回退匹配。 */
+/** 未命名会话的默认显示标题，供 NULL title 的搜索回退匹配。 */
 export const untitledTitleForLocale = (locale: 'en' | 'zh-CN'): string => locale === 'zh-CN' ? '未命名对话' : 'Untitled Chat';
-/** 与 Agent Web 一致的 locale 收敛：zh* → zh-CN，en* → en，其余默认 zh-CN。 */
+/** locale 收敛：zh* → zh-CN，en* → en，其余默认 zh-CN。 */
 export const normalizeHistoryLocale = (locale?: string): 'en' | 'zh-CN' => {
   const value = (locale ?? '').trim().toLowerCase();
   if (value.startsWith('en')) return 'en';

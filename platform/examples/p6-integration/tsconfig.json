@@ -4,7 +4,6 @@
     "rootDir": "src",
     "outDir": "dist",
     "composite": true,
-    "jsx": "react-jsx",
     "baseUrl": ".",
     "paths": {
       "@sage/agent-api": [
@@ -15,9 +14,6 @@
       ],
       "@sage/agent-contracts": [
         "../../packages/agent-contracts/src/index.ts"
-      ],
-      "@sage/agent-web/tasks": [
-        "../../apps/agent-web/src/tasks.tsx"
       ],
       "@sage/agent-worker": [
         "../../apps/agent-worker/src/index.ts"
@@ -67,9 +63,6 @@
     },
     {
       "path": "../../apps/agent-api"
-    },
-    {
-      "path": "../../apps/agent-web"
     },
     {
       "path": "../../apps/agent-worker"

@@ -192,7 +192,14 @@ export function registerTaskRoutes(app: FastifyInstance, controller: TaskControl
   app.get<{Params:{taskId:string;artifactId:string}}>('/v1/tasks/:taskId/artifacts/:artifactId',async(request,reply)=>{
     const principal=await authorize(request,options,'read',request.params.taskId);const artifacts=await options.queryStore?.listTaskArtifacts(tenantId,request.params.taskId)??[];
     const reference=artifacts.find((item)=>item.artifactId===request.params.artifactId);if(!reference)return reply.code(404).send({error:{code:'TASK_ARTIFACT_NOT_FOUND',retryable:false}});
-    try{return options.artifactResolver?await options.artifactResolver.resolve(reference,principal):reference;}catch{
+    try{
+      const resolved=options.artifactResolver?await options.artifactResolver.resolve(reference,principal):reference;
+      if(request.query && (request.query as {download?:string}).download==='1' && resolved.content!==undefined){
+        const raw=resolved.encoding==='base64'?Buffer.from(resolved.content,'base64'):Buffer.from(resolved.content,'utf8');
+        return reply.type(resolved.mediaType).header('content-disposition',`attachment; filename="${resolved.name}"`).send(raw);
+      }
+      return resolved;
+    }catch{
       const view=await options.queryStore?.getTaskView(tenantId,request.params.taskId,now(),threshold).catch(()=>undefined);
       if(view?.sessionId&&view.runId&&view.messageId)try{options.telemetry?.record('sage_artifact_store_unavailable_total',1,{tenant_id:tenantId,message_id:view.messageId,session_id:view.sessionId,run_id:view.runId,task_id:view.taskId,workflow_id:view.workflowId,target_id:view.targetId,attempt:view.attempt},{artifact_id:reference.artifactId});}catch{/* Telemetry cannot change Artifact response. */}
       return reply.code(503).send({error:{code:'ARTIFACT_STORE_UNAVAILABLE',retryable:true},artifact:reference});

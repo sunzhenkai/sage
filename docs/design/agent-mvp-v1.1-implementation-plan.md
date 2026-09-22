@@ -16,10 +16,10 @@
 
 ```text
 短 Chat：
-agent-web -> agent-api -> LocalAgentClient -> Agent Library -> SSE
+agent-api -> LocalAgentClient -> Agent Library -> SSE
 
 可靠 Task：
-agent-web -> agent-api -> Task Router -> Temporal Target
+agent-api -> Task Router -> Temporal Target
                                          -> agent-worker
                                          -> LocalAgentClient
                                          -> Agent Library
@@ -205,7 +205,6 @@ P7 生产试运行门
 - `chat-domain`、`app-contracts`、Fastify Chat API、PostgreSQL Chat Store。
 - Message/MessagePart、Summary、Artifact 引用和失败 Retry。
 - SSE Timeline、`sequence`/`afterSequence` 断点续传。
-- 最小 React/Vite Chat UI，展示文本、Tool、Artifact、Error 和 Task Card 占位。
 - Chat Service 仅通过 LocalAgentClient 调用 Library。
 
 ### 非范围

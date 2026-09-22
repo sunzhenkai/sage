@@ -1,0 +1,215 @@
+/* Providers 视图：默认模型 + 语言切换、connections 列表、catalog combobox */
+
+.providers-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.providers-card-head h2 {
+  margin-bottom: 0;
+}
+
+.providers-language {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.providers-language-label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.providers-note {
+  margin: 8px 0;
+  font-size: 13px;
+}
+
+.providers-note-success {
+  color: var(--sage-deep);
+}
+
+.providers-note-warning {
+  color: var(--amber);
+}
+
+.providers-availability {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.providers-availability li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.providers-availability-reason {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.providers-connection-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.providers-connection {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.providers-connection:last-child {
+  border-bottom: none;
+}
+
+.providers-connection-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.providers-connection-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.providers-connection-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  max-width: 46%;
+  text-align: right;
+}
+
+.providers-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.providers-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.providers-catalog {
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.providers-catalog-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* ---------- catalog combobox ---------- */
+
+.catalog-combobox {
+  position: relative;
+}
+
+.catalog-combobox-input {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.catalog-combobox-input .input {
+  width: 100%;
+  padding-right: 28px;
+}
+
+.catalog-combobox-input .spinner {
+  position: absolute;
+  right: 8px;
+}
+
+.catalog-combobox.is-disabled .input {
+  opacity: 0.6;
+}
+
+.catalog-combobox-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  max-height: 260px;
+  overflow-y: auto;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 8%);
+}
+
+.catalog-combobox-option {
+  padding: 6px 8px;
+  border-radius: 6px;
+}
+
+.catalog-combobox-option.is-active {
+  background: var(--surface-sunken);
+}
+
+.catalog-combobox-empty {
+  padding: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.catalog-combobox-more {
+  padding: 4px;
+  display: flex;
+  justify-content: center;
+  border-top: 1px solid var(--line);
+}
+
+.catalog-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.catalog-item-name {
+  font-weight: 550;
+}
+
+.catalog-item-meta {
+  color: var(--muted);
+  font-size: 12px;
+}

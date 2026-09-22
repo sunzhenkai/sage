@@ -24,12 +24,6 @@ nodes:
     layer: Actors
     group: Host Integration
     positionHint: far-left
-  - id: agent-web-ui
-    label: "Agent Web UI\nChat + Tasks"
-    type: manager
-    layer: Manager
-    group: Agent Application
-    positionHint: left
   - id: temporal-target-registry
     label: "Temporal Target Registry\ntask type / env / namespace / queue"
     type: manager
@@ -163,18 +157,12 @@ nodes:
     group: Credential
     positionHint: bottom
 edges:
-  - id: user-operates-web-ui
+  - id: user-operates-application-api
     from: end-user
-    to: agent-web-ui
+    to: application-api
     protocol: HTTPS
     sync: sync
     label: "HTTPS · chat and task operations"
-  - id: web-ui-calls-application-api
-    from: agent-web-ui
-    to: application-api
-    protocol: HTTP/JSON and SSE
-    sync: sync
-    label: "HTTP/SSE · commands and streams"
   - id: application-api-validates-identity
     from: application-api
     to: identity-provider

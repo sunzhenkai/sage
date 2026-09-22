@@ -18,7 +18,6 @@ flowchart LR
 
   subgraph manager["Manager"]
     direction TB
-    agent_web_ui["Agent Web UI<br/>Chat + Tasks"]
     temporal_target_registry["Temporal Target Registry<br/>task type / env / namespace / queue"]
   end
 
@@ -59,8 +58,7 @@ flowchart LR
     secret_manager["Secret Manager<br/>service and user credentials"]
   end
 
-  end_user -->|"HTTPS · chat and task operations"| agent_web_ui
-  agent_web_ui -->|"HTTP/SSE · commands and streams"| application_api
+  end_user -->|"HTTPS · chat and task operations"| application_api
   application_api -->|"OIDC · authenticate and scope"| identity_provider
   application_api -.->|"OTLP · API telemetry"| observability_backend
   application_api -->|"in-process · chat commands"| chat_service
@@ -106,7 +104,7 @@ flowchart LR
   classDef externalClass fill:#FFCDD2,stroke:#B71C1C,color:#111
 
   class end_user,host_application actorsClass
-  class agent_web_ui,temporal_target_registry managerClass
+  class temporal_target_registry managerClass
   class application_api,agent_library_api gatewayClass
   class chat_service,task_service,task_router,environment_task_workers,agent_runner runtimeClass
   class temporal_client_adapter,pi_harness,skill_tool_runtime,credential_provider platformClass

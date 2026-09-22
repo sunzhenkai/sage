@@ -4,23 +4,17 @@
 TBD - synchronized from change workspace-usability. Update Purpose when the capability is refined.
 ## Requirements
 ### Requirement: 显式创建与可恢复的 Session history
-系统 SHALL 在裸 `/` 展示 landing 与 retention 范围内仍存在的 session history，且 SHALL 只在用户显式执行 New Chat 时调用 `POST /v1/chat/sessions`。当前 session SHALL 由 canonical `session` query 表达；不存在或已删除的 session SHALL 显示 recovery state，不得静默创建或替换 session。
+系统 SHALL 只在用户显式调用 `POST /v1/chat/sessions` 时创建 session；对不存在或已删除的 session 的访问 SHALL 返回稳定错误（404），不得静默创建或替换 session。
 
-#### Scenario: Fresh local Web visit 不自动创建 session
-- **WHEN** 用户打开不含 `session` query 的本地 Web URL
-- **THEN** Web 展示 landing 与 history，且不发送创建 session 的请求
 
 #### Scenario: 显式 New Chat
-- **WHEN** 用户在 landing 执行 New Chat 且创建成功
-- **THEN** 系统恰好创建一个 session，并导航到含返回 id 的 canonical URL
+- **WHEN** 用户显式调用 `POST /v1/chat/sessions` 且创建成功
+- **THEN** 系统恰好创建一个 session，并返回其 id
 
-#### Scenario: Stale session URL
-- **WHEN** canonical URL 指向不存在或已被 retention job 删除的 session
-- **THEN** Web 展示 history、New Chat 与可恢复错误，且不创建替代 session
 
 #### Scenario: Closed session 保持只读
 - **WHEN** 用户打开 retention 范围内的 closed session
-- **THEN** 系统展示其历史内容但禁止发送新消息，且不提供隐式 reopen
+- **THEN** 系统提供其历史内容但拒绝新消息发送，且不提供隐式 reopen
 
 ### Requirement: Tenant-scoped enriched history API
 系统 SHALL 提供 tenant-scoped `GET /v1/chat/sessions`，返回 moderate enriched item：`sessionId`、`status`、可选 `title`、可选 `preview`、可选 `lastMessageRole`、可选 `lastMessageAt`、可选 `archivedAt`、`createdAt`、`updatedAt`、`retentionEligibleAt`；response SHALL NOT 嵌入 transcript、runs、summaries 或 message count。`limit` SHALL 默认 30 且范围为 1–100，`status` SHALL 支持 `all|open|closed`，`q` SHALL 最多 100 code points且按 effective title 做 case-insensitive literal contains——effective title 为存储 `title`，`title IS NULL` 时回退为该 session 在当前 locale 下的默认显示标题（en 为 `Untitled Chat`，zh-CN 为 `未命名对话`），使搜索词与列表展示的兜底标题一致，`archived` SHALL 仅接受 `true|false` 且缺省为 `false`，所有 query schema SHALL 拒绝额外字段。缺省与 `archived=false` SHALL 只返回 `archived_at IS NULL` 的 session；`archived=true` SHALL 只返回已归档 session；`archived` SHALL 与 `status` 正交组合并参与 cursor 的 normalized filter 绑定。
@@ -74,10 +68,10 @@ History SHALL 按 `(updated_at DESC, session_id DESC)` 排序，并使用包含 
 
 #### Scenario: 并发活跃记录的收敛
 - **WHEN** continuation 期间 session 被创建或更新并移动到当前 cursor 之前
-- **THEN**当前 continuation 不保证返回该记录，刷新第一页后 SHALL 返回它，UI 不得将此行为描述为 strict snapshot
+- **THEN**当前 continuation 不保证返回该记录，刷新第一页后 SHALL 返回它
 
 ### Requirement: 安全且可辨识的 title 与 preview
-Workspace显式New Chat调用`POST /v1/chat/sessions`时，Web request body SHALL省略`title`且API/store SHALL以SQL `NULL` title创建session，不得发送或注入占位title。首条persisted user message SHALL在message/run/event的同一事务中为`NULL` title派生最多80 code points的标题，且不得覆盖显式title。History preview SHALL只使用最新persisted message的首个非空text或sanitized artifact label，且在归一化与截断前 SHALL 剔除该 text 中的 `<think>…</think>` 推理区间（含未闭合 `<think>` 时剔除其后全部内容）；剔除后无剩余可展示文本时，preview SHALL 回退到该 message 的下一可用非空 text part，仍无则该字段缺省，SHALL NOT 以空白或推理原文充当 preview。Preview 最多160 code points；SHALL NOT读取Artifact body。Preview SHALL NOT参与v1 search。
+显式调用`POST /v1/chat/sessions`创建 session 时，API/store SHALL以SQL `NULL` title创建，不得发送或注入占位title。首条persisted user message SHALL在message/run/event的同一事务中为`NULL` title派生最多80 code points的标题，且不得覆盖显式title。History preview SHALL只使用最新persisted message的首个非空text或sanitized artifact label，且在归一化与截断前 SHALL 剔除该 text 中的 `<think>…</think>` 推理区间（含未闭合 `<think>` 时剔除其后全部内容）；剔除后无剩余可展示文本时，preview SHALL 回退到该 message 的下一可用非空 text part，仍无则该字段缺省，SHALL NOT 以空白或推理原文充当 preview。Preview 最多160 code points；SHALL NOT读取Artifact body。Preview SHALL NOT参与v1 search。
 
 #### Scenario: 首条 user text 派生标题
 - **WHEN** open session 的首条 persisted user message 含有非空 text且 title 为 `NULL`
@@ -85,7 +79,7 @@ Workspace显式New Chat调用`POST /v1/chat/sessions`时，Web request body SHAL
 
 #### Scenario: Workspace New Chat 以 NULL title 创建
 - **WHEN**用户在Workspace显式执行New Chat
-- **THEN**Web发送的POST body不含`title`字段，API/store创建`title IS NULL`的session，且首条persisted user text提交前不写入`Local Sage Chat`或其他占位值
+- **THEN**POST body不含`title`字段时，API/store创建`title IS NULL`的session，且首条persisted user text提交前不写入`Local Sage Chat`或其他占位值
 
 #### Scenario: 显式 title 不被覆盖
 - **WHEN**session由未来API client显式设置title，包括显式设置为`Local Sage Chat`，随后持久化首条user text
@@ -117,22 +111,6 @@ Workspace显式New Chat调用`POST /v1/chat/sessions`时，Web request body SHAL
 #### Scenario: 独立 component 并发 migration
 - **WHEN** Chat 与 Provider Catalog 从不同入口并发执行 migration
 - **THEN**每个 component 按自身 manifest和advisory lock有序推进，共享 ledger但不把 Catalog migration塞入Chat component
-
-### Requirement: Session history 加载失败时只展示错误态
-
-当 `GET /v1/chat/sessions` 失败时，Chat landing SHALL仅展示错误横幅，SHALL NOT同时渲染「No retained sessions」等空状态文案或「New Chat」以外的可交互历史控件。错误与空状态必须互斥，使用户明确区分「加载失败」与「无数据」。
-
-#### Scenario: History API 失败
-- **WHEN** 用户打开 Chat landing 且 history 接口返回错误
-- **THEN** UI 展示「Chat history unavailable」及具体错误信息，不展示空状态面板、历史列表或 Load more
-
-#### Scenario: History API 成功但无数据
-- **WHEN** history 接口返回空列表且状态码为 200
-- **THEN** UI 正常展示「No retained sessions」空状态与 New Chat 按钮
-
-#### Scenario: History API 成功后筛选无结果
-- **WHEN** 用户在已有历史数据时切换 status filter 导致当前筛选结果为空
-- **THEN** UI 展示筛选后的空提示，不展示全量加载错误
 
 ### Requirement: 显式归档与恢复
 系统 SHALL 提供 `POST /v1/chat/sessions/:sessionId/archive` 与 `POST /v1/chat/sessions/:sessionId/unarchive`。归档 SHALL 以 `archived_at` 非空表达且幂等：重复归档保留首次归档时间；恢复 SHALL 置空 `archived_at` 且幂等，并保持 session 原 `open`/`closed` 状态不变。归档与恢复 SHALL NOT 修改 `updated_at` 或 `retentionEligibleAt`。session 不存在时两操作 SHALL 返回 404 `CHAT_SESSION_NOT_FOUND`。已归档 session SHALL 只读：提交新消息与 retry SHALL 被拒绝且不隐式 reopen；恢复后按原状态恢复可写性。

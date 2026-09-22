@@ -22,7 +22,7 @@ export interface PostgresTaskStorePools {
   readonly projection: PoolConfig | Pool;
 }
 
-interface LedgerRow extends QueryResultRow { status: 'claimed' | 'committed' | 'effect_unknown' | 'cancelled'; lease_expires_at: Date | string | null; result: unknown }
+interface LedgerRow extends QueryResultRow { status: 'claimed' | 'committed' | 'effect_unknown' | 'cancelled' | 'failed'; lease_expires_at: Date | string | null; result: unknown }
 interface ProjectionRow extends QueryResultRow {
   tenant_id: string; task_id: string; workflow_id: string; task_type: TaskProjection['taskType']; target_id: string;
   attempt: number; status: TaskProjection['status']; revision: number; projection_source: TaskProjection['projectionSource']; history_event_id: string | number;
@@ -32,6 +32,7 @@ interface ProjectionRow extends QueryResultRow {
   logical_cursor: string | null; authority_receipt_digest: string | null; projection_freshness: TaskProjection['projectionFreshness'] | null;
   freshness_reason: string | null; last_reconciled_at: Date | string | null; last_repair_id: string | null;
   last_reconciliation_error: string | null; projection_audit_version: string | number | null;
+  failure_code: string | null; failure_detail: string | null;
 }
 interface OutboxRow extends QueryResultRow { outbox_id: string | number; idempotency_key: string; projection: unknown }
 interface PendingRepairRow extends QueryResultRow { audit: unknown }
@@ -50,8 +51,8 @@ interface PackageInputRow extends QueryResultRow {
 }
 
 interface RunOutputRow extends QueryResultRow {
-  tenant_id: string; task_id: string; artifact_ref: string; output: string;
-  media_type: string; created_at: Date | string;
+  tenant_id: string; task_id: string; artifact_ref: string; output: string | null;
+  package_bytes: Buffer | null; file_manifest: unknown; media_type: string; created_at: Date | string;
 }
 
 interface RunAgentSettingsRow extends QueryResultRow {
@@ -84,6 +85,7 @@ interface TaskViewRow extends RoutingRow {
   projection_freshness_reason?: string | null; projection_last_reconciled_at?: Date | string | null;
   projection_last_repair_id?: string | null; projection_last_reconciliation_error?: string | null;
   projection_audit_version?: string | number | null;
+  projection_failure_code?: string | null; projection_failure_detail?: string | null;
 }
 const json = (value: unknown): string => JSON.stringify(value);
 const poolOf = (config: PoolConfig | Pool): Pool => config instanceof Pool ? config : new Pool(config);
@@ -117,7 +119,8 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
       new URL('../../task-domain/migrations/004_task_run_output.sql', import.meta.url),
       new URL('../../task-domain/migrations/005_run_agent_settings.sql', import.meta.url),
       new URL('../../task-domain/migrations/006_provider_connections.sql', import.meta.url),
-      new URL('../../task-domain/migrations/007_task_package_run_contract.sql', import.meta.url)
+      new URL('../../task-domain/migrations/007_task_package_run_contract.sql', import.meta.url),
+      new URL('../../task-domain/migrations/008_output_package_and_failure.sql', import.meta.url)
     ];
     const migrations = (await Promise.all(migrationUrls.map((url) => readFile(url, 'utf8'))))
       .map((sql) => sql.replace(/^\s*BEGIN;\s*/, '').replace(/\s*COMMIT;\s*$/, '').trim());
@@ -157,17 +160,21 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
       if (!isAgentSliceResult(existing.result)) throw new TaskStoreError('claimSlice.invalidUnknownResult');
       return { status: 'effect_unknown', result: existing.result };
     }
+    if (existing.status === 'failed') {
+      if (!isAgentSliceResult(existing.result)) throw new TaskStoreError('claimSlice.invalidFailedResult');
+      return { status: 'failed', result: existing.result };
+    }
     if (existing.status === 'claimed') {
-      const result: AgentSliceResult = { schemaVersion: '1', taskId: input.taskId, sliceNumber: input.sliceNumber, outcome: 'effect_unknown', done: false, duplicate: true, detail: 'Prior Activity lease expired without a committed outcome' };
-      const updated = await this.#query<LedgerRow>('claimSlice.expireUnknown', `UPDATE task_effect_ledger SET status='effect_unknown',result=$2,
-        committed_at=now(),updated_at=now(),lease_expires_at=NULL WHERE idempotency_key=$1 AND status='claimed' AND lease_expires_at <= now()
-        RETURNING status,lease_expires_at,result`, [idempotencyKey, json(result)]);
-      const final = updated.rows[0];
-      if (final && isAgentSliceResult(final.result)) return { status: 'effect_unknown', result: final.result };
+      const reclaimed = await this.#query<LedgerRow>('claimSlice.reclaimExpired', `UPDATE task_effect_ledger
+        SET owner_token=$2,lease_expires_at=$3,updated_at=now()
+        WHERE idempotency_key=$1 AND status='claimed' AND lease_expires_at <= now()
+        RETURNING status,lease_expires_at,result`, [idempotencyKey, ownerToken, leaseExpiresAt]);
+      if (reclaimed.rowCount === 1) return { status: 'claimed' };
       const latest = (await this.#query<LedgerRow>('claimSlice.refresh', 'SELECT status,lease_expires_at,result FROM task_effect_ledger WHERE idempotency_key=$1', [idempotencyKey])).rows[0];
       if (latest?.status === 'cancelled') return { status: 'cancelled' };
       if (latest?.status === 'committed' && isAgentSliceResult(latest.result)) return { status: 'committed', result: latest.result };
       if (latest?.status === 'effect_unknown' && isAgentSliceResult(latest.result)) return { status: 'effect_unknown', result: latest.result };
+      if (latest?.status === 'failed' && isAgentSliceResult(latest.result)) return { status: 'failed', result: latest.result };
     }
     return { status: 'in_progress' };
   }
@@ -177,6 +184,9 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
   }
   async markEffectUnknown(idempotencyKey: string, ownerToken: string, result: AgentSliceResult, projection: TaskProjection): Promise<void> {
     await this.#finishSlice('effect_unknown', idempotencyKey, ownerToken, result, projection);
+  }
+  async markSliceFailed(idempotencyKey: string, ownerToken: string, result: AgentSliceResult, projection: TaskProjection): Promise<void> {
+    await this.#finishSlice('failed', idempotencyKey, ownerToken, result, projection);
   }
   async cancelSlice(idempotencyKey: string, ownerToken: string, projection: TaskProjection): Promise<void> {
     if (!isTaskProjection(projection) || projection.status !== 'cancelled') throw new Error('INVALID_TASK_CANCELLATION');
@@ -199,7 +209,7 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
     await this.#projectBestEffort(idempotencyKey, projection);
   }
 
-  async #finishSlice(status: 'committed' | 'effect_unknown', idempotencyKey: string, ownerToken: string, result: AgentSliceResult, projection: TaskProjection): Promise<void> {
+  async #finishSlice(status: 'committed' | 'effect_unknown' | 'failed', idempotencyKey: string, ownerToken: string, result: AgentSliceResult, projection: TaskProjection): Promise<void> {
     if (!isAgentSliceResult(result) || !isTaskProjection(projection)) throw new Error('INVALID_TASK_COMMIT');
     const client = await this.#pool.connect();
     try {
@@ -269,8 +279,8 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
     const freshness = projection.projectionFreshness ?? 'unavailable';
     const result=await client.query(`INSERT INTO task_projection
       (tenant_id,task_id,workflow_id,task_type,target_id,attempt,status,revision,projection_source,history_event_id,checkpoint_ref,artifact_ref,last_control_id,projection_updated_at,history_observed_at,
-       lifecycle_path,owner_token,adapter_ref,runtime_ref,logical_cursor,authority_receipt_digest,projection_freshness,freshness_reason,last_reconciled_at,last_repair_id,last_reconciliation_error,projection_audit_version)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::bigint,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27)
+       lifecycle_path,owner_token,adapter_ref,runtime_ref,logical_cursor,authority_receipt_digest,projection_freshness,freshness_reason,last_reconciled_at,last_repair_id,last_reconciliation_error,projection_audit_version,failure_code,failure_detail)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::bigint,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29)
       ON CONFLICT (tenant_id,task_id) DO UPDATE SET workflow_id=EXCLUDED.workflow_id,task_type=EXCLUDED.task_type,target_id=EXCLUDED.target_id,
       attempt=EXCLUDED.attempt,status=EXCLUDED.status,revision=EXCLUDED.revision,projection_source=EXCLUDED.projection_source,
       history_event_id=EXCLUDED.history_event_id,checkpoint_ref=EXCLUDED.checkpoint_ref,
@@ -279,13 +289,14 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
       adapter_ref=EXCLUDED.adapter_ref,runtime_ref=EXCLUDED.runtime_ref,logical_cursor=EXCLUDED.logical_cursor,
       authority_receipt_digest=EXCLUDED.authority_receipt_digest,projection_freshness=EXCLUDED.projection_freshness,
       freshness_reason=EXCLUDED.freshness_reason,last_reconciled_at=EXCLUDED.last_reconciled_at,last_repair_id=EXCLUDED.last_repair_id,
-      last_reconciliation_error=EXCLUDED.last_reconciliation_error,projection_audit_version=EXCLUDED.projection_audit_version
+      last_reconciliation_error=EXCLUDED.last_reconciliation_error,projection_audit_version=EXCLUDED.projection_audit_version,
+      failure_code=EXCLUDED.failure_code,failure_detail=EXCLUDED.failure_detail
       WHERE task_projection.attempt < EXCLUDED.attempt OR (task_projection.attempt=EXCLUDED.attempt AND (
         (EXCLUDED.projection_source='history' AND (task_projection.projection_source='writer' OR task_projection.history_event_id < EXCLUDED.history_event_id))
         OR (EXCLUDED.projection_source='writer' AND task_projection.projection_source='writer'
           AND (task_projection.revision < EXCLUDED.revision OR (task_projection.revision=EXCLUDED.revision AND task_projection.projection_updated_at < EXCLUDED.projection_updated_at))
           AND NOT (task_projection.status IN ('succeeded','failed','cancelled','effect_unknown') AND EXCLUDED.status IN ('running','paused')))
-      ))`,[projection.tenantId,projection.taskId,projection.workflowId,projection.taskType,projection.targetId,projection.attempt,projection.status,projection.revision,projection.projectionSource,projection.historyEventId,projection.checkpointRef??null,projection.artifactRef??null,projection.lastControlId??null,projection.projectionUpdatedAt,projection.historyObservedAt,lifecyclePath,ownerToken,adapterRef,runtimeRef,logicalCursor,projection.authorityReceiptDigest??null,freshness,projection.freshnessReason??null,projection.lastReconciledAt??null,projection.lastRepairId??null,projection.lastReconciliationError??null,projection.projectionAuditVersion??0]);
+      ))`,[projection.tenantId,projection.taskId,projection.workflowId,projection.taskType,projection.targetId,projection.attempt,projection.status,projection.revision,projection.projectionSource,projection.historyEventId,projection.checkpointRef??null,projection.artifactRef??null,projection.lastControlId??null,projection.projectionUpdatedAt,projection.historyObservedAt,lifecyclePath,ownerToken,adapterRef,runtimeRef,logicalCursor,projection.authorityReceiptDigest??null,freshness,projection.freshnessReason??null,projection.lastReconciledAt??null,projection.lastRepairId??null,projection.lastReconciliationError??null,projection.projectionAuditVersion??0,projection.failureCode??null,projection.failureDetail??null]);
     return (result.rowCount??0)>0;
   }
 
@@ -311,6 +322,8 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
       ...(row.last_repair_id == null ? {} : { lastRepairId: row.last_repair_id }),
       ...(row.last_reconciliation_error == null ? {} : { lastReconciliationError: row.last_reconciliation_error }),
       ...(row.projection_audit_version == null ? {} : { projectionAuditVersion: Number(row.projection_audit_version) }),
+      ...(row.failure_code == null ? {} : { failureCode: row.failure_code }),
+      ...(row.failure_detail == null ? {} : { failureDetail: row.failure_detail }),
       projectionUpdatedAt: iso(row.projection_updated_at), historyObservedAt: iso(row.history_observed_at)
     };
     if (!isTaskProjection(projection)) throw new TaskStoreError('getProjection.invalid');
@@ -403,7 +416,7 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
     const limit = filter.limit ?? 100;
     if (!Number.isInteger(limit) || limit < 1 || limit > 500 || !Number.isFinite(freshnessThresholdMs) || freshnessThresholdMs < 0) throw new Error('INVALID_TASK_LIST_FILTER');
     const rows = (await this.#query<TaskViewRow>('listTaskViews', `SELECT r.*,
-      p.task_id AS projection_task_id,p.attempt,p.status AS projection_status,p.revision,p.projection_source,p.history_event_id,p.checkpoint_ref,p.artifact_ref,p.last_control_id,p.projection_updated_at,p.history_observed_at
+      p.task_id AS projection_task_id,p.attempt,p.status AS projection_status,p.revision,p.projection_source,p.history_event_id,p.checkpoint_ref,p.artifact_ref,p.last_control_id,p.projection_updated_at,p.history_observed_at,p.failure_code AS projection_failure_code,p.failure_detail AS projection_failure_detail
       FROM task_routing r LEFT JOIN task_projection p ON p.tenant_id=r.tenant_id AND p.task_id=r.task_id
       WHERE r.tenant_id=$1 AND ($2::text IS NULL OR p.status=$2) AND ($3::text IS NULL OR r.task_type=$3)
         AND ($4::text IS NULL OR r.target_snapshot->>'environment'=$4)
@@ -413,7 +426,7 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
 
   async getTaskView(tenantId: string, taskId: string, now = new Date(), freshnessThresholdMs = 30_000): Promise<TaskProjectionView | undefined> {
     const rows = (await this.#query<TaskViewRow>('getTaskView', `SELECT r.*,
-      p.task_id AS projection_task_id,p.attempt,p.status AS projection_status,p.revision,p.projection_source,p.history_event_id,p.checkpoint_ref,p.artifact_ref,p.last_control_id,p.projection_updated_at,p.history_observed_at
+      p.task_id AS projection_task_id,p.attempt,p.status AS projection_status,p.revision,p.projection_source,p.history_event_id,p.checkpoint_ref,p.artifact_ref,p.last_control_id,p.projection_updated_at,p.history_observed_at,p.failure_code AS projection_failure_code,p.failure_detail AS projection_failure_detail
       FROM task_routing r LEFT JOIN task_projection p ON p.tenant_id=r.tenant_id AND p.task_id=r.task_id
       WHERE r.tenant_id=$1 AND r.task_id=$2`,[tenantId,taskId])).rows;
     return rows[0] === undefined ? undefined : this.#viewFromRow(rows[0],now,freshnessThresholdMs);
@@ -497,7 +510,8 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
       ...(routing.startEnvelope.input.sessionId?{sessionId:routing.startEnvelope.input.sessionId}:{}),
       ...(routing.startEnvelope.input.runId?{runId:routing.startEnvelope.input.runId}:{}),
       ...(routing.startEnvelope.input.messageId?{messageId:routing.startEnvelope.input.messageId}:{}),
-      ...(row.checkpoint_ref?{checkpointRef:row.checkpoint_ref as NonNullable<TaskProjectionView['checkpointRef']>}:{}),...(row.artifact_ref?{artifactRef:row.artifact_ref as NonNullable<TaskProjectionView['artifactRef']>}:{})};
+      ...(row.checkpoint_ref?{checkpointRef:row.checkpoint_ref as NonNullable<TaskProjectionView['checkpointRef']>}:{}),...(row.artifact_ref?{artifactRef:row.artifact_ref as NonNullable<TaskProjectionView['artifactRef']>}:{}),
+      ...(row.projection_failure_code?{failureCode:row.projection_failure_code}:{}),...(row.projection_failure_detail?{failureDetail:row.projection_failure_detail}:{})};
   }
 
   #routingRecord(row: RoutingRow): TaskRoutingRecord {
@@ -586,33 +600,41 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
   async writeRunOutput(record: TaskRunOutputRecord): Promise<{ readonly status: 'stored' | 'existing' }> {
     if (record === null || typeof record !== 'object' || typeof record.tenantId !== 'string' || typeof record.taskId !== 'string'
       || typeof record.artifactRef !== 'string' || !record.artifactRef.startsWith('artifact://')
-      || typeof record.output !== 'string' || record.output.length === 0 || typeof record.mediaType !== 'string') {
+      || typeof record.mediaType !== 'string') {
       throw new TaskStoreError('writeRunOutput.invalid');
     }
+    const textOutput = typeof record.output === 'string' && record.output.length > 0 ? record.output : undefined;
+    const packageBytes = record.packageBytes !== undefined && record.packageBytes.byteLength > 0
+      ? Buffer.from(record.packageBytes) : undefined;
+    if (textOutput === undefined && packageBytes === undefined) throw new TaskStoreError('writeRunOutput.invalid');
+    const manifest = record.fileManifest ?? (record.files ?? []).map((name) => ({ name, sizeBytes: 0, mediaType: record.mediaType }));
     const inserted = await this.#query('writeRunOutput.insert', `INSERT INTO task_run_output
-      (tenant_id, task_id, artifact_ref, output, media_type, created_at)
-      VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (tenant_id, task_id) DO NOTHING RETURNING tenant_id`,
-      [record.tenantId, record.taskId, record.artifactRef, record.output, record.mediaType, iso(record.createdAt)]);
-    // 本地栈没有常驻 reconciler 派生引用行；随输出一并幂等登记，使 artifact 列表/详情可用。
+      (tenant_id, task_id, artifact_ref, output, package_bytes, file_manifest, media_type, created_at)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT (tenant_id, task_id) DO NOTHING RETURNING tenant_id`,
+      [record.tenantId, record.taskId, record.artifactRef, textOutput ?? null, packageBytes ?? null, json(manifest), record.mediaType, iso(record.createdAt)]);
     const artifactId = `artifact-${record.artifactRef.split('/').slice(-2).join('-')}`;
+    const packageName = packageBytes === undefined ? 'task-output' : 'output.tar.gz';
     await this.#query('writeRunOutput.artifactRef', `INSERT INTO task_artifact_reference
-      (tenant_id, task_id, artifact_id, artifact_ref, attempt, name, media_type) VALUES ($1,$2,$3,$4,1,'task-output',$5)
+      (tenant_id, task_id, artifact_id, artifact_ref, attempt, name, media_type) VALUES ($1,$2,$3,$4,1,$5,$6)
       ON CONFLICT (tenant_id, task_id, artifact_ref) DO NOTHING`,
-      [record.tenantId, record.taskId, artifactId, record.artifactRef, record.mediaType]);
-    // 声明式产物名清单：以 `#file/` 后缀引用登记（取回器按基准引用解析内容）。
-    for (const fileName of record.files ?? []) {
+      [record.tenantId, record.taskId, artifactId, record.artifactRef, packageName, record.mediaType]);
+    for (const entry of manifest) {
       await this.#query('writeRunOutput.artifactFile', `INSERT INTO task_artifact_reference
         (tenant_id, task_id, artifact_id, artifact_ref, attempt, name, media_type) VALUES ($1,$2,$3,$4,1,$5,$6)
         ON CONFLICT (tenant_id, task_id, artifact_ref) DO NOTHING`,
-        [record.tenantId, record.taskId, `${artifactId}-file-${fileName}`, `${record.artifactRef}#file/${fileName}`, fileName, record.mediaType]);
+        [record.tenantId, record.taskId, `${artifactId}-file-${entry.name}`, `${record.artifactRef}#file/${entry.name}`, entry.name, entry.mediaType]);
     }
     if (inserted.rowCount === 1) return { status: 'stored' };
     const existing = await this.#query<RunOutputRow>('writeRunOutput.get', `SELECT
-      tenant_id, task_id, artifact_ref, output, media_type, created_at
+      tenant_id, task_id, artifact_ref, output, package_bytes, file_manifest, media_type, created_at
       FROM task_run_output WHERE tenant_id=$1 AND task_id=$2`, [record.tenantId, record.taskId]);
     const row = existing.rows[0];
     if (row === undefined) throw new TaskStoreError('writeRunOutput.missing');
-    if (row.artifact_ref !== record.artifactRef || row.output !== record.output) {
+    const existingBytes = row.package_bytes === null ? undefined : row.package_bytes;
+    const sameText = (row.output ?? undefined) === textOutput;
+    const samePackage = (existingBytes === undefined && packageBytes === undefined)
+      || (existingBytes !== undefined && packageBytes !== undefined && existingBytes.equals(packageBytes));
+    if (row.artifact_ref !== record.artifactRef || !sameText || !samePackage) {
       throw new TaskStoreError('writeRunOutput.conflict');
     }
     return { status: 'existing' };
@@ -621,17 +643,20 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
   async getRunOutput(tenantId: string, taskId: string): Promise<TaskRunOutputRecord | undefined> {
     if (typeof tenantId !== 'string' || typeof taskId !== 'string') throw new TaskStoreError('getRunOutput.invalid');
     const result = await this.#query<RunOutputRow>('getRunOutput', `SELECT
-      tenant_id, task_id, artifact_ref, output, media_type, created_at
+      tenant_id, task_id, artifact_ref, output, package_bytes, file_manifest, media_type, created_at
       FROM task_run_output WHERE tenant_id=$1 AND task_id=$2`, [tenantId, taskId]);
     const row = result.rows[0];
     if (row === undefined) return undefined;
+    const manifest = Array.isArray(row.file_manifest) ? row.file_manifest as TaskRunOutputRecord['fileManifest'] : undefined;
     const record: TaskRunOutputRecord = {
       tenantId: row.tenant_id,
       taskId: row.task_id,
       artifactRef: row.artifact_ref as TaskRunOutputRecord['artifactRef'],
-      output: row.output,
       mediaType: row.media_type,
-      createdAt: iso(row.created_at)
+      createdAt: iso(row.created_at),
+      ...(row.output === null || row.output.length === 0 ? {} : { output: row.output }),
+      ...(row.package_bytes === null ? {} : { packageBytes: new Uint8Array(row.package_bytes) }),
+      ...(manifest === undefined ? {} : { fileManifest: manifest, files: manifest.map((entry) => entry.name) })
     };
     return record;
   }

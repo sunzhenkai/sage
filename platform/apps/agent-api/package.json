@@ -39,6 +39,7 @@
     "@sage/temporal-routing": "workspace:*",
     "@sage/temporal-schedules": "workspace:*",
     "@sage/tool-runtime": "workspace:*",
+    "@fastify/multipart": "9.4.0",
     "@temporalio/client": "1.22.0",
     "fastify": "5.11.3",
     "pg": "8.23.0",

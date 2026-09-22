@@ -818,7 +818,6 @@ Coordinator History 只保存 stable IDs、refs、digests、有界状态和 comm
 第一阶段建议维持模块化单体/少量部署单元：
 
 ```text
-agent-web
 agent-api
   ├── Interactive Host
   ├── Control Plane

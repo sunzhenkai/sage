@@ -54,13 +54,12 @@ This starts only compose PostgreSQL and runs the real Chat migration/store, Fast
 
 ## 应用服务
 
-完整本地应用栈包含 `agent-api`、`agent-worker`、`agent-web`，默认宿主端口如下：
+完整本地应用栈包含 `agent-api`、`agent-worker`，默认宿主端口如下：
 
 | 服务 | 宿主端口 | 健康/访问 |
 |---|---:|---|
 | `agent-api` | `9610` | `/livez`、`/readyz` |
 | `agent-worker` | `9611` | `/livez`、`/readyz`；返回 `sage-dev` 和 `sage-agent-task-v1` |
-| `agent-web` | `14173` | `/`；`/v1` 代理到 `agent-api` |
 
 端口可通过 `SAGE_API_HOST_PORT`、`SAGE_WORKER_HEALTH_HOST_PORT`、`SAGE_WEB_HOST_PORT` 覆盖。应用容器内部端口固定为 API `9610`、Worker health `9611`、Web `4173`，容器间必须使用 Compose service name。
 
@@ -80,7 +79,6 @@ corepack pnpm smoke:local
 ```bash
 SAGE_DEPLOYMENT_MODE=local corepack pnpm --filter @sage/agent-api dev
 SAGE_DEPLOYMENT_MODE=local corepack pnpm --filter @sage/agent-worker dev
-SAGE_API_PROXY_TARGET=http://127.0.0.1:9610 corepack pnpm --filter @sage/agent-web dev
 ```
 
 API/Worker 本地 runtime 使用 `PiHarness` 和固定 local principal，仅用于开发/联调；`SAGE_DEPLOYMENT_MODE` 不是生产身份开关。MinIO 当前作为独立本地基础设施运行，未声称已接入应用 Artifact Adapter。

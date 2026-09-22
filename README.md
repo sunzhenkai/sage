@@ -11,7 +11,7 @@ Sage 是一个面向多产品复用的 Agent 执行内核与运行时平台。�
 ```
 .
 ├── platform/         # 工作区根：apps / packages / examples / fixtures / docs / evidence
-│   ├── apps/         # agent-api、agent-worker、agent-web
+│   ├── apps/         # agent-api、agent-worker
 │   ├── packages/     # agent-contracts、tool-runtime、agent-state-postgres、…
 │   └── docs/         # 部署、运维、phase exit evidence
 ├── docs/design/      # 架构与 MVP 设计文档（语言无关的 Contract）
@@ -24,7 +24,6 @@ Sage 是一个面向多产品复用的 Agent 执行内核与运行时平台。�
 
 - **Language**: TypeScript (Node.js `24.14.0`)
 - **Package Manager**: pnpm `10.33.0` (via Corepack)
-- **Web**: React + Vite
 - **API**: Fastify + HTTP/JSON + SSE
 - **Workflow**: Temporal TypeScript SDK (`temporalio/auto-setup:1.29.1`)
 - **Storage**: PostgreSQL `17.6` (Chat / Task Projection / Agent State) + S3-compatible Artifact Store (MinIO)
@@ -43,7 +42,7 @@ docker compose up -d --wait postgres temporal artifact-store
 TOKEN=$(openssl rand -hex 32)
 printf 'SAGE_SERVICE_TOKEN=%s\nSAGE_SERVICE_TOKEN_HASHES=%s\n' "$TOKEN" "$(printf '%s' "$TOKEN" | sha256sum | cut -d' ' -f1)" >> .env
 
-docker compose up -d --build --wait agent-api agent-worker agent-web
+docker compose up -d --build --wait agent-api agent-worker
 
 # 健康检查
 curl http://127.0.0.1:9610/readyz

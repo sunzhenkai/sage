@@ -20,6 +20,7 @@
     "@sage/agent-client": "workspace:*",
     "@sage/agent-contracts": "workspace:*",
     "@sage/agent-lib": "workspace:*",
+    "@sage/agent-package-release": "workspace:*",
     "@sage/agent-run-admission": "workspace:*",
     "@sage/agent-state-postgres": "workspace:*",
     "@sage/chat-domain": "workspace:*",

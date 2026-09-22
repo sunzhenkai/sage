@@ -39,7 +39,6 @@
 TypeScript + Node.js
 PiHarness
 Fastify + HTTP/JSON + SSE
-React + Vite
 Temporal TypeScript SDK
 PostgreSQL Chat/Task Projection/Agent State
 S3-compatible Artifact Store
@@ -52,11 +51,6 @@ LocalAgentClient
 ## 目标架构
 
 ```text
-Agent Web UI
-├── Chat
-└── Tasks
-       │ HTTP/SSE
-       ▼
 Application API
 ├── Chat Service ──> Chat Store
 │      ├── short run ──> Agent Library
@@ -170,10 +164,6 @@ Session / Task / Checkpoint -X-> 明文 Secret
 - [第一版 Architecture Review](./first-version-system.architecture-review.yaml)
 - [MVP 1：通用 Agent Library](./agent-library-mvp.md)
 - [MVP 2：独立 Agent Application](./long-running-agent-app-mvp.md)
-- [Agent Application：Chat session history 与导航设计](./agent-application/session-history-and-navigation.md)
-- [Agent Application：Provider/Model Catalog 同步设计](./agent-application/provider-catalog-sync.md)
-- [Agent Application：Provider profile 与 Catalog UX 设计](./agent-application/provider-profile-catalog-ux.md)
-- [Agent Application：Workspace 交互契约设计](./agent-application/workspace-interaction-contracts.md)
 - [开放问题与决策门](./open-questions.md)
 
 ### Generic Agent Platform final validation

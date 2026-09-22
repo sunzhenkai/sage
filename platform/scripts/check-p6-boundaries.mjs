@@ -1,11 +1,11 @@
 import {readFile} from 'node:fs/promises';
 import {join} from 'node:path';
 const root=new URL('..',import.meta.url).pathname;const read=(path)=>readFile(join(root,path),'utf8');
-const [promotion,chat,chatMigration,pgImmutability,task,taskMigration,store,routing,api,ui,observability,e2e,worker,dashboard,alerts,agentDoc,appDoc,exit,manifest,workspace]=await Promise.all([
+const [promotion,chat,chatMigration,pgImmutability,task,taskMigration,store,routing,api,observability,e2e,worker,dashboard,alerts,agentDoc,appDoc,exit,manifest,workspace]=await Promise.all([
   read('apps/agent-api/src/promotion.ts'),read('packages/chat-domain/src/index.ts'),read('packages/chat-domain/migrations/001_chat.sql'),read('packages/chat-domain/src/p6-immutability.integration.test.ts'),
   read('packages/task-domain/src/index.ts'),read('packages/task-domain/migrations/001_task_store.sql'),read('packages/task-store-postgres/src/index.ts'),
-  read('packages/temporal-routing/src/index.ts'),read('apps/agent-api/src/task-api.ts'),read('apps/agent-web/src/tasks.tsx'),read('packages/observability/src/index.ts'),
-  read('examples/p6-integration/src/p6.e2e.test.tsx'),read('apps/agent-worker/src/activities.ts'),read('observability/grafana/sage-p6-cross-chain.json'),read('observability/prometheus/sage-p6-alerts.yaml'),read('../docs/design/agent-library-mvp.md'),read('../docs/design/long-running-agent-app-mvp.md'),
+  read('packages/temporal-routing/src/index.ts'),read('apps/agent-api/src/task-api.ts'),read('packages/observability/src/index.ts'),
+  read('examples/p6-integration/src/p6.e2e.test.ts'),read('apps/agent-worker/src/activities.ts'),read('observability/grafana/sage-p6-cross-chain.json'),read('observability/prometheus/sage-p6-alerts.yaml'),read('../docs/design/agent-library-mvp.md'),read('../docs/design/long-running-agent-app-mvp.md'),
   read('docs/p6-exit-review.md'),read('examples/p6-integration/package.json').then(JSON.parse),read('package.json').then(JSON.parse)
 ]);
 const failures=[];const require=(condition,message)=>{if(!condition)failures.push(message);};
@@ -27,7 +27,6 @@ require(task.includes('historyEventId')&&task.includes('projectionSource')&&task
 require(api.includes('TASK_HTTP_AUTH_CONFIGURATION_REQUIRED')&&api.includes('authenticateRequest'),'Task HTTP auth must fail closed and support verified session principal');
 require(routing.includes('batchSize>500')&&store.includes('ON CONFLICT (tenant_id,task_id,source_event_id) DO NOTHING'),'bounded/idempotent reconciliation missing');
 require(api.includes("'/v1/tasks'")&&api.includes("'/v1/tasks/:taskId/events'")&&api.includes('ARTIFACT_STORE_UNAVAILABLE'),'Task read/artifact APIs missing');
-require(ui.includes('ProjectionFreshness')&&ui.includes('TaskList')&&ui.includes('controlAllowed'),'Task UI incomplete');
 require(observability.includes('P6_CROSS_CHAIN_DASHBOARD')&&observability.includes('target-unavailable'),'Dashboard/alerts missing');
 for(const scenario of ['NativeConnection.connect','Worker.create','createAgentTaskActivities','TemporalTaskHistorySource','reader.read()','INJECTED_P6_WORKER_RESTART_AFTER_COMMIT','setProjectionWritesEnabled(false)','artifactDown','127.0.0.1:1'])require(e2e.includes(scenario),`P6 real E2E scenario missing: ${scenario}`);
 require(!e2e.includes('FakeTemporalTarget'),'P6 E2E must not use a fake Temporal target');

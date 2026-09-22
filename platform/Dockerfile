@@ -10,8 +10,7 @@ COPY examples ./examples
 COPY spikes ./spikes
 COPY scripts ./scripts
 RUN pnpm install --frozen-lockfile
-RUN pnpm exec tsc -b --pretty false \
- && pnpm --filter @sage/agent-web build
+RUN pnpm exec tsc -b --pretty false
 
 FROM node:24.14.0-bookworm-slim AS runtime
 ENV NODE_ENV=development
@@ -24,6 +23,3 @@ CMD ["node", "apps/agent-api/dist/runtime.js"]
 FROM runtime AS agent-worker
 CMD ["node", "apps/agent-worker/dist/runtime.js"]
 
-FROM runtime AS agent-web
-WORKDIR /workspace/apps/agent-web
-CMD ["node", "node_modules/vite/bin/vite.js", "preview", "--host", "0.0.0.0", "--port", "4173", "--strictPort"]

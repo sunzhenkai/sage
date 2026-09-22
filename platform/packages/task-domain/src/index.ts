@@ -165,9 +165,10 @@ export type ExecuteAgentSliceInput = Static<typeof ExecuteAgentSliceInputSchema>
 
 export const AgentSliceResultSchema = Type.Object({
   schemaVersion: Type.Literal('1'), taskId: Id, sliceNumber: Type.Integer({ minimum: 1 }),
-  outcome: Type.Union([Type.Literal('committed'), Type.Literal('effect_unknown')]), done: Type.Boolean(),
+  outcome: Type.Union([Type.Literal('committed'), Type.Literal('effect_unknown'), Type.Literal('failed')]), done: Type.Boolean(),
   checkpointRef: Type.Optional(TaskCheckpointRefSchema), artifactRef: Type.Optional(TaskArtifactRefSchema),
-  duplicate: Type.Boolean(), detail: Type.Optional(Type.String({ minLength: 1, maxLength: 500 }))
+  duplicate: Type.Boolean(), detail: Type.Optional(Type.String({ minLength: 1, maxLength: 500 })),
+  failureCode: Type.Optional(Type.String({ minLength: 1, maxLength: 128 }))
 }, { additionalProperties: false, $id: 'AgentSliceResult.v1' });
 export type AgentSliceResult = Static<typeof AgentSliceResultSchema>;
 
@@ -193,7 +194,9 @@ export const TaskProjectionSchema = Type.Object({
   projectionFreshness: Type.Optional(ProjectionFreshnessSchema), freshnessReason: Type.Optional(Type.String({ minLength: 1, maxLength: 256 })),
   lastReconciledAt: Type.Optional(Timestamp), lastRepairId: Type.Optional(Id),
   lastReconciliationError: Type.Optional(Type.String({ minLength: 1, maxLength: 256 })),
-  projectionAuditVersion: Type.Optional(Type.Integer({ minimum: 0 }))
+  projectionAuditVersion: Type.Optional(Type.Integer({ minimum: 0 })),
+  failureCode: Type.Optional(Type.String({ minLength: 1, maxLength: 128 })),
+  failureDetail: Type.Optional(Type.String({ minLength: 1, maxLength: 2_048 }))
 }, { additionalProperties: false, $id: 'TaskProjection.v1' });
 export type TaskProjection = Static<typeof TaskProjectionSchema>;
 
@@ -205,12 +208,14 @@ export type SliceClaim =
   | { readonly status: 'in_progress' }
   | { readonly status: 'cancelled' }
   | { readonly status: 'committed'; readonly result: AgentSliceResult }
-  | { readonly status: 'effect_unknown'; readonly result: AgentSliceResult };
+  | { readonly status: 'effect_unknown'; readonly result: AgentSliceResult }
+  | { readonly status: 'failed'; readonly result: AgentSliceResult };
 
 export interface TaskCommitStore {
   claimSlice(input: ExecuteAgentSliceInput, idempotencyKey: string, ownerToken: string, leaseExpiresAt: string): Promise<SliceClaim>;
   commitSlice(idempotencyKey: string, ownerToken: string, result: AgentSliceResult, projection: TaskProjection): Promise<void>;
   markEffectUnknown(idempotencyKey: string, ownerToken: string, result: AgentSliceResult, projection: TaskProjection): Promise<void>;
+  markSliceFailed(idempotencyKey: string, ownerToken: string, result: AgentSliceResult, projection: TaskProjection): Promise<void>;
   cancelSlice(idempotencyKey: string, ownerToken: string, projection: TaskProjection): Promise<void>;
 }
 export interface TaskProjectionStore {
@@ -256,7 +261,13 @@ export interface TaskArtifactReference {
   readonly attempt: number; readonly name: string; readonly mediaType: string;
   /** Resolved content, present only when the local run-output store holds the body. */
   readonly content?: string;
-  readonly encoding?: 'utf-8';
+  readonly encoding?: 'utf-8' | 'base64';
+}
+
+export interface OutputFileManifestEntry {
+  readonly name: string;
+  readonly sizeBytes: number;
+  readonly mediaType: string;
 }
 
 /** 包运行输入的物化记录：entry prompt + references 清单 + 用户输入，含资产 digest 清单。 */
@@ -308,7 +319,10 @@ export interface TaskRunOutputRecord {
   readonly tenantId: string;
   readonly taskId: string;
   readonly artifactRef: TaskArtifactRef;
-  readonly output: string;
+  /** 存量文本行；新 run 以 packageBytes 为权威产物。 */
+  readonly output?: string;
+  readonly packageBytes?: Uint8Array;
+  readonly fileManifest?: readonly OutputFileManifestEntry[];
   readonly mediaType: string;
   /** 任务声明的产物名清单（manifest output.files）：物化时按名登记为可取回引用。 */
   readonly files?: readonly string[];
@@ -398,6 +412,7 @@ export interface TaskProjectionView {
   readonly projectionUpdatedAt?: string; readonly freshness: ProjectionFreshness; readonly staleReason?: ProjectionStaleReason;
   readonly targetSnapshot: WorkflowTargetSnapshot; readonly sessionId?:string; readonly runId?:string; readonly messageId?:string;
   readonly checkpointRef?: TaskCheckpointRef; readonly artifactRef?: TaskArtifactRef;
+  readonly failureCode?: string; readonly failureDetail?: string;
 }
 export interface TaskListFilter { readonly status?: TaskStatus; readonly taskType?: TaskTypeId; readonly environment?: WorkflowTargetSnapshot['environment']; readonly limit?: number }
 export interface ProjectionRepairAudit {
