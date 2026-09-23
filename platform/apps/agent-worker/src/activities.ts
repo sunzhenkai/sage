@@ -439,7 +439,7 @@ const summaryFromRejection = (input: DurableCoordinatorHostDispatchInput, result
   summaryFromHostFailure(input, result.code, result.code === 'KERNEL_CANCELLED' ? 'CANCELLED' : 'FAILED');
 
 /**
- * V2 dispatch binding to the Phase 1 Durable Host. The only result crossing the
+ * V2 dispatch binding to the Durable Host. The only result crossing the
  * Activity boundary is a validated, body-free CoordinatorReceiptSummary.
  */
 export function createDurableCoordinatorHostActivities(options: DurableCoordinatorHostActivityOptions): DurableCoordinatorHostActivities {

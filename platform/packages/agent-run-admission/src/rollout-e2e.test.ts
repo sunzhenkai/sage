@@ -25,7 +25,7 @@ const draft = () => ({
   boundsRef: 'bounds://summary/1', governanceRef: 'governance://summary/1', admittedAt: '2030-01-01T00:00:00.000Z',
 });
 
-describe('Phase 3 migration and rollback lifecycle', () => {
+describe('Migration and rollback lifecycle', () => {
   it('runs shadow to canonical to lossless legacy rollback without Spec drift or double owner', () => {
     const shadowConfig = parsePhase3AdmissionFeatureConfig({
       SAGE_AGENT_SHADOW_ADMISSION: 'true', SAGE_AGENT_ADMISSION_TENANT_ALLOWLIST: 'tenant-reference',

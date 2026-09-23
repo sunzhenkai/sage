@@ -614,14 +614,14 @@
     "adapter->framework-sdk"
   ],
   "openQuestions": [
-    "phase4:9.1",
-    "phase4:9.2",
-    "phase4:9.3",
-    "phase4:10.5",
-    "phase4:11.2",
-    "phase4:11.3",
-    "phase4:12.2",
-    "phase4:12.3",
-    "phase4:12.5"
+    "deferred:9.1",
+    "deferred:9.2",
+    "deferred:9.3",
+    "deferred:10.5",
+    "deferred:11.2",
+    "deferred:11.3",
+    "deferred:12.2",
+    "deferred:12.3",
+    "deferred:12.5"
   ]
 }

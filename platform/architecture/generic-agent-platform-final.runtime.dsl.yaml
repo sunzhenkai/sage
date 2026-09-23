@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "generator": "agent-platform-final@1",
   "modelId": "generic-agent-platform-final",
-  "modelDigest": "sha256:c29345b37fa4614515cb03624123b9e0d8314f8c17a07681513bb092f66c2188",
+  "modelDigest": "sha256:9a205ddb1e533110b6fcd562c421bc6fa3c002595e3c4f98b7c4ac156c883fd2",
   "status": "draft",
   "admission": "blocked",
   "trustBoundaries": [
@@ -770,5 +770,5 @@
       ]
     }
   ],
-  "contentDigest": "sha256:e4c63fd4a9059311f04ad81893064baea8375320eb83b7c3abec59a499b0928a"
+  "contentDigest": "sha256:6cc8b6bf4ae9438263186ef4d9e883ebd0baad89903f1d869f0bfade3df4c48b"
 }

@@ -68,10 +68,10 @@ export async function scanPaths(paths) {
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
   const targets = process.argv.slice(2);
-  if (targets.length === 0) throw new Error('usage: data-boundary-scanner.mjs <json-file-or-directory> [...]');
+  if (targets.length === 0) throw new Error('usage: scanner.mjs <json-file-or-directory> [...]');
   const result = await scanPaths(targets);
   if (result.findings.length) {
     console.error(result.findings.join('\n'));
     process.exitCode = 1;
-  } else console.log(`Phase 3 data-boundary scan: OK (${result.scanned} documents)`);
+  } else console.log(`Data-boundary scan: OK (${result.scanned} documents)`);
 }

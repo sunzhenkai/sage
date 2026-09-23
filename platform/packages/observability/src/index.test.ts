@@ -198,7 +198,7 @@ describe('Durable Coordinator operational signals', () => {
   });
 });
 
-describe('Phase 3 platform correlation telemetry', () => {
+describe('Platform correlation telemetry', () => {
   it('keeps Release/Admission/Spec/Target refs in sanitized traces/logs but not metric labels', () => {
     const stream = new CaptureStream();
     const metricAttributes: Attributes[] = [];

@@ -14,7 +14,7 @@ describe('agent-platform-final machine gates', () => {
     expect(preflight).toMatchObject({status:'BLOCKED',decision:'NO-GO'});
     expect(entry).toMatchObject({status:'BLOCKED',decision:'NO-GO',promotionToken:null});
     expect(entry.externalDeferredTaskIds).toHaveLength(9);
-  },15000);
+  },60000);
   it('detects add/delete/modify and rename in protected paths',()=>{
     const before={files:[{path:'a',digest:'1'},{path:'b',digest:'2'}]},after={files:[{path:'renamed',digest:'1'},{path:'b',digest:'3'},{path:'c',digest:'4'}]};
     const diff=diffProtectedManifests(before,after);

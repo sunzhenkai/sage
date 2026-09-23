@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { scanPaths, scanValue } from './data-boundary-scanner.mjs';
+import { scanPaths, scanValue } from './scanner.mjs';
 
-describe('Phase 3 Package/Release/runtime/audit/telemetry data-boundary scanner', () => {
+describe('Package/Release/runtime/audit/telemetry data-boundary scanner', () => {
   it('accepts reference-only Package, Release, Spec, Envelope, History, audit, log and trace fixtures', async () => {
     const result = await scanPaths([
-      new URL('../../fixtures/phase3/', import.meta.url).pathname,
+      new URL('../../fixtures/data-boundary/', import.meta.url).pathname,
       new URL('../../fixtures/reference-workload/controlled-summary/agent-package.json', import.meta.url).pathname
     ]);
     expect(result.scanned).toBe(2);
