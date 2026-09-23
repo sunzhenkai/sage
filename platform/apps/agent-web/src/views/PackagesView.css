@@ -17,7 +17,7 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  border-right: 1px solid var(--line);
+  border-right: 1px solid var(--target-line);
   padding: 14px;
 }
 
@@ -52,7 +52,7 @@
 }
 
 .pkg-row-id {
-  color: var(--muted);
+  color: var(--target-muted);
   font-size: 12px;
   white-space: nowrap;
   overflow: hidden;
@@ -65,7 +65,7 @@
   gap: 12px;
   min-width: 0;
   flex-wrap: wrap;
-  color: var(--muted);
+  color: var(--target-muted);
   font-size: 12px;
 }
 
@@ -78,7 +78,7 @@
 .pkg-section-title {
   font-size: 14px;
   font-weight: 700;
-  color: var(--sage-deep);
+  color: var(--target-info);
   margin: 6px 0 10px;
 }
 
@@ -106,14 +106,14 @@
 }
 
 .pkg-example-id {
-  color: var(--muted);
+  color: var(--target-muted);
   font-size: 12px;
 }
 
 .pkg-example-desc {
   margin: 0;
   font-size: 13px;
-  color: var(--muted);
+  color: var(--target-muted);
   flex: 1;
 }
 
@@ -160,19 +160,19 @@
 }
 
 .pkg-detail-id {
-  color: var(--muted);
+  color: var(--target-muted);
   font-size: 13px;
 }
 
 .pkg-detail-created {
-  color: var(--muted);
+  color: var(--target-muted);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
 
 .pkg-desc {
   margin: 0;
-  color: var(--muted);
+  color: var(--target-muted);
   font-size: 13px;
   max-width: 720px;
 }
@@ -191,13 +191,13 @@
 .pkg-subhead {
   font-size: 13px;
   font-weight: 700;
-  color: var(--sage-deep);
+  color: var(--target-info);
   margin: 14px 0 6px;
 }
 
 .pkg-hint,
 .pkg-muted {
-  color: var(--muted);
+  color: var(--target-muted);
   font-size: 12px;
   margin: 8px 0 0;
 }
@@ -223,7 +223,7 @@
 .pkg-run-disabled {
   margin: 0 0 10px;
   font-size: 13px;
-  color: var(--amber);
+  color: var(--target-warning);
 }
 
 .pkg-run-actions {
@@ -234,7 +234,7 @@
 
 .pkg-asset {
   padding: 8px 0;
-  border-bottom: 1px dotted var(--line);
+  border-bottom: 1px dotted var(--target-line);
 }
 
 .pkg-asset:last-child {
@@ -254,14 +254,14 @@
 }
 
 .pkg-asset-bytes {
-  color: var(--muted);
+  color: var(--target-muted);
   font-size: 12px;
   white-space: nowrap;
 }
 
 .pkg-digest {
   margin-left: auto;
-  color: var(--muted);
+  color: var(--target-muted);
   font-size: 12px;
   max-width: 220px;
   overflow: hidden;
@@ -272,18 +272,18 @@
 .pkg-asset-preview summary {
   cursor: pointer;
   font-size: 12px;
-  color: var(--muted);
+  color: var(--target-muted);
   margin-top: 6px;
 }
 
 .pkg-asset-preview pre {
   margin: 8px 0 0;
   padding: 10px 12px;
-  background: var(--surface-sunken);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
+  background: var(--target-neutral-wash);
+  border: 1px solid var(--target-line);
+  border-radius: var(--target-radius-sm);
   overflow-x: auto;
-  font-family: var(--mono);
+  font-family: var(--target-font-mono);
   font-size: 12px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;

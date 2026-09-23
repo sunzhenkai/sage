@@ -1,8 +1,10 @@
-# 设计语言（参考截图提炼）
+# 设计语言（类 Notion 目标视觉）
 
-- 状态：reference（视觉语言基线，供呈现层实现与评审对照）
+- 状态：target visual authority（类 Notion 目标视觉唯一权威）
 - 来源：8 张参考产品截图（设置/个人资料、命令面板、用户菜单、收件箱、聊天、任务看板、自动化空态、集成页）
-- 关联：布局契约 [`layout-v1.md`](./layout-v1.md)；色值与 token 为读图近似值，落地时以 `src/styles/global.css` 主题变量为准
+- 关联：结构契约 [`layout-v1.md`](./layout-v1.md)；目标 token 与迁移映射 [`target-token-map.md`](./target-token-map.md)；运行时实现 [`platform/apps/agent-web/src/styles/global.css`](../../platform/apps/agent-web/src/styles/global.css)
+- 取值规则：本文的设计 DNA、语义色、字号、圆角、阴影、图标和动效为目标视觉规范；截图中的近似值只用于解释意图，精确实现值以 `target-token-map.md` 冻结值为准。
+- 组件边界：命令面板、看板列、keycap、模板卡、下拉菜单头等是参考截图中的视觉样本，不是当前 `agent-web` 的功能需求；实现只迁移现有 surface，不因样本新建业务功能。
 
 ## 1. 一句话定位
 
@@ -118,3 +120,11 @@ Linear / Notion 一派的「安静型效率工具」：中性灰画布、发丝�
 ## 12. 速写提示（给 AI 生成/绘图用）
 
 > 「Linear/Notion 风格的安静效率工具：白底 + gray-50 侧栏，全部结构用 1px gray-200 发丝线，8–16px 圆角阶梯，Lucide 线性单色图标，灰阶之外只有状态语义色（琥珀=进行、蓝=完成、红=阻塞、绿=审核），看板列以 50 号淡色打底、白色圆角卡片浮层，空态是居中线性图标加一句灰字。」
+
+## 13. 权威与迁移说明
+
+- `design-language.md` 负责目标视觉身份、语义和组件语言。
+- `target-token-map.md` 负责目标 token 的精确值、当前值和 delta。
+- `layout-v1.md` 负责结构、交互和功能可观察行为，不重复定义视觉 token。
+- `global.css` 是运行时实现事实，只允许按 `target-token-map.md` 落地。
+- 当前园丁台视觉是迁移前实现状态，不是最终目标。

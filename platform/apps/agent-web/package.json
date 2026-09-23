@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b --pretty false",
+    "check:ui-tokens": "node scripts/check-ui-target-tokens.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

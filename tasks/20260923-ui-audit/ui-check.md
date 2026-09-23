@@ -1,7 +1,8 @@
-# agent-web UI 检查报告（Cursor + Grok 4.7，只读）
+# agent-web UI 检查报告（一次性快照，Cursor + Grok 4.7，只读）
 
 - 日期：2026-09-23；Endpoint：iship/cursor，模型 `grok-4.7[context=256k,reasoning_effort=high,fast=true]`
 - 基线：725ad1f（分支 fix/ui-0922）；范围 platform/apps/agent-web/src
+- 状态：历史一次性快照，不是契约，不作为后续验收依据。以下至少三条结论已与当前源码不符：导航标签隐藏方式、`.settings-page` 选择器、通知栈外层 `aria-live`；其余条目未在本轮复核。
 
 这是一次只读 UI/UX 检查。我先按界面审计流程加载约定，再对照 `CONTEXT.md` 和 `agent-web` 源码逐项核对。审计按只读证据标准走：先重建当前界面自己的设计契约和用语，再顺着各视图的渲染路径核对。不改任何文件。用语契约已经对上。接下来按各视图的渲染路径核对样式、交互和文案，只记能落到具体行号的问题。呈现层契约在 `layout-v1.md`。我先对照它核对布局 token 和选中态，避免把已经写明的取舍当成问题。这轮没有达到 P0 的项。视觉骨架（token、`.pane-item`、三段式、加载/空态/错误）是齐的；应修的是窄列表栏溢出、折叠导航丢掉可访问名称，以及 `CONTEXT.md` 里几处已经写明的禁词仍出现在界面上。
 

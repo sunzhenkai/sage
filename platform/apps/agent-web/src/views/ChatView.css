@@ -1,5 +1,4 @@
-/* Chat 视图：左侧会话列表 + 右侧会话区；时间线按“茎干”组织，
- * 运行中的轮次节点复用全局 bud-pulse 呼吸动效（记忆点）。 */
+/* Chat 视图：左侧会话列表 + 右侧会话区；时间线按轮次组织，状态反馈使用目标 token。 */
 
 .chat-view {
   flex: 1;
@@ -15,8 +14,8 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--line);
-  background: var(--surface);
+  border-right: 1px solid var(--target-line);
+  background: var(--target-surface);
 }
 
 .chat-list-controls {
@@ -24,7 +23,7 @@
   flex-direction: column;
   gap: 8px;
   padding: 10px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--target-line);
 }
 
 .chat-list-scroll {
@@ -52,7 +51,7 @@
   flex-direction: column;
   gap: 4px;
   padding: 8px 10px;
-  color: var(--ink);
+  color: var(--target-ink);
 }
 
 /* 行容器是 li，链接只包标题/预览/时间；操作按钮是链接的同级（见 ChatView.tsx 注释） */
@@ -60,7 +59,7 @@
   display: flex;
   flex-direction: column;
   gap: 3px;
-  color: var(--ink);
+  color: var(--target-ink);
   text-decoration: none;
   min-width: 0;
 }
@@ -85,7 +84,7 @@
 }
 
 .chat-session-preview {
-  color: var(--muted);
+  color: var(--target-muted);
   font-size: 12px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -96,7 +95,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  color: var(--faint-text);
+  color: var(--target-muted);
   font-size: 11px;
 }
 
@@ -142,8 +141,8 @@
   align-items: center;
   gap: 8px;
   padding: 10px 18px;
-  border-bottom: 1px solid var(--line);
-  background: var(--surface);
+  border-bottom: 1px solid var(--target-line);
+  background: var(--target-surface);
 }
 
 .chat-conv-title {
@@ -195,14 +194,13 @@
   flex: none;
   margin-top: 5px;
   border-radius: 50%;
-  background: var(--sage);
-  border: 2px solid var(--paper);
-  box-shadow: 0 0 0 1px var(--line-strong);
+  background: var(--target-info);
+  border: 2px solid var(--target-paper);
+  box-shadow: 0 0 0 1px var(--target-line-strong);
 }
 
 .turn-node-live {
-  background: var(--sage-deep);
-  animation: bud-pulse var(--dur-slow) ease-in-out infinite;
+  background: var(--target-info);
 }
 
 .turn-stem::after {
@@ -210,7 +208,7 @@
   width: 2px;
   flex: 1;
   margin-top: 4px;
-  background: var(--line-strong);
+  background: var(--target-line-strong);
   border-radius: 1px;
 }
 
@@ -232,7 +230,7 @@
 }
 
 .turn-attempt {
-  color: var(--muted);
+  color: var(--target-muted);
   font-size: 12px;
 }
 
@@ -247,13 +245,13 @@
 .user-bubble {
   max-width: 78%;
   padding: 8px 12px;
-  border-radius: var(--radius);
-  background: var(--sage-wash);
-  border: 1px solid #c4d6c2;
+  border-radius: var(--target-radius-md);
+  background: var(--target-success-wash);
+  border: 1px solid var(--target-success);
 }
 
 .turn-pending {
-  color: var(--muted);
+  color: var(--target-muted);
   font-style: italic;
   margin: 8px 0 0;
 }
@@ -272,15 +270,15 @@
 
 .thinking-block {
   margin: 8px 0;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--surface-sunken);
+  border: 1px solid var(--target-line);
+  border-radius: var(--target-radius-sm);
+  background: var(--target-neutral-wash);
   padding: 8px 12px;
 }
 
 .thinking-block summary {
   cursor: pointer;
-  color: var(--muted);
+  color: var(--target-muted);
   font-size: 13px;
   font-weight: 600;
 }
@@ -298,30 +296,30 @@
   flex-wrap: wrap;
   max-width: 100%;
   padding: 5px 10px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
+  border: 1px solid var(--target-line);
+  border-radius: var(--target-radius-sm);
+  background: var(--target-surface);
   font-size: 13px;
 }
 
 .act-row.act-error {
-  border-color: #e0bcab;
-  background: var(--clay-wash);
+  border-color: var(--target-danger);
+  background: var(--target-danger-wash);
 }
 
 .act-label {
-  color: var(--muted);
+  color: var(--target-muted);
   font-size: 12px;
 }
 
 .act-artifact {
-  font-family: var(--mono);
+  font-family: var(--target-font-mono);
   font-size: 12px;
   overflow-wrap: anywhere;
 }
 
 .act-note {
-  color: var(--muted);
+  color: var(--target-muted);
   font-size: 12px;
 }
 
@@ -334,8 +332,8 @@
 /* ---------- 输入区 ---------- */
 
 .chat-composer {
-  border-top: 1px solid var(--line);
-  background: var(--surface);
+  border-top: 1px solid var(--target-line);
+  background: var(--target-surface);
   padding: 12px 18px;
   display: flex;
   flex-direction: column;
@@ -359,21 +357,21 @@
 }
 
 .composer-runtime-hint {
-  color: var(--faint-text);
+  color: var(--target-muted);
   font-size: 12px;
 }
 
 .composer-note {
   font-size: 13px;
-  color: var(--muted);
+  color: var(--target-muted);
 }
 
 .composer-warn {
-  color: var(--amber);
+  color: var(--target-warning);
 }
 
 .composer-readonly {
-  color: var(--muted);
+  color: var(--target-muted);
 }
 
 .composer-quick {
@@ -410,7 +408,7 @@
   align-items: center;
   gap: 8px;
   margin-bottom: 4px;
-  color: var(--muted);
+  color: var(--target-muted);
   font-size: 12px;
 }
 

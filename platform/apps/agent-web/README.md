@@ -1,6 +1,6 @@
 # @sage/agent-web
 
-Sage 本地工作区的单页 Web 控制面。React 19 + Vite + TypeScript，无第三方 UI/状态框架；样式为手写 CSS（设计基线见 `src/styles/global.css` 头注）。功能契约以 `docs/design/ui/ui-v1.md` 为唯一依据。
+Sage 本地工作区的单页 Web 控制面。React 19 + Vite + TypeScript，无第三方 UI/状态框架；样式为手写 CSS。功能行为以 `docs/design/ui/ui-v1.md` 为准，目标视觉以 `docs/design/ui/design-language.md` 为准，结构/交互以 `docs/design/ui/layout-v1.md` 为准，目标 token 与迁移以 `docs/design/ui/target-token-map.md` 为准，运行时实现事实见 `src/styles/global.css`。
 
 ## 命令
 
@@ -50,6 +50,6 @@ corepack pnpm --filter @sage/agent-web preview
 
 ### 视觉基线
 
-主题：本地工作区的"园丁台"——暖纸底、墨绿、鼠尾草 accent；等宽字体承担 ID/时间/digest/事件负载。记忆点：Chat 时间线"茎干"，运行中的轮次节点为呼吸芽点。动效仅服务于状态表达，尊重 `prefers-reduced-motion`。
+目标视觉：类 Notion 安静型效率工具。视觉身份、语义色和组件语言见 `docs/design/ui/design-language.md`；精确 token 和迁移差异见 `docs/design/ui/target-token-map.md`。
 
-**呈现层验收依据：[`docs/design/ui/layout-v1.md`](../../../docs/design/ui/layout-v1.md)**——三段式布局（rail / 列表栏 `--pane-list-w` / 内容区）、三列职责、`.pane-item` 唯一选中规格、token 表（布局/间距/动效/对比度）、通知与徽标语义、仅亮色决策均以该文件为准。样式自定义的依据是 `src/styles/global.css` 头注与 layout-v1 token；`docs/design/ui/ui-v1-frontend-prompt.md` §3「样式是自由度，不是验收项」与 §4「明确不设限」写于呈现层无契约时期，仅作历史语境，现行验收不再适用。
+**呈现验收入口：** 功能契约 [`docs/design/ui/ui-v1.md`](../../../docs/design/ui/ui-v1.md)；目标视觉 [`docs/design/ui/design-language.md`](../../../docs/design/ui/design-language.md)；结构/交互 [`docs/design/ui/layout-v1.md`](../../../docs/design/ui/layout-v1.md)；目标 token [`docs/design/ui/target-token-map.md`](../../../docs/design/ui/target-token-map.md)。`ui-v1-frontend-prompt.md` 仅为历史实现记录。
