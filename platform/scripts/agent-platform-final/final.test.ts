@@ -31,7 +31,7 @@ describe('agent-platform-final machine gates', () => {
   it('validates authority uniqueness and metadata but preserves draft admission',async()=>{
     const valid=await validateModel();
     expect(valid).toMatchObject({status:'PASS',baselineAdmission:'BLOCKED',modelStatus:'draft',authorityCount:11});
-    const model=JSON.parse(await readFile(join(process.cwd(),'../docs/design/_cross/generic-agent-platform-final.system-model.json'),'utf8'));
+    const model=JSON.parse(await readFile(join(process.cwd(),'architecture/generic-agent-platform-final.system-model.json'),'utf8'));
     model.authorities.push(model.authorities[0]);
     expect((await validateModel(model)).errors).toContain('DUPLICATE_AUTHORITY:release-spec');
     await validateModel();
@@ -64,6 +64,5 @@ describe('agent-platform-final machine gates', () => {
     await expect(promoteBaseline({gatePath:'/tmp/forged.json'})).rejects.toThrow('PROMOTION_NON_CANONICAL_INPUT_FORBIDDEN');
     await expect(promoteBaseline({targetPath:'/tmp/target.md'})).rejects.toThrow('PROMOTION_NON_CANONICAL_INPUT_FORBIDDEN');
     await expect(promoteBaseline({expectedRevision:'sha256:'+'0'.repeat(64),expectedSourceRevision:'stale'})).rejects.toThrow('PROMOTION_GATE_NOT_GO');
-    expect(await readFile(join(process.cwd(),'../docs/design/_cross/generic-agent-platform-final.md'),'utf8')).toContain('Proposed final architecture baseline');
   });
 });

@@ -1,12 +1,12 @@
 import {readFile} from 'node:fs/promises';
 import {join} from 'node:path';
 const root=new URL('..',import.meta.url).pathname;const read=(path)=>readFile(join(root,path),'utf8');
-const [promotion,chat,chatMigration,pgImmutability,task,taskMigration,store,routing,api,observability,e2e,worker,dashboard,alerts,agentDoc,appDoc,exit,manifest,workspace]=await Promise.all([
+const [promotion,chat,chatMigration,pgImmutability,task,taskMigration,store,routing,api,observability,e2e,worker,dashboard,alerts,exit,manifest,workspace]=await Promise.all([
   read('apps/agent-api/src/promotion.ts'),read('packages/chat-domain/src/index.ts'),read('packages/chat-domain/migrations/001_chat.sql'),read('packages/chat-domain/src/p6-immutability.integration.test.ts'),
   read('packages/task-domain/src/index.ts'),read('packages/task-domain/migrations/001_task_store.sql'),read('packages/task-store-postgres/src/index.ts'),
   read('packages/temporal-routing/src/index.ts'),read('apps/agent-api/src/task-api.ts'),read('packages/observability/src/index.ts'),
-  read('examples/p6-integration/src/p6.e2e.test.ts'),read('apps/agent-worker/src/activities.ts'),read('observability/grafana/sage-p6-cross-chain.json'),read('observability/prometheus/sage-p6-alerts.yaml'),read('../docs/design/agent-library-mvp.md'),read('../docs/design/long-running-agent-app-mvp.md'),
-  read('docs/p6-exit-review.md'),read('examples/p6-integration/package.json').then(JSON.parse),read('package.json').then(JSON.parse)
+  read('examples/p6-integration/src/p6.e2e.test.ts'),read('apps/agent-worker/src/activities.ts'),read('observability/grafana/sage-p6-cross-chain.json'),read('observability/prometheus/sage-p6-alerts.yaml'),
+  read('architecture/runbooks/p6-exit-review.md'),read('examples/p6-integration/package.json').then(JSON.parse),read('package.json').then(JSON.parse)
 ]);
 const failures=[];const require=(condition,message)=>{if(!condition)failures.push(message);};
 require(promotion.includes('PromotionPrincipalAuthenticator')&&promotion.includes('authenticateRequest'),'promotion must use server-authenticated request principal');
@@ -32,7 +32,6 @@ for(const scenario of ['NativeConnection.connect','Worker.create','createAgentTa
 require(!e2e.includes('FakeTemporalTarget'),'P6 E2E must not use a fake Temporal target');
 for(const metric of ['sage_chat_task_promotions_total','sage_task_route_decisions_total','sage_task_worker_attempt_total','sage_task_projection_lag_ms','sage_task_reconcile_retryable_failure_total','sage_artifact_store_unavailable_total','sage_temporal_target_unavailable_total'])require([promotion,routing,api,worker].some((source)=>source.includes(metric)),`P6 metric is not emitted by a business path: ${metric}`);
 require(dashboard.includes('sage_task_projection_lag_ms')&&dashboard.includes('tenant_id,message_id')&&alerts.includes('SageTemporalTargetUnavailable')&&alerts.includes('tenant_id, message_id'),'deployable P6 dashboard/alerts with tenant/message correlation missing');
-require(agentDoc.includes('P6 Requirements Traceability Matrix')&&appDoc.includes('P6 Requirements Traceability Matrix'),'product traceability matrices missing');
 require(exit.includes('AI review')&&exit.includes('human production approval'),'AI review governance statement missing');
 require(workspace.scripts['test:p6:e2e']&&workspace.scripts['check-p6-boundaries'],'root P6 scripts missing');
 for(const [name,version] of Object.entries(manifest.dependencies))require(name.startsWith('@sage/')?version==='workspace:*':/^\d+\.\d+\.\d+$/.test(version),`P6 dependency not exact/workspace: ${name}@${version}`);

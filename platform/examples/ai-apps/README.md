@@ -4,7 +4,7 @@
 
 | 示例包 | 主题 | 说明 |
 |--------|------|------|
-| `github-trending/` | GitHub 热门项目解读 | 分析 trending 项目快照，产出排名解读、亮点与趋势 digest（展示页见 `docs/showcase/github-trending.html`） |
+| `github-trending/` | GitHub 热门项目解读 | 分析 trending 项目快照，产出排名解读、亮点与趋势 digest |
 | `finance-briefing/` | 财经简报 | 拉取最新外汇汇率（Frankfurter）与全球主要股指快照（Yahoo Finance），产出结构化财经简报 |
 | `lifecycle-probe/` | 生命周期探针 | 无 references、无 output.schema.json 的最小包，输出确定性，专用于「创建 → 提交 → 运行 → 产物管理」全链路验证（见下文） |
 

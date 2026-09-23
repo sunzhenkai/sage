@@ -10,13 +10,11 @@ Sage 是一个面向多产品复用的 Agent 执行内核与运行时平台。�
 
 ```
 .
-├── platform/         # 工作区根：apps / packages / examples / fixtures / docs / evidence
+├── platform/         # 工作区根：apps / packages / examples / fixtures / architecture / evidence
 │   ├── apps/         # agent-api、agent-worker
 │   ├── packages/     # agent-contracts、tool-runtime、agent-state-postgres、…
-│   └── docs/         # 部署、运维、phase exit evidence
-├── docs/design/      # 架构与 MVP 设计文档（语言无关的 Contract）
+│   └── architecture/ # 架构模型 / Runtime DSL / 架构评审 / 运维 runbook（机器校验输入）
 ├── openspec/         # OpenSpec 变更与 spec 演进
-├── tasks/            # 任务交付台账与归档
 └── .service-manager.md  # 本机服务启停说明（已 gitignore，不进版本控制）
 ```
 
@@ -50,28 +48,27 @@ curl http://127.0.0.1:9611/readyz
 curl http://127.0.0.1:14173/
 ```
 
-端口与启动细节见 `platform/docs/local-development.md` 与根目录的 `.service-manager.md`。
+端口与启动细节见 `platform/architecture/runbooks/` 与本机 `.service-manager.md`。
 
-## 设计文档
+## 架构产物
 
-- [Agent 项目 MVP 总览](docs/design/README.md)
-- [Agent MVP 第一版实现架构](docs/design/first-version-system-architecture.md)
-- [通用 Agent 平台终版架构](docs/design/_cross/generic-agent-platform-final-architecture.md)
-- [MVP 1：通用 Agent Library](docs/design/agent-library-mvp.md)
-- [OpenSpec 变更](openspec/)
+- 终版架构：[`platform/architecture/generic-agent-platform-final-architecture.md`](platform/architecture/generic-agent-platform-final-architecture.md)
+- System Model / Runtime DSL / Formal Review：`platform/architecture/generic-agent-platform-final.*`
+- 运维 runbook 与 phase exit：`platform/architecture/runbooks/`
+- OpenSpec 变更：`openspec/`
 
 ## 阶段产物与治理
 
 项目按 Phase（P0–P7）滚动交付，每个 Phase 都有：
 
-- `docs/design/` 与 `openspec/changes/<change>/` 下的提案与 spec 演进
-- `platform/docs/pN-*.md` 与 `platform/evidence/agent-platform-*` 下的 exit review / acceptance / 架构评审产物
+- `platform/architecture/` 下的架构模型 / DSL / review 与 `openspec/changes/<change>/` 下的提案与 spec 演进
+- `platform/architecture/runbooks/pN-*.md` 与 `platform/evidence/agent-platform-*` 下的 exit review / acceptance / 架构评审产物
 - `tasks/archive/<date>-T<n>-<slug>/` 下的任务归档
 
 ## 状态
 
 - 当前实现基线：v1.1（已交付）
-- 长期目标态：[Sage 通用 Agent 平台终版架构](docs/design/_cross/generic-agent-platform-final-architecture.md)（待 System Model / Runtime DSL / Formal Architecture Review 升级为 validated baseline）
+- 长期目标态：[Sage 通用 Agent 平台终版架构](platform/architecture/generic-agent-platform-final-architecture.md)（待 System Model / Runtime DSL / Formal Architecture Review 升级为 validated baseline）
 
 ## 许可证
 

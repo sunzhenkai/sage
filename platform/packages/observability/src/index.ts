@@ -216,7 +216,7 @@ export const DURABLE_COORDINATOR_ALERTS: readonly DurableCoordinatorAlertPanel[]
   threshold: 0,
   window: signal === 'projection_lag' || signal === 'projection_repair' ? '5m' : '1m',
   severity: signal === 'projection_lag' || signal === 'projection_repair' ? 'warning' : 'critical',
-  runbook: 'platform/docs/p7-incident-runbooks.md'
+  runbook: 'platform/architecture/runbooks/p7-incident-runbooks.md'
 }));
 
 export type AgentPlatformCorrelationStage =
