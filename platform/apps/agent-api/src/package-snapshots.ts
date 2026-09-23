@@ -2,7 +2,7 @@ import { buildSnapshotEgressConnector as buildConnector, parseSnapshotEgressAllo
 import { fetchScheduleInputSnapshots, PackageSnapshotError, type ScheduleSnapshotConnector } from '@sage/agent-run-admission';
 
 /**
- * 包运行输入快照的受控出口获取。P8 起实现在共享层：
+ * 包运行输入快照的受控出口获取。实现在共享层：
  * - 传输/白名单策略在 tool-runtime（API 与 worker 共用同一策略）；
  * - 逐源获取语义（onFailure: fail | markMissing）在 agent-run-admission（runs-api 与 schedule dispatcher 同一实现）。
  * 本模块保留既有导入面，行为不漂移。

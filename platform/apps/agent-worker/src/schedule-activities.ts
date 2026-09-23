@@ -5,7 +5,7 @@ import type { DispatchScheduleOccurrenceActivityInput, DispatchScheduleOccurrenc
 import { recordScheduleTriggerSignal, type AgentObservability } from '@sage/observability';
 
 /**
- * P8 dispatcher 控制面活动（D3/D4）：每次 schedule 触发以固化 task/params 走既有包运行准入；
+ * Dispatcher 控制面活动（D3/D4）：每次 schedule 触发以固化 task/params 走既有包运行准入；
  * 依赖不可用 fail closed 记 failed trigger；对账 activity 推算期望 occurrence 差集记 MISSED。
  */
 

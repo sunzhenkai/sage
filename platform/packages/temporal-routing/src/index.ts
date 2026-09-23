@@ -2,7 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { Connection, NamespaceNotFoundError, WorkflowClient, WorkflowExecutionAlreadyStartedError, WorkflowNotFoundError
 } from '@temporalio/client';
 import { defaultPayloadConverter } from '@temporalio/common';
-import type { P6Correlation, P6TelemetryRecorder } from '@sage/observability';
+import type { CrossChainCorrelation, CrossChainTelemetryRecorder } from '@sage/observability';
 import type { CredentialProvider, SecretRef } from '@sage/platform-ports';
 import {
   TASK_CONTROL_SIGNAL, TASK_NAMESPACE, TASK_QUEUE, TASK_STATE_QUERY, TASK_TARGET, TASK_TYPE, isAgentSliceResult,
@@ -386,7 +386,7 @@ export interface TrustedMultiTargetTaskControllerOptions {
   readonly projectionFreshnessThresholdMs?: number;
   readonly reconcileAttempts?: number;
   readonly reconcileDelayMs?: number;
-  readonly telemetry?: P6TelemetryRecorder;
+  readonly telemetry?: CrossChainTelemetryRecorder;
 }
 
 type DescribeOutcome = 'exists' | 'absent' | 'unknown';
@@ -598,8 +598,8 @@ export class TrustedMultiTargetTaskController {
     const { record, workflow } = await this.#bound(taskId);
     return this.#controlBound(record, workflow, control);
   }
-  #emit(name:Parameters<P6TelemetryRecorder['record']>[0],record:TaskRoutingRecord,value:number,fields:Readonly<Record<string,unknown>>={}):void{
-    const correlation=p6Correlation(record);if(!correlation)return;
+  #emit(name:Parameters<CrossChainTelemetryRecorder['record']>[0],record:TaskRoutingRecord,value:number,fields:Readonly<Record<string,unknown>>={}):void{
+    const correlation=telemetryCorrelation(record);if(!correlation)return;
     try{this.#options.telemetry?.record(name,value,correlation,fields);}catch{/* Telemetry cannot change Task semantics. */}
   }
   async #controlBound(record: TaskRoutingRecord, workflow: WorkflowClient, control: TaskControl): Promise<TaskQueryResult> {
@@ -669,7 +669,7 @@ function projectionTimelineEvent(projection: TaskProjection, controlKind?: strin
 }
 
 /** 投影推进成功后的 Timeline 事件追加：best-effort，失败仅可观测，不回滚投影。 */
-async function appendProjectionTimelineEvent(store: TaskProjectionStore | undefined, projection: TaskProjection, controlKind?: string, telemetry?: P6TelemetryRecorder): Promise<void> {
+async function appendProjectionTimelineEvent(store: TaskProjectionStore | undefined, projection: TaskProjection, controlKind?: string, telemetry?: CrossChainTelemetryRecorder): Promise<void> {
   if (store?.appendProjectionEvents === undefined) return;
   try { await store.appendProjectionEvents([projectionTimelineEvent(projection, controlKind)]); }
   catch {
@@ -721,7 +721,7 @@ async function sendControl(workflow: WorkflowClient, workflowId: string, control
 }
 
 
-function p6Correlation(record:TaskRoutingRecord):P6Correlation|undefined{
+function telemetryCorrelation(record:TaskRoutingRecord):CrossChainCorrelation|undefined{
   const input=record.startEnvelope.input;
   if(!input.sessionId||!input.runId||!input.messageId)return undefined;
   return {tenant_id:record.tenantId,message_id:input.messageId,session_id:input.sessionId,run_id:input.runId,task_id:record.taskId,workflow_id:record.workflowId,target_id:record.snapshot.targetId,attempt:input.attempt};
@@ -871,7 +871,7 @@ export class DurableCoordinatorHistorySource implements DurableCoordinatorObserv
 export interface TaskProjectionReconcilerOptions {
   readonly tenantId:string; readonly store:TaskReconciliationStore; readonly clientFactory:TemporalClientFactory;
   readonly historySource?:TaskHistorySource; readonly v2HistorySource?:DurableCoordinatorObservationSource; readonly batchSize?:number; readonly freshnessThresholdMs?:number; readonly now?:()=>Date;
-  readonly telemetry?:P6TelemetryRecorder;
+  readonly telemetry?:CrossChainTelemetryRecorder;
 }
 
 export interface TaskHistorySource {
@@ -1033,8 +1033,8 @@ export class TaskProjectionReconciler {
       outcome:'retryable_failure',retryable:true,repairedEventCount,failureCode,repairedAt:timestamp});}
     catch{/* A failed audit sink cannot be recursively audited. The failed batch remains retryable. */}
   }
-  #emit(name:Parameters<P6TelemetryRecorder['record']>[0],record:TaskRoutingRecord,value:number,fields:Readonly<Record<string,unknown>>={}):void{
-    const correlation=p6Correlation(record);if(!correlation)return;
+  #emit(name:Parameters<CrossChainTelemetryRecorder['record']>[0],record:TaskRoutingRecord,value:number,fields:Readonly<Record<string,unknown>>={}):void{
+    const correlation=telemetryCorrelation(record);if(!correlation)return;
     try{this.#options.telemetry?.record(name,value,correlation,fields);}catch{/* Telemetry cannot change reconciliation. */}
   }
 }

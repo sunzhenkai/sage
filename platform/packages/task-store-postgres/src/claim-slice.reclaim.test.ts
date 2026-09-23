@@ -4,7 +4,7 @@ import { Pool } from 'pg';
 import { TASK_TYPE, type ExecuteAgentSliceInput } from '@sage/task-domain';
 import { PostgresTaskStore } from './index.js';
 
-const url = process.env.P6_POSTGRES_URL;
+const url = process.env.CROSS_CHAIN_POSTGRES_URL;
 const integration = describe.skipIf(!url);
 let store: PostgresTaskStore;
 let admin: Pool;

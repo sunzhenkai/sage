@@ -15,7 +15,7 @@ const passingGateEnvironment = {
   SAGE_AGENT_GATE_ROLLBACK_PASS: 'true',
 } as const;
 
-describe('Phase 3 admission rollout policy', () => {
+describe('Admission rollout policy', () => {
   it('parses independent dark-launch controls and defaults to safe legacy behavior', () => {
     const defaults = parsePhase3AdmissionFeatureConfig({});
     expect(defaults).toMatchObject({

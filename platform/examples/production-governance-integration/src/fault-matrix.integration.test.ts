@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DefaultDenyEgressPolicy, RevalidatingEgressConnector, productionSandboxProfile, assertProductionSandboxProfile } from '@sage/tool-runtime';
 import { CircuitBreaker, RetryBudget, WeightedFairQueue, advanceCanary } from '@sage/production-governance';
 const digest = `sha256:${'a'.repeat(64)}`;
-describe('Phase 4 fault/rollback matrix (local engineering only)', () => {
+describe('Fault/rollback matrix (local engineering only)', () => {
   it.each([['private', '10.0.0.1'], ['metadata', '169.254.169.254'], ['loopback', '127.0.0.1'], ['ipv6-link-local', 'fe80::1']])('blocks %s egress', async (_name, ip) => { const policy = new DefaultDenyEgressPolicy([{ scheme: 'https', hostname: 'api.example', ports: [443], pathPrefixes: ['/'] }], { resolve: async () => [ip] }); await expect(policy.authorize('https://api.example/')).rejects.toThrow('EGRESS_ADDRESS_DENIED'); });
   it('fails closed when DNS, connection revalidation, sandbox profile, or provider health is unavailable', async () => {
     const down = new DefaultDenyEgressPolicy([{ scheme: 'https', hostname: 'api.example', ports: [443], pathPrefixes: ['/'] }], { resolve: async () => { throw new Error('dns down'); } }); await expect(down.authorize('https://api.example/')).rejects.toThrow('dns down');

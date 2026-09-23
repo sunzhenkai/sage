@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import type { P6TelemetryRecorder } from '@sage/observability';
+import type { CrossChainTelemetryRecorder } from '@sage/observability';
 import type { AuthenticatedPrincipal } from '@sage/app-contracts';
 import type { AgentEventV2 } from '@sage/agent-contracts';
 import type { TaskRunLogAttemptSummary, TaskRunLogQueryPort } from '@sage/platform-ports';
@@ -53,7 +53,7 @@ export interface TaskRouteOptions {
   readonly tenantId:string; readonly authenticator:TaskPrincipalAuthenticator; readonly authorizer:TaskOperationAuthorizer;
   readonly deploymentMode?:'development'|'pilot'|'production'; readonly pilotAdmissionGate?:PilotAdmissionGate;
   readonly productionAdmission?:{readonly runtime:ProductionApiAdmissionRuntime;readonly drainTimeoutMs?:number;buildRequest(request:CreateTaskRequest,principal:AuthenticatedPrincipal):ProductionAdmissionRequest}; readonly accessAudit?:TaskAccessAuditRecorder;
-  readonly queryStore?:TaskProjectionQueryStore; readonly artifactResolver?:TaskArtifactResolver; readonly telemetry?:P6TelemetryRecorder;
+  readonly queryStore?:TaskProjectionQueryStore; readonly artifactResolver?:TaskArtifactResolver; readonly telemetry?:CrossChainTelemetryRecorder;
   readonly runLogQuery?:TaskRunLogQueryPort;
   readonly freshnessThresholdMs?:number; readonly now?:()=>Date;
 }
@@ -237,7 +237,7 @@ export function registerTaskRoutes(app: FastifyInstance, controller: TaskControl
     try{const principal=await authorize(request,options,'signal',request.params.taskId);const conflict=await controlConflict(options,request.params.taskId,request.body.kind,now,threshold);if(conflict)return conflictReply(reply,conflict);return reply.code(202).send(await controller.signal(request.params.taskId, request.body.kind, request.body.controlId ?? `control-${randomUUID()}`,principal));}
     catch(cause){const response=routingError(reply,cause);if(response)return response;throw cause;}
   });
-  // Backward-compatible singular route retained for P4/P5 clients.
+  // Backward-compatible singular route retained for legacy clients.
   app.post<{ Params: { taskId: string }; Body: { kind: 'pause' | 'resume'; controlId?: string } }>('/v1/tasks/:taskId/signal',{schema:{body:signalBodySchema},preValidation:controlPreValidation(options,'signal',signalFields)}, async (request, reply) => {
     const rejected=rejectedControlFields(request.body,signalFields);if(rejected.length)return reply.code(400).send({error:{code:'TASK_CONTROL_UNTRUSTED_FIELD_REJECTED',message:rejected.join(','),retryable:false}});
     try{const principal=await authorize(request,options,'signal',request.params.taskId);const conflict=await controlConflict(options,request.params.taskId,request.body.kind,now,threshold);if(conflict)return conflictReply(reply,conflict);return reply.code(202).send(await controller.signal(request.params.taskId, request.body.kind, request.body.controlId ?? `control-${randomUUID()}`,principal));}

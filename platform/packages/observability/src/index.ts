@@ -115,25 +115,25 @@ export function createOtlpTraceExporter(config?: ConstructorParameters<typeof OT
 }
 
 
-export type P6MetricName=
+export type TelemetryMetricName=
   |'sage_chat_task_promotions_total'|'sage_task_route_decisions_total'|'sage_task_worker_attempt_total'
   |'sage_task_projection_lag_ms'|'sage_task_reconcile_retryable_failure_total'
   |'sage_artifact_store_unavailable_total'|'sage_temporal_target_unavailable_total'
   |'sage_task_effect_unknown_total'|'sage_task_projection_drift_total'
   |'sage_task_projection_event_append_failed_total';
-export interface P6Correlation{readonly tenant_id:string;readonly message_id:string;readonly session_id:string;readonly run_id:string;readonly task_id:string;readonly workflow_id:string;readonly target_id:string;readonly attempt:number}
-export interface P6TelemetryRecorder{record(name:P6MetricName,value:number,correlation:P6Correlation,fields?:Readonly<Record<string,unknown>>):void}
-export class OtlpP6TelemetryRecorder implements P6TelemetryRecorder{
-  record(name:P6MetricName,value:number,correlation:P6Correlation,fields:Readonly<Record<string,unknown>>={}):void{
+export interface CrossChainCorrelation{readonly tenant_id:string;readonly message_id:string;readonly session_id:string;readonly run_id:string;readonly task_id:string;readonly workflow_id:string;readonly target_id:string;readonly attempt:number}
+export interface CrossChainTelemetryRecorder{record(name:TelemetryMetricName,value:number,correlation:CrossChainCorrelation,fields?:Readonly<Record<string,unknown>>):void}
+export class OtlpCrossChainTelemetryRecorder implements CrossChainTelemetryRecorder{
+  record(name:TelemetryMetricName,value:number,correlation:TelemetryCorrelation,fields:Readonly<Record<string,unknown>>={}):void{
     const {tenant_id,...runtime}=correlation;
     const observability=new AgentObservability({correlation:runtime});
-    observability.log('p6.metric.correlation',{tenant_id,...fields});
+    observability.log('cross_chain.metric.correlation',{tenant_id,...fields});
     observability.metricLowCardinality(name,value,Object.fromEntries(Object.entries(fields).filter(([key])=>!HIGH_CARDINALITY_METRIC_KEY.test(key))));
   }
 }
-export interface P6DashboardPanel { readonly id:string; readonly metric:P6MetricName; readonly groupBy:readonly string[]; readonly alert?:{readonly threshold:number;readonly window:string;readonly severity:'warning'|'critical'} }
+export interface CrossChainDashboardPanel { readonly id:string; readonly metric:TelemetryMetricName; readonly groupBy:readonly string[]; readonly alert?:{readonly threshold:number;readonly window:string;readonly severity:'warning'|'critical'} }
 const p6GroupBy=['terminal_status','error_code','target_class'] as const;
-export const P6_CROSS_CHAIN_DASHBOARD:readonly P6DashboardPanel[]=[
+export const CROSS_CHAIN_DASHBOARD:readonly CrossChainDashboardPanel[]=[
   {id:'chat-promotion-rate',metric:'sage_chat_task_promotions_total',groupBy:p6GroupBy},
   {id:'route-target',metric:'sage_task_route_decisions_total',groupBy:p6GroupBy},
   {id:'worker-attempt',metric:'sage_task_worker_attempt_total',groupBy:p6GroupBy},
@@ -144,7 +144,7 @@ export const P6_CROSS_CHAIN_DASHBOARD:readonly P6DashboardPanel[]=[
   {id:'effect-unknown',metric:'sage_task_effect_unknown_total',groupBy:p6GroupBy,alert:{threshold:0,window:'5m',severity:'critical'}},
   {id:'projection-drift',metric:'sage_task_projection_drift_total',groupBy:p6GroupBy,alert:{threshold:0,window:'5m',severity:'warning'}}
 ] as const;
-export function p6CorrelationComplete(fields:object):boolean{
+export function telemetryCorrelationComplete(fields:object):boolean{
   if(fields===null||typeof fields!=='object'||Array.isArray(fields))return false;
   const value=fields as Readonly<Record<string,unknown>>;
   const strings=['tenant_id','message_id','session_id','run_id','task_id','workflow_id','target_id'];
@@ -216,7 +216,7 @@ export const DURABLE_COORDINATOR_ALERTS: readonly DurableCoordinatorAlertPanel[]
   threshold: 0,
   window: signal === 'projection_lag' || signal === 'projection_repair' ? '5m' : '1m',
   severity: signal === 'projection_lag' || signal === 'projection_repair' ? 'warning' : 'critical',
-  runbook: 'platform/docs/p7-incident-runbooks.md'
+  runbook: 'platform/architecture/runbooks/routing-incident-runbooks.md'
 }));
 
 export type AgentPlatformCorrelationStage =
@@ -275,7 +275,7 @@ export function recordAgentPlatformCorrelation(
   return metric;
 }
 
-// ===== P8 Schedule 触发观测（低基数：metrics 只带 outcome/reason_code，schedule 标识进日志字段） =====
+// ===== Schedule 触发观测（低基数：metrics 只带 outcome/reason_code，schedule 标识进日志字段） =====
 export type ScheduleTriggerOutcome = 'succeeded' | 'failed' | 'skipped' | 'missed';
 export interface ScheduleTriggerSignalInput {
   readonly outcome: ScheduleTriggerOutcome;

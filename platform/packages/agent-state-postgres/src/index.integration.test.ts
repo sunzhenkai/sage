@@ -4,7 +4,7 @@ import { Pool } from 'pg';
 import type { AgentStateAdapter, CheckpointRef, AgentTaskSpecStorePort, BoundedRunReceiptStorePort, AgentEventStorePort, CheckpointStorePort } from '@sage/platform-ports';
 import { PostgresAgentAuthorityStore, PostgresAgentStateAdapter, PostgresIdempotencyStore, PostgresTaskRunLogQuery, assertReferenceOnly } from './index.js';
 
-const databaseUrl = process.env.P2_POSTGRES_URL;
+const databaseUrl = process.env.AGENT_STATE_POSTGRES_URL;
 const integration = describe.skipIf(!databaseUrl);
 
 export function agentStateAdapterContract(name: string, getAdapter: () => AgentStateAdapter): void {

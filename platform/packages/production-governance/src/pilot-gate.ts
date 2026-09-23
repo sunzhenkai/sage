@@ -1,9 +1,9 @@
 import { checkAlertRoutingCoverage } from './failure-taxonomy.js';
 
 /**
- * P8 无人值守 pilot 运行门（spec: unattended-schedule-pilot-gate）。
+ * 无人值守 pilot 运行门（spec: unattended-schedule-pilot-gate）。
  * 决议引用 soak 证据、风险台账、认证与告警路由检查；任一 UNFILLED 输出 NO-GO 并列明补齐路径。
- * 诚实证据纪律（P7 先例）：缺失的人类证据保持 UNFILLED，不伪造、不以本地短窗冒充真实窗口。
+ * 诚实证据纪律：缺失的人类证据保持 UNFILLED，不伪造、不以本地短窗冒充真实窗口。
  */
 
 export type PilotGateStatus = 'GO' | 'NO-GO';
@@ -79,7 +79,7 @@ export function evaluatePilotGate(input: PilotGateInput, now = new Date()): Pilo
   items.push({
     id: 'risk-ledger', provided: unaccepted.length === 0 && input.riskLedger.length > 0,
     detail: unaccepted.length === 0 ? `accepted=${input.riskLedger.length}` : `UNFILLED — ${unaccepted.map(entry => entry.id).join(', ')} 未接受`,
-    remediation: '在 docs/p8-risk-ledger.md 补齐每项风险的接受主体与复评期限；接受记录可追溯且不可静默清除。'
+    remediation: '在 architecture/runbooks/risk-ledger.md 补齐每项风险的接受主体与复评期限；接受记录可追溯且不可静默清除。'
   });
 
   // 5) go/no-go 治理衔接：评审主体完成签名。

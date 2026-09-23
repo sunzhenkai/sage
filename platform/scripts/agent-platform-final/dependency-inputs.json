@@ -14,7 +14,7 @@
     {
       "change": "agent-platform-contract-authority-foundation",
       "owner": "Agent Core",
-      "evidence": "evidence/agent-platform-contract-authority-foundation/phase-0-conformance.md",
+      "evidence": "evidence/agent-platform-contract-authority-foundation/conformance.md",
       "progress": {
         "total": 45,
         "complete": 45,
@@ -25,7 +25,7 @@
     {
       "change": "agent-runtime-kernel-broker-integration",
       "owner": "Agent Core",
-      "evidence": "evidence/agent-runtime-kernel-broker-integration/phase-1-runtime-kernel-ports.md",
+      "evidence": "evidence/agent-runtime-kernel-broker-integration/runtime-kernel-ports.md",
       "progress": {
         "total": 51,
         "complete": 51,
@@ -36,7 +36,7 @@
     {
       "change": "durable-agent-coordinator-adapter",
       "owner": "Task Runtime",
-      "evidence": "evidence/durable-agent-coordinator-adapter/phase-2-dependency-gate.md",
+      "evidence": "evidence/durable-agent-coordinator-adapter/dependency-gate.md",
       "progress": {
         "total": 56,
         "complete": 56,
@@ -47,7 +47,7 @@
     {
       "change": "agent-package-release-admission",
       "owner": "Package Platform",
-      "evidence": "evidence/agent-package-release-admission/phase-3-dependency-gate.md",
+      "evidence": "evidence/agent-package-release-admission/dependency-gate.md",
       "progress": {
         "total": 65,
         "complete": 65,

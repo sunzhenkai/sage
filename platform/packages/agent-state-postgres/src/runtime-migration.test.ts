@@ -72,7 +72,7 @@ describe('runtime kernel broker migration', () => {
   });
 });
 
-describe('P8 schedule plane migration', () => {
+describe('Schedule plane migration', () => {
   it('defines control-plane schedules, append-only trigger events, and ledger schedule budget accounts', async () => {
     const sql = await readFile(new URL('../migrations/009_p8_schedule_plane.sql', import.meta.url), 'utf8');
     expect(sql.startsWith('BEGIN;')).toBe(true);

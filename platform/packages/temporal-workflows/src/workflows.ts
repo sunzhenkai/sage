@@ -47,7 +47,7 @@ export async function AgentTaskWorkflow(input: AgentTaskWorkflowInput): Promise<
       state = { ...state, status: 'running', lastControlId: control.controlId };
       return;
     }
-    // Unknown effects require an explicit resolution protocol, which P4 does not implement.
+    // Unknown effects require an explicit resolution protocol, which the durable coordinator does not implement.
     // Reusing the same attempt/idempotency key would only return the same unknown result.
     if (control.kind === 'retry' && state.status === 'failed') {
       retryGeneration += 1;

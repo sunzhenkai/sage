@@ -4,7 +4,7 @@ import https from 'node:https';
 import { DefaultDenyEgressPolicy, RevalidatingEgressConnector, type ConnectionValidatingTransportPort, type ControlledEgressConnectorPort, type EgressRule, type EgressTransportResponse, type TrustedDnsResolverPort } from './egress.js';
 
 /**
- * 包运行输入快照的受控出口（P8 起 API 与 worker 共用）：default-deny 策略，
+ * 包运行输入快照的受控出口（API 与 worker 共用）：default-deny 策略，
  * 白名单来自 `SAGE_PACKAGE_SNAPSHOT_EGRESS_ALLOWLIST`（`host[/path-prefix]` 逗号分隔，仅 https/443），
  * 未配置即全拒绝（fail-closed）；连接只落在策略解析并 pin 的地址上（SNI/Host 仍用域名）。
  */

@@ -142,15 +142,15 @@ describe('correlated sanitized observability', () => {
 });
 
 
-describe('P6 cross-chain operational dashboard',()=>{
+describe('Cross-chain operational dashboard',()=>{
   it('covers Chat Router Worker Store Artifact and Temporal target with alertable correlation',async()=>{
-    const {P6_CROSS_CHAIN_DASHBOARD,p6CorrelationComplete}=await import('./index.js');
-    expect(P6_CROSS_CHAIN_DASHBOARD.map((panel)=>panel.id)).toEqual(expect.arrayContaining(['chat-promotion-rate','route-target','worker-attempt','projection-lag','reconcile-failure','artifact-outage','target-unavailable']));
-    expect(P6_CROSS_CHAIN_DASHBOARD.filter((panel)=>panel.alert).map((panel)=>panel.id)).toEqual(expect.arrayContaining(['projection-lag','reconcile-failure','artifact-outage','target-unavailable']));
+    const {CROSS_CHAIN_DASHBOARD,telemetryCorrelationComplete}=await import('./index.js');
+    expect(CROSS_CHAIN_DASHBOARD.map((panel)=>panel.id)).toEqual(expect.arrayContaining(['chat-promotion-rate','route-target','worker-attempt','projection-lag','reconcile-failure','artifact-outage','target-unavailable']));
+    expect(CROSS_CHAIN_DASHBOARD.filter((panel)=>panel.alert).map((panel)=>panel.id)).toEqual(expect.arrayContaining(['projection-lag','reconcile-failure','artifact-outage','target-unavailable']));
     const complete={tenant_id:'tenant',message_id:'message',session_id:'session',run_id:'run',task_id:'task',workflow_id:'workflow',target_id:'target',attempt:1};
-    expect(p6CorrelationComplete(complete)).toBe(true);
-    for(const field of Object.keys(complete))expect(p6CorrelationComplete({...complete,[field]:undefined})).toBe(false);
-    for(const malformed of [{...complete,message_id:''},{...complete,tenant_id:'   '},{...complete,attempt:0},{...complete,attempt:1.5},{...complete,attempt:'1'},null,[]])expect(p6CorrelationComplete(malformed as never)).toBe(false);
+    expect(telemetryCorrelationComplete(complete)).toBe(true);
+    for(const field of Object.keys(complete))expect(telemetryCorrelationComplete({...complete,[field]:undefined})).toBe(false);
+    for(const malformed of [{...complete,message_id:''},{...complete,tenant_id:'   '},{...complete,attempt:0},{...complete,attempt:1.5},{...complete,attempt:'1'},null,[]])expect(telemetryCorrelationComplete(malformed as never)).toBe(false);
   });
 });
 
@@ -170,7 +170,7 @@ describe('Durable Coordinator operational signals', () => {
     expect(result).toMatchObject({ metric_name: 'sage_durable_coordinator_owner_conflict_total', path: 'DURABLE_COORDINATOR_V2', outcome: 'rejected', reason_code: 'OWNER_CAS_LOST' });
     expect(metricAttributes[0]).toEqual({ path: 'DURABLE_COORDINATOR_V2', outcome: 'rejected', reason_code: 'OWNER_CAS_LOST' });
     expect(DURABLE_COORDINATOR_ALERTS).toHaveLength(8);
-    expect(DURABLE_COORDINATOR_ALERTS.every((alert) => alert.threshold === 0 && alert.runbook.includes('p7-incident-runbooks'))).toBe(true);
+    expect(DURABLE_COORDINATOR_ALERTS.every((alert) => alert.threshold === 0 && alert.runbook.includes('routing-incident-runbooks'))).toBe(true);
   });
 
   it('keeps payloads and high-cardinality correlation out of metrics and redacts sensitive log fields', () => {
@@ -198,7 +198,7 @@ describe('Durable Coordinator operational signals', () => {
   });
 });
 
-describe('Phase 3 platform correlation telemetry', () => {
+describe('Platform correlation telemetry', () => {
   it('keeps Release/Admission/Spec/Target refs in sanitized traces/logs but not metric labels', () => {
     const stream = new CaptureStream();
     const metricAttributes: Attributes[] = [];

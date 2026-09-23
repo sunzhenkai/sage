@@ -73,7 +73,7 @@ const build = (options: { readonly token?: string } = {}): Harness => {
   return { app, audit, token: options.token ?? 'dev-token' };
 };
 
-describe('P8 /v1/schedules API', () => {
+describe('/v1/schedules API', () => {
   it('requires service token authentication on every management operation', async () => {
     const { app } = build();
     for (const [method, url] of [['POST', '/v1/schedules'], ['GET', '/v1/schedules'], ['GET', '/v1/schedules/daily-brief'], ['POST', '/v1/schedules/daily-brief/pause'], ['DELETE', '/v1/schedules/daily-brief']] as const) {

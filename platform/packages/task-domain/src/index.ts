@@ -5,7 +5,7 @@ const Id = Type.String({ minLength: 1, maxLength: 128, pattern: '^[A-Za-z0-9][A-
 const Timestamp = Type.String({ format: 'date-time' });
 const Reference = (scheme: string, id: string) => Type.String({ pattern: `^${scheme}://[^\\s]+$`, maxLength: 2_048, $id: id });
 
-/** P4 constants remain stable; P5 adds a second trusted TaskType and dynamic trusted targets. */
+/** Constants remain stable; trusted routing adds a second trusted TaskType and dynamic trusted targets. */
 export const TASK_TYPE = 'sage.agent-task.v1' as const;
 export const BATCH_TASK_TYPE = 'sage.batch-agent-task.v1' as const;
 export const TASK_TYPES = [TASK_TYPE, BATCH_TASK_TYPE] as const;

@@ -1,0 +1,36 @@
+{
+  "name": "@sage/cross-chain-e2e",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "clean": "rm -rf dist",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@sage/agent-api": "workspace:*",
+    "@sage/agent-client": "workspace:*",
+    "@sage/agent-contracts": "workspace:*",
+    "@sage/agent-package-release": "workspace:*",
+    "@sage/agent-release-registry": "workspace:*",
+    "@sage/agent-worker": "workspace:*",
+    "@sage/app-contracts": "workspace:*",
+    "@sage/chat-domain": "workspace:*",
+    "@sage/local-fakes": "workspace:*",
+    "@sage/observability": "workspace:*",
+    "@sage/platform-ports": "workspace:*",
+    "@sage/secret-vault": "workspace:*",
+    "@sage/task-domain": "workspace:*",
+    "@sage/task-store-postgres": "workspace:*",
+    "@sage/temporal-registry": "workspace:*",
+    "@sage/temporal-routing": "workspace:*",
+    "@temporalio/client": "1.22.0",
+    "@temporalio/worker": "1.22.0",
+    "fastify": "5.11.3",
+    "pg": "8.23.0"
+  },
+  "devDependencies": {
+    "@types/pg": "8.21.0"
+  }
+}

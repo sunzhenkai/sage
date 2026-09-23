@@ -9,7 +9,7 @@ import { assertScheduleDefinition, scheduleDefinitionDigest, type ScheduleContro
 import type { AuthenticatedPrincipal } from '@sage/app-contracts';
 
 /**
- * P8 /v1/schedules：创建/列表/详情/暂停/恢复/删除/触发历史。
+ * /v1/schedules：创建/列表/详情/暂停/恢复/删除/触发历史。
  * 认证走 service token（stub 信任头在本链路不提权，见 production-identity 的 service token 模块）；
  * 所有管理操作写不可变审计；FOLLOW 绑定在控制面记录锚点 Release；next fire 由设施 adapter 提供。
  */

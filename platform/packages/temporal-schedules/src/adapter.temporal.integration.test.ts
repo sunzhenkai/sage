@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { ScheduleDefinition } from '@sage/platform-ports';
 import { runScheduleLifecycleConformance, TemporalScheduleAdapter } from './index.js';
 
-// 真实 Temporal 垂直链路可选 gate（对齐 p4 惯例）：默认跳过；本地 compose 栈可用时以
-// SAGE_TEMPORAL_ADDRESS=127.0.0.1:17233 运行（pnpm test:p8:integration）。
+// 真实 Temporal 垂直链路可选 gate（对齐 durability 集成惯例）：默认跳过；本地 compose 栈可用时以
+// SAGE_TEMPORAL_ADDRESS=127.0.0.1:17233 运行（pnpm test:schedules:integration）。
 const address = process.env.SAGE_TEMPORAL_ADDRESS;
 const namespace = process.env.SAGE_TEMPORAL_NAMESPACE ?? 'sage-dev';
 

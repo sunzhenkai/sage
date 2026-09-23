@@ -1053,7 +1053,7 @@ export const ScheduleTargetConstraintsSchema = Type.Object({
 export type ScheduleTargetConstraints = Static<typeof ScheduleTargetConstraintsSchema>;
 
 export const ScheduleInvocationTemplateSchema = Type.Object({
-  // task 必填：P8 绑定语义（schedule MUST 声明目标 task），legacy 空输入在 schema 层即拒绝。
+  // task 必填：绑定语义（schedule MUST 声明目标 task），legacy 空输入在 schema 层即拒绝。
   task: Type.String({ minLength: 1, maxLength: 64, pattern: '^[a-z][a-z0-9-]{0,63}$' }),
   params: Type.Optional(Type.Record(
     Type.String({ minLength: 1, maxLength: 64 }),
@@ -1155,7 +1155,7 @@ export interface SchedulePort {
   resume(ref: ScheduleRef): Promise<ScheduleSnapshot>;
   remove(ref: ScheduleRef): Promise<void>;
   describe(ref: ScheduleRef): Promise<ScheduleSnapshot | undefined>;
-  /** 设施侧下次触发时间（P8 UI next fire 展示）；不支持或暂停时返回 undefined。 */
+  /** 设施侧下次触发时间（UI next fire 展示）；不支持或暂停时返回 undefined。 */
   nextFireAtMs?(ref: ScheduleRef): Promise<number | undefined>;
   health(): Promise<AdapterHealth>;
 }

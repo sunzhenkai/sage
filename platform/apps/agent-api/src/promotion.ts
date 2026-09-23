@@ -9,7 +9,7 @@ import {
   type PromoteChatMessageRequest
 } from '@sage/app-contracts';
 import type { AgentExecutionEnvelope } from '@sage/agent-contracts';
-import type { P6TelemetryRecorder } from '@sage/observability';
+import type { CrossChainTelemetryRecorder } from '@sage/observability';
 import type { ChatStore } from '@sage/chat-domain';
 import { assertCoordinatorEnvelope } from '@sage/platform-ports';
 import {
@@ -141,7 +141,7 @@ export async function reconcileDurableChatPromotion(options: {
 }
 export interface RegisterPromotionOptions {
   readonly store: ChatStore; readonly controller: PromotionTaskController; readonly authenticator: PromotionPrincipalAuthenticator;
-  readonly authorizer: ChatPromotionAuthorizer; readonly tenantId: string; readonly now?: () => Date; readonly telemetry?:P6TelemetryRecorder;
+  readonly authorizer: ChatPromotionAuthorizer; readonly tenantId: string; readonly now?: () => Date; readonly telemetry?:CrossChainTelemetryRecorder;
   /** Production wiring must provide a real V2 starter, an admitted Envelope and a source checkpoint provider. */
   readonly durablePromotion?: {
     readonly starter: DurablePromotionStarter;

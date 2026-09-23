@@ -180,7 +180,7 @@ export async function createWorkerRuntime(config = readWorkerRuntimeConfig()): P
       }),
       buildId: env('SAGE_WORKER_BUILD_ID', 'sage-local-worker-v1')
     });
-    // P8：dispatcher worker（SAGE_SCHEDULE_DISPATCH_ENABLED=1 启用），复用同一 Temporal 连接与任务存储。
+    // dispatcher worker（SAGE_SCHEDULE_DISPATCH_ENABLED=1 启用），复用同一 Temporal 连接与任务存储。
     const dispatcherConfig = readScheduleDispatcherConfig(process.env, { tenantId: config.tenantId, postgresUrl: config.postgresUrl, temporalAddress: config.temporalAddress });
     let dispatcher: ScheduleDispatcherRuntime | undefined;
     if (dispatcherConfig.enabled) {

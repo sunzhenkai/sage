@@ -1,7 +1,7 @@
 import { defineQuery, defineSignal, proxyActivities, setHandler } from '@temporalio/workflow';
 
 /**
- * P8 ScheduleTriggerDispatcher.v1：Temporal Schedule 的 target action。
+ * ScheduleTriggerDispatcher.v1：Temporal Schedule 的 target action。
  *
  * 确定性约束：本 workflow 不做任何 I/O，只做纯计算 + 一次 activity 调用（有界重试）。
  * canonical occurrence 身份由 workflow 启动时间推导——start time 来自 history，

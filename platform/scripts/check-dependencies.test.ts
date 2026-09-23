@@ -100,27 +100,27 @@ describe('canonical public surface leakage gate', () => {
 });
 
 
-describe('Phase 3 package dependency boundaries', () => {
-  const phase3ForbiddenSerializedKeys = [...forbiddenSerializedKeys, 'workflowId'];
+describe('Package dependency boundaries', () => {
+  const admissionForbiddenSerializedKeys = [...forbiddenSerializedKeys, 'workflowId'];
 
-const phase3Policy = {
+const admissionPolicy = {
     rules: {
       'agent-package-release': { owner: 'Package Platform', mayDependOn: ['agent-contracts'] },
       'agent-release-registry': { owner: 'Package Platform', mayDependOn: [] },
       'agent-run-admission': { owner: 'Package Platform', mayDependOn: ['agent-contracts', 'platform-ports'] }
     },
     hardConstraints: {
-      'agent-package-release': { forbiddenExternalPrefixes, forbiddenSerializedKeys: phase3ForbiddenSerializedKeys, forbiddenSourceTokens: ['WorkflowId', 'HistoryEvent', 'TaskQueue'] },
-      'agent-release-registry': { forbiddenExternalPrefixes, forbiddenSerializedKeys: phase3ForbiddenSerializedKeys, forbiddenSourceTokens: ['WorkflowId', 'HistoryEvent', 'TaskQueue'] },
-      'agent-run-admission': { forbiddenExternalPrefixes, forbiddenSerializedKeys: phase3ForbiddenSerializedKeys, forbiddenSourceTokens: ['WorkflowId', 'HistoryEvent', 'TaskQueue'] }
+      'agent-package-release': { forbiddenExternalPrefixes, forbiddenSerializedKeys: admissionForbiddenSerializedKeys, forbiddenSourceTokens: ['WorkflowId', 'HistoryEvent', 'TaskQueue'] },
+      'agent-release-registry': { forbiddenExternalPrefixes, forbiddenSerializedKeys: admissionForbiddenSerializedKeys, forbiddenSourceTokens: ['WorkflowId', 'HistoryEvent', 'TaskQueue'] },
+      'agent-run-admission': { forbiddenExternalPrefixes, forbiddenSerializedKeys: admissionForbiddenSerializedKeys, forbiddenSourceTokens: ['WorkflowId', 'HistoryEvent', 'TaskQueue'] }
     }
   };
 
-  const phase3Violations = (packageName: string, source: string): string[] => findDependencyBoundaryViolations({
+  const admissionViolations = (packageName: string, source: string): string[] => findDependencyBoundaryViolations({
     normalized: `packages/${packageName}/src/index.ts`,
     packageName,
     text: source,
-    policy: phase3Policy
+    policy: admissionPolicy
   });
 
   it.each([
@@ -128,16 +128,16 @@ const phase3Policy = {
     ['agent-release-registry', "import type { AgentTaskSpecStorePort } from '@sage/platform-ports';"],
     ['agent-run-admission', "import type { AgentRunner } from '@sage/agent-lib';"]
   ])('rejects unauthorized canonical dependency from %s', (packageName, source) => {
-    expect(phase3Violations(packageName, source)).toHaveLength(1);
-    expect(phase3Violations(packageName, source)[0]).toContain('may not depend on');
+    expect(admissionViolations(packageName, source)).toHaveLength(1);
+    expect(admissionViolations(packageName, source)[0]).toContain('may not depend on');
   });
 
-  it.each(['@temporalio/client', '@aws-sdk/client-bedrock-runtime', 'fastify', 'pg', '@modelcontextprotocol/sdk'])('rejects SDK leakage from Phase 3 packages: %s', (specifier) => {
-    expect(phase3Violations('agent-run-admission', `import type { Leaked } from '${specifier}';`)).toHaveLength(1);
+  it.each(['@temporalio/client', '@aws-sdk/client-bedrock-runtime', 'fastify', 'pg', '@modelcontextprotocol/sdk'])('rejects SDK leakage from packages: %s', (specifier) => {
+    expect(admissionViolations('agent-run-admission', `import type { Leaked } from '${specifier}';`)).toHaveLength(1);
   });
 
   it.each(['workflowId', 'providerClient', 'databaseConnection', 'mcpClient'])('rejects framework-shaped serialized field %s', (key) => {
-    expect(phase3Violations('agent-package-release', `export const leaked = { ${key}: true };`)).toEqual([
+    expect(admissionViolations('agent-package-release', `export const leaked = { ${key}: true };`)).toEqual([
       `packages/agent-package-release/src/index.ts: forbidden serialized framework field ${key}`,
     ]);
   });

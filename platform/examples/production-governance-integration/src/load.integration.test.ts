@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CircuitBreaker, RetryBudget, WeightedFairQueue } from '@sage/production-governance';
 
-describe('Phase 4 capacity/fairness/backpressure load (local engineering only)', () => {
+describe('Capacity/fairness/backpressure load (local engineering only)', () => {
   it('preserves a quiet tenant share under 1000 noisy items', () => {
     const queue = new WeightedFairQueue([{ tenantId: 'noisy', weight: 9, concurrency: 9, queueLimit: 1000 }, { tenantId: 'quiet', weight: 1, concurrency: 1, queueLimit: 10 }], 10);
     for (let index = 0; index < 1000; index += 1) queue.enqueue('noisy', index);

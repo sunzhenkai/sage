@@ -12,7 +12,7 @@ import type { ScheduleRef, ScheduleTriggerEvent } from '@sage/platform-ports';
  * 6.3 ai-app-lifecycle-e2e（schedule 路径）：注册 → Release → 创建绑定该 Release 的 schedule →
  * 触发（压缩时钟）→ admission 生成新 AgentTaskSpec → durable run 启动 → task 投影 / 触发历史 / 预算账户一致。
  * FIXED 绑定在 Release 更新后不漂移；失败触发（依赖不可用）fail closed。
- * （soak 压缩时钟等效窗口 + 故障注入在 scripts/p8/soak.exercise.test.ts，本用例聚焦单次全链路正确性。）
+ * （soak 压缩时钟等效窗口 + 故障注入在 scripts/schedules/soak.exercise.test.ts，本用例聚焦单次全链路正确性。）
  */
 
 const definition: ScheduleDefinition = {
