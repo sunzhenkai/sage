@@ -2,12 +2,13 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { ApplicationFailure } from '@temporalio/activity';
+import type * as TemporalActivity from '@temporalio/activity';
 import { TASK_TYPE, type ExecuteAgentSliceInput, type TaskCommitStore, type TaskRunOutputRecord } from '@sage/task-domain';
 import { extractOutputFile } from '@sage/agent-package-release';
 import { createAgentTaskActivities } from './activities.js';
 
 vi.mock('@temporalio/activity', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@temporalio/activity')>();
+  const actual = await importOriginal<typeof TemporalActivity>();
   return {
     ...actual,
     activityInfo: () => ({ activityId: 'act-1', attempt: 1 }),

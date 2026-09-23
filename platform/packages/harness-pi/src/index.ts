@@ -159,13 +159,13 @@ export interface FakeLiveInvokerOptions {
  * LiveProviderHarness）全链路保真。识别输入中的脚本标记：
  * - `[fail]`：抛出稳定错误（模拟 provider 故障）；
  * - `[slow]`：按 tokensPerSecond 模拟推理时延；
- * - `[tokens:N]`：返回 N 作为 token 用量；
+ * - `[tokens:N]`：返回 N 作为 token 用量（不按请求上限截断，以保真模拟超额用量）；
  * - `[continue]`：首个 turn 返回 `done:false` 驱动续跑（per-invoker 实例状态）。
  */
 export const createFakeLiveInvoker = (options: FakeLiveInvokerOptions = {}): LiveProviderInvoker => {
   const tokensPerSecond = options.tokensPerSecond ?? 5_000;
   let turn = 0;
-  return async ({ messages, maxTokens, signal }) => {
+  return async ({ messages, signal }) => {
     turn += 1;
     const lastUser = [...messages].reverse().find((message) => message.role === 'user');
     const input = (lastUser?.text ?? '').trim().slice(0, 2_000);
@@ -173,7 +173,8 @@ export const createFakeLiveInvoker = (options: FakeLiveInvokerOptions = {}): Liv
     const continuation = input.includes('[continue]');
     const requestedTokens = Number(input.match(/\[tokens:(\d+)\]/u)?.[1] ?? 8);
     const output = continuation && turn === 1 ? '[continue] next' : `已收到：${input}`;
-    const tokens = Math.max(1, Math.min(requestedTokens, maxTokens));
+    // 模拟 provider 真实用量：不因 maxTokens 而截断，否则预算守卫永远无法触发。
+    const tokens = Number.isFinite(requestedTokens) && requestedTokens > 0 ? requestedTokens : 8;
     if (input.includes('[pause]')) return { text: output, tokens, done: false, pause: true };
     if (input.includes('[slow]')) {
       const delayMs = (tokens / tokensPerSecond) * 1_000;

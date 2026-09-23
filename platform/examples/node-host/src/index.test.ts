@@ -121,11 +121,12 @@ describe('live provider Node.js Host example', () => {
   });
 
   it('enforces token and turn budgets with stable errors', async () => {
-    const client = liveClient();
-    const token = await execute(client, makeSpec('[tokens:100]', { maxTokens: 10 }));
+    const token = await execute(liveClient(), makeSpec('[tokens:100]', { maxTokens: 10 }));
     expect(token.outcome.status).toBe('budget_exhausted');
     expect(token.outcome.error?.code).toBe('TOKEN_BUDGET_EXHAUSTED');
-    const turn = await execute(client, makeSpec('[continue]', { maxTurns: 1 }));
+    // 每轮用新的 client：fake invoker 的 turn 是 per-invoker 实例状态，
+    // 复用同一实例会让 [continue] 不再触发续跑，从而测不到 turn 预算。
+    const turn = await execute(liveClient(), makeSpec('[continue]', { maxTurns: 1 }));
     expect(turn.outcome.error?.code).toBe('TURN_BUDGET_EXHAUSTED');
     expectTimeline(token.events);
     expectTimeline(turn.events);
