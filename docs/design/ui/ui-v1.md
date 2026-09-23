@@ -72,15 +72,18 @@ corepack pnpm --filter @sage/agent-web build
 | `session=<id>`           | 当前 Chat 会话；也用于在其他视图间保留会话上下文。 |
 | `task=<id>`              | 打开 Task 详情。                                   |
 | `package=<id>`           | 打开 Package / App 详情。                          |
+| `schedule=<id>`          | 打开 Schedule 详情；未知 id 在视图内回落空态，路由层不丢弃该参数。 |
+| `connection=<id>`        | 设置·模型与连接中选中的 provider connection 详情；未知 id 在视图内回落空态。 |
+| `panel=model`            | 设置·模型与连接的默认模型面板；与 `connection=` 互斥——同时存在时以 `connection=` 为准，忽略 `panel`。不得使用可能与真实连接 id 冲突的字面量（如 `default`）作选中值。 |
 
 规则：
 
 1. 未知 `view` 一律回落到 Chat；`view=settings` 下 `tab` 取 `general`（默认）或 `connections`（模型与连接），未知值一律回落到 `general`。
-2. 内部链接由 `workspaceHref` 生成；Chat 不写入 `view`，其他视图写入 `view`。
+2. 内部链接由 `workspaceHref` 生成；Chat 不写入 `view`，其他视图写入 `view`；`workspaceHref` 按入参从零构造 query，跨视图导航不携带已失效的选中参数（`schedule`/`connection`/`panel` 不会被带到其他视图）。
 3. 同源且相同 path 的左键点击使用 `history.pushState` 和自定义导航事件完成客户端导航。
 4. 以下情况不拦截：修饰键或非左键点击、`target="_blank"`、下载链接、`#`、`mailto:`、`tel:`、data URL、外部 URL 或非当前 path 的链接。
 5. `popstate` 与自定义导航事件都会刷新路由状态。
-6. Chat、Tasks、Packages、Schedules 的活动实体变化时，对应视图状态必须隔离，旧请求或旧状态不得跨实体残留。
+6. Chat、Tasks、Packages、Schedules、Settings（含模型与连接的 `connection`/`panel` 选中）的活动实体变化时，对应视图状态必须隔离，旧请求或旧状态不得跨实体残留（详情子树随实体 id 卸载重挂，或 effect 以实体 id 为依赖并保留 AbortController）。
 
 ### 3.2 应用壳层
 

@@ -1,7 +1,28 @@
-import { useEffect, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 
 import { useLocale } from '../i18n'
 import { useFeedback } from './Feedback'
+
+// ---------- topbar 视图级动作插槽 ----------
+// Shell 提供容器元素（值为稳定 element，不随 render 变化）；视图用 portal 把
+// 自己唯一的视图级主按钮渲染进去，卸载即消失。避免父 state 存 ReactNode 的重渲染环。
+export const TopbarActionsContext = createContext<HTMLElement | null>(null)
+
+export function TopbarActions({ children }: { children: ReactNode }) {
+  const container = useContext(TopbarActionsContext)
+  return container ? createPortal(children, container) : null
+}
+
+// ---------- 设置视图列表栏下段插槽（双段结构的 item 段） ----------
+// SettingsView 提供容器（子菜单段下方），ProvidersView 把语言入口 + 默认模型 pinned + 连接条目
+// portal 进去；容器值为稳定 element，避免父 state 存 ReactNode 的重渲染环。
+export const SettingsListContext = createContext<HTMLElement | null>(null)
+
+export function SettingsListPortal({ children }: { children: ReactNode }) {
+  const container = useContext(SettingsListContext)
+  return container ? createPortal(children, container) : null
+}
 
 // ---------- Button ----------
 
@@ -104,6 +125,8 @@ export type BadgeTone =
   | 'info'
   | 'warning'
   | 'neutral'
+  // 灰阶标识标签：元数据（适配器/来源/事件类型/资产类型…）专用，无呼吸动点、不用状态色。
+  | 'plain'
 
 export function Badge({ tone = 'neutral', children }: { tone?: BadgeTone; children: ReactNode }) {
   return <span className={`badge badge-${tone}`}>{children}</span>
@@ -129,6 +152,7 @@ export function ConfirmButton({
   size?: 'sm' | 'md'
 }) {
   const [armed, setArmed] = useState(false)
+  const { t } = useLocale()
   return armed ? (
     <span className="confirm-pair">
       <Button
@@ -142,7 +166,7 @@ export function ConfirmButton({
       >
         {confirmLabel}
       </Button>
-      <Button size={size} variant="ghost" disabled={busy} onClick={() => setArmed(false)}>
+      <Button size={size} variant="ghost" disabled={busy} onClick={() => setArmed(false)} aria-label={t('common.cancel')}>
         ×
       </Button>
     </span>
@@ -171,7 +195,8 @@ export function SearchBox({
   onChange: (value: string) => void
   onSubmit: () => void
   placeholder?: string
-  submitLabel: string
+  /** 省略时不渲染提交按钮：客户端即时过滤用（服务端搜索必须提供，保持提交式） */
+  submitLabel?: string
 }) {
   return (
     <form
@@ -188,9 +213,11 @@ export function SearchBox({
         placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}
       />
-      <Button type="submit" size="sm" variant="primary">
-        {submitLabel}
-      </Button>
+      {submitLabel !== undefined && (
+        <Button type="submit" size="sm" variant="primary">
+          {submitLabel}
+        </Button>
+      )}
     </form>
   )
 }
@@ -258,24 +285,84 @@ export function Modal({
   children,
   footer,
   wide = false,
+  dirty = false,
 }: {
   title: string
   onClose: () => void
   children: ReactNode
   footer?: ReactNode
   wide?: boolean
+  /** 有未保存修改时置 true：点遮罩不再关闭，避免静默丢表单；Escape 仍可关闭 */
+  dirty?: boolean
 }) {
+  const { t } = useLocale()
+  const dialogRef = useRef<HTMLDivElement | null>(null)
+  // onClose 经 ref 读取：父组件每次 render 传新函数不会重跑焦点 effect（StrictMode 双执行也安全）。
+  const onCloseRef = useRef(onClose)
   useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    onCloseRef.current = onClose
   }, [onClose])
 
+  // 焦点环：打开时移入对话框（优先首个表单控件）、Tab 闭合在对话框内、关闭时归还触发元素。
+  useEffect(() => {
+    const dialog = dialogRef.current
+    const previous = document.activeElement as HTMLElement | null
+    const focusables = () =>
+      dialog
+        ? Array.from(
+            dialog.querySelectorAll<HTMLElement>(
+              'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+            ),
+          )
+        : []
+    const initial =
+      dialog?.querySelector<HTMLElement>('input, textarea, select') ?? focusables()[0] ?? dialog
+    initial?.focus()
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onCloseRef.current()
+        return
+      }
+      if (event.key !== 'Tab' || !dialog) return
+      const list = focusables()
+      if (list.length === 0) {
+        event.preventDefault()
+        dialog.focus()
+        return
+      }
+      const first = list[0]
+      const last = list[list.length - 1]
+      const active = document.activeElement
+      const inside = active instanceof Node && dialog.contains(active)
+      if (event.shiftKey) {
+        if (!inside || active === first) {
+          event.preventDefault()
+          last.focus()
+        }
+      } else if (!inside || active === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      // 清理时归还焦点给触发元素（StrictMode 下先还再重取，不会丢）。
+      if (previous && typeof previous.focus === 'function') previous.focus()
+    }
+  }, [])
+
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div
+      className="modal-overlay"
+      onClick={() => {
+        if (!dirty) onClose()
+      }}
+    >
       <div
+        ref={dialogRef}
+        tabIndex={-1}
         className={`modal${wide ? ' modal-wide' : ''}`}
         role="dialog"
         aria-modal="true"
@@ -284,7 +371,7 @@ export function Modal({
       >
         <div className="modal-head">
           <h2>{title}</h2>
-          <button type="button" className="modal-close" onClick={onClose} aria-label="close">
+          <button type="button" className="modal-close" onClick={onClose} aria-label={t('common.close')}>
             ×
           </button>
         </div>

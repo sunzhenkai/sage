@@ -1,18 +1,14 @@
-/* Tasks 视图：左侧列表 + 右侧详情；无详情时列表占整行。 */
+/* Tasks 视图：左侧列表栏 + 右侧内容区；未选中时内容区显示空态（三段式契约）。 */
 
 /* 特异性高于全局 .view（global.css 注入顺序在后，会平手胜出），必须双类限定。 */
 .view.tasks-view {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(320px, 380px) minmax(0, 1fr);
-  gap: 16px;
-  padding: 16px 20px;
+  grid-template-columns: var(--pane-list-w) minmax(0, 1fr);
+  gap: 0;
+  padding: 0;
   overflow: hidden;
-}
-
-.tasks-view.is-list-only {
-  grid-template-columns: minmax(0, 1fr);
 }
 
 .tasks-list {
@@ -21,10 +17,9 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 12px 14px;
+  /* 层2/层3 分隔：1px 竖线（Chat 同款），列表栏不再套二级卡片 */
+  border-right: 1px solid var(--line);
+  padding: 14px;
 }
 
 .tasks-toolbar {
@@ -54,6 +49,7 @@
   gap: 6px;
 }
 
+/* 行布局留在此类；视觉规格（border/bg/hover/is-current）由 .pane-item 承载 */
 .task-row {
   width: 100%;
   text-align: left;
@@ -61,21 +57,9 @@
   flex-direction: column;
   gap: 5px;
   padding: 9px 11px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
   cursor: pointer;
   font: inherit;
   color: inherit;
-}
-
-.task-row:hover {
-  border-color: var(--line-strong);
-}
-
-.task-row.is-active {
-  border-color: var(--sage);
-  background: var(--sage-mist);
 }
 
 .task-row-top {
@@ -111,6 +95,7 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  padding: var(--page-pad-y) var(--page-pad-x);
 }
 
 .task-detail-head {
@@ -127,11 +112,6 @@
   gap: 6px;
   align-items: flex-start;
   min-width: 0;
-}
-
-.task-back {
-  font-size: 12px;
-  color: var(--sage);
 }
 
 .task-detail-title {
@@ -224,7 +204,7 @@
   display: inline-flex;
   gap: 10px;
   font-size: 12px;
-  color: var(--faint);
+  color: var(--faint-text);
 }
 
 .task-artifacts {

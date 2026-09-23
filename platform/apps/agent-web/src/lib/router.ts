@@ -19,6 +19,9 @@ export interface WorkspaceRoute {
   session?: string
   task?: string
   package?: string
+  schedule?: string
+  connection?: string
+  panel?: 'model'
 }
 
 export interface WorkspaceLink {
@@ -27,6 +30,9 @@ export interface WorkspaceLink {
   session?: string
   task?: string
   package?: string
+  schedule?: string
+  connection?: string
+  panel?: 'model'
 }
 
 export function parseRoute(search: string): WorkspaceRoute {
@@ -41,6 +47,14 @@ export function parseRoute(search: string): WorkspaceRoute {
   if (task) route.task = task
   const pkg = params.get('package')
   if (pkg) route.package = pkg
+  const schedule = params.get('schedule')
+  if (schedule) route.schedule = schedule
+  const connection = params.get('connection')
+  if (connection) route.connection = connection
+  const panel = params.get('panel')
+  if (panel === 'model') route.panel = 'model'
+  // 互斥：connection= 与 panel=model 同时存在时以 connection 为准，忽略 panel（spec：查询参数驱动的选中状态）。
+  if (route.connection && route.panel) delete route.panel
   return route
 }
 
@@ -56,6 +70,12 @@ export function workspaceHref(link: WorkspaceLink): string {
   if (link.session) params.set('session', link.session)
   if (link.task) params.set('task', link.task)
   if (link.package) params.set('package', link.package)
+  if (link.schedule) params.set('schedule', link.schedule)
+  if (link.connection) {
+    params.set('connection', link.connection)
+  } else if (link.panel === 'model') {
+    params.set('panel', 'model')
+  }
   const query = params.toString()
   return query ? `${window.location.pathname}?${query}` : window.location.pathname
 }

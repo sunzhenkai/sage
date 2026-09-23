@@ -7,6 +7,7 @@ import {
   type ChangeEvent,
   type FocusEvent,
   type KeyboardEvent,
+  type ReactNode,
 } from 'react'
 
 import type { ModelCatalogItem, ProviderCatalogItem } from '@sage/app-contracts'
@@ -19,11 +20,14 @@ import {
   EmptyState,
   ErrorBanner,
   Field,
+  KeyValue,
   LoadingBlock,
   Modal,
   Segmented,
   Select,
+  SettingsListPortal,
   TextInput,
+  TopbarActions,
 } from '../components/ui'
 import { useLocale, type TranslateFn } from '../i18n'
 import { ApiError, toUserMessage, type ApiCtx } from '../lib/api/client'
@@ -41,6 +45,7 @@ import {
   type SaveProviderConnectionInput,
 } from '../lib/api/providers'
 import type { RunAgentSettingsView, WorkspaceProviderView } from '../lib/api/types'
+import { navigate, workspaceHref } from '../lib/router'
 
 import './ProvidersView.css'
 
@@ -55,7 +60,7 @@ function mergeByKey<T>(prev: readonly T[], next: readonly T[], key: (item: T) =>
   return [...prev, ...next.filter((item) => !seen.has(key(item)))]
 }
 
-export function ProvidersView({ api }: { api: ApiCtx }) {
+export function ProvidersView({ api, connection, panel }: { api: ApiCtx; connection?: string; panel?: 'model' }) {
   const { locale, setLocale, t } = useLocale()
   const feedback = useFeedback()
 
@@ -134,15 +139,17 @@ export function ProvidersView({ api }: { api: ApiCtx }) {
     }
   }, [api, locale, connectionsVersion])
 
-  const handleDelete = async (connection: WorkspaceProviderView) => {
+  const handleDelete = async (target: WorkspaceProviderView) => {
     if (deletingRef.current) return
     deletingRef.current = true
-    setDeletingId(connection.id)
+    setDeletingId(target.id)
     try {
-      await deleteProviderConnection(api, connection.id)
+      await deleteProviderConnection(api, target.id)
       feedback.success(t('providers.connections.deleted'))
       setConnectionsVersion((v) => v + 1)
       setSettingsVersion((v) => v + 1)
+      // 删除的是当前选中项 → 清除选中（回列表态，不带失效参数）。
+      if (connection === target.id) navigate(workspaceHref({ view: 'settings', tab: 'connections' }))
     } catch (error: unknown) {
       feedback.error(t('providers.connections.deleteFailed'), { body: toUserMessage(error) })
     } finally {
@@ -155,103 +162,156 @@ export function ProvidersView({ api }: { api: ApiCtx }) {
   const [formMode, setFormMode] = useState<'create' | 'edit' | null>(null)
   const [editingConnection, setEditingConnection] = useState<WorkspaceProviderView | null>(null)
 
-  return (
-    <div className="view">
-      <div className="page">
+  const openCreate = () => {
+    setEditingConnection(null)
+    setFormMode('create')
+  }
+
+  const selectedConn = connection !== undefined && connections !== null
+    ? connections.find((item) => item.id === connection) ?? null
+    : null
+  const showModelPanel = connection === undefined && panel === 'model'
+  const isDefault = settings !== null && !settings.unset && settings.providerConnectionId !== undefined
+    && settings.providerConnectionId === connection
+
+  const listSegment = (
+    <>
+      <div className="providers-language">
+        <span className="providers-language-label">{t('providers.language')}</span>
+        <Segmented
+          value={locale}
+          onChange={setLocale}
+          ariaLabel={t('providers.language')}
+          options={[
+            { value: 'zh-CN', label: '简体中文' },
+            { value: 'en', label: 'English' },
+          ]}
+        />
+      </div>
+      <a
+        className={`settings-pinned pane-item${showModelPanel ? ' is-current' : ''}`}
+        aria-current={showModelPanel ? 'true' : undefined}
+        href={workspaceHref({ view: 'settings', tab: 'connections', panel: 'model' })}
+      >
+        <span className="settings-pinned-title">{t('providers.defaultModel.title')}</span>
+      </a>
+      {connections !== null && connections.length > 0 && (
+        <ul className="providers-connection-list">
+          {connections.map((item) => {
+            const isCurrent = connection === item.id
+            return (
+              <li key={item.id}>
+                <a
+                  className={`providers-conn-row pane-item${isCurrent ? ' is-current' : ''}`}
+                  aria-current={isCurrent ? 'true' : undefined}
+                  href={workspaceHref({ view: 'settings', tab: 'connections', connection: item.id })}
+                >
+                  <span className="providers-conn-name">{item.name}</span>
+                  <span className="providers-conn-meta mono">
+                    {item.providerName && item.modelName ? `${item.providerName} / ${item.modelName}` : item.modelId}
+                  </span>
+                </a>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+      {connections !== null && connections.length === 0 && (
+        <p className="settings-list-hint">{t('providers.connections.emptyHint')}</p>
+      )}
+    </>
+  )
+
+  // 层 3 内容区：连接详情 / 默认模型面板 / 选中引导空态（三者互斥）。
+  let content: ReactNode
+  if (connection !== undefined) {
+    if (connectionsLoading) {
+      content = <LoadingBlock title={t('common.loading')} />
+    } else if (connectionsError) {
+      content = (
+        <ErrorBanner
+          title={t('common.notAvailable')}
+          body={connectionsError}
+          onRetry={() => setConnectionsVersion((v) => v + 1)}
+          retryLabel={t('common.retry')}
+        />
+      )
+    } else if (selectedConn === null) {
+      content = <EmptyState title={t('providers.connections.notFound')} />
+    } else {
+      content = (
+        <ConnectionDetail
+          connection={selectedConn}
+          isDefault={isDefault}
+          busy={deletingId === selectedConn.id}
+          onEdit={() => {
+            setEditingConnection(selectedConn)
+            setFormMode('edit')
+          }}
+          onDelete={() => void handleDelete(selectedConn)}
+          t={t}
+        />
+      )
+    }
+  } else if (showModelPanel) {
+    if (settingsLoading) {
+      content = <LoadingBlock title={t('common.loading')} />
+    } else if (settingsError) {
+      content = (
+        <ErrorBanner
+          title={t('common.notAvailable')}
+          body={settingsError}
+          onRetry={() => setSettingsVersion((v) => v + 1)}
+          retryLabel={t('common.retry')}
+        />
+      )
+    } else if (settings) {
+      content = (
         <section className="card">
           <div className="providers-card-head">
             <h2>{t('providers.defaultModel.title')}</h2>
-            <div className="providers-language">
-              <span className="providers-language-label">{t('providers.language')}</span>
-              <Segmented
-                value={locale}
-                onChange={setLocale}
-                ariaLabel={t('providers.language')}
-                options={[
-                  { value: 'zh-CN', label: '简体中文' },
-                  { value: 'en', label: 'English' },
-                ]}
-              />
-            </div>
           </div>
-
-          {settingsLoading ? (
-            <LoadingBlock title={t('common.loading')} />
-          ) : settingsError ? (
-            <ErrorBanner
-              title={t('common.notAvailable')}
-              body={settingsError}
-              onRetry={() => setSettingsVersion((v) => v + 1)}
-              retryLabel={t('common.retry')}
-            />
-          ) : settings ? (
-            <DefaultModelSection settings={settings} saving={savingDefault} onSelect={(id) => void handleSelectDefault(id)} t={t} />
-          ) : (
-            <ErrorBanner title={t('common.notAvailable')} />
-          )}
+          <DefaultModelSection settings={settings} saving={savingDefault} onSelect={(id) => void handleSelectDefault(id)} t={t} />
         </section>
-
-        <section className="card">
-          <div className="providers-card-head">
-            <h2>{t('providers.connections.title')}</h2>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => {
-                setEditingConnection(null)
-                setFormMode('create')
-              }}
-            >
+      )
+    } else {
+      content = <ErrorBanner title={t('common.notAvailable')} />
+    }
+  } else {
+    if (connectionsLoading) {
+      content = <LoadingBlock title={t('common.loading')} />
+    } else if (connectionsError) {
+      content = (
+        <ErrorBanner
+          title={t('common.notAvailable')}
+          body={connectionsError}
+          onRetry={() => setConnectionsVersion((v) => v + 1)}
+          retryLabel={t('common.retry')}
+        />
+      )
+    } else {
+      content = (
+        <EmptyState
+          title={t('providers.connections.selectPrompt')}
+          action={
+            <Button variant="primary" size="sm" onClick={openCreate}>
               {t('providers.connections.add')}
             </Button>
-          </div>
+          }
+        />
+      )
+    }
+  }
 
-          {connectionsLoading ? (
-            <LoadingBlock title={t('common.loading')} />
-          ) : connectionsError ? (
-            <ErrorBanner
-              title={t('common.notAvailable')}
-              body={connectionsError}
-              onRetry={() => setConnectionsVersion((v) => v + 1)}
-              retryLabel={t('common.retry')}
-            />
-          ) : connections && connections.length > 0 ? (
-            <ul className="providers-connection-list">
-              {connections.map((connection) => (
-                <ConnectionRow
-                  key={connection.id}
-                  connection={connection}
-                  isDefault={!settings?.unset && settings?.providerConnectionId === connection.id}
-                  busy={deletingId === connection.id}
-                  onEdit={() => {
-                    setEditingConnection(connection)
-                    setFormMode('edit')
-                  }}
-                  onDelete={() => void handleDelete(connection)}
-                  t={t}
-                />
-              ))}
-            </ul>
-          ) : (
-            <EmptyState
-              title={t('common.empty')}
-              action={
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={() => {
-                    setEditingConnection(null)
-                    setFormMode('create')
-                  }}
-                >
-                  {t('providers.connections.add')}
-                </Button>
-              }
-            />
-          )}
-        </section>
-      </div>
-
+  return (
+    <>
+      <TopbarActions>
+        <Button variant="primary" size="sm" onClick={openCreate}>
+          {t('providers.connections.add')}
+        </Button>
+      </TopbarActions>
+      <SettingsListPortal>{listSegment}</SettingsListPortal>
+      <div className="providers-detail">{content}</div>
       {formMode && (
         <ConnectionFormModal
           api={api}
@@ -268,7 +328,7 @@ export function ProvidersView({ api }: { api: ApiCtx }) {
           }}
         />
       )}
-    </div>
+    </>
   )
 }
 
@@ -341,9 +401,9 @@ function DefaultModelSection({
   )
 }
 
-// ---------- 8.2 连接行 ----------
+// ---------- 8.2 连接详情（层 3 内容区；编辑/删除动作随选中项呈现） ----------
 
-function ConnectionRow({
+function ConnectionDetail({
   connection,
   isDefault,
   busy,
@@ -364,36 +424,11 @@ function ConnectionRow({
     : connection.modelId
 
   return (
-    <li className="providers-connection">
-      <div className="providers-connection-main">
-        <div className="providers-connection-title">
-          <strong>{connection.name}</strong>
-          <Badge tone="neutral">{connection.adapterKind}</Badge>
-          {connection.source === 'user' ? (
-            <Badge tone="info">{t('providers.connections.sourceUser')}</Badge>
-          ) : (
-            <>
-              <Badge tone="neutral">{t('providers.connections.sourceDeployment')}</Badge>
-              <Badge tone="warning">{t('providers.connections.readonly')}</Badge>
-            </>
-          )}
-          {connection.credentialPresent ? (
-            <Badge tone="succeeded">{t('providers.connections.credentialPresent')}</Badge>
-          ) : (
-            <Badge tone="warning">{t('providers.connections.credentialMissing')}</Badge>
-          )}
-        </div>
-        <div className="providers-connection-meta">
-          <span>{modelLabel}</span>
-          <span className="mono">{connection.baseUrl}</span>
-        </div>
-      </div>
-      <div className="providers-connection-actions">
-        {isDefault && (
-          <span className="providers-note providers-note-warning">{t('providers.connections.deleteAffectsDefault')}</span>
-        )}
+    <section className="card">
+      <div className="providers-card-head">
+        <h2>{connection.name}</h2>
         {!readonly && (
-          <>
+          <div className="providers-connection-actions">
             <Button size="sm" variant="ghost" onClick={onEdit}>
               {t('providers.connections.edit')}
             </Button>
@@ -404,10 +439,39 @@ function ConnectionRow({
               busy={busy}
               onConfirm={onDelete}
             />
-          </>
+          </div>
         )}
       </div>
-    </li>
+
+      <div className="providers-connection-title">
+        <Badge tone="plain">{connection.adapterKind}</Badge>
+        {connection.source === 'user' ? (
+          <Badge tone="plain">{t('providers.connections.sourceUser')}</Badge>
+        ) : (
+          <>
+            <Badge tone="plain">{t('providers.connections.sourceDeployment')}</Badge>
+            <Badge tone="warning">{t('providers.connections.readonly')}</Badge>
+          </>
+        )}
+        {connection.credentialPresent ? (
+          <Badge tone="succeeded">{t('providers.connections.credentialPresent')}</Badge>
+        ) : (
+          <Badge tone="warning">{t('providers.connections.credentialMissing')}</Badge>
+        )}
+      </div>
+
+      {isDefault && (
+        <p className="providers-note providers-note-warning">{t('providers.connections.deleteAffectsDefault')}</p>
+      )}
+
+      <KeyValue label={t('providers.connections.baseUrl')} mono>
+        {connection.baseUrl}
+      </KeyValue>
+      <KeyValue label={t('providers.connections.modelId')} mono>
+        {modelLabel === connection.modelId ? connection.modelId : `${modelLabel} · ${connection.modelId}`}
+      </KeyValue>
+      {readonly && <p className="providers-note">{t('providers.connections.form.apiKeyEditPlaceholder')}</p>}
+    </section>
   )
 }
 
@@ -605,10 +669,21 @@ function ConnectionFormModal({
     }, 1000)
   }
 
+  // 脏检查：任一字段偏离初始值即视为有未保存修改，Modal 遮罩不再关闭（Escape 仍可关）。
+  const dirty =
+    name !== (connection?.name ?? '') ||
+    adapterKind !== (connection?.adapterKind === 'anthropic' ? 'anthropic' : 'openai-compatible') ||
+    baseUrl !== (connection?.baseUrl ?? '') ||
+    modelId !== (connection?.modelId ?? '') ||
+    apiKey !== '' ||
+    providerName !== (connection?.providerName ?? '') ||
+    modelName !== (connection?.modelName ?? '')
+
   return (
     <Modal
       title={t(mode === 'create' ? 'providers.connections.form.createTitle' : 'providers.connections.form.editTitle')}
       onClose={onClose}
+      dirty={dirty}
       wide
       footer={
         <>

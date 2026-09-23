@@ -13,6 +13,7 @@ import {
   Modal,
   Select,
   TextInput,
+  TopbarActions,
   type BadgeTone,
 } from '../components/ui'
 import { useLocale } from '../i18n'
@@ -303,15 +304,15 @@ export function PackagesView({ api, packageId }: { api: ApiCtx; packageId?: stri
     }
   }
 
-  if (!packageId) {
-    return (
-      <div className="view packages-view">
-        <div className="pkg-toolbar">
-          <span className="pkg-toolbar-spacer" />
-          <Button variant="primary" size="sm" onClick={() => setCreateOpen(true)}>
-            {t('packages.create')}
-          </Button>
-        </div>
+  // 三段式：列表栏常驻（aside），内容区随 package= 切换；创建 Modal 在共同父节点挂载。
+  return (
+    <div className="view packages-view">
+      <TopbarActions>
+        <Button variant="primary" size="sm" onClick={() => setCreateOpen(true)}>
+          {t('packages.create')}
+        </Button>
+      </TopbarActions>
+      <aside className="pkg-list-pane">
         {listState.loading && <LoadingBlock title={t('common.loading')} />}
         {!listState.loading && listState.error && (
           <ErrorBanner
@@ -330,7 +331,8 @@ export function PackagesView({ api, packageId }: { api: ApiCtx; packageId?: stri
               <a
                 key={app.packageId}
                 role="listitem"
-                className="pkg-row"
+                className={`pkg-row pane-item${packageId === app.packageId ? ' is-current' : ''}`}
+                aria-current={packageId === app.packageId ? 'true' : undefined}
                 href={workspaceHref({ view: 'packages', package: app.packageId })}
               >
                 <span className="pkg-row-main">
@@ -353,23 +355,10 @@ export function PackagesView({ api, packageId }: { api: ApiCtx; packageId?: stri
           </div>
         )}
         <ExamplesBlock importingId={importingId} onImport={(example) => void importExample(example)} />
-        {createOpen && (
-          <CreateAppModal
-            busy={createBusy}
-            onCancel={() => setCreateOpen(false)}
-            onSubmit={(input) => void submitCreate(input)}
-          />
-        )}
-      </div>
-    )
-  }
-
-  return (
-    <div className="view packages-view">
+      </aside>
       <div className="pkg-detail">
-        <a className="pkg-back" href={workspaceHref({ view: 'packages' })}>
-          {t('packages.detail.backToList')}
-        </a>
+        {/* 三段式契约：未选中条目时列表栏常驻，内容区给引导空态 */}
+        {!packageId && <EmptyState title={t('packages.detail.selectPrompt')} />}
         {detailState.status === 'loading' && <LoadingBlock title={t('common.loading')} />}
         {detailState.status === 'error' && (
           <ErrorBanner
@@ -412,6 +401,13 @@ export function PackagesView({ api, packageId }: { api: ApiCtx; packageId?: stri
           </>
         )}
       </div>
+      {createOpen && (
+        <CreateAppModal
+          busy={createBusy}
+          onCancel={() => setCreateOpen(false)}
+          onSubmit={(input) => void submitCreate(input)}
+        />
+      )}
     </div>
   )
 }
@@ -481,7 +477,11 @@ function CreateAppModal({
   }
 
   return (
-    <Modal title={t('packages.form.title')} onClose={() => { if (!busy) onCancel() }}>
+    <Modal
+      title={t('packages.form.title')}
+      onClose={() => { if (!busy) onCancel() }}
+      dirty={draft.appId !== '' || draft.name !== '' || draft.description !== ''}
+    >
       <Field
         label={t('packages.form.appId')}
         htmlFor="pkg-create-appid"
@@ -747,7 +747,8 @@ function ManifestCard({ app }: { app: AppDetail }) {
       {manifestInputs.length > 0 && (
         <>
           <h3 className="pkg-subhead">{t('packages.detail.manifestInputs')}</h3>
-          <table className="data-table">
+          <div className="table-scroll">
+            <table className="data-table">
             <thead>
               <tr>
                 <th>name</th>
@@ -771,12 +772,14 @@ function ManifestCard({ app }: { app: AppDetail }) {
               ))}
             </tbody>
           </table>
+            </div>
         </>
       )}
       {dataSources.length > 0 && (
         <>
           <h3 className="pkg-subhead">{t('packages.detail.manifestDataSources')}</h3>
-          <table className="data-table">
+          <div className="table-scroll">
+            <table className="data-table">
             <thead>
               <tr>
                 <th>name</th>
@@ -798,12 +801,14 @@ function ManifestCard({ app }: { app: AppDetail }) {
               })}
             </tbody>
           </table>
+            </div>
         </>
       )}
       {manifestTasks.length > 0 && (
         <>
           <h3 className="pkg-subhead">{t('packages.detail.manifestTasks')}</h3>
-          <table className="data-table">
+          <div className="table-scroll">
+            <table className="data-table">
             <thead>
               <tr>
                 <th>name</th>
@@ -822,6 +827,7 @@ function ManifestCard({ app }: { app: AppDetail }) {
               })}
             </tbody>
           </table>
+            </div>
         </>
       )}
     </section>
@@ -834,12 +840,12 @@ function AssetsCard({ app }: { app: AppDetail }) {
   return (
     <section className="card pkg-card">
       <h2>{t('packages.detail.assets')}</h2>
-      {assets.length === 0 && <p className="pkg-muted">{t('common.empty')}</p>}
+      {assets.length === 0 && <p className="pkg-muted">{t('packages.detail.assetsEmpty')}</p>}
       {assets.map((asset) => (
         <div className="pkg-asset" key={asset.relativePath}>
           <div className="pkg-asset-head">
             <span className="mono pkg-asset-path">{asset.relativePath}</span>
-            <Badge tone="neutral">{asset.kind}</Badge>
+            <Badge tone="plain">{asset.kind}</Badge>
             <span className="pkg-asset-bytes">{formatBytes(asset.bytes)}</span>
             <span className="mono pkg-digest" title={asset.digest}>
               {asset.digest}
@@ -868,7 +874,8 @@ function ReleasesCard({ app }: { app: AppDetail }) {
       {releases.length === 0 ? (
         <p className="pkg-muted">{t('packages.detail.releasesEmpty')}</p>
       ) : (
-        <table className="data-table">
+        <div className="table-scroll">
+            <table className="data-table">
           <thead>
             <tr>
               <th>version</th>
@@ -890,6 +897,7 @@ function ReleasesCard({ app }: { app: AppDetail }) {
             ))}
           </tbody>
         </table>
+            </div>
       )}
     </section>
   )

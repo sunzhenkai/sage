@@ -159,7 +159,7 @@ export function ChatView(props: { api: ApiCtx; session?: string }) {
           <ConversationView key={props.session} api={props.api} session={props.session} />
         ) : (
           <div className="chat-no-session">
-            <EmptyState title={t('chat.conversations')} description={t('chat.noPreview')} />
+            <EmptyState title={t('chat.noSessionPrompt')} />
           </div>
         )}
       </section>
@@ -303,9 +303,7 @@ function SessionListPanel({ api, currentSession }: { api: ApiCtx; currentSession
           placeholder={t('chat.searchPlaceholder')}
           submitLabel={t('chat.searchSubmit')}
         />
-        <Button variant="primary" size="sm" loading={creating} onClick={() => void newChat()}>
-          {t('chat.newChat')}
-        </Button>
+        {/* 视图级主动作（新建对话）由全局 topbar 常驻承担，列表栏头不放主按钮（spec：列表栏头只放筛选与搜索）；空态 CTA 在下方保留 */}
       </div>
 
       <div className="chat-list-scroll">
@@ -321,7 +319,7 @@ function SessionListPanel({ api, currentSession }: { api: ApiCtx; currentSession
         {loading && <LoadingBlock title={t('common.loading')} />}
         {!loading && loadError === null && items.length === 0 && (
           <EmptyState
-            title={t('common.empty')}
+            title={t('chat.listEmpty')}
             action={
               <Button size="sm" variant="primary" loading={creating} onClick={() => void newChat()}>
                 {t('chat.newChat')}
@@ -335,9 +333,12 @@ function SessionListPanel({ api, currentSession }: { api: ApiCtx; currentSession
               const isCurrent = item.sessionId === currentSession
               const busy = pendingActionId !== null
               return (
-                <li key={item.sessionId}>
+                <li
+                  key={item.sessionId}
+                  className={`chat-session-item pane-item${isCurrent ? ' is-current' : ''}`}
+                >
                   <a
-                    className={`chat-session-item${isCurrent ? ' is-current' : ''}`}
+                    className="chat-session-link"
                     href={workspaceHref({ session: item.sessionId })}
                     aria-current={isCurrent ? 'true' : undefined}
                   >
@@ -348,41 +349,42 @@ function SessionListPanel({ api, currentSession }: { api: ApiCtx; currentSession
                     <span className="chat-session-preview">{item.preview ?? t('chat.noPreview')}</span>
                     <span className="chat-session-meta">
                       <span>{formatListTime(item.updatedAt)}</span>
-                      <span className="chat-session-actions" onClick={(event) => event.preventDefault()}>
-                        {archivedView ? (
-                          <Button
-                            size="sm"
-                            loading={pendingActionId === item.sessionId}
-                            disabled={busy}
-                            onClick={() => void runSessionAction(item, 'restore')}
-                          >
-                            {t('chat.restore')}
-                          </Button>
-                        ) : (
-                          <>
-                            <Button
-                              size="sm"
-                              loading={pendingActionId === item.sessionId}
-                              disabled={busy}
-                              onClick={() => void runSessionAction(item, 'archive')}
-                            >
-                              {t('chat.archive')}
-                            </Button>
-                            <ConfirmButton
-                              // 过滤 / 归档视图 / 重新加载变化时 remount，清空删除确认态。
-                              key={`${statusFilter}:${String(archivedView)}:${String(reloadNonce)}`}
-                              label={t('common.delete')}
-                              confirmLabel={t('chat.deleteConfirm')}
-                              danger
-                              busy={pendingActionId === item.sessionId}
-                              disabled={busy}
-                              onConfirm={() => void runSessionAction(item, 'delete')}
-                            />
-                          </>
-                        )}
-                      </span>
                     </span>
                   </a>
+                  {/* 操作按钮与链接同级：禁止 a>button 嵌套（HTML 交互内容模型 + 读屏语义） */}
+                  <span className="chat-session-actions">
+                    {archivedView ? (
+                      <Button
+                        size="sm"
+                        loading={pendingActionId === item.sessionId}
+                        disabled={busy}
+                        onClick={() => void runSessionAction(item, 'restore')}
+                      >
+                        {t('chat.restore')}
+                      </Button>
+                    ) : (
+                      <>
+                        <Button
+                          size="sm"
+                          loading={pendingActionId === item.sessionId}
+                          disabled={busy}
+                          onClick={() => void runSessionAction(item, 'archive')}
+                        >
+                          {t('chat.archive')}
+                        </Button>
+                        <ConfirmButton
+                          // 过滤 / 归档视图 / 重新加载变化时 remount，清空删除确认态。
+                          key={`${statusFilter}:${String(archivedView)}:${String(reloadNonce)}`}
+                          label={t('common.delete')}
+                          confirmLabel={t('chat.deleteConfirm')}
+                          danger
+                          busy={pendingActionId === item.sessionId}
+                          disabled={busy}
+                          onConfirm={() => void runSessionAction(item, 'delete')}
+                        />
+                      </>
+                    )}
+                  </span>
                 </li>
               )
             })}
@@ -719,7 +721,7 @@ function ConversationView({ api, session }: { api: ApiCtx; session: string }) {
           <div className="chat-timeline-scroll">
             {timelineError && <ErrorBanner title={timelineError.title} body={timelineError.body} />}
             {turns.length === 0 ? (
-              <EmptyState title={t('common.empty')} description={t('chat.noPreview')} />
+              <EmptyState title={t('chat.noPreview')} />
             ) : (
               <ol className="chat-timeline">
                 {turns.map((turn) => (
@@ -1021,7 +1023,7 @@ function RawEventsModal({
               <div className="raw-event-head">
                 <span className="mono">#{event.sequence}</span>
                 <span>{formatShortTime(event.occurredAt, locale)}</span>
-                <Badge tone="neutral">{event.payload.kind}</Badge>
+                <Badge tone="plain">{event.payload.kind}</Badge>
               </div>
               <JsonBlock value={event.payload} />
             </li>

@@ -1,21 +1,24 @@
 /* Packages（AI Apps）视图布局与样式。 */
 
-.packages-view {
-  padding: 16px 20px 32px;
+/* 三段式：grid 两列（列表栏 + 内容区）；特异性需双类压过全局 .view 的 flex（注入顺序在后） */
+.view.packages-view {
+  display: grid;
+  grid-template-columns: var(--pane-list-w) minmax(0, 1fr);
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* ---------- 列表栏（层2） ---------- */
+
+.pkg-list-pane {
+  min-height: 0;
   overflow-y: auto;
-  gap: 14px;
-}
-
-/* ---------- 列表模式 ---------- */
-
-.pkg-toolbar {
   display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.pkg-toolbar-spacer {
-  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+  border-right: 1px solid var(--line);
+  padding: 14px;
 }
 
 .pkg-list {
@@ -24,22 +27,15 @@
   gap: 8px;
 }
 
+/* 行布局留在此类；视觉规格（border/bg/hover/is-current）由 .pane-item 承载 */
 .pkg-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 14px;
   padding: 10px 14px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
   text-decoration: none;
   color: inherit;
-}
-
-.pkg-row:hover {
-  border-color: var(--sage);
-  background: var(--surface-sunken);
 }
 
 .pkg-row-main {
@@ -133,15 +129,13 @@
 /* ---------- 详情模式 ---------- */
 
 .pkg-detail {
+  min-height: 0;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 14px;
   max-width: 980px;
-}
-
-.pkg-back {
-  align-self: flex-start;
-  font-size: 13px;
+  padding: var(--page-pad-y) var(--page-pad-x);
 }
 
 .pkg-detail-head {

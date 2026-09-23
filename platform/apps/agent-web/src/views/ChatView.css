@@ -10,7 +10,7 @@
 /* ---------- 会话列表面板 ---------- */
 
 .chat-list-panel {
-  width: 300px;
+  width: var(--pane-list-w);
   flex: none;
   min-height: 0;
   display: flex;
@@ -31,16 +31,10 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  scrollbar-width: none; /* Firefox 隐藏滚动条 */
-  -ms-overflow-style: none; /* IE/Edge 隐藏滚动条 */
   padding: 10px;
   display: flex;
   flex-direction: column;
   gap: 6px;
-}
-
-.chat-list-scroll::-webkit-scrollbar {
-  display: none; /* WebKit（Chrome/Safari/Edge）隐藏滚动条 */
 }
 
 .chat-session-list {
@@ -52,26 +46,27 @@
   gap: 6px;
 }
 
+/* 行容器是 li：布局属性留在这里；视觉规格（border/bg/hover/is-current）由 .pane-item 承载 */
 .chat-session-item {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
   padding: 8px 10px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--paper);
   color: var(--ink);
 }
 
-.chat-session-item:hover {
+/* 行容器是 li，链接只包标题/预览/时间；操作按钮是链接的同级（见 ChatView.tsx 注释） */
+.chat-session-link {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  color: var(--ink);
   text-decoration: none;
-  border-color: var(--faint);
+  min-width: 0;
 }
 
-.chat-session-item.is-current {
-  border-color: var(--sage);
-  background: var(--sage-mist);
-  box-shadow: inset 2px 0 0 var(--sage);
+.chat-session-link:hover {
+  text-decoration: none;
 }
 
 .chat-session-top {
@@ -100,15 +95,15 @@
 .chat-session-meta {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 6px;
-  color: var(--faint);
+  color: var(--faint-text);
   font-size: 11px;
 }
 
 .chat-session-actions {
   display: inline-flex;
   gap: 4px;
+  align-self: flex-end;
 }
 
 /* ---------- 会话区 ---------- */
@@ -140,13 +135,14 @@
   margin: 0;
 }
 
+/* 层2/层3 头部与 topbar 同底色（--surface），层级差异只用分隔线表达（5.7 统一） */
 .chat-conv-head {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 10px 18px;
   border-bottom: 1px solid var(--line);
-  background: var(--paper);
+  background: var(--surface);
 }
 
 .chat-conv-title {
@@ -205,7 +201,7 @@
 
 .turn-node-live {
   background: var(--sage-deep);
-  animation: bud-pulse 1.6s ease-in-out infinite;
+  animation: bud-pulse var(--dur-slow) ease-in-out infinite;
 }
 
 .turn-stem::after {
@@ -338,7 +334,7 @@
 
 .chat-composer {
   border-top: 1px solid var(--line);
-  background: var(--paper);
+  background: var(--surface);
   padding: 12px 18px;
   display: flex;
   flex-direction: column;
@@ -362,7 +358,7 @@
 }
 
 .composer-runtime-hint {
-  color: var(--faint);
+  color: var(--faint-text);
   font-size: 12px;
 }
 
@@ -418,10 +414,6 @@
 }
 
 @media (max-width: 860px) {
-  .chat-list-panel {
-    width: 220px;
-  }
-
   .composer-runtime-hint {
     display: none;
   }

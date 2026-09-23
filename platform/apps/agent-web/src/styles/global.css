@@ -11,6 +11,7 @@
   --ink: #1e251e;
   --muted: #5d665a;
   --faint: #8b927f;
+  --faint-text: #676e5f; /* 浅色文字专用：对 --surface ≈5.3:1、对 --surface-sunken ≈4.5:1（WCAG AA）；--faint 保留给边框/hover */
   --line: #e3e0d2;
   --line-strong: #cbc7b4;
   --sage: #3e6b4a;
@@ -19,7 +20,7 @@
   --sage-mist: #f2f6ef;
   --clay: #a3492b;
   --clay-wash: #f5e7df;
-  --amber: #8a6a1c;
+  --amber: #7a5d16; /* 原 #8a6a1c：对 --amber-wash 仅 4.3:1；新值 ≈5.3:1（WCAG AA） */
   --amber-wash: #f4edd8;
   --steel: #3d5a73;
   --steel-wash: #e4ebf1;
@@ -31,6 +32,13 @@
   --rail-collapsed: 32px;
   --submenu: 196px;
   --shadow-pop: 0 10px 32px rgba(30, 37, 30, 0.16);
+  /* 三段式布局 token（唯一定义处；≤860px 在媒体查询里重定义 --pane-list-w） */
+  --pane-list-w: 320px;
+  --page-pad-x: 20px;
+  --page-pad-y: 16px;
+  --pane-gap: 12px;
+  --dur-fast: 140ms;
+  --dur-slow: 1.6s;
 }
 
 * {
@@ -219,12 +227,18 @@ button {
   flex: 1;
 }
 
+.topbar-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .view {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  animation: view-in 140ms ease-out;
+  animation: view-in var(--dur-fast) ease-out;
 }
 
 @keyframes view-in {
@@ -258,7 +272,7 @@ button {
   font-size: 12px;
 }
 
-/* ---------- 通知 ---------- */
+/* ---------- 通知（单栈右下：不遮挡 topbar 主操作区） ---------- */
 
 .notice-stack {
   position: fixed;
@@ -271,11 +285,6 @@ button {
   max-width: 380px;
 }
 
-.notice-stack-alert {
-  bottom: auto;
-  top: 18px;
-}
-
 .notice {
   display: flex;
   gap: 10px;
@@ -286,6 +295,12 @@ button {
   border-radius: var(--radius);
   padding: 10px 12px;
   box-shadow: var(--shadow-pop);
+  animation: notice-in 120ms ease-out;
+}
+
+@keyframes notice-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
 }
 
 .notice-error {
@@ -413,8 +428,20 @@ button {
 .badge-warning { background: var(--amber-wash); color: var(--amber); border-color: #ddd0a4; }
 .badge-neutral { background: var(--surface-sunken); color: var(--muted); }
 
+/* 元数据标识（plain）：灰阶、无状态圆点——彩色+动点只留真实状态 */
+.badge-plain {
+  background: var(--surface-sunken);
+  color: var(--muted);
+  border-color: var(--line);
+  font-weight: 500;
+}
+
+.badge-plain::before {
+  display: none;
+}
+
 .badge-running::before {
-  animation: bud-pulse 1.6s ease-in-out infinite;
+  animation: bud-pulse var(--dur-slow) ease-in-out infinite;
 }
 
 /* ---------- 表单 ---------- */
@@ -503,7 +530,7 @@ button {
 .segmented-count {
   margin-left: 5px;
   font-size: 11px;
-  color: var(--faint);
+  color: var(--faint-text);
 }
 
 /* ---------- 加载 / 空态 / 错误 ---------- */
@@ -719,6 +746,23 @@ button {
   padding: 14px 16px;
 }
 
+/* ---------- 列表栏 item 统一规格（三段式契约；exemplar = Chat 会话行现码逐字提取） ---------- */
+.pane-item {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.pane-item:hover {
+  border-color: var(--faint);
+}
+
+.pane-item.is-current {
+  border-color: var(--sage);
+  background: var(--sage-mist);
+  box-shadow: inset 2px 0 0 var(--sage);
+}
+
 .card + .card {
   margin-top: 12px;
 }
@@ -747,6 +791,12 @@ table.data-table th {
   color: var(--muted);
   font-weight: 600;
   font-size: 12px;
+}
+
+/* 宽内容（多列表格）横向滚动容器：不溢出卡片边界 */
+.table-scroll {
+  overflow-x: auto;
+  max-width: 100%;
 }
 
 /* ---------- Markdown ---------- */
@@ -849,6 +899,10 @@ table.data-table th {
 /* ---------- 响应式 ---------- */
 
 @media (max-width: 860px) {
+  :root {
+    --pane-list-w: 220px;
+  }
+
   .shell, .shell.is-collapsed {
     grid-template-columns: var(--rail-collapsed) 1fr;
     gap: 8px;
@@ -898,4 +952,13 @@ table.data-table th {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* 全局隐藏滚动条：仅隐藏视觉，滚动能力保留。 */
+* {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/旧 Edge */
+}
+*::-webkit-scrollbar {
+  display: none; /* WebKit/Chromium */
 }

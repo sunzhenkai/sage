@@ -1,17 +1,44 @@
-/* Settings 视图：左侧子菜单（复用 .rail-link）+ 右侧设置面板。 */
+/* Settings 视图：三段式双段列表栏（子菜单段 + item 段 portal）+ 内容区。
+   item 段容器在 connections tab 由 ProvidersView 填充（:not(:empty) 才画分隔线）。 */
 
-/* 特异性高于全局 .page（global.css 注入顺序在后，会平手胜出），必须双类限定。 */
-.page.settings-page {
-  flex-direction: row;
-  align-items: stretch;
+/* 特异性高于全局 .view（global.css 注入顺序在后，同特异性平手胜出），必须双类限定。 */
+.view.settings-view {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: var(--pane-list-w) minmax(0, 1fr);
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* ---------- 层 2：列表栏（子菜单段 + item 段） ---------- */
+
+.settings-list-pane {
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-right: 1px solid var(--line);
+  padding: 14px;
 }
 
 .settings-nav {
-  flex: none;
-  width: var(--submenu);
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+
+.settings-list-items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settings-list-items:not(:empty) {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
 }
 
 /* 手动折叠（.shell.is-collapsed）不影响子菜单：全局折叠规则会隐藏 .rail-label 并把
@@ -30,12 +57,16 @@
   }
 }
 
+/* ---------- 层 3：内容区 ---------- */
+
 .settings-body {
-  flex: 1;
   min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  padding: var(--page-pad-y) var(--page-pad-x);
 }
 
 /* ---------- 通用面板 ---------- */
@@ -51,15 +82,8 @@
   color: var(--muted);
 }
 
-/* ---------- 模型与连接面板 ---------- */
-
-/* 该面板直接复用 ProvidersView，只抹掉它自带的 .view/.page 外层间距与滚动，
-   让卡片按 settings-body 的 gap 堆叠（三重类限定，压过 global.css 的 .page）。 */
-.settings-connections > .view {
-  flex: none;
-}
-
-.settings-connections > .view > .page {
-  padding: 0;
-  overflow: visible;
+.settings-list-hint {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0;
 }

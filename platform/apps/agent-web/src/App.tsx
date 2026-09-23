@@ -1,7 +1,10 @@
 import { Component, useEffect, useMemo, useState, type ReactNode } from 'react'
 
-import { FeedbackProvider, useFeedback } from './components/Feedback'
-import { Button } from './components/ui'
+import {
+  FeedbackProvider,
+  useFeedback,
+} from './components/Feedback'
+import { Button, TopbarActionsContext } from './components/ui'
 import { LocaleProvider, useLocale } from './i18n'
 import { createSession } from './lib/api/chat'
 import { createCtx, type ApiCtx, type ApiOptions } from './lib/api/client'
@@ -47,6 +50,7 @@ function Shell({ api }: { api: ApiCtx }) {
   const { t, locale, setLocale } = useLocale()
   const feedback = useFeedback()
   const [route, setRoute] = useState<WorkspaceRoute>(currentRoute)
+  const [actionsEl, setActionsEl] = useState<HTMLDivElement | null>(null)
   const [collapsed, setCollapsed] = useState(() => readStorage(STORAGE_KEYS.sidebarCollapsed) === 'true')
   const [creating, setCreating] = useState(false)
 
@@ -95,18 +99,18 @@ function Shell({ api }: { api: ApiCtx }) {
       case 'packages':
         return <PackagesView api={api} packageId={route.package} />
       case 'schedules':
-        return <SchedulesView api={api} />
+        return <SchedulesView api={api} schedule={route.schedule} />
       case 'settings':
-        return <SettingsView api={api} tab={route.tab ?? 'general'} />
+        return <SettingsView api={api} tab={route.tab ?? 'general'} connection={route.connection} panel={route.panel} />
       case 'chat':
       default:
         return <ChatView api={api} session={route.session} />
     }
-  }, [activeView, api, route.task, route.session, route.package, route.tab])
+  }, [activeView, api, route.task, route.session, route.package, route.tab, route.schedule, route.connection, route.panel])
 
   return (
     <div className={`shell${collapsed ? ' is-collapsed' : ''}`}>
-      <nav className="rail" aria-label="workspace">
+      <nav className="rail" aria-label={t('shell.nav.workspace')}>
         <a className="rail-brand" href={homeHref} title={t('shell.nav.home')}>
           <LeafMark />
           <span className="rail-brand-text">
@@ -142,14 +146,18 @@ function Shell({ api }: { api: ApiCtx }) {
         </div>
       </nav>
       <div className="shell-main">
-        <header className="topbar">
-          <h1 className="topbar-title">{t(VIEW_TITLE_KEY[activeView])}</h1>
-          <span className="topbar-spacer" />
-          <Button variant="primary" loading={creating} onClick={() => void newChat()}>
-            <PlusIcon /> {t('shell.newChat')}
-          </Button>
-        </header>
-        {view}
+        <TopbarActionsContext.Provider value={actionsEl}>
+          <header className="topbar">
+            <h1 className="topbar-title">{t(VIEW_TITLE_KEY[activeView])}</h1>
+            <span className="topbar-spacer" />
+            {/* 视图级主动作插槽：每视图至多注册一个；全局新建对话常驻其右侧（ui-v1 §3.2） */}
+            <div className="topbar-actions" ref={setActionsEl} />
+            <Button variant="primary" loading={creating} onClick={() => void newChat()}>
+              <PlusIcon /> {t('shell.newChat')}
+            </Button>
+          </header>
+          {view}
+        </TopbarActionsContext.Provider>
       </div>
     </div>
   )

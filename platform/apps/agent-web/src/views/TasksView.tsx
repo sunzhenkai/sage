@@ -363,7 +363,7 @@ export function TasksView({ api, task, session }: { api: ApiCtx; task?: string; 
       else if (kind === 'resume') await sendTaskSignal(api, detail.taskId, 'resume')
       else if (kind === 'cancel') await cancelTask(api, detail.taskId)
       else await retryTask(api, detail.taskId)
-      feedback.success(t(`tasks.detail.controls.${kind}`), { body: t('common.saved') })
+      feedback.success(t(`tasks.detail.controls.${kind}`), { body: t(`tasks.detail.controls.${kind}Done`) })
       reloadList()
       setRefreshing(true)
       setDetailTick((tick) => tick + 1)
@@ -392,7 +392,7 @@ export function TasksView({ api, task, session }: { api: ApiCtx; task?: string; 
   const reversedAttempts = useMemo(() => [...attempts].reverse(), [attempts])
 
   return (
-    <div className={`view tasks-view${task ? '' : ' is-list-only'}`}>
+    <div className="view tasks-view">
       <aside className="tasks-list">
         <div className="tasks-toolbar">
           <Segmented value={statusFilter} onChange={setStatusFilter} options={filterOptions} ariaLabel={t('tasks.title')} />
@@ -403,7 +403,6 @@ export function TasksView({ api, task, session }: { api: ApiCtx; task?: string; 
           onChange={setSearch}
           onSubmit={() => undefined}
           placeholder={t('tasks.searchPlaceholder')}
-          submitLabel={t('common.search')}
         />
         {listError && (
           <ErrorBanner title={t('tasks.listLoadFailed')} body={listError} onRetry={reloadList} retryLabel={t('common.retry')} />
@@ -421,7 +420,8 @@ export function TasksView({ api, task, session }: { api: ApiCtx; task?: string; 
               <li key={item.taskId}>
                 <button
                   type="button"
-                  className={`task-row${task === item.taskId ? ' is-active' : ''}`}
+                  className={`task-row pane-item${task === item.taskId ? ' is-current' : ''}`}
+                  aria-current={task === item.taskId ? 'true' : undefined}
                   onClick={() => navigate(workspaceHref({ view: 'tasks', task: item.taskId, session }))}
                 >
                   <span className="task-row-top">
@@ -438,14 +438,13 @@ export function TasksView({ api, task, session }: { api: ApiCtx; task?: string; 
             ))}
           </ul>
         )}
-        {!listLoading && tasks.length > 0 && filteredTasks.length === 0 && <p className="task-muted">{t('common.empty')}</p>}
+        {!listLoading && tasks.length > 0 && filteredTasks.length === 0 && <p className="task-muted">{t('common.noMatch')}</p>}
       </aside>
 
-      {task && (
+      {task ? (
         <section className="tasks-detail">
           <div className="task-detail-head">
             <div className="task-detail-title-wrap">
-              <a className="task-back" href={workspaceHref({ view: 'tasks', session })}>{t('tasks.detail.backToList')}</a>
               <h2 className="task-detail-title mono">{task}</h2>
               {detail && <Badge tone={statusTone(detail.status)}>{statusLabel(detail.status)}</Badge>}
             </div>
@@ -555,7 +554,7 @@ export function TasksView({ api, task, session }: { api: ApiCtx; task?: string; 
                     {events.map((event) => (
                       <li key={event.eventId}>
                         <span className="mono task-seq">#{event.sequence}</span>
-                        <Badge tone="neutral">{event.type}</Badge>
+                        <Badge tone="plain">{event.type}</Badge>
                         <span className="task-time">{formatFullTime(event.occurredAt, locale)}</span>
                       </li>
                     ))}
@@ -647,6 +646,11 @@ export function TasksView({ api, task, session }: { api: ApiCtx; task?: string; 
               </div>
             </>
           )}
+        </section>
+      ) : (
+        <section className="tasks-detail">
+          {/* 三段式契约：未选中条目时列表栏常驻，内容区给引导空态 */}
+          <EmptyState title={t('tasks.detail.selectPrompt')} />
         </section>
       )}
     </div>

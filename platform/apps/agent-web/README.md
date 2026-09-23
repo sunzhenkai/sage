@@ -51,3 +51,5 @@ corepack pnpm --filter @sage/agent-web preview
 ### 视觉基线
 
 主题：本地工作区的"园丁台"——暖纸底、墨绿、鼠尾草 accent；等宽字体承担 ID/时间/digest/事件负载。记忆点：Chat 时间线"茎干"，运行中的轮次节点为呼吸芽点。动效仅服务于状态表达，尊重 `prefers-reduced-motion`。
+
+**呈现层验收依据：[`docs/design/ui/layout-v1.md`](../../../docs/design/ui/layout-v1.md)**——三段式布局（rail / 列表栏 `--pane-list-w` / 内容区）、三列职责、`.pane-item` 唯一选中规格、token 表（布局/间距/动效/对比度）、通知与徽标语义、仅亮色决策均以该文件为准。样式自定义的依据是 `src/styles/global.css` 头注与 layout-v1 token；`docs/design/ui/ui-v1-frontend-prompt.md` §3「样式是自由度，不是验收项」与 §4「明确不设限」写于呈现层无契约时期，仅作历史语境，现行验收不再适用。
