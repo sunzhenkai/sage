@@ -588,6 +588,8 @@ export function TasksView({ api, task, session }: { api: ApiCtx; task?: string; 
                 )}
                 {logsLoading ? (
                   <Spinner label={t('common.loading')} />
+                ) : logEvents.length === 0 ? (
+                  <p className="task-muted">{t('tasks.detail.logsEmpty')}</p>
                 ) : (
                   <ol className="task-logs">
                     {logEvents.map((event) => (

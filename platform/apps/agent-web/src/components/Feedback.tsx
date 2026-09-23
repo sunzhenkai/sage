@@ -84,7 +84,7 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
   return (
     <FeedbackContext.Provider value={api}>
       {children}
-      <div className="notice-stack" aria-live="polite">
+      <div className="notice-stack">
         {ordered.map((notice) => (
           <div key={notice.id} className={`notice notice-${notice.kind}`} role={notice.kind === 'error' ? 'alert' : 'status'}>
             <div className="notice-body">

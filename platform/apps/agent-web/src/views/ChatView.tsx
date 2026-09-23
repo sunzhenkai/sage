@@ -376,7 +376,8 @@ function SessionListPanel({ api, currentSession }: { api: ApiCtx; currentSession
                           // 过滤 / 归档视图 / 重新加载变化时 remount，清空删除确认态。
                           key={`${statusFilter}:${String(archivedView)}:${String(reloadNonce)}`}
                           label={t('common.delete')}
-                          confirmLabel={t('chat.deleteConfirm')}
+                          confirmLabel={t('common.confirm')}
+                          confirmTitle={t('chat.deleteConfirm')}
                           danger
                           busy={pendingActionId === item.sessionId}
                           disabled={busy}

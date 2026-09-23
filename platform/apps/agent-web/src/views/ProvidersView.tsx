@@ -389,7 +389,7 @@ function DefaultModelSection({
           <li key={provider.id}>
             <span className="providers-availability-name">{provider.name}</span>
             <Badge tone={provider.available ? 'succeeded' : 'warning'}>
-              {provider.available ? 'available' : t('common.notAvailable')}
+              {provider.available ? t('common.available') : t('common.notAvailable')}
             </Badge>
             {!provider.available && provider.reason && (
               <span className="providers-availability-reason">{provider.reason}</span>
@@ -846,6 +846,7 @@ function CatalogCombobox({
   const { t } = useLocale()
   const feedback = useFeedback()
   const listboxId = useId()
+  const catalogOptionId = (item: CatalogItem) => `${listboxId}:${catalogKey(item)}`
   const rootRef = useRef<HTMLDivElement | null>(null)
 
   const [query, setQuery] = useState('')
@@ -991,6 +992,7 @@ function CatalogCombobox({
           aria-expanded={open}
           aria-controls={listboxId}
           aria-autocomplete="list"
+          aria-activedescendant={open && activeIndex >= 0 && activeIndex < items.length ? catalogOptionId(items[activeIndex]) : undefined}
           onChange={(event: ChangeEvent<HTMLInputElement>) => {
             setQuery(event.target.value)
             setOpen(true)
@@ -1007,6 +1009,7 @@ function CatalogCombobox({
             items.map((item, index) => (
               <li
                 key={catalogKey(item)}
+                id={catalogOptionId(item)}
                 role="option"
                 aria-selected={index === activeIndex}
                 className={`catalog-combobox-option${index === activeIndex ? ' is-active' : ''}`}

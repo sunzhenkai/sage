@@ -28,7 +28,7 @@ import {
 } from '../lib/api/apps'
 import { ApiError, toUserMessage, type ApiCtx } from '../lib/api/client'
 import type { AppDetail, AppListItem, ManifestInput, ManifestTask } from '../lib/api/types'
-import { formatBytes, formatFullTime } from '../lib/format'
+import { formatBytes, formatFullTime, formatListTime } from '../lib/format'
 import { navigate, workspaceHref } from '../lib/router'
 
 import './PackagesView.css'
@@ -347,7 +347,7 @@ export function PackagesView({ api, packageId }: { api: ApiCtx; packageId?: stri
                     {t('packages.detail.manifestVersion')} {app.latestVersion ?? DASH}
                   </span>
                   <span className="pkg-row-time">
-                    {app.updatedAt ? formatFullTime(app.updatedAt, locale) : DASH}
+                    {app.updatedAt ? formatListTime(app.updatedAt) : DASH}
                   </span>
                 </span>
               </a>
@@ -751,11 +751,11 @@ function ManifestCard({ app }: { app: AppDetail }) {
             <table className="data-table">
             <thead>
               <tr>
-                <th>name</th>
-                <th>type</th>
-                <th>required</th>
-                <th>enum</th>
-                <th>default</th>
+                <th>{t('packages.detail.table.name')}</th>
+                <th>{t('packages.detail.table.type')}</th>
+                <th>{t('packages.detail.table.required')}</th>
+                <th>{t('packages.detail.table.enum')}</th>
+                <th>{t('packages.detail.table.default')}</th>
               </tr>
             </thead>
             <tbody>
@@ -782,8 +782,8 @@ function ManifestCard({ app }: { app: AppDetail }) {
             <table className="data-table">
             <thead>
               <tr>
-                <th>name</th>
-                <th>definition</th>
+                <th>{t('packages.detail.table.name')}</th>
+                <th>{t('packages.detail.table.definition')}</th>
               </tr>
             </thead>
             <tbody>
@@ -811,8 +811,8 @@ function ManifestCard({ app }: { app: AppDetail }) {
             <table className="data-table">
             <thead>
               <tr>
-                <th>name</th>
-                <th>entry</th>
+                <th>{t('packages.detail.table.name')}</th>
+                <th>{t('packages.detail.table.entry')}</th>
               </tr>
             </thead>
             <tbody>
@@ -878,10 +878,10 @@ function ReleasesCard({ app }: { app: AppDetail }) {
             <table className="data-table">
           <thead>
             <tr>
-              <th>version</th>
-              <th>compiler</th>
-              <th>digest</th>
-              <th>created</th>
+              <th>{t('packages.detail.table.version')}</th>
+              <th>{t('packages.detail.table.compiler')}</th>
+              <th>{t('packages.detail.table.digest')}</th>
+              <th>{t('packages.detail.table.created')}</th>
             </tr>
           </thead>
           <tbody>

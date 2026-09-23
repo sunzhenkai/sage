@@ -137,6 +137,7 @@
 
 /* 层2/层3 头部与 topbar 同底色（--surface），层级差异只用分隔线表达（5.7 统一） */
 .chat-conv-head {
+  flex-wrap: wrap;
   display: flex;
   align-items: center;
   gap: 8px;

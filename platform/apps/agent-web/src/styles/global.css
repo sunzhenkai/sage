@@ -178,10 +178,20 @@ button {
   gap: 2px;
 }
 
+/* 视觉隐藏但保留在无障碍树：折叠 / 窄屏下导航和子菜单名称仍可被读屏访问。 */
 .shell.is-collapsed .rail-label,
 .shell.is-collapsed .rail-brand-text,
 .shell.is-collapsed .rail-tagline {
-  display: none;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* 折叠态：图标水平、垂直居中，占据整行点击区 */
@@ -909,8 +919,19 @@ table.data-table th {
     padding: 6px;
   }
 
-  .rail-label, .rail-brand-text, .rail-tagline {
-    display: none;
+  .rail-label,
+  .rail-brand-text,
+  .rail-tagline {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
   }
 
   .rail-brand,
@@ -929,7 +950,7 @@ table.data-table th {
   /* 子菜单同款收成纯图标栏：文字已由上面的 .rail-label 规则隐藏，这里收窄到 rail
      折叠宽度并居中图标（双类限定，压过 SettingsView.css 的 --submenu 宽度）。
      手动折叠（.shell.is-collapsed）不影响子菜单，因此规则只挂在断点上。 */
-  .settings-page .settings-nav {
+  .settings-view .settings-nav {
     width: var(--rail-collapsed);
   }
 

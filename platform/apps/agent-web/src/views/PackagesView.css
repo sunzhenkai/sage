@@ -30,9 +30,8 @@
 /* 行布局留在此类；视觉规格（border/bg/hover/is-current）由 .pane-item 承载 */
 .pkg-row {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
+  flex-direction: column;
+  gap: 5px;
   padding: 10px 14px;
   text-decoration: none;
   color: inherit;
@@ -63,10 +62,11 @@
 .pkg-row-meta {
   display: flex;
   align-items: baseline;
-  gap: 16px;
+  gap: 12px;
+  min-width: 0;
+  flex-wrap: wrap;
   color: var(--muted);
   font-size: 12px;
-  white-space: nowrap;
 }
 
 .pkg-row-time {
@@ -84,7 +84,7 @@
 
 .pkg-example-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
 }
 
@@ -139,6 +139,7 @@
 }
 
 .pkg-detail-head {
+  flex-wrap: wrap;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;

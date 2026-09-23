@@ -130,7 +130,12 @@ function Shell({ api }: { api: ApiCtx }) {
           </a>
         ))}
         <div className="rail-foot">
-          <button type="button" className="rail-link" onClick={toggleCollapsed}>
+          <button
+            type="button"
+            className="rail-link"
+            onClick={toggleCollapsed}
+            title={t(collapsed ? 'shell.nav.expand' : 'shell.nav.collapse')}
+          >
             <PanelIcon collapsed={collapsed} />
             <span className="rail-label">{t(collapsed ? 'shell.nav.expand' : 'shell.nav.collapse')}</span>
           </button>

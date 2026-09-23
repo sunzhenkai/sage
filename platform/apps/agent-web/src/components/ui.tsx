@@ -45,6 +45,7 @@ export function Button({
       type="button"
       className={`btn btn-${variant} btn-${size}`}
       disabled={disabled || loading}
+      aria-busy={loading ? true : undefined}
       {...rest}
     >
       {loading && <span className="spinner spinner-inline" aria-hidden="true" />}
@@ -137,6 +138,7 @@ export function Badge({ tone = 'neutral', children }: { tone?: BadgeTone; childr
 export function ConfirmButton({
   label,
   confirmLabel,
+  confirmTitle,
   onConfirm,
   danger = false,
   busy = false,
@@ -145,6 +147,7 @@ export function ConfirmButton({
 }: {
   label: string
   confirmLabel: string
+  confirmTitle?: string
   onConfirm: () => void
   danger?: boolean
   busy?: boolean
@@ -159,6 +162,7 @@ export function ConfirmButton({
         variant={danger ? 'danger' : 'primary'}
         size={size}
         loading={busy}
+        title={confirmTitle}
         onClick={() => {
           onConfirm()
           setArmed(false)
@@ -211,6 +215,7 @@ export function SearchBox({
         type="search"
         value={value}
         placeholder={placeholder}
+        aria-label={placeholder}
         onChange={(event) => onChange(event.target.value)}
       />
       {submitLabel !== undefined && (
