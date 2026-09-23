@@ -97,6 +97,7 @@
         "agent-client",
         "agent-contracts",
         "agent-lib",
+        "agent-package-release",
         "agent-run-admission",
         "agent-state-postgres",
         "chat-domain",
