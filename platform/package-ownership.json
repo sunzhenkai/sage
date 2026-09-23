@@ -188,7 +188,7 @@
         "platform-ports"
       ]
     },
-    "p3-integration": {
+    "chat-run-integration": {
       "owner": "Quality",
       "mayDependOn": [
         "agent-api",
@@ -198,7 +198,7 @@
         "chat-domain"
       ]
     },
-    "p4-integration": {
+    "workflow-durability-integration": {
       "owner": "Quality",
       "mayDependOn": [
         "agent-api",
@@ -210,7 +210,7 @@
         "temporal-routing"
       ]
     },
-    "p5-integration": {
+    "trusted-routing-integration": {
       "owner": "Quality",
       "mayDependOn": [
         "agent-client",
@@ -223,7 +223,7 @@
         "temporal-routing"
       ]
     },
-    "p6-integration": {
+    "cross-chain-e2e": {
       "owner": "Quality",
       "mayDependOn": [
         "agent-api",

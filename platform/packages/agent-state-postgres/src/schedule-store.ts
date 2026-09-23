@@ -10,7 +10,7 @@ export class ScheduleStoreError extends Error {
 }
 
 /**
- * P8 控制面 schedule 权威存储：快照（revision 乐观并发）+ append-only 触发事件流。
+ * 控制面 schedule 权威存储：快照（revision 乐观并发）+ append-only 触发事件流。
  * 调度设施（Temporal Schedules）只是执行面；本存储是管理 API、触发历史与对账的权威。
  */
 export class PostgresScheduleStore implements ScheduleControlStore {

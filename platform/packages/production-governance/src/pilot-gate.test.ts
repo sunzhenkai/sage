@@ -17,7 +17,7 @@ describe('pilot gate evaluation', () => {
     expect(decision.items).toHaveLength(5);
   });
 
-  it('keeps real-window soak evidence UNFILLED until it is genuinely provided (P7 honest-evidence discipline)', () => {
+  it('keeps real-window soak evidence UNFILLED until it is genuinely provided (honest-evidence discipline)', () => {
     const decision = evaluatePilotGate({ ...satisfied, soakEvidence: undefined });
     expect(decision.decision).toBe('NO-GO');
     expect(decision.blockers).toContain('soak-real-window');

@@ -135,8 +135,8 @@ describe('agent contracts v1', () => {
   it('enforces the versioned 64 KiB serialized payload and 128-reference bounds', () => {
     expect(CANONICAL_RUNTIME_CONTRACT_V1).toEqual({ schemaMajor: 1, maxSerializedPayloadBytes: 65_536, maxReceiptRefs: 128 });
 
-    const envelope = { schemaVersion: '1', specRef: 'spec://p4/envelope', specDigest: `sha256:${'a'.repeat(64)}`, taskId: 'task-p4', runId: 'run-p4', attemptId: 'attempt-1', invocationId: 'invoke-p4' };
-    const receipt = { schemaVersion: '1', receiptRef: 'receipt://p7/final', invocationId: 'invoke-p4', specDigest: envelope.specDigest, outcome: 'COMPLETED', eventRange: { first: 1, last: 2 }, receiptRefs: ['receipt://p5/usage', 'receipt://p6/checkpoint'], artifactRefs: ['artifact://p4/output'] };
+    const envelope = { schemaVersion: '1', specRef: 'spec://envelope', specDigest: `sha256:${'a'.repeat(64)}`, taskId: 'task-fixture-4', runId: 'run-fixture-4', attemptId: 'attempt-1', invocationId: 'invoke-1' };
+    const receipt = { schemaVersion: '1', receiptRef: 'receipt://final', invocationId: 'invoke-1', specDigest: envelope.specDigest, outcome: 'COMPLETED', eventRange: { first: 1, last: 2 }, receiptRefs: ['receipt://usage', 'receipt://checkpoint'], artifactRefs: ['artifact://output'] };
     assertCanonicalPayloadBounds(envelope, receipt.receiptRefs);
     assertCanonicalPayloadBounds(receipt, receipt.receiptRefs);
 

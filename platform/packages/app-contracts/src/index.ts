@@ -411,7 +411,7 @@ export interface QuiescePromotionSourceInput {
   readonly checkpointRef?: `checkpoint://${string}`; readonly checkpointDigest?: `sha256:${string}`; readonly now: string;
 }
 
-// ===== P8 Schedule Plane HTTP 契约（/v1/schedules，/v1/effects/resolutions） =====
+// ===== Schedule Plane HTTP 契约（/v1/schedules，/v1/effects/resolutions） =====
 // 自包含 wire schema：与 platform-ports 的 canonical 契约保持语义一致（由 agent-api 一致性测试锚定），
 // 本包依赖边界为空（package-ownership），不直接 import canonical schema。
 

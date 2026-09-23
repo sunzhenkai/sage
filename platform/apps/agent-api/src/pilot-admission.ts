@@ -1,5 +1,5 @@
-export const P7_CHANGE_ID = 'sage-p7-production-pilot-readiness';
-export const REQUIRED_P7_EXERCISES = [
+export const PILOT_CHANGE_ID = 'sage-production-pilot-readiness';
+export const REQUIRED_PILOT_EXERCISES = [
   'postgres-backup-restore',
   'artifact-backup-restore',
   'worker-compatible-rollout-rollback',
@@ -19,7 +19,7 @@ export interface ExternalPilotApproval {
 
 export interface ExternalPilotApprovalRecord {
   readonly schemaVersion: '1';
-  readonly changeId: typeof P7_CHANGE_ID;
+  readonly changeId: typeof PILOT_CHANGE_ID;
   readonly approvalId: string;
   readonly decision: 'GO' | 'NO_GO';
   readonly evidenceDigest: string;
@@ -31,7 +31,7 @@ export interface ExternalPilotApprovalRecord {
 
 export interface ExternalPilotApprovalProvider {
   /** Must load from an external system of record; repository files and request bodies are not approval sources. */
-  load(changeId: typeof P7_CHANGE_ID): Promise<ExternalPilotApprovalRecord | undefined>;
+  load(changeId: typeof PILOT_CHANGE_ID): Promise<ExternalPilotApprovalRecord | undefined>;
 }
 
 export interface ExternalHumanApprovalVerifier {
@@ -71,11 +71,11 @@ export class ExternalApprovalPilotAdmissionGate {
 
   async assertApproved(): Promise<PilotAdmissionEvidence> {
     let record: ExternalPilotApprovalRecord | undefined;
-    try { record = await this.options.provider.load(P7_CHANGE_ID); }
+    try { record = await this.options.provider.load(PILOT_CHANGE_ID); }
     catch { throw new PilotAdmissionDeniedError('approval_provider_unavailable'); }
     if (!record) throw new PilotAdmissionDeniedError('approval_record_missing');
     const now = (this.options.now ?? (() => new Date()))().getTime();
-    if (record.schemaVersion !== '1' || record.changeId !== P7_CHANGE_ID || record.decision !== 'GO') {
+    if (record.schemaVersion !== '1' || record.changeId !== PILOT_CHANGE_ID || record.decision !== 'GO') {
       throw new PilotAdmissionDeniedError('approval_record_not_go');
     }
     if (!nonEmpty(record.approvalId) || !/^[a-f0-9]{64}$/i.test(record.evidenceDigest)) {
@@ -85,7 +85,7 @@ export class ExternalApprovalPilotAdmissionGate {
       || Date.parse(record.approvedAt) > now || Date.parse(record.expiresAt) <= now) {
       throw new PilotAdmissionDeniedError('approval_record_expired_or_future');
     }
-    for (const exercise of REQUIRED_P7_EXERCISES) {
+    for (const exercise of REQUIRED_PILOT_EXERCISES) {
       if (!record.completedExerciseIds.includes(exercise)) throw new PilotAdmissionDeniedError(`exercise_missing:${exercise}`);
     }
     const verified = await Promise.all(record.approvals.map(async (approval) => {

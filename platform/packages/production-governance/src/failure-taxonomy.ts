@@ -1,6 +1,6 @@
 /**
  * D10：无人值守失败类别 → 告警路由映射表（单一事实来源）。
- * Prometheus 告警规则与 Grafana 注解由该表生成（延续 P7「每条规则有 responder 与 runbook 注解」纪律）；
+ * Prometheus 告警规则与 Grafana 注解由该表生成（延续「每条规则有 responder 与 runbook 注解」纪律）；
  * 无映射的失败类别以未知失败告警兜底，不得静默。
  */
 
@@ -54,7 +54,7 @@ export function classifyUnattendedFailure(code: string): UnattendedFailureClassi
 /** 由映射表生成 Prometheus 告警规则 YAML（每条规则强制 responder_service 与 runbook_url 注解）。 */
 export function renderUnattendedAlertRulesYaml(): string {
   const rules = [...UNATTENDED_FAILURE_TAXONOMY.map(rule => ({ ...rule, expr: rule.expr })), UNKNOWN_FAILURE_RULE];
-  const lines: string[] = ['groups:', '  - name: sage-p8-unattended-schedule', '    rules:'];
+  const lines: string[] = ['groups:', '  - name: sage-unattended-schedule', '    rules:'];
   for (const rule of rules) {
     lines.push(`      - alert: ${rule.alert}`);
     lines.push(`        expr: ${rule.expr}`);
@@ -64,7 +64,7 @@ export function renderUnattendedAlertRulesYaml(): string {
     lines.push(`          responder_service: ${rule.responder}`);
     lines.push(`        annotations:`);
     lines.push(`          summary: "Unattended failure ${rule.code} requires response"`);
-    lines.push(`          runbook_url: "architecture/runbooks/p8-incident-runbooks.md#${rule.runbookAnchor}"`);
+    lines.push(`          runbook_url: "architecture/runbooks/schedule-incident-runbooks.md#${rule.runbookAnchor}"`);
   }
   return `${lines.join('\n')}\n`;
 }
@@ -79,7 +79,7 @@ export function checkAlertRoutingCoverage(): AlertRoutingCheckResult {
   const entries = rules.map(rule => {
     const responder = rule.responder.trim();
     const unfilled = responder.length === 0 || responder === 'placeholder' || responder === 'unset';
-    return { alert: rule.alert, responder, runbook: `architecture/runbooks/p8-incident-runbooks.md#${rule.runbookAnchor}`, unfilled };
+    return { alert: rule.alert, responder, runbook: `architecture/runbooks/schedule-incident-runbooks.md#${rule.runbookAnchor}`, unfilled };
   });
   return { entries, unfilledCount: entries.filter(entry => entry.unfilled).length };
 }

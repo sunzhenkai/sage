@@ -243,7 +243,7 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
       deploymentMode: 'local',
       snapshotConnector: buildSnapshotEgressConnector(process.env[SNAPSHOT_EGRESS_ALLOWLIST_ENV])
     });
-    // P8：service token（配置即强认证）+ schedules 管理链路 + dispatcher 内部解析端点。
+    // service token（配置即强认证）+ schedules 管理链路 + dispatcher 内部解析端点。
     const serviceToken = ServiceTokenAuthenticator.fromEnv(process.env, config.tenantId);
     // schedules 管理链路口径（与运行门「schedule 管理必须服务身份认证」一致）：
     // 配置了 SAGE_SERVICE_TOKEN_HASHES 时只认 Bearer service token（stub 信任头不提权）；
@@ -301,7 +301,7 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
       }
     });
 
-    // P8：统一裁决端点（D6）。本地模式以 Postgres effect 台账 + service token 认证；
+    // 统一裁决端点（D6）。本地模式以 Postgres effect 台账 + service token 认证；
     // 动作执行走任务控制面 retry/cancel（「未提交+继续」新 attempt，「已提交+继续」Ledger replay 幂等）。
     const effectLedger = new PostgresToolEffectLedger({ connectionString: config.postgresUrl });
     registerEffectResolutionsRoute(app, {

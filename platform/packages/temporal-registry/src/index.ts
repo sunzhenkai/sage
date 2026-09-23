@@ -246,7 +246,7 @@ export function createDevRegistryBundle(version = 'registry-dev-v1', options: {
   const target = (targetId: string, region: 'us-east' | 'eu-west', residency: 'us' | 'eu', taskQueue: string, priority: number): TemporalTargetProfile => ({
     schemaVersion: '1', targetId, version: `${targetId}-v1`, enabled: true, clusterId: 'sage-dev-cluster', endpoint,
     namespace: 'sage-dev', taskQueue, credentialRef: `secret://temporal/${targetId}`, environment: 'development',
-    region, residency, allowedTenantIds: ['tenant-p5', 'tenant-local'], isolationKey: `${targetId}-namespace-queue`,
+    region, residency, allowedTenantIds: ['tenant-fixture-5', 'tenant-local'], isolationKey: `${targetId}-namespace-queue`,
     health: targetId === DEV_TARGET_US ? (options.usHealth ?? 'healthy') : (options.euHealth ?? 'healthy'),
     runtimeBuildRef: `runtime://${targetId}/${targetId}-runtime-v1`,
     capacityAvailable: targetId === DEV_TARGET_US ? (options.usCapacity ?? 10) : (options.euCapacity ?? 10),

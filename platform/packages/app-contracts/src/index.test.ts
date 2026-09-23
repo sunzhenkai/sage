@@ -28,7 +28,7 @@ import {
   TimelineEventSchema
 } from './index.js';
 
-describe('P3 app contracts', () => {
+describe('App contracts', () => {
   it('accepts text and reference-only artifact parts and rejects inline bytes', () => {
     expect(Value.Check(MessagePartSchema, { kind: 'text', text: 'hello' })).toBe(true);
     expect(Value.Check(MessagePartSchema, { kind: 'artifact', artifact: { artifactRef: 'artifact://chat/a', name: 'a.txt', mediaType: 'text/plain', sizeBytes: 12 } })).toBe(true);
@@ -150,7 +150,7 @@ describe('Provider connection check contracts', () => {
   });
 });
 
-describe('P8 schedule plane HTTP contracts', () => {
+describe('Schedule plane HTTP contracts', () => {
   const validDefinition = {
     schemaVersion: '1' as const,
     scheduleId: 'daily-brief',

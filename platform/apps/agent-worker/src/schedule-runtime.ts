@@ -9,7 +9,7 @@ import { createScheduleDispatcherActivities, type DispatcherReleaseResolution, t
 import type { PostgresTaskStore } from '@sage/task-store-postgres';
 
 /**
- * P8 dispatcher worker：轮询 `sage-schedule-dispatcher-v1` 队列执行 ScheduleTriggerDispatcher.v1。
+ * Dispatcher worker：轮询 `sage-schedule-dispatcher-v1` 队列执行 ScheduleTriggerDispatcher.v1。
  * 控制面数据（schedule 记录/触发事件/账本/spec）与 API 共享 Postgres 权威；
  * Release 解析经 API 内部端点（service token），保持 registry 单一写入方。
  */

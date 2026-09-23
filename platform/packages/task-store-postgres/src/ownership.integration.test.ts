@@ -4,7 +4,7 @@ import {Pool} from 'pg';
 import {PostgresTaskStore} from './index.js';
 import {TASK_TYPE, type TaskRoutingRecord} from '@sage/task-domain';
 
-const url = process.env.P6_POSTGRES_URL;
+const url = process.env.CROSS_CHAIN_POSTGRES_URL;
 const integration = describe.skipIf(!url);
 let store: PostgresTaskStore;
 let admin: Pool;

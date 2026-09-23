@@ -6,7 +6,7 @@ import type { ToolEffectLedgerPort, TrustedPrincipal } from '@sage/platform-port
 import type { EffectResolutionService } from './effect-resolution.js';
 
 /**
- * P8 统一裁决端点（D6，spec: unattended-run-autonomy「EFFECT_UNKNOWN 人工裁决协议」）：
+ * 统一裁决端点（D6，spec: unattended-run-autonomy「EFFECT_UNKNOWN 人工裁决协议」）：
  * `POST /v1/effects/resolutions`——裁决结论（CONFIRMED_COMMITTED / CONFIRMED_NOT_COMMITTED / ABANDONED）
  * + 处理动作（CONTINUE_NEW_ATTEMPT / TERMINATE）。
  * - 裁决落 append-only 审计（EffectResolutionService → agent_effect_resolutions），重复冲突拒绝；

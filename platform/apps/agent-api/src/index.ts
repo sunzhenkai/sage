@@ -400,7 +400,7 @@ export type { RegisterRunAgentSettingsRoutesOptions, RunAgentSettingsPrincipalAu
 export type { RegisterPackagesRoutesOptions, PackagesPrincipalAuthenticator } from './packages-api.js';
 export type { RegisterAppsRoutesOptions, AppsPrincipalAuthenticator } from './apps-api.js';
 export type { RegisterPackageRunsRoutesOptions, RunsPrincipalAuthenticator, PackageReleaseResolver, ResolvedReleaseLockPayload } from './runs-api.js';
-export { ExternalApprovalPilotAdmissionGate, PilotAdmissionDeniedError, P7_CHANGE_ID, REQUIRED_P7_EXERCISES } from './pilot-admission.js';
+export { ExternalApprovalPilotAdmissionGate, PilotAdmissionDeniedError, PILOT_CHANGE_ID, REQUIRED_PILOT_EXERCISES } from './pilot-admission.js';
 export type { ExternalHumanApprovalVerifier, ExternalPilotApproval, ExternalPilotApprovalProvider, ExternalPilotApprovalRecord, PilotAdmissionEvidence, PilotAdmissionGate, PilotApprovalRole } from './pilot-admission.js';
 export { ChatPromotionAuthorizer, PromotionAuthorizationError, registerChatPromotionRoute } from './promotion.js';
 export type { PromotionPrincipalAuthenticator, RestrictedPromotionRule, RegisterPromotionOptions } from './promotion.js';

@@ -2,7 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { activityInfo, cancellationSignal, CancelledFailure, ApplicationFailure, heartbeat } from '@temporalio/activity';
-import type { P6TelemetryRecorder } from '@sage/observability';
+import type { CrossChainTelemetryRecorder } from '@sage/observability';
 import {
   assertCanonicalPayloadBounds,
   sha256Digest,
@@ -57,7 +57,7 @@ export interface AgentTaskActivityOptions {
   readonly leaseMs?: number;
   readonly now?: () => Date;
   readonly afterCommit?: (result: AgentSliceResult) => Promise<void> | void;
-  readonly telemetry?:P6TelemetryRecorder;
+  readonly telemetry?:CrossChainTelemetryRecorder;
   readonly canonicalCompatibility?: TaskCanonicalCompatibilityOptions;
 }
 export interface AgentTaskActivities { executeAgentSlice(input: ExecuteAgentSliceInput): Promise<AgentSliceResult> }

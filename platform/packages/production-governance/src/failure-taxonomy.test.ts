@@ -27,7 +27,7 @@ describe('unattended failure taxonomy', () => {
   });
 
   it('keeps the committed prometheus rules file in sync with the taxonomy', async () => {
-    const committed = await readFile(new URL('../../../observability/prometheus/sage-p8-alerts.yaml', import.meta.url), 'utf8');
+    const committed = await readFile(new URL('../../../observability/prometheus/sage-schedule-alerts.yaml', import.meta.url), 'utf8');
     expect(committed).toBe(renderUnattendedAlertRulesYaml());
   });
 

@@ -66,7 +66,7 @@ async function register(): Promise<void> {
   const packageId = packageIdOverride ?? guessPackageId(files['app.yaml']);
   if (!packageId) throw new Error('MANIFEST_MISSING_OR_INVALID: could not determine package id from app.yaml');
 
-  // P8（5.2）：优先使用 service token（SAGE_SERVICE_TOKEN，dev 环境用 dev token）；
+  // （5.2）优先使用 service token（SAGE_SERVICE_TOKEN，dev 环境用 dev token）；
   // 未配置时回退旧明文信任头（仅未启用强认证的本地环境）。
   const serviceToken = process.env.SAGE_SERVICE_TOKEN;
   const headers: Record<string, string> = { 'content-type': 'application/json' };
