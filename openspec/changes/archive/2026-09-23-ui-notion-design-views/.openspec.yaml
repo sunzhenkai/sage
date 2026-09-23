@@ -1,0 +1,6 @@
+schema: spec-driven
+created: 2026-09-23
+goal: 将 Chat、Tasks、Packages、Providers、Schedules、Settings 视图样式迁移为类 Notion
+  目标视觉，并完成视觉证据与回归。
+
+skip_specs: true

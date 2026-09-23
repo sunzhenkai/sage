@@ -1,0 +1,4 @@
+schema: spec-driven
+created: 2026-09-23
+goal: 为 agent-web UI 细节打磨轮建立可重复的固定视口截图、运行时检查与证据状态记录，作为当前 Cursor Grok 4.7 审查输入。
+skip_specs: true

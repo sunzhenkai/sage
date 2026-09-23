@@ -2,7 +2,7 @@
 
 - 状态：target visual authority（类 Notion 目标视觉唯一权威）
 - 来源：8 张参考产品截图（设置/个人资料、命令面板、用户菜单、收件箱、聊天、任务看板、自动化空态、集成页）
-- 关联：结构契约 [`layout-v1.md`](./layout-v1.md)；目标 token 与迁移映射 [`target-token-map.md`](./target-token-map.md)；运行时实现 [`platform/apps/agent-web/src/styles/global.css`](../../platform/apps/agent-web/src/styles/global.css)
+- 关联：结构契约 [`layout-v1.md`](./layout-v1.md)；目标 token 与迁移映射 [`target-token-map.md`](./target-token-map.md)；运行时实现 [`platform/apps/agent-web/src/styles/global.css`](../../../platform/apps/agent-web/src/styles/global.css)
 - 取值规则：本文的设计 DNA、语义色、字号、圆角、阴影、图标和动效为目标视觉规范；截图中的近似值只用于解释意图，精确实现值以 `target-token-map.md` 冻结值为准。
 - 组件边界：命令面板、看板列、keycap、模板卡、下拉菜单头等是参考截图中的视觉样本，不是当前 `agent-web` 的功能需求；实现只迁移现有 surface，不因样本新建业务功能。
 

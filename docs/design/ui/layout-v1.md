@@ -2,7 +2,7 @@
 
 - 状态：active structural contract（结构、交互与可观察行为验收依据）
 - 适用：`platform/apps/agent-web` 全部视图
-- 关联：功能契约 [`ui-v1.md`](./ui-v1.md)（行为）、目标视觉 [`design-language.md`](./design-language.md)、目标 token [`target-token-map.md`](./target-token-map.md)、运行时实现 [`platform/apps/agent-web/src/styles/global.css`](../../platform/apps/agent-web/src/styles/global.css)
+- 关联：功能契约 [`ui-v1.md`](./ui-v1.md)（行为）、目标视觉 [`design-language.md`](./design-language.md)、目标 token [`target-token-map.md`](./target-token-map.md)、运行时实现 [`platform/apps/agent-web/src/styles/global.css`](../../../platform/apps/agent-web/src/styles/global.css)
 - 决策来源：用户确认的类 Notion 目标视觉与本仓库结构迁移设计；原三段式决策记录在当前检出中不可达，不作为本文件的运行时依赖。
 
 > 历史说明：`ui-v1-frontend-prompt.md` 是历史实现 prompt，其旧样式自由条款已失效；当前呈现验收按 `design-language.md` 与 `target-token-map.md` 执行。

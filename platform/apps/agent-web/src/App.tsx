@@ -1,4 +1,4 @@
-import { Component, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import {
   FeedbackProvider,
@@ -186,9 +186,11 @@ class BootBoundary extends Component<{ children: ReactNode }, { error: Error | n
 
 function BootFailure({ error }: { error: Error }) {
   const { t } = useLocale()
+  const h1Ref = useRef<HTMLHeadingElement>(null)
+  useEffect(() => { h1Ref.current?.focus() }, [])
   return (
-    <div className="boot-fail">
-      <h1>{t('shell.unavailable.title')}</h1>
+    <div className="boot-fail" role="alert">
+      <h1 ref={h1Ref} tabIndex={-1}>{t('shell.unavailable.title')}</h1>
       <p>{t('shell.unavailable.body')}</p>
       <pre>{error.message || 'Runtime failure'}</pre>
       <Button onClick={() => navigate('/')}>{t('shell.unavailable.backHome')}</Button>

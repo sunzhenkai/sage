@@ -195,6 +195,12 @@ export function ProvidersView({ api, connection, panel }: { api: ApiCtx; connect
       >
         <span className="settings-pinned-title">{t('providers.defaultModel.title')}</span>
       </a>
+      {connections === null && !connectionsError && connectionsLoading && (
+        <p className="settings-list-hint" role="status">{t('common.loading')}</p>
+      )}
+      {connectionsError && (
+        <p className="settings-list-hint" role="alert">{connectionsError}</p>
+      )}
       {connections !== null && connections.length > 0 && (
         <ul className="providers-connection-list">
           {connections.map((item) => {
@@ -987,10 +993,12 @@ function CatalogCombobox({
         <TextInput
           value={query}
           placeholder={placeholder}
+          aria-label={placeholder}
           disabled={disabled}
+          aria-busy={loading ? true : undefined}
           role="combobox"
           aria-expanded={open}
-          aria-controls={listboxId}
+          aria-controls={open ? listboxId : undefined}
           aria-autocomplete="list"
           aria-activedescendant={open && activeIndex >= 0 && activeIndex < items.length ? catalogOptionId(items[activeIndex]) : undefined}
           onChange={(event: ChangeEvent<HTMLInputElement>) => {
@@ -1023,21 +1031,21 @@ function CatalogCombobox({
               </li>
             ))
           )}
-          {nextCursor && (
-            <li className="catalog-combobox-more">
-              <Button
-                size="sm"
-                variant="ghost"
-                loading={loadingMore}
-                disabled={loadingMore}
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => void loadRef.current(nextCursor)}
-              >
-                {t('providers.catalog.loadMore')}
-              </Button>
-            </li>
-          )}
         </ul>
+      )}
+      {open && !disabled && nextCursor && (
+        <div className="catalog-combobox-more">
+          <Button
+            size="sm"
+            variant="ghost"
+            loading={loadingMore}
+            disabled={loadingMore}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => void loadRef.current(nextCursor)}
+          >
+            {t('providers.catalog.loadMore')}
+          </Button>
+        </div>
       )}
     </div>
   )

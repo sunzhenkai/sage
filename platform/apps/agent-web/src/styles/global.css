@@ -990,6 +990,74 @@ table.data-table th {
   }
 }
 
+
+/* ---------- 375px 窄屏 ---------- */
+
+@media (max-width: 375px) {
+  :root {
+    --pane-list-w: 140px;
+    --page-pad-x: 12px;
+    --page-pad-y: 12px;
+  }
+
+  .shell, .shell.is-collapsed {
+    grid-template-columns: var(--rail-collapsed) 1fr;
+    gap: 4px;
+    padding: 4px;
+  }
+
+  .settings-view .settings-nav {
+    width: 100%;
+  }
+
+  .settings-nav .rail-label,
+  .shell.is-collapsed .settings-nav .rail-label,
+  .shell.is-collapsed .settings-back .rail-label {
+    position: static;
+    width: auto;
+    height: auto;
+    padding: 0;
+    margin: 0;
+    overflow: visible;
+    clip: none;
+    clip-path: none;
+    white-space: normal;
+    border: none;
+  }
+
+  .settings-nav .rail-link,
+  .shell.is-collapsed .settings-nav .rail-link,
+  .shell.is-collapsed .settings-back {
+    justify-content: flex-start;
+    padding-left: 10px;
+    padding-right: 10px;
+    gap: 10px;
+  }
+
+  .empty-state {
+    padding: 20px 12px;
+  }
+
+  .card {
+    padding: 10px 12px;
+  }
+
+  .notice-stack {
+    left: 8px;
+    right: 8px;
+    max-width: none;
+  }
+
+  .settings-language {
+    flex-wrap: wrap;
+  }
+
+  .segmented {
+    max-width: 100%;
+    flex-wrap: wrap;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

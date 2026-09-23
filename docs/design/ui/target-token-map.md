@@ -2,7 +2,7 @@
 
 - 状态：target-contract
 - 目标权威：[`design-language.md`](./design-language.md)
-- 运行时事实：[`platform/apps/agent-web/src/styles/global.css`](../../platform/apps/agent-web/src/styles/global.css)
+- 运行时事实：[`platform/apps/agent-web/src/styles/global.css`](../../../platform/apps/agent-web/src/styles/global.css)
 - 适用：`platform/apps/agent-web` 的视觉迁移与视觉验收；不改变 `ui-v1.md` 功能契约。
 - 版本：v1（冻结于 2026-09-23）
 

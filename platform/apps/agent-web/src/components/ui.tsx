@@ -155,13 +155,18 @@ export function ConfirmButton({
   size?: 'sm' | 'md'
 }) {
   const [armed, setArmed] = useState(false)
+  const confirmRef = useRef<HTMLButtonElement>(null)
   const { t } = useLocale()
+  useEffect(() => {
+    if (armed) confirmRef.current?.focus()
+  }, [armed])
   return armed ? (
     <span className="confirm-pair">
-      <Button
-        variant={danger ? 'danger' : 'primary'}
-        size={size}
-        loading={busy}
+      <button
+        type="button"
+        ref={confirmRef}
+        className={`btn btn-${danger ? 'danger' : 'primary'} btn-${size}`}
+        disabled={busy}
         title={confirmTitle}
         onClick={() => {
           onConfirm()
@@ -169,7 +174,7 @@ export function ConfirmButton({
         }}
       >
         {confirmLabel}
-      </Button>
+      </button>
       <Button size={size} variant="ghost" disabled={busy} onClick={() => setArmed(false)} aria-label={t('common.cancel')}>
         ×
       </Button>

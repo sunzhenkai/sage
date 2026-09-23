@@ -8,7 +8,9 @@
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b --pretty false",
     "check:ui-tokens": "node scripts/check-ui-target-tokens.mjs",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "screenshots": "tsx scripts/screenshots.ts",
+    "browser-smoke": "playwright test --config playwright.config.ts"
   },
   "dependencies": {
     "@sage/app-contracts": "workspace:*",
@@ -16,6 +18,7 @@
     "react-dom": "^19.2.8"
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.1",

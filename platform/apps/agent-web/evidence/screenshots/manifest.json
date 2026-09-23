@@ -1,0 +1,1463 @@
+[
+  {
+    "name": "chat",
+    "viewport": 375,
+    "locale": "zh-CN",
+    "url": "/",
+    "screenshot": "evidence/screenshots/375/chat.png",
+    "consoleErrors": [],
+    "lang": "zh-CN",
+    "scrollWidth": 375,
+    "clientWidth": 375,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "会话"
+      }
+    ],
+    "status": [],
+    "alerts": [],
+    "empty": [
+      "在左侧选择一个会话，或新建对话"
+    ],
+    "loading": false
+  },
+  {
+    "name": "tasks",
+    "viewport": 375,
+    "locale": "zh-CN",
+    "url": "/?view=tasks",
+    "screenshot": "evidence/screenshots/375/tasks.png",
+    "consoleErrors": [],
+    "lang": "zh-CN",
+    "scrollWidth": 375,
+    "clientWidth": 375,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "Task 工作区"
+      }
+    ],
+    "status": [],
+    "alerts": [],
+    "empty": [
+      "在左侧选择一个 Task 查看详情"
+    ],
+    "loading": false
+  },
+  {
+    "name": "packages",
+    "viewport": 375,
+    "locale": "zh-CN",
+    "url": "/?view=packages",
+    "screenshot": "evidence/screenshots/375/packages.png",
+    "consoleErrors": [],
+    "lang": "zh-CN",
+    "scrollWidth": 375,
+    "clientWidth": 375,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "应用"
+      }
+    ],
+    "status": [],
+    "alerts": [],
+    "empty": [
+      "在左侧选择一个 App 查看详情"
+    ],
+    "loading": false
+  },
+  {
+    "name": "schedules",
+    "viewport": 375,
+    "locale": "zh-CN",
+    "url": "/?view=schedules",
+    "screenshot": "evidence/screenshots/375/schedules.png",
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    ],
+    "lang": "zh-CN",
+    "scrollWidth": 375,
+    "clientWidth": 375,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "计划任务"
+      }
+    ],
+    "status": [],
+    "alerts": [
+      "需要服务端凭据Schedule 管理依赖服务端注入的 service token。请配置 SAGE_SERVICE_TOKEN 或 SAGE_SERVICE_TOKEN_HASHES 并重启本地栈后刷新。"
+    ],
+    "empty": [],
+    "loading": false
+  },
+  {
+    "name": "settings",
+    "viewport": 375,
+    "locale": "zh-CN",
+    "url": "/?view=settings",
+    "screenshot": "evidence/screenshots/375/settings.png",
+    "consoleErrors": [],
+    "lang": "zh-CN",
+    "scrollWidth": 375,
+    "clientWidth": 375,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "设置"
+      },
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "通用"
+      }
+    ],
+    "status": [],
+    "alerts": [],
+    "empty": [],
+    "loading": false
+  },
+  {
+    "name": "chat-selected",
+    "viewport": 375,
+    "locale": "zh-CN",
+    "url": "/?session=ses-trending-report",
+    "screenshot": "evidence/screenshots/375/chat-selected.png",
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ],
+    "lang": "zh-CN",
+    "scrollWidth": 375,
+    "clientWidth": 375,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "会话"
+      }
+    ],
+    "status": [],
+    "alerts": [
+      "会话不再可用会话可能已被 retention 清理。回到会话列表开始新的对话。查看会话列表"
+    ],
+    "empty": [],
+    "loading": false
+  },
+  {
+    "name": "tasks-selected",
+    "viewport": 375,
+    "locale": "zh-CN",
+    "url": "/?view=tasks&task=task-watch-1",
+    "screenshot": "evidence/screenshots/375/tasks-selected.png",
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ],
+    "lang": "zh-CN",
+    "scrollWidth": 375,
+    "clientWidth": 375,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "Task 工作区"
+      }
+    ],
+    "status": [],
+    "alerts": [],
+    "empty": [
+      "Task 不存在或已被清理"
+    ],
+    "loading": false
+  },
+  {
+    "name": "packages-selected",
+    "viewport": 375,
+    "locale": "zh-CN",
+    "url": "/?view=packages&package=github-trending",
+    "screenshot": "evidence/screenshots/375/packages-selected.png",
+    "consoleErrors": [],
+    "lang": "zh-CN",
+    "scrollWidth": 375,
+    "clientWidth": 375,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "应用"
+      }
+    ],
+    "status": [
+      "加载中…"
+    ],
+    "alerts": [],
+    "empty": [],
+    "loading": true
+  },
+  {
+    "name": "schedules-selected",
+    "viewport": 375,
+    "locale": "zh-CN",
+    "url": "/?view=schedules&schedule=sched-nightly-report",
+    "screenshot": "evidence/screenshots/375/schedules-selected.png",
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    ],
+    "lang": "zh-CN",
+    "scrollWidth": 375,
+    "clientWidth": 375,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "计划任务"
+      }
+    ],
+    "status": [],
+    "alerts": [
+      "需要服务端凭据Schedule 管理依赖服务端注入的 service token。请配置 SAGE_SERVICE_TOKEN 或 SAGE_SERVICE_TOKEN_HASHES 并重启本地栈后刷新。"
+    ],
+    "empty": [],
+    "loading": false
+  },
+  {
+    "name": "settings-selected",
+    "viewport": 375,
+    "locale": "zh-CN",
+    "url": "/?view=settings&tab=connections&connection=conn-anthropic",
+    "screenshot": "evidence/screenshots/375/settings-selected.png",
+    "consoleErrors": [],
+    "lang": "zh-CN",
+    "scrollWidth": 375,
+    "clientWidth": 375,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "设置"
+      }
+    ],
+    "status": [],
+    "alerts": [],
+    "empty": [
+      "该连接不存在或已被删除"
+    ],
+    "loading": false
+  },
+  {
+    "name": "settings-model",
+    "viewport": 375,
+    "locale": "zh-CN",
+    "url": "/?view=settings&tab=connections&panel=model",
+    "screenshot": "evidence/screenshots/375/settings-model.png",
+    "consoleErrors": [],
+    "lang": "zh-CN",
+    "scrollWidth": 375,
+    "clientWidth": 375,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "设置"
+      },
+      {
+        "cls": "settings-pinned pane-item is-current",
+        "aria": "true",
+        "text": "默认运行模型"
+      }
+    ],
+    "status": [
+      "默认运行模型已就绪。"
+    ],
+    "alerts": [],
+    "empty": [],
+    "loading": false
+  },
+  {
+    "name": "tasks-error",
+    "viewport": 375,
+    "locale": "zh-CN",
+    "url": "/?view=tasks&task=missing-task",
+    "screenshot": "evidence/screenshots/375/tasks-error.png",
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ],
+    "lang": "zh-CN",
+    "scrollWidth": 375,
+    "clientWidth": 375,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "Task 工作区"
+      }
+    ],
+    "status": [],
+    "alerts": [],
+    "empty": [
+      "Task 不存在或已被清理"
+    ],
+    "loading": false
+  },
+  {
+    "name": "packages-error",
+    "viewport": 375,
+    "locale": "zh-CN",
+    "url": "/?view=packages&package=missing-app",
+    "screenshot": "evidence/screenshots/375/packages-error.png",
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ],
+    "lang": "zh-CN",
+    "scrollWidth": 375,
+    "clientWidth": 375,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "应用"
+      }
+    ],
+    "status": [
+      "加载中…"
+    ],
+    "alerts": [],
+    "empty": [
+      "App 不存在或已被删除"
+    ],
+    "loading": true
+  },
+  {
+    "name": "schedules-error",
+    "viewport": 375,
+    "locale": "zh-CN",
+    "url": "/?view=schedules",
+    "screenshot": "evidence/screenshots/375/schedules-error.png",
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    ],
+    "lang": "zh-CN",
+    "scrollWidth": 375,
+    "clientWidth": 375,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "计划任务"
+      }
+    ],
+    "status": [],
+    "alerts": [
+      "需要服务端凭据Schedule 管理依赖服务端注入的 service token。请配置 SAGE_SERVICE_TOKEN 或 SAGE_SERVICE_TOKEN_HASHES 并重启本地栈后刷新。"
+    ],
+    "empty": [],
+    "loading": false
+  },
+  {
+    "name": "chat-en",
+    "viewport": 375,
+    "locale": "en",
+    "url": "/",
+    "screenshot": "evidence/screenshots/375/chat-en.png",
+    "consoleErrors": [],
+    "lang": "en",
+    "scrollWidth": 375,
+    "clientWidth": 375,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "Sessions"
+      }
+    ],
+    "status": [],
+    "alerts": [],
+    "empty": [
+      "Select a session on the left, or start a new session"
+    ],
+    "loading": false
+  },
+  {
+    "name": "tasks-en",
+    "viewport": 375,
+    "locale": "en",
+    "url": "/?view=tasks",
+    "screenshot": "evidence/screenshots/375/tasks-en.png",
+    "consoleErrors": [],
+    "lang": "en",
+    "scrollWidth": 375,
+    "clientWidth": 375,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "Task workspace"
+      }
+    ],
+    "status": [],
+    "alerts": [],
+    "empty": [
+      "Select a task on the left to view details"
+    ],
+    "loading": false
+  },
+  {
+    "name": "packages-en",
+    "viewport": 375,
+    "locale": "en",
+    "url": "/?view=packages",
+    "screenshot": "evidence/screenshots/375/packages-en.png",
+    "consoleErrors": [],
+    "lang": "en",
+    "scrollWidth": 375,
+    "clientWidth": 375,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "Apps"
+      }
+    ],
+    "status": [],
+    "alerts": [],
+    "empty": [
+      "Select an app on the left to view details"
+    ],
+    "loading": false
+  },
+  {
+    "name": "schedules-en",
+    "viewport": 375,
+    "locale": "en",
+    "url": "/?view=schedules",
+    "screenshot": "evidence/screenshots/375/schedules-en.png",
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    ],
+    "lang": "en",
+    "scrollWidth": 375,
+    "clientWidth": 375,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "Schedules"
+      }
+    ],
+    "status": [],
+    "alerts": [
+      "Server credentials requiredSchedule management requires a service token injected by the server. Set SAGE_SERVICE_TOKEN o"
+    ],
+    "empty": [],
+    "loading": false
+  },
+  {
+    "name": "settings-en",
+    "viewport": 375,
+    "locale": "en",
+    "url": "/?view=settings",
+    "screenshot": "evidence/screenshots/375/settings-en.png",
+    "consoleErrors": [],
+    "lang": "en",
+    "scrollWidth": 375,
+    "clientWidth": 375,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "Settings"
+      },
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "General"
+      }
+    ],
+    "status": [],
+    "alerts": [],
+    "empty": [],
+    "loading": false
+  },
+  {
+    "name": "chat",
+    "viewport": 860,
+    "locale": "zh-CN",
+    "url": "/",
+    "screenshot": "evidence/screenshots/860/chat.png",
+    "consoleErrors": [],
+    "lang": "zh-CN",
+    "scrollWidth": 860,
+    "clientWidth": 860,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "会话"
+      }
+    ],
+    "status": [],
+    "alerts": [],
+    "empty": [
+      "在左侧选择一个会话，或新建对话"
+    ],
+    "loading": false
+  },
+  {
+    "name": "tasks",
+    "viewport": 860,
+    "locale": "zh-CN",
+    "url": "/?view=tasks",
+    "screenshot": "evidence/screenshots/860/tasks.png",
+    "consoleErrors": [],
+    "lang": "zh-CN",
+    "scrollWidth": 860,
+    "clientWidth": 860,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "Task 工作区"
+      }
+    ],
+    "status": [],
+    "alerts": [],
+    "empty": [
+      "在左侧选择一个 Task 查看详情"
+    ],
+    "loading": false
+  },
+  {
+    "name": "packages",
+    "viewport": 860,
+    "locale": "zh-CN",
+    "url": "/?view=packages",
+    "screenshot": "evidence/screenshots/860/packages.png",
+    "consoleErrors": [],
+    "lang": "zh-CN",
+    "scrollWidth": 860,
+    "clientWidth": 860,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "应用"
+      }
+    ],
+    "status": [],
+    "alerts": [],
+    "empty": [
+      "在左侧选择一个 App 查看详情"
+    ],
+    "loading": false
+  },
+  {
+    "name": "schedules",
+    "viewport": 860,
+    "locale": "zh-CN",
+    "url": "/?view=schedules",
+    "screenshot": "evidence/screenshots/860/schedules.png",
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    ],
+    "lang": "zh-CN",
+    "scrollWidth": 860,
+    "clientWidth": 860,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "计划任务"
+      }
+    ],
+    "status": [],
+    "alerts": [
+      "需要服务端凭据Schedule 管理依赖服务端注入的 service token。请配置 SAGE_SERVICE_TOKEN 或 SAGE_SERVICE_TOKEN_HASHES 并重启本地栈后刷新。"
+    ],
+    "empty": [],
+    "loading": false
+  },
+  {
+    "name": "settings",
+    "viewport": 860,
+    "locale": "zh-CN",
+    "url": "/?view=settings",
+    "screenshot": "evidence/screenshots/860/settings.png",
+    "consoleErrors": [],
+    "lang": "zh-CN",
+    "scrollWidth": 860,
+    "clientWidth": 860,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "设置"
+      },
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "通用"
+      }
+    ],
+    "status": [],
+    "alerts": [],
+    "empty": [],
+    "loading": false
+  },
+  {
+    "name": "chat-selected",
+    "viewport": 860,
+    "locale": "zh-CN",
+    "url": "/?session=ses-trending-report",
+    "screenshot": "evidence/screenshots/860/chat-selected.png",
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ],
+    "lang": "zh-CN",
+    "scrollWidth": 860,
+    "clientWidth": 860,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "会话"
+      }
+    ],
+    "status": [],
+    "alerts": [
+      "会话不再可用会话可能已被 retention 清理。回到会话列表开始新的对话。查看会话列表"
+    ],
+    "empty": [],
+    "loading": false
+  },
+  {
+    "name": "tasks-selected",
+    "viewport": 860,
+    "locale": "zh-CN",
+    "url": "/?view=tasks&task=task-watch-1",
+    "screenshot": "evidence/screenshots/860/tasks-selected.png",
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ],
+    "lang": "zh-CN",
+    "scrollWidth": 860,
+    "clientWidth": 860,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "Task 工作区"
+      }
+    ],
+    "status": [],
+    "alerts": [],
+    "empty": [
+      "Task 不存在或已被清理"
+    ],
+    "loading": false
+  },
+  {
+    "name": "packages-selected",
+    "viewport": 860,
+    "locale": "zh-CN",
+    "url": "/?view=packages&package=github-trending",
+    "screenshot": "evidence/screenshots/860/packages-selected.png",
+    "consoleErrors": [],
+    "lang": "zh-CN",
+    "scrollWidth": 860,
+    "clientWidth": 860,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "应用"
+      }
+    ],
+    "status": [
+      "加载中…"
+    ],
+    "alerts": [],
+    "empty": [],
+    "loading": true
+  },
+  {
+    "name": "schedules-selected",
+    "viewport": 860,
+    "locale": "zh-CN",
+    "url": "/?view=schedules&schedule=sched-nightly-report",
+    "screenshot": "evidence/screenshots/860/schedules-selected.png",
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    ],
+    "lang": "zh-CN",
+    "scrollWidth": 860,
+    "clientWidth": 860,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "计划任务"
+      }
+    ],
+    "status": [],
+    "alerts": [
+      "需要服务端凭据Schedule 管理依赖服务端注入的 service token。请配置 SAGE_SERVICE_TOKEN 或 SAGE_SERVICE_TOKEN_HASHES 并重启本地栈后刷新。"
+    ],
+    "empty": [],
+    "loading": false
+  },
+  {
+    "name": "settings-selected",
+    "viewport": 860,
+    "locale": "zh-CN",
+    "url": "/?view=settings&tab=connections&connection=conn-anthropic",
+    "screenshot": "evidence/screenshots/860/settings-selected.png",
+    "consoleErrors": [],
+    "lang": "zh-CN",
+    "scrollWidth": 860,
+    "clientWidth": 860,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "设置"
+      }
+    ],
+    "status": [],
+    "alerts": [],
+    "empty": [
+      "该连接不存在或已被删除"
+    ],
+    "loading": false
+  },
+  {
+    "name": "settings-model",
+    "viewport": 860,
+    "locale": "zh-CN",
+    "url": "/?view=settings&tab=connections&panel=model",
+    "screenshot": "evidence/screenshots/860/settings-model.png",
+    "consoleErrors": [],
+    "lang": "zh-CN",
+    "scrollWidth": 860,
+    "clientWidth": 860,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "设置"
+      },
+      {
+        "cls": "settings-pinned pane-item is-current",
+        "aria": "true",
+        "text": "默认运行模型"
+      }
+    ],
+    "status": [
+      "默认运行模型已就绪。"
+    ],
+    "alerts": [],
+    "empty": [],
+    "loading": false
+  },
+  {
+    "name": "tasks-error",
+    "viewport": 860,
+    "locale": "zh-CN",
+    "url": "/?view=tasks&task=missing-task",
+    "screenshot": "evidence/screenshots/860/tasks-error.png",
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ],
+    "lang": "zh-CN",
+    "scrollWidth": 860,
+    "clientWidth": 860,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "Task 工作区"
+      }
+    ],
+    "status": [],
+    "alerts": [],
+    "empty": [
+      "Task 不存在或已被清理"
+    ],
+    "loading": false
+  },
+  {
+    "name": "packages-error",
+    "viewport": 860,
+    "locale": "zh-CN",
+    "url": "/?view=packages&package=missing-app",
+    "screenshot": "evidence/screenshots/860/packages-error.png",
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ],
+    "lang": "zh-CN",
+    "scrollWidth": 860,
+    "clientWidth": 860,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "应用"
+      }
+    ],
+    "status": [
+      "加载中…"
+    ],
+    "alerts": [],
+    "empty": [
+      "App 不存在或已被删除"
+    ],
+    "loading": true
+  },
+  {
+    "name": "schedules-error",
+    "viewport": 860,
+    "locale": "zh-CN",
+    "url": "/?view=schedules",
+    "screenshot": "evidence/screenshots/860/schedules-error.png",
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    ],
+    "lang": "zh-CN",
+    "scrollWidth": 860,
+    "clientWidth": 860,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "计划任务"
+      }
+    ],
+    "status": [],
+    "alerts": [
+      "需要服务端凭据Schedule 管理依赖服务端注入的 service token。请配置 SAGE_SERVICE_TOKEN 或 SAGE_SERVICE_TOKEN_HASHES 并重启本地栈后刷新。"
+    ],
+    "empty": [],
+    "loading": false
+  },
+  {
+    "name": "chat-en",
+    "viewport": 860,
+    "locale": "en",
+    "url": "/",
+    "screenshot": "evidence/screenshots/860/chat-en.png",
+    "consoleErrors": [],
+    "lang": "en",
+    "scrollWidth": 860,
+    "clientWidth": 860,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "Sessions"
+      }
+    ],
+    "status": [],
+    "alerts": [],
+    "empty": [
+      "Select a session on the left, or start a new session"
+    ],
+    "loading": false
+  },
+  {
+    "name": "tasks-en",
+    "viewport": 860,
+    "locale": "en",
+    "url": "/?view=tasks",
+    "screenshot": "evidence/screenshots/860/tasks-en.png",
+    "consoleErrors": [],
+    "lang": "en",
+    "scrollWidth": 860,
+    "clientWidth": 860,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "Task workspace"
+      }
+    ],
+    "status": [],
+    "alerts": [],
+    "empty": [
+      "Select a task on the left to view details"
+    ],
+    "loading": false
+  },
+  {
+    "name": "packages-en",
+    "viewport": 860,
+    "locale": "en",
+    "url": "/?view=packages",
+    "screenshot": "evidence/screenshots/860/packages-en.png",
+    "consoleErrors": [],
+    "lang": "en",
+    "scrollWidth": 860,
+    "clientWidth": 860,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "Apps"
+      }
+    ],
+    "status": [],
+    "alerts": [],
+    "empty": [
+      "Select an app on the left to view details"
+    ],
+    "loading": false
+  },
+  {
+    "name": "schedules-en",
+    "viewport": 860,
+    "locale": "en",
+    "url": "/?view=schedules",
+    "screenshot": "evidence/screenshots/860/schedules-en.png",
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    ],
+    "lang": "en",
+    "scrollWidth": 860,
+    "clientWidth": 860,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "Schedules"
+      }
+    ],
+    "status": [],
+    "alerts": [
+      "Server credentials requiredSchedule management requires a service token injected by the server. Set SAGE_SERVICE_TOKEN o"
+    ],
+    "empty": [],
+    "loading": false
+  },
+  {
+    "name": "settings-en",
+    "viewport": 860,
+    "locale": "en",
+    "url": "/?view=settings",
+    "screenshot": "evidence/screenshots/860/settings-en.png",
+    "consoleErrors": [],
+    "lang": "en",
+    "scrollWidth": 860,
+    "clientWidth": 860,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "Settings"
+      },
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "General"
+      }
+    ],
+    "status": [],
+    "alerts": [],
+    "empty": [],
+    "loading": false
+  },
+  {
+    "name": "chat",
+    "viewport": 1280,
+    "locale": "zh-CN",
+    "url": "/",
+    "screenshot": "evidence/screenshots/1280/chat.png",
+    "consoleErrors": [],
+    "lang": "zh-CN",
+    "scrollWidth": 1280,
+    "clientWidth": 1280,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "会话"
+      }
+    ],
+    "status": [],
+    "alerts": [],
+    "empty": [
+      "在左侧选择一个会话，或新建对话"
+    ],
+    "loading": false
+  },
+  {
+    "name": "tasks",
+    "viewport": 1280,
+    "locale": "zh-CN",
+    "url": "/?view=tasks",
+    "screenshot": "evidence/screenshots/1280/tasks.png",
+    "consoleErrors": [],
+    "lang": "zh-CN",
+    "scrollWidth": 1280,
+    "clientWidth": 1280,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "Task 工作区"
+      }
+    ],
+    "status": [],
+    "alerts": [],
+    "empty": [
+      "在左侧选择一个 Task 查看详情"
+    ],
+    "loading": false
+  },
+  {
+    "name": "packages",
+    "viewport": 1280,
+    "locale": "zh-CN",
+    "url": "/?view=packages",
+    "screenshot": "evidence/screenshots/1280/packages.png",
+    "consoleErrors": [],
+    "lang": "zh-CN",
+    "scrollWidth": 1280,
+    "clientWidth": 1280,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "应用"
+      }
+    ],
+    "status": [],
+    "alerts": [],
+    "empty": [
+      "在左侧选择一个 App 查看详情"
+    ],
+    "loading": false
+  },
+  {
+    "name": "schedules",
+    "viewport": 1280,
+    "locale": "zh-CN",
+    "url": "/?view=schedules",
+    "screenshot": "evidence/screenshots/1280/schedules.png",
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    ],
+    "lang": "zh-CN",
+    "scrollWidth": 1280,
+    "clientWidth": 1280,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "计划任务"
+      }
+    ],
+    "status": [],
+    "alerts": [
+      "需要服务端凭据Schedule 管理依赖服务端注入的 service token。请配置 SAGE_SERVICE_TOKEN 或 SAGE_SERVICE_TOKEN_HASHES 并重启本地栈后刷新。"
+    ],
+    "empty": [],
+    "loading": false
+  },
+  {
+    "name": "settings",
+    "viewport": 1280,
+    "locale": "zh-CN",
+    "url": "/?view=settings",
+    "screenshot": "evidence/screenshots/1280/settings.png",
+    "consoleErrors": [],
+    "lang": "zh-CN",
+    "scrollWidth": 1280,
+    "clientWidth": 1280,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "设置"
+      },
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "通用"
+      }
+    ],
+    "status": [],
+    "alerts": [],
+    "empty": [],
+    "loading": false
+  },
+  {
+    "name": "chat-selected",
+    "viewport": 1280,
+    "locale": "zh-CN",
+    "url": "/?session=ses-trending-report",
+    "screenshot": "evidence/screenshots/1280/chat-selected.png",
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ],
+    "lang": "zh-CN",
+    "scrollWidth": 1280,
+    "clientWidth": 1280,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "会话"
+      }
+    ],
+    "status": [],
+    "alerts": [
+      "会话不再可用会话可能已被 retention 清理。回到会话列表开始新的对话。查看会话列表"
+    ],
+    "empty": [],
+    "loading": false
+  },
+  {
+    "name": "tasks-selected",
+    "viewport": 1280,
+    "locale": "zh-CN",
+    "url": "/?view=tasks&task=task-watch-1",
+    "screenshot": "evidence/screenshots/1280/tasks-selected.png",
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ],
+    "lang": "zh-CN",
+    "scrollWidth": 1280,
+    "clientWidth": 1280,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "Task 工作区"
+      }
+    ],
+    "status": [],
+    "alerts": [],
+    "empty": [
+      "Task 不存在或已被清理"
+    ],
+    "loading": false
+  },
+  {
+    "name": "packages-selected",
+    "viewport": 1280,
+    "locale": "zh-CN",
+    "url": "/?view=packages&package=github-trending",
+    "screenshot": "evidence/screenshots/1280/packages-selected.png",
+    "consoleErrors": [],
+    "lang": "zh-CN",
+    "scrollWidth": 1280,
+    "clientWidth": 1280,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "应用"
+      }
+    ],
+    "status": [
+      "加载中…"
+    ],
+    "alerts": [],
+    "empty": [],
+    "loading": true
+  },
+  {
+    "name": "schedules-selected",
+    "viewport": 1280,
+    "locale": "zh-CN",
+    "url": "/?view=schedules&schedule=sched-nightly-report",
+    "screenshot": "evidence/screenshots/1280/schedules-selected.png",
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    ],
+    "lang": "zh-CN",
+    "scrollWidth": 1280,
+    "clientWidth": 1280,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "计划任务"
+      }
+    ],
+    "status": [],
+    "alerts": [
+      "需要服务端凭据Schedule 管理依赖服务端注入的 service token。请配置 SAGE_SERVICE_TOKEN 或 SAGE_SERVICE_TOKEN_HASHES 并重启本地栈后刷新。"
+    ],
+    "empty": [],
+    "loading": false
+  },
+  {
+    "name": "settings-selected",
+    "viewport": 1280,
+    "locale": "zh-CN",
+    "url": "/?view=settings&tab=connections&connection=conn-anthropic",
+    "screenshot": "evidence/screenshots/1280/settings-selected.png",
+    "consoleErrors": [],
+    "lang": "zh-CN",
+    "scrollWidth": 1280,
+    "clientWidth": 1280,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "设置"
+      }
+    ],
+    "status": [],
+    "alerts": [],
+    "empty": [
+      "该连接不存在或已被删除"
+    ],
+    "loading": false
+  },
+  {
+    "name": "settings-model",
+    "viewport": 1280,
+    "locale": "zh-CN",
+    "url": "/?view=settings&tab=connections&panel=model",
+    "screenshot": "evidence/screenshots/1280/settings-model.png",
+    "consoleErrors": [],
+    "lang": "zh-CN",
+    "scrollWidth": 1280,
+    "clientWidth": 1280,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "设置"
+      },
+      {
+        "cls": "settings-pinned pane-item is-current",
+        "aria": "true",
+        "text": "默认运行模型"
+      }
+    ],
+    "status": [
+      "默认运行模型已就绪。"
+    ],
+    "alerts": [],
+    "empty": [],
+    "loading": false
+  },
+  {
+    "name": "tasks-error",
+    "viewport": 1280,
+    "locale": "zh-CN",
+    "url": "/?view=tasks&task=missing-task",
+    "screenshot": "evidence/screenshots/1280/tasks-error.png",
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ],
+    "lang": "zh-CN",
+    "scrollWidth": 1280,
+    "clientWidth": 1280,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "Task 工作区"
+      }
+    ],
+    "status": [],
+    "alerts": [],
+    "empty": [
+      "Task 不存在或已被清理"
+    ],
+    "loading": false
+  },
+  {
+    "name": "packages-error",
+    "viewport": 1280,
+    "locale": "zh-CN",
+    "url": "/?view=packages&package=missing-app",
+    "screenshot": "evidence/screenshots/1280/packages-error.png",
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ],
+    "lang": "zh-CN",
+    "scrollWidth": 1280,
+    "clientWidth": 1280,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "应用"
+      }
+    ],
+    "status": [
+      "加载中…"
+    ],
+    "alerts": [],
+    "empty": [
+      "App 不存在或已被删除"
+    ],
+    "loading": true
+  },
+  {
+    "name": "schedules-error",
+    "viewport": 1280,
+    "locale": "zh-CN",
+    "url": "/?view=schedules",
+    "screenshot": "evidence/screenshots/1280/schedules-error.png",
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    ],
+    "lang": "zh-CN",
+    "scrollWidth": 1280,
+    "clientWidth": 1280,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "计划任务"
+      }
+    ],
+    "status": [],
+    "alerts": [
+      "需要服务端凭据Schedule 管理依赖服务端注入的 service token。请配置 SAGE_SERVICE_TOKEN 或 SAGE_SERVICE_TOKEN_HASHES 并重启本地栈后刷新。"
+    ],
+    "empty": [],
+    "loading": false
+  },
+  {
+    "name": "chat-en",
+    "viewport": 1280,
+    "locale": "en",
+    "url": "/",
+    "screenshot": "evidence/screenshots/1280/chat-en.png",
+    "consoleErrors": [],
+    "lang": "en",
+    "scrollWidth": 1280,
+    "clientWidth": 1280,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "Sessions"
+      }
+    ],
+    "status": [],
+    "alerts": [],
+    "empty": [
+      "Select a session on the left, or start a new session"
+    ],
+    "loading": false
+  },
+  {
+    "name": "tasks-en",
+    "viewport": 1280,
+    "locale": "en",
+    "url": "/?view=tasks",
+    "screenshot": "evidence/screenshots/1280/tasks-en.png",
+    "consoleErrors": [],
+    "lang": "en",
+    "scrollWidth": 1280,
+    "clientWidth": 1280,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "Task workspace"
+      }
+    ],
+    "status": [],
+    "alerts": [],
+    "empty": [
+      "Select a task on the left to view details"
+    ],
+    "loading": false
+  },
+  {
+    "name": "packages-en",
+    "viewport": 1280,
+    "locale": "en",
+    "url": "/?view=packages",
+    "screenshot": "evidence/screenshots/1280/packages-en.png",
+    "consoleErrors": [],
+    "lang": "en",
+    "scrollWidth": 1280,
+    "clientWidth": 1280,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "Apps"
+      }
+    ],
+    "status": [],
+    "alerts": [],
+    "empty": [
+      "Select an app on the left to view details"
+    ],
+    "loading": false
+  },
+  {
+    "name": "schedules-en",
+    "viewport": 1280,
+    "locale": "en",
+    "url": "/?view=schedules",
+    "screenshot": "evidence/screenshots/1280/schedules-en.png",
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    ],
+    "lang": "en",
+    "scrollWidth": 1280,
+    "clientWidth": 1280,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "Schedules"
+      }
+    ],
+    "status": [],
+    "alerts": [
+      "Server credentials requiredSchedule management requires a service token injected by the server. Set SAGE_SERVICE_TOKEN o"
+    ],
+    "empty": [],
+    "loading": false
+  },
+  {
+    "name": "settings-en",
+    "viewport": 1280,
+    "locale": "en",
+    "url": "/?view=settings",
+    "screenshot": "evidence/screenshots/1280/settings-en.png",
+    "consoleErrors": [],
+    "lang": "en",
+    "scrollWidth": 1280,
+    "clientWidth": 1280,
+    "ariaCurrent": [
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "Settings"
+      },
+      {
+        "cls": "rail-link is-active",
+        "aria": "page",
+        "text": "General"
+      }
+    ],
+    "status": [],
+    "alerts": [],
+    "empty": [],
+    "loading": false
+  }
+]
