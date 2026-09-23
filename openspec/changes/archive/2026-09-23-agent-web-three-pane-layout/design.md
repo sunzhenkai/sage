@@ -1,6 +1,6 @@
 ## Context
 
-`agent-web`（React 19 + Vite + TS + 手写 CSS，无 UI 库）以 HEAD `14a3f7e` 为基线：五视图（chat/tasks/packages/schedules/settings）已收敛，「模型与连接」以 `SettingsTab = general | connections` 内嵌于设置视图（`SettingsView` 直接渲染 `ProvidersView`）。呈现层此前无规格（`ui-v1.md` 排除呈现层、实现 prompt 声明"样式是自由度"），布局由各视图自由生长。完整审计、评审（cursor + grok-4.7，22 条）与逐条修订记录见 `design-plans/001-agent-web-three-pane.md`（v2）及其 `reviews/` 回执；本文件只固化实现取舍，行为契约见 `specs/agent-web-shell/spec.md`。
+`agent-web`（React 19 + Vite + TS + 手写 CSS，无 UI 库）以 HEAD `14a3f7e` 为基线：五视图（chat/tasks/packages/schedules/settings）已收敛，「模型与连接」以 `SettingsTab = general | connections` 内嵌于设置视图（`SettingsView` 直接渲染 `ProvidersView`）。呈现层此前无规格（`ui-v1.md` 排除呈现层、实现 prompt 声明"样式是自由度"），布局由各视图自由生长。完整审计、评审（cursor + grok-4.7，22 条）与逐条修订记录见原审计计划文件（v2，已移除），其结论已固化为 `docs/design/ui/layout-v1.md` 与本变更各文件；本文件只固化实现取舍，行为契约见 `specs/agent-web-shell/spec.md`。
 
 约束：
 
@@ -31,7 +31,7 @@
    逐视图自定义（现状）导致三套 master-detail；备选「每视图自带头部」会破坏 topbar 唯一性，备选「整体改 CSS Grid 框架库」超 Non-Goals。列宽由 `--pane-list-w`（320px / 断点 220px）唯一定义，视图只引用不硬编码（现存 `ChatView.css` 断点 220px 硬编码须删除，否则变量失效）。
 
 2. **设置视图层 2 采用双段结构：子菜单段 + 连接 item 段同栏共存（320px）。**
-   备选 A「保留 168px 子菜单 + 内容区左右分栏」会形成 主菜单+子菜单+连接列表+内容 的四列嵌套（评审 P1 风险），且列表与内容职责被打散；备选 B「设置豁免三段式」与使用者原始裁决"列表（子菜单/item）"冲突。双段结构使"子菜单与 item 同属层 2"成为唯一形态，其他视图仅含 item 段。此决策取代 design-plans/001 v2 §1 的 Settings 168px 豁免条款（该豁免写于归并落地前）。
+   备选 A「保留 168px 子菜单 + 内容区左右分栏」会形成 主菜单+子菜单+连接列表+内容 的四列嵌套（评审 P1 风险），且列表与内容职责被打散；备选 B「设置豁免三段式」与使用者原始裁决"列表（子菜单/item）"冲突。双段结构使"子菜单与 item 同属层 2"成为唯一形态，其他视图仅含 item 段。此决策取代原审计计划 v2 §1 的 Settings 168px 豁免条款（该豁免写于归并落地前，计划文件已移除）。
 
 3. **选中态以 Chat 会话行现码为唯一 exemplar，规格逐字提取为 `.pane-item` + `is-current`。**
    不新造视觉值（评审 P0：v1 曾发明 `--surface`/`radius-sm`/`is-active` 新值，与现码不符）。迁移期对仍有私有行类的视图用双类限定（沿用 `.view.tasks-view` 的既有对抗方式），迁移完成后删除视图侧行类，终态不允许新旧行类并存。CSS Layer 重构可根治注入顺序问题，但波及全站，登记为后续候选。

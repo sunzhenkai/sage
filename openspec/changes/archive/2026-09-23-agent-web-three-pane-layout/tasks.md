@@ -1,7 +1,7 @@
 ## 1. 基线核对与门禁（每个 Phase 开工前重复执行）
 
 - [x] 1.1 核对 `git rev-parse --short HEAD` 与计划基线（提案时为 `14a3f7e`）；若工作树存在未提交的布局相关改动，停下报告，按现码重取证后再开工——不得还原任何既有改动（含已落地的设置归并）
-- [x] 1.2 抽查关键锚点存在性：`router.ts` 的 `ViewName` 为五视图、`SettingsTab = 'general' | 'connections'`、`SettingsView` 内嵌 `ProvidersView`、`ChatView.css` 会话行选中态 `.chat-session-item.is-current`；与引用不符时先更新 `design-plans/001-agent-web-three-pane.md` 再继续
+- [x] 1.2 抽查关键锚点存在性：`router.ts` 的 `ViewName` 为五视图、`SettingsTab = 'general' | 'connections'`、`SettingsView` 内嵌 `ProvidersView`、`ChatView.css` 会话行选中态 `.chat-session-item.is-current`；与引用不符时先更新本变更 `design.md` 再继续
 - [x] 1.3 确认门禁命令可用：`corepack pnpm --filter @sage/agent-web typecheck` 与 `build`（每 Phase 收尾必跑，全绿才算完成）——已建基线全绿（注意：需 `corepack prepare pnpm@10.33.0 --activate`，否则 engines 拦截）
 
 ## 2. Phase 0 — P0 可访问性（无布局依赖，可独立先行）
@@ -79,7 +79,7 @@
 ## 7. 终验与回执
 
 - [x] 7.1：运行时回归（playwright 实测，70/70 PASS）：五视图导航/选中/回退全流程、归档动作行消失+通知、语言入口三处与 EN/ZH 切换（html lang 同步）、设置连接详情/默认模型/互斥参数、SSE 徽标进「实时」、modal 表单脏检查；Chat 发送与任务控制等未改动代码路径按静态核验（key/guard/cleanup 未触碰） 功能回归：五视图全流程（会话收发/归档/删除、任务控制与日志、应用上传导入启动、计划任务增删查历史、设置语言与连接增删改）行为与迁移前一致；语言三处入口全部可用
-- [x] 7.2：布局验收：1440×900/1024×768/850×800 三档实测三列不塌、无横向溢出（0px）、列表栏 320/220px、rail 断点 32px；URL 直达与回退保持选中；全站选中/hover 仅 .pane-item 一套（截图8张存 design-plans/evidence/three-pane/，采集条件：zh-CN、headless chromium、preview+dev-mock@9613、基线工作树=14a3f7e+本变更） 布局验收：1440×900、1024×768、860px 断点附近三列不塌；未选中条目时列表常驻 + 内容空态；选中项 URL 直达、前进后退保持；全站选中/hover 规格唯一（grep 核对无私有变体残留）
+- [x] 7.2：布局验收：1440×900/1024×768/850×800 三档实测三列不塌、无横向溢出（0px）、列表栏 320/220px、rail 断点 32px；URL 直达与回退保持选中；全站选中/hover 仅 .pane-item 一套（截图8张：zh-CN、headless chromium、preview+dev-mock@9613、基线工作树=14a3f7e+本变更；截图未入库） 布局验收：1440×900、1024×768、860px 断点附近三列不塌；未选中条目时列表常驻 + 内容空态；选中项 URL 直达、前进后退保持；全站选中/hover 规格唯一（grep 核对无私有变体残留）
 - [x] 7.3：可访问性复测：对比度 7 组全 PASS（5.24/4.51/4.85/5.27/6.12/5.66/3.20）；Modal 焦点环/归还在 StrictMode dev 双轮实测通过；zh-CN aria 实测播报中文（关闭/工作区导航）；嵌套交互 0 处 可访问性复测：对比度三组 ≥4.5:1；键盘 Tab 遍历无陷阱；StrictMode 下 Modal 焦点开关两次不丢；zh-CN 读屏无英文 aria
 - [x] 7.4：typecheck + build 全绿（tsc -b exit0；vite build exit0，产物 348.56 kB JS / 中英字典同构由 tsc 保证） 机械门禁：`corepack pnpm --filter @sage/agent-web typecheck` 与 `build` 全绿（含中英字典同构）
-- [x] 7.5：openspec validate --strict 通过（valid）；回执已写入 design-plans/README.md；feel check 截图 8 张按 visual-evidence 记录采集条件 `openspec validate --change agent-web-three-pane-layout --strict` 通过；回执写入 `design-plans/README.md`（机械检查 + feel check 结果、执行者、日期），feel check 取证按 dotf-ui-design 的 visual-evidence 规范记录采集条件
+- [x] 7.5：openspec validate --strict 通过（valid）；回执见本勾选记录；feel check 截图 8 张按 visual-evidence 记录采集条件 `openspec validate --change agent-web-three-pane-layout --strict` 通过；回执见本勾选记录（机械检查 + feel check 结果、执行者、日期），feel check 取证按 dotf-ui-design 的 visual-evidence 规范记录采集条件

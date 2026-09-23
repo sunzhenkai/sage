@@ -1,6 +1,6 @@
 ## Why
 
-`agent-web` 缺少统一的布局与呈现契约：功能契约 `docs/design/ui/ui-v1.md` 明文排除呈现层、实现 prompt 声明"样式是自由度，不是验收项"，导致五视图出现三套 master-detail 模式、4 套选中态、3 套 hover、9 档字号与每视图自定间距；另有 4 项 P0 可访问性问题（对比度不达 WCAG AA、会话行 `<a>` 嵌 `<button>`、Modal 焦点与丢数据、aria 硬编码英文）。使用者已裁决统一的三段式布局契约（rail → 列表栏 → 内容区），且「模型与连接」并入设置视图的独立改动已落地（`14a3f7e`，主菜单收敛为五视图），现在是把布局契约固化为规格并整修已知缺陷的时机。本变更的完整审计依据见 `design-plans/001-agent-web-three-pane.md`（v2，已经 cursor + grok-4.7 评审，22 条建议全采纳）。
+`agent-web` 缺少统一的布局与呈现契约：功能契约 `docs/design/ui/ui-v1.md` 明文排除呈现层、实现 prompt 声明"样式是自由度，不是验收项"，导致五视图出现三套 master-detail 模式、4 套选中态、3 套 hover、9 档字号与每视图自定间距；另有 4 项 P0 可访问性问题（对比度不达 WCAG AA、会话行 `<a>` 嵌 `<button>`、Modal 焦点与丢数据、aria 硬编码英文）。使用者已裁决统一的三段式布局契约（rail → 列表栏 → 内容区），且「模型与连接」并入设置视图的独立改动已落地（`14a3f7e`，主菜单收敛为五视图），现在是把布局契约固化为规格并整修已知缺陷的时机。本变更的完整审计已经 cursor + grok-4.7 评审（22 条建议全采纳），其结论固化于 `design.md` 的决策记录与 `docs/design/ui/layout-v1.md`。
 
 ## What Changes
 
@@ -28,4 +28,4 @@
 - **代码**：`platform/apps/agent-web/src/` — `App.tsx`（topbar 插槽）、`components/ui.tsx`（Modal 焦点、SearchBox、Badge plain、ConfirmButton aria）、`components/Feedback.tsx`（单栈通知）、`styles/global.css`（token 与 `.pane-item`）、`views/` 全部五个视图的 TSX/CSS、`lib/router.ts`（`schedule`/`connection`/`panel` 参数）、`i18n/zh-CN.ts` 与 `en.ts`（成对新增 key，`Messages = typeof zhCN` 同构为 typecheck 硬条件）。
 - **文档**：新增 `docs/design/ui/layout-v1.md`；更新 `docs/design/ui/ui-v1.md` §3.1 查询表、`platform/apps/agent-web/README.md` 视觉基线段。
 - **不受影响**：`@sage/app-contracts` 类型、agent-api 后端、`scripts/dev-mock.mjs` 协议。
-- **依赖关系**：以 HEAD `14a3f7e`（五视图归并已落地）为基线；`design-plans/001` v2 的 Phase 2.4 依赖门控由此解除，但其行号需按执行时 HEAD 复核。
+- **依赖关系**：以 HEAD `14a3f7e`（五视图归并已落地）为基线；原审计计划 Phase 2.4 的依赖门控由此解除，但其行号需按执行时 HEAD 复核。

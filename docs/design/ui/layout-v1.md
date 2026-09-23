@@ -3,7 +3,7 @@
 - 状态：active（呈现层验收依据）
 - 适用：`platform/apps/agent-web` 全部视图
 - 关联：功能契约 [`ui-v1.md`](./ui-v1.md)（行为）、`src/styles/global.css` 头注（主题）；三段式变更见 `openspec/changes/agent-web-three-pane-layout/`
-- 决策来源：使用者裁决的三段式布局 + `design-plans/001-agent-web-three-pane.md`（v2，经 cursor + grok-4.7 评审）
+- 决策来源：使用者裁决的三段式布局（经 cursor + grok-4.7 评审，实现取舍见 `openspec/changes/archive/2026-09-23-agent-web-three-pane-layout/design.md`）
 
 > 历史语境：`ui-v1-frontend-prompt.md` §3「样式是自由度，不是验收项」与 §4「样式与呈现：明确不设限」写于呈现层无契约时期；自本文件起，**呈现层验收以本文为准**，prompt 文件仅作历史记录、不修改。
 
