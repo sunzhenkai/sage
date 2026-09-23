@@ -8,7 +8,7 @@ import type { AuthenticatedPrincipal } from '@sage/app-contracts';
  *   常量时间比较，多 key 并存支持轮换；
  * - 配置生效时，packages/apps/runs/schedules/resolutions 五条链路仅认可 service token 主体，
  *   旧明文信任头 `x-authentication-id` 停止提权（与未认证一致）；
- * - 本地开发使用 dev token（见 docs/p8-schedule-plane.md），经 compose env 注入。
+ * - 本地开发使用 dev token（见 architecture/runbooks/），经 compose env 注入。
  */
 export const SERVICE_TOKEN_HASHES_ENV = 'SAGE_SERVICE_TOKEN_HASHES';
 

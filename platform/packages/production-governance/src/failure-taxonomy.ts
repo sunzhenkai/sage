@@ -64,7 +64,7 @@ export function renderUnattendedAlertRulesYaml(): string {
     lines.push(`          responder_service: ${rule.responder}`);
     lines.push(`        annotations:`);
     lines.push(`          summary: "Unattended failure ${rule.code} requires response"`);
-    lines.push(`          runbook_url: "docs/p8-incident-runbooks.md#${rule.runbookAnchor}"`);
+    lines.push(`          runbook_url: "architecture/runbooks/p8-incident-runbooks.md#${rule.runbookAnchor}"`);
   }
   return `${lines.join('\n')}\n`;
 }
@@ -79,7 +79,7 @@ export function checkAlertRoutingCoverage(): AlertRoutingCheckResult {
   const entries = rules.map(rule => {
     const responder = rule.responder.trim();
     const unfilled = responder.length === 0 || responder === 'placeholder' || responder === 'unset';
-    return { alert: rule.alert, responder, runbook: `docs/p8-incident-runbooks.md#${rule.runbookAnchor}`, unfilled };
+    return { alert: rule.alert, responder, runbook: `architecture/runbooks/p8-incident-runbooks.md#${rule.runbookAnchor}`, unfilled };
   });
   return { entries, unfilledCount: entries.filter(entry => entry.unfilled).length };
 }

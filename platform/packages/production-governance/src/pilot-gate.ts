@@ -79,7 +79,7 @@ export function evaluatePilotGate(input: PilotGateInput, now = new Date()): Pilo
   items.push({
     id: 'risk-ledger', provided: unaccepted.length === 0 && input.riskLedger.length > 0,
     detail: unaccepted.length === 0 ? `accepted=${input.riskLedger.length}` : `UNFILLED — ${unaccepted.map(entry => entry.id).join(', ')} 未接受`,
-    remediation: '在 docs/p8-risk-ledger.md 补齐每项风险的接受主体与复评期限；接受记录可追溯且不可静默清除。'
+    remediation: '在 architecture/runbooks/p8-risk-ledger.md 补齐每项风险的接受主体与复评期限；接受记录可追溯且不可静默清除。'
   });
 
   // 5) go/no-go 治理衔接：评审主体完成签名。

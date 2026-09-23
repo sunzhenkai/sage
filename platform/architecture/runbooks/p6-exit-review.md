@@ -46,7 +46,6 @@ pnpm test:p3:integration
 pnpm test:p4:integration
 pnpm test:p5:integration
 pnpm test:p6:e2e # includes real PG append-only/delete-deny integration plus real Temporal E2E
-pnpm check-p6-boundaries
 ```
 
 Negative proof (this command **MUST fail** during real `NativeConnection` initialization):
