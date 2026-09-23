@@ -14,9 +14,9 @@ const NAV_ITEMS: ReadonlyArray<{ key: SettingsTab; labelKey: string; icon: () =>
   { key: 'connections', labelKey: 'settings.nav.connections', icon: PlugIcon },
 ]
 
-// 三段式（双段列表栏）：层 2 = 子菜单段（settings-nav）+ item 段（settings-list-items，
-// 由 ProvidersView portal 填充，仅 connections tab 出现）；层 3 = settings-body 内容区。
-// 总列数恒为三列（rail 在卡片外），禁止第四列嵌套。
+// 三段式：层 2 = 当前层级的单一列表（general = 子菜单；connections = 连接 item 列表，
+// 由 ProvidersView portal 填充，顶部提供返回子菜单入口）；层 3 = settings-body 内容区。
+// 两类列表互斥呈现，禁止混合；总列数恒为三列（rail 在卡片外），禁止第四列嵌套。
 export function SettingsView({
   api,
   tab,
@@ -35,20 +35,32 @@ export function SettingsView({
     <div className="view settings-view">
       <SettingsListContext.Provider value={listItemsEl}>
         <aside className="settings-list-pane">
-          <nav className="settings-nav" aria-label={t('settings.title')}>
-            {NAV_ITEMS.map((item) => (
+          {tab === 'general' ? (
+            <nav className="settings-nav" aria-label={t('settings.title')}>
+              {NAV_ITEMS.map((item) => (
+                <a
+                  key={item.key}
+                  className={`rail-link${tab === item.key ? ' is-active' : ''}`}
+                  href={workspaceHref({ view: 'settings', tab: item.key })}
+                  aria-current={tab === item.key ? 'page' : undefined}
+                >
+                  <item.icon />
+                  <span className="rail-label">{t(item.labelKey)}</span>
+                </a>
+              ))}
+            </nav>
+          ) : (
+            <>
               <a
-                key={item.key}
-                className={`rail-link${tab === item.key ? ' is-active' : ''}`}
-                href={workspaceHref({ view: 'settings', tab: item.key })}
-                aria-current={tab === item.key ? 'page' : undefined}
+                className="rail-link settings-back"
+                href={workspaceHref({ view: 'settings', tab: 'general' })}
               >
-                <item.icon />
-                <span className="rail-label">{t(item.labelKey)}</span>
+                <ChevronLeftIcon />
+                <span className="rail-label">{t('settings.back')}</span>
               </a>
-            ))}
-          </nav>
-          <div className="settings-list-items" ref={setListItemsEl} />
+              <div className="settings-list-items" ref={setListItemsEl} />
+            </>
+          )}
         </aside>
         <div className="settings-body">
           {tab === 'connections' ? (
@@ -86,7 +98,15 @@ function GeneralPanel() {
   )
 }
 
-// ---------- 子菜单图标（内联 SVG，与 rail 同款） ----------
+// ---------- 列表栏图标（内联 SVG，与 rail 同款） ----------
+
+function ChevronLeftIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="m14 6-6 6 6 6" />
+    </svg>
+  )
+}
 
 function SlidersIcon() {
   return (

@@ -46,9 +46,9 @@
 - 选中态同时体现在查询参数与 `aria-current`。
 - 视图行类只保留布局属性（flex/padding/字号），视觉属性一律由 `.pane-item` 承载——**不允许新旧行类并存**（`global.css` 注入在后，同特异性平手胜出，见 `TasksView.css` 头注）。
 
-## 4. 设置视图：双段列表栏
+## 4. 设置视图：互斥列表栏
 
-层 2 = **子菜单段**（通用 / 模型与连接，`.rail-link` 导航语义 + `aria-current=page`）+ **item 段**（`SettingsListContext` portal，仅 `connections` tab 出现：语言入口 + pinned「默认模型」+ 连接条目）。内容区三态互斥：连接详情（`connection=`）/ 默认模型面板（`panel=model`）/ 选中引导空态。**恒为三列，禁止四列嵌套。**
+层 2 同一时刻只呈现**一类列表**：`general` = 子菜单（通用 / 模型与连接，`.rail-link` 导航语义 + `aria-current=page`）；`connections` = 连接 item 列表（`SettingsListContext` portal：返回入口 + 语言入口 + pinned「默认模型」+ 连接条目），**不与子菜单混合呈现**。内容区三态互斥：连接详情（`connection=`）/ 默认模型面板（`panel=model`）/ 选中引导空态。**恒为三列，禁止四列嵌套。**
 
 ## 5. Token 表
 

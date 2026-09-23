@@ -299,6 +299,7 @@ export const zhCN = {
   },
   settings: {
     title: '设置',
+    back: '返回设置',
     nav: {
       general: '通用',
       connections: '模型与连接',

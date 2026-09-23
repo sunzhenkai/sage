@@ -299,6 +299,7 @@ export const en = {
   },
   settings: {
     title: 'Settings',
+    back: 'Back to settings',
     nav: {
       general: 'General',
       connections: 'Models & Connections',

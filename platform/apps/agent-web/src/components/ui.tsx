@@ -14,8 +14,8 @@ export function TopbarActions({ children }: { children: ReactNode }) {
   return container ? createPortal(children, container) : null
 }
 
-// ---------- 设置视图列表栏下段插槽（双段结构的 item 段） ----------
-// SettingsView 提供容器（子菜单段下方），ProvidersView 把语言入口 + 默认模型 pinned + 连接条目
+// ---------- 设置视图连接列表插槽（connections tab 的 item 列表） ----------
+// SettingsView 在 connections tab 提供容器，ProvidersView 把语言入口 + 默认模型 pinned + 连接条目
 // portal 进去；容器值为稳定 element，避免父 state 存 ReactNode 的重渲染环。
 export const SettingsListContext = createContext<HTMLElement | null>(null)
 

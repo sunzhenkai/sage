@@ -1,5 +1,5 @@
-/* Settings 视图：三段式双段列表栏（子菜单段 + item 段 portal）+ 内容区。
-   item 段容器在 connections tab 由 ProvidersView 填充（:not(:empty) 才画分隔线）。 */
+/* Settings 视图：三段式列表栏（单一列表互斥呈现）+ 内容区。
+   general = 子菜单；connections = 返回入口 + ProvidersView portal 的连接 item 列表。 */
 
 /* 特异性高于全局 .view（global.css 注入顺序在后，同特异性平手胜出），必须双类限定。 */
 .view.settings-view {
@@ -12,7 +12,7 @@
   overflow: hidden;
 }
 
-/* ---------- 层 2：列表栏（子菜单段 + item 段） ---------- */
+/* ---------- 层 2：列表栏（同一时刻只呈现一类列表） ---------- */
 
 .settings-list-pane {
   min-height: 0;
@@ -36,20 +36,23 @@
   gap: 6px;
 }
 
+/* connections 列表与顶部返回入口之间用发丝线分隔，不构成第二级导航。 */
 .settings-list-items:not(:empty) {
   border-top: 1px solid var(--line);
   padding-top: 10px;
 }
 
-/* 手动折叠（.shell.is-collapsed）不影响子菜单：全局折叠规则会隐藏 .rail-label 并把
-   .rail-link 居中，这里只在桌面宽度上为子菜单还原文字与内边距；≤860px 的纯图标栏
-   断点规则（global.css）不受影响。 */
+/* 手动折叠（.shell.is-collapsed）不影响设置列表栏：全局折叠规则会隐藏 .rail-label 并把
+   .rail-link 居中，这里只在桌面宽度上为子菜单和返回入口还原文字与内边距；≤860px 的
+   纯图标栏断点规则（global.css）不受影响。 */
 @media (min-width: 861px) {
-  .shell.is-collapsed .settings-nav .rail-label {
+  .shell.is-collapsed .settings-nav .rail-label,
+  .shell.is-collapsed .settings-back .rail-label {
     display: inline;
   }
 
-  .shell.is-collapsed .settings-nav .rail-link {
+  .shell.is-collapsed .settings-nav .rail-link,
+  .shell.is-collapsed .settings-back {
     justify-content: flex-start;
     padding-left: 10px;
     padding-right: 10px;
