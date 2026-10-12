@@ -1,0 +1,23 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"sage://agent-platform-final/gate/v1",
+  "type":"object",
+  "additionalProperties":false,
+  "required":["schemaVersion","status","decision","sourceRevision","sourceDigest","toolDigest","targetBaseline","targetRevision","generatedAt","items","blockers","overrideAttempts","productionEvidenceVerified","contentDigest"],
+  "properties":{
+    "schemaVersion":{"const":"1"},
+    "status":{"enum":["PASS","FAIL","BLOCKED"]},
+    "decision":{"enum":["GO","NO-GO"]},
+    "sourceRevision":{"type":"string","pattern":"^[a-f0-9]{40}$"},
+    "sourceDigest":{"type":"string","pattern":"^sha256:[a-f0-9]{64}$"},
+    "toolDigest":{"type":"string","pattern":"^sha256:[a-f0-9]{64}$"},
+    "targetBaseline":{"const":"Proposed final architecture baseline"},
+    "targetRevision":{"type":"string","pattern":"^sha256:[a-f0-9]{64}$"},
+    "generatedAt":{"type":"string","format":"date-time"},
+    "productionEvidenceVerified":{"type":"boolean"},
+    "items":{"type":"array","minItems":23,"maxItems":23,"items":{"type":"object","additionalProperties":true,"required":["key","status","owner","observedAt","evidenceRef","evidenceDigest","freshness"],"properties":{"key":{"type":"string","minLength":1},"status":{"enum":["PASS","FAIL","BLOCKED"]},"owner":{"type":"string","minLength":1},"observedAt":{"type":"string","format":"date-time"},"evidenceRef":{"type":"string","minLength":1},"evidenceDigest":{"anyOf":[{"type":"string","pattern":"^sha256:[a-f0-9]{64}$"},{"type":"null"}]},"freshness":{"enum":["CURRENT","STALE","MISSING","INVALID","EXTERNAL_REQUIRED"]}}},
+    "blockers":{"type":"array"},
+    "overrideAttempts":{"type":"array"},
+    "contentDigest":{"type":"string","pattern":"^sha256:[a-f0-9]{64}$"}
+  }
+}

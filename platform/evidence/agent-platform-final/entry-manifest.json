@@ -1,0 +1,69 @@
+{
+  "schemaVersion": "1",
+  "caseId": "apgv/entry/v1/dependency-manifest",
+  "status": "BLOCKED",
+  "decision": "NO-GO",
+  "canonicalContractMajor": 1,
+  "sourceRevision": "89afe72fe8af688fffb0025b439d780e1c7722bb",
+  "sourceDigest": "sha256:97db272d674472f7ed1fe99cb23af00c5cc8bf3c7ffecc68991385cc7ec29cc9",
+  "toolDigest": "sha256:3eb1ef94b5890ca727158b106142685c8733b0ace5bcb4cf3f0ac14f9f0643f4",
+  "compatibilityWindow": {
+    "runtimeMajor": 1,
+    "coordinatorBuilds": [
+      "build://legacy-temporal/v1",
+      "build://coordinator-v2/v1"
+    ]
+  },
+  "productionFreshnessHours": 24,
+  "dependencies": [
+    {
+      "change": "agent-platform-contract-authority-foundation",
+      "owner": "Agent Core",
+      "status": "BLOCKED",
+      "evidenceRef": "evidence/agent-platform-contract-authority-foundation/conformance.md",
+      "evidenceDigest": null
+    },
+    {
+      "change": "agent-runtime-kernel-broker-integration",
+      "owner": "Agent Core",
+      "status": "BLOCKED",
+      "evidenceRef": "evidence/agent-runtime-kernel-broker-integration/runtime-kernel-ports.md",
+      "evidenceDigest": null
+    },
+    {
+      "change": "durable-agent-coordinator-adapter",
+      "owner": "Task Runtime",
+      "status": "BLOCKED",
+      "evidenceRef": "evidence/durable-agent-coordinator-adapter/dependency-gate.md",
+      "evidenceDigest": null
+    },
+    {
+      "change": "agent-package-release-admission",
+      "owner": "Package Platform",
+      "status": "BLOCKED",
+      "evidenceRef": "evidence/agent-package-release-admission/dependency-gate.md",
+      "evidenceDigest": null
+    },
+    {
+      "change": "agent-platform-production-governance",
+      "owner": "Platform Security/SRE",
+      "status": "BLOCKED",
+      "evidenceRef": "evidence/production-governance/readiness-manifest.json",
+      "evidenceDigest": null
+    }
+  ],
+  "externalDeferredTaskIds": [
+    "9.1",
+    "9.2",
+    "9.3",
+    "10.5",
+    "11.2",
+    "11.3",
+    "12.2",
+    "12.3",
+    "12.5"
+  ],
+  "promotionToken": null,
+  "generatedAt": "2026-09-23T17:15:47.124Z",
+  "contentDigest": "sha256:4285a20a3be53d575bd26fb55098036ae6ef414346d4ed50d5234edd1738c16f"
+}

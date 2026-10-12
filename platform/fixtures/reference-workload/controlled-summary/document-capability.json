@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "1",
+  "capabilityId": "capability://document.fetch@1",
+  "version": "1.0.0",
+  "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+  "access": "read-only",
+  "operations": ["fetch-bounded-document"],
+  "limits": { "maxDocuments": 4, "maxBytes": 16384 }
+}

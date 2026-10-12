@@ -1,0 +1,1 @@
+{"schemaVersion":"1","scenario":"pending-timer","commands":["START","TIMER_PENDING"],"expected":"COMPATIBLE"}

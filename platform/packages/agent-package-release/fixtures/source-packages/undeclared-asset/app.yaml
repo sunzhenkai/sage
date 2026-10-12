@@ -1,0 +1,8 @@
+schemaVersion: '1'
+id: undeclared-asset-app
+version: 1.0.0
+description: 目录包含未声明文件的非法源包
+entry: prompts/system.md
+modelRoute:
+  provider: anthropic
+  model: claude-sonnet-4-5

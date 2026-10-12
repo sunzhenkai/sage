@@ -1,0 +1,1 @@
+{"schemaVersion":"1","scenario":"nondeterministic","commands":["RANDOM_BRANCH"],"expected":"REPLAY_NONDETERMINISTIC"}

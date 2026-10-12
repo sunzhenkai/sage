@@ -1,0 +1,8 @@
+schemaVersion: '1'
+id: traversal-app
+version: 1.0.0
+description: 目录包含指向包外的符号链接的非法源包
+entry: prompts/system.md
+modelRoute:
+  provider: anthropic
+  model: claude-sonnet-4-5

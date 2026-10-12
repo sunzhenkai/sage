@@ -1,0 +1,1 @@
+{"schemaVersion":"1","semanticInputDigest":"sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","interactive":{"executionMode":"INTERACTIVE","hostProfile":"bounded-client"},"durable":{"executionMode":"DURABLE","hostProfile":"coordinator-activity"},"onlyAllowedDifferences":["executionMode","hostProfile"]}

@@ -1,0 +1,10 @@
+{
+  "kind": "history",
+  "messages": [
+    {
+      "role": "assistant",
+      "content": "The prior turn is available by reference.",
+      "session_ref": "session://tenant-a/session-1"
+    }
+  ]
+}

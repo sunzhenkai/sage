@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "1",
+  "viewId": "view://controlled-summary/result@1",
+  "source": "result-artifact-and-receipts",
+  "fields": {
+    "summary": "result.summary",
+    "sourceCount": "result.sourceCount",
+    "artifactRef": "receipt.artifactRefs[0]",
+    "receiptRef": "receipt.receiptRef"
+  },
+  "forbiddenSources": ["secret", "credential", "endpoint", "full-input", "context-body"]
+}

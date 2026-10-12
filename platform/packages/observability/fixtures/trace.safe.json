@@ -1,0 +1,10 @@
+{
+  "kind": "trace",
+  "name": "tool.call",
+  "attributes": {
+    "run_id": "run-1",
+    "tool_call_id": "call-1",
+    "artifact_ref": "artifact://tenant-a/results/result-1",
+    "connectionRef": "connection://tenant-a/crm/read"
+  }
+}

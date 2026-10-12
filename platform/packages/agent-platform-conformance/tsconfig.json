@@ -1,0 +1,6 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": { "rootDir": "src", "outDir": "dist", "composite": true, "baseUrl": ".", "paths": { "@sage/agent-runtime-conformance": ["../agent-runtime-conformance/src/index.ts"] } },
+  "include": ["src/**/*.ts"],
+  "references": [{ "path": "../agent-runtime-conformance" }]
+}

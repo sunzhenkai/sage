@@ -1,0 +1,12 @@
+{
+  "tenant_id": "fixture-tenant",
+  "task_id": "fixture-task",
+  "workflow_id": "fixture-workflow",
+  "target_id": "fixture-target",
+  "attempt": 1,
+  "run_id": "fixture-run",
+  "tool_call_id": "fixture-tool-call",
+  "checkpoint_ref": "checkpoint://fixture/task/1",
+  "credential_ref": "secret://fixture/temporal/read-only",
+  "artifact_ref": "artifact://fixture/task/output"
+}

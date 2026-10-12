@@ -1,0 +1,1 @@
+{"schemaVersion":"1","scenario":"effect-unknown","commands":["START","EFFECT_UNKNOWN","WAIT"],"expected":"COMPATIBLE"}

@@ -1,0 +1,1 @@
+import{expect,it}from'vitest';import{hostSpecialCase}from'./fixtures/host-special-case.js';import{duplicateLoopHost}from'./fixtures/duplicate-loop-host.js';it('rejects host semantic duplication fixtures',()=>expect([hostSpecialCase.failureCode,duplicateLoopHost.failureCode]).toEqual(['HOST_WORKLOAD_SPECIAL_CASE','HOST_DUPLICATE_AGENT_LOOP']));

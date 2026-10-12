@@ -1,0 +1,1 @@
+import{expect,it}from'vitest';import{byDomain}from'./fault-fixtures.js';it('covers effect claim/provider/commit/unknown',()=>{const cases=byDomain('effect');expect(cases).toHaveLength(4);expect(cases.find(x=>x.point==='effect.unknown')?.recovery).toContain('retry budget zero');});

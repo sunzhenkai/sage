@@ -1,0 +1,1 @@
+{"schemaVersion":"1","capabilities":[{"id":"document.fetch","version":"1","mode":"read","input":"artifact-refs","limits":{"documents":16,"bytes":1048576}},{"id":"evidence.publish","version":"1","mode":"idempotent-write","semanticActionId":"required","result":"immutable-artifact"}]}

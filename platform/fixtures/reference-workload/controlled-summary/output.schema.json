@@ -1,0 +1,12 @@
+{
+  "$schema": "schema://sage/declaration-schema@1",
+  "schemaVersion": "1",
+  "schemaId": "schema://controlled-summary/output@1",
+  "kind": "output",
+  "fields": {
+    "summary": { "type": "string", "maxLength": 8192 },
+    "sourceCount": { "type": "integer", "minimum": 0, "maximum": 4 },
+    "artifactRef": { "type": "artifact-ref" },
+    "receiptRef": { "type": "receipt-ref" }
+  }
+}

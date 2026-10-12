@@ -1,0 +1,11 @@
+{
+  "kind": "event",
+  "type": "tool.completed",
+  "payload": {
+    "artifact_ref": "artifact://tenant-a/results/result-1",
+    "run_ref": "run://tenant-a/run-1",
+    "data": {
+      "status": "succeeded"
+    }
+  }
+}

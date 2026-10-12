@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GithubTrendingDigest",
+  "type": "object",
+  "properties": {
+    "overview": { "type": "string" },
+    "repos": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "positioning": { "type": "string" },
+          "highlight": { "type": "string" },
+          "trendSignal": { "type": "string" }
+        },
+        "required": ["name", "positioning", "highlight", "trendSignal"]
+      }
+    },
+    "insights": { "type": "array", "items": { "type": "string" } },
+    "missingData": { "type": "array", "items": { "type": "string" } }
+  },
+  "required": ["overview", "repos", "insights"]
+}

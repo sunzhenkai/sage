@@ -1,0 +1,53 @@
+{
+  "package": {
+    "packageId": "controlled-summary-reference",
+    "version": "1.0.0",
+    "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "schemaRef": "schema://controlled-summary/package@1"
+  },
+  "release": {
+    "releaseId": "release-001",
+    "packageRef": "package://controlled-summary-reference@1.0.0",
+    "channel": "reference-canary",
+    "status": "published"
+  },
+  "spec": {
+    "specId": "spec-001",
+    "releaseRef": "release://release-001",
+    "modelRef": "model://reference/summary@1",
+    "contextRef": "context://controlled-summary/plan@1"
+  },
+  "envelope": {
+    "envelopeId": "envelope-001",
+    "specRef": "spec://spec-001",
+    "attemptRef": "attempt://attempt-001",
+    "artifactRefs": ["artifact://controlled-summary/source-catalog@1"]
+  },
+  "history": {
+    "eventType": "AttemptAdmitted",
+    "sequence": 1,
+    "specRef": "spec://spec-001",
+    "envelopeRef": "envelope://envelope-001"
+  },
+  "audit": {
+    "stage": "admission",
+    "outcome": "admitted",
+    "releaseRef": "release://release-001",
+    "attemptRef": "attempt://attempt-001"
+  },
+  "log": {
+    "level": "info",
+    "message": "agent platform admission completed",
+    "releaseId": "release-001",
+    "specId": "spec-001",
+    "attemptId": "attempt-001"
+  },
+  "trace": {
+    "stage": "admission",
+    "outcome": "admitted",
+    "traceRef": "trace://trace-001",
+    "releaseId": "release-001",
+    "specId": "spec-001",
+    "attemptId": "attempt-001"
+  }
+}

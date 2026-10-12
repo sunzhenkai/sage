@@ -1,0 +1,9 @@
+{
+  "name": "@sage/temporal-workflows",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": { "types": "./dist/workflows.d.ts", "default": "./dist/workflows.js" } },
+  "scripts": { "clean": "rm -rf dist", "typecheck": "tsc -p tsconfig.json --noEmit", "build": "tsc -p tsconfig.json" },
+  "dependencies": { "@sage/platform-ports": "workspace:*", "@sage/task-domain": "workspace:*", "@temporalio/workflow": "1.22.0" }
+}

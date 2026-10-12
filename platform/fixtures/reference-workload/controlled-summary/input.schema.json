@@ -1,0 +1,10 @@
+{
+  "$schema": "schema://sage/declaration-schema@1",
+  "schemaVersion": "1",
+  "schemaId": "schema://controlled-summary/input@1",
+  "kind": "input",
+  "fields": {
+    "documentRefs": { "type": "array", "maxItems": 4, "items": { "type": "artifact-ref" } },
+    "question": { "type": "string", "maxLength": 2048, "required": false }
+  }
+}

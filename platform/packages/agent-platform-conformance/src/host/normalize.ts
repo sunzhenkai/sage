@@ -1,0 +1,4 @@
+import type { CanonicalObservation } from '../contracts.js';
+const TRANSPORT=new Set(['interactive.stream','durable.dispatch','durable.heartbeat','durable.continue-as-new']);
+export function normalizeHostTrace(items:readonly CanonicalObservation[]):readonly CanonicalObservation[]{return items.filter((item)=>!TRANSPORT.has(item.type)).map((item)=>({...item,parents:item.parents.filter((parent)=>!items.some((candidate)=>candidate.id===parent&&TRANSPORT.has(candidate.type))).sort()})).sort((a,b)=>a.id.localeCompare(b.id));}
+export function assertNoCanonicalProjectionLoss(before:readonly CanonicalObservation[],after:readonly CanonicalObservation[]):void{const expected=before.filter((item)=>!TRANSPORT.has(item.type)).map(({id})=>id).sort();if(JSON.stringify(expected)!==JSON.stringify(after.map(({id})=>id).sort()))throw new Error('HOST_CANONICAL_EVENT_REMOVED');}

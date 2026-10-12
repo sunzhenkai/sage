@@ -1,0 +1,1 @@
+{"schemaVersion":"1","skillId":"evidence-digest","version":"1","instructions":["cite every document artifact","deduplicate claims","mark sensitivity","emit schema-valid output"],"inputSchemaRef":"schema://evidence-digest/input/v1","outputSchemaRef":"schema://evidence-digest/output/v1"}

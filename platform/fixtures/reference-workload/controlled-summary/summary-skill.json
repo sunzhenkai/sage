@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "1",
+  "skillId": "skill://controlled-summary/summary@1",
+  "version": "1.0.0",
+  "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "description": "Bounded summarization instruction asset.",
+  "instructions": ["Summarize only admitted context.", "Do not invent sources.", "Return the output schema."]
+}

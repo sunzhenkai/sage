@@ -1,0 +1,1 @@
+/tmp/outside-secret.txt

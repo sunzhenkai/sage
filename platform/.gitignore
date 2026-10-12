@@ -1,0 +1,7 @@
+node_modules/
+coverage/
+**/dist/
+**/dist-types/
+**/*.tsbuildinfo
+.env
+.spike-output/

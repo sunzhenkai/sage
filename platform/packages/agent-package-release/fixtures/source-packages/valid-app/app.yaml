@@ -1,0 +1,17 @@
+schemaVersion: '1'
+id: demo-assistant
+version: 1.0.0
+description: 一个演示用 ai app 源包
+entry: prompts/system.md
+modelRoute:
+  provider: anthropic
+  model: claude-sonnet-4-5
+  fallbacks:
+    - claude-haiku-4-5
+budgets:
+  maxTokens: 4000
+  maxToolCalls: 20
+skillRefs:
+  - skill://writer/v1
+capabilityRefs:
+  - capability://file-reader/v1

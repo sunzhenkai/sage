@@ -1,0 +1,1 @@
+{"schemaVersion":"1","scenario":"control-race","commands":["START","CANCEL_REQUESTED","RECEIPT_COMMITTED"],"expected":"COMPATIBLE"}

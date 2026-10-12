@@ -1,0 +1,252 @@
+{
+  "schemaVersion": "1",
+  "status": "fail",
+  "modelDigest": "sha256:830d4046e44bcef1a1aad015eaaa6d7b5e0e0131569b4e1ec11c9459b485445a",
+  "productionEvidence": false,
+  "checks": [
+    {
+      "name": "Layer",
+      "status": "pass",
+      "evidenceRefs": [
+        "platform/evidence/agent-platform-final/boundary-canonical.json"
+      ],
+      "evidenceDigest": "sha256:a0ef371aa70ad2a721262078896ee71a387352c582e36b3fd8a94127360a821f"
+    },
+    {
+      "name": "DDD",
+      "status": "pass",
+      "evidenceRefs": [
+        "platform/evidence/agent-platform-final/boundary-evidence-digest.json"
+      ],
+      "evidenceDigest": "sha256:38fdeaa3c7c96e0d9dd5b462040778aa7922512a240b0a96aa575eaac4e5054b"
+    },
+    {
+      "name": "Dependency",
+      "status": "pass",
+      "evidenceRefs": [
+        "platform/evidence/agent-platform-final/boundary-public-surfaces.json"
+      ],
+      "evidenceDigest": "sha256:8b9858370fa7422bc355e195e98ef82e2764977ac6b3348f94d1946b0ee727f9"
+    },
+    {
+      "name": "Authority",
+      "status": "pass",
+      "evidenceRefs": [
+        "platform/evidence/agent-platform-final/architecture-model-validation.json"
+      ],
+      "evidenceDigest": "sha256:1bf8a4d56fd2b596a174f9dea67b1316f6533beb9552e345819a7cdb4ba780a2"
+    },
+    {
+      "name": "Recovery",
+      "status": "pass",
+      "evidenceRefs": [
+        "platform/evidence/agent-platform-final/fault-matrix.json"
+      ],
+      "evidenceDigest": "sha256:5bd2e8dd70b0185f988fe532cb1ae9f93eb7ef1539670f69fcf4f676cd1f2253"
+    },
+    {
+      "name": "Data flow",
+      "status": "pass",
+      "evidenceRefs": [
+        "platform/evidence/agent-platform-final/architecture-projection-validation.json"
+      ],
+      "evidenceDigest": "sha256:a963c044cac7d1faf6c19797c5f8990482b6ef3ae190637d19d2a4a71e866680"
+    },
+    {
+      "name": "SDK leakage",
+      "status": "pass",
+      "evidenceRefs": [
+        "platform/evidence/agent-platform-final/boundary-canonical.json"
+      ],
+      "evidenceDigest": "sha256:a0ef371aa70ad2a721262078896ee71a387352c582e36b3fd8a94127360a821f"
+    },
+    {
+      "name": "Dual Host equivalence",
+      "status": "pass",
+      "evidenceRefs": [
+        "platform/evidence/agent-platform-final/host-equivalence.json"
+      ],
+      "evidenceDigest": "sha256:1d5f952b673630a8653ebb26569bb7a7512406d5ed3aabdf47c7e2d257d59f6d"
+    },
+    {
+      "name": "Engine replaceability",
+      "status": "pass",
+      "evidenceRefs": [
+        "platform/evidence/agent-platform-final/engine-conformance.json"
+      ],
+      "evidenceDigest": "sha256:9829c53da0cdb54098a33a4c6835c8c6594eed5af6ca1ad8b90546371a4dd16f"
+    },
+    {
+      "name": "Scale",
+      "status": "insufficient-evidence",
+      "evidenceRefs": [
+        "platform/evidence/production-governance/readiness-manifest.json"
+      ],
+      "evidenceDigest": "sha256:e8ccc9ffa44f882750dbe7637126c81d260a082b6bf4f70784c991d56eb60674"
+    },
+    {
+      "name": "HA",
+      "status": "insufficient-evidence",
+      "evidenceRefs": [
+        "platform/evidence/production-governance/readiness-manifest.json"
+      ],
+      "evidenceDigest": "sha256:e8ccc9ffa44f882750dbe7637126c81d260a082b6bf4f70784c991d56eb60674"
+    },
+    {
+      "name": "Security",
+      "status": "insufficient-evidence",
+      "evidenceRefs": [
+        "platform/evidence/production-governance/readiness-manifest.json"
+      ],
+      "evidenceDigest": "sha256:e8ccc9ffa44f882750dbe7637126c81d260a082b6bf4f70784c991d56eb60674"
+    },
+    {
+      "name": "Operation",
+      "status": "insufficient-evidence",
+      "evidenceRefs": [
+        "platform/evidence/production-governance/readiness-manifest.json"
+      ],
+      "evidenceDigest": "sha256:e8ccc9ffa44f882750dbe7637126c81d260a082b6bf4f70784c991d56eb60674"
+    },
+    {
+      "name": "Production readiness",
+      "status": "insufficient-evidence",
+      "evidenceRefs": [
+        "platform/evidence/production-governance/readiness-manifest.json"
+      ],
+      "evidenceDigest": "sha256:e8ccc9ffa44f882750dbe7637126c81d260a082b6bf4f70784c991d56eb60674"
+    }
+  ],
+  "findings": [
+    {
+      "id": "APGV-HIGH-01",
+      "severity": "high",
+      "elementIds": [
+        "trust.security",
+        "trust.data"
+      ],
+      "evidenceRefs": [
+        "platform/evidence/production-governance/readiness-manifest.json"
+      ],
+      "owner": "Platform Security/SRE",
+      "disposition": "open-insufficient-evidence",
+      "deferredTaskId": "9.1"
+    },
+    {
+      "id": "APGV-HIGH-02",
+      "severity": "high",
+      "elementIds": [
+        "trust.security",
+        "trust.data"
+      ],
+      "evidenceRefs": [
+        "platform/evidence/production-governance/readiness-manifest.json"
+      ],
+      "owner": "Platform Security/SRE",
+      "disposition": "open-insufficient-evidence",
+      "deferredTaskId": "9.2"
+    },
+    {
+      "id": "APGV-HIGH-03",
+      "severity": "high",
+      "elementIds": [
+        "trust.security",
+        "trust.data"
+      ],
+      "evidenceRefs": [
+        "platform/evidence/production-governance/readiness-manifest.json"
+      ],
+      "owner": "Platform Security/SRE",
+      "disposition": "open-insufficient-evidence",
+      "deferredTaskId": "9.3"
+    },
+    {
+      "id": "APGV-HIGH-04",
+      "severity": "high",
+      "elementIds": [
+        "trust.security",
+        "trust.data"
+      ],
+      "evidenceRefs": [
+        "platform/evidence/production-governance/readiness-manifest.json"
+      ],
+      "owner": "Platform Security/SRE",
+      "disposition": "open-insufficient-evidence",
+      "deferredTaskId": "10.5"
+    },
+    {
+      "id": "APGV-HIGH-05",
+      "severity": "high",
+      "elementIds": [
+        "trust.security",
+        "trust.data"
+      ],
+      "evidenceRefs": [
+        "platform/evidence/production-governance/readiness-manifest.json"
+      ],
+      "owner": "Platform Security/SRE",
+      "disposition": "open-insufficient-evidence",
+      "deferredTaskId": "11.2"
+    },
+    {
+      "id": "APGV-HIGH-06",
+      "severity": "high",
+      "elementIds": [
+        "trust.security",
+        "trust.data"
+      ],
+      "evidenceRefs": [
+        "platform/evidence/production-governance/readiness-manifest.json"
+      ],
+      "owner": "Platform Security/SRE",
+      "disposition": "open-insufficient-evidence",
+      "deferredTaskId": "11.3"
+    },
+    {
+      "id": "APGV-HIGH-07",
+      "severity": "high",
+      "elementIds": [
+        "trust.security",
+        "trust.data"
+      ],
+      "evidenceRefs": [
+        "platform/evidence/production-governance/readiness-manifest.json"
+      ],
+      "owner": "Accountable Human Approvers",
+      "disposition": "open-insufficient-evidence",
+      "deferredTaskId": "12.2"
+    },
+    {
+      "id": "APGV-HIGH-08",
+      "severity": "high",
+      "elementIds": [
+        "trust.security",
+        "trust.data"
+      ],
+      "evidenceRefs": [
+        "platform/evidence/production-governance/readiness-manifest.json"
+      ],
+      "owner": "Accountable Human Approvers",
+      "disposition": "open-insufficient-evidence",
+      "deferredTaskId": "12.3"
+    },
+    {
+      "id": "APGV-HIGH-09",
+      "severity": "high",
+      "elementIds": [
+        "trust.security",
+        "trust.data"
+      ],
+      "evidenceRefs": [
+        "platform/evidence/production-governance/readiness-manifest.json"
+      ],
+      "owner": "Accountable Human Approvers",
+      "disposition": "open-insufficient-evidence",
+      "deferredTaskId": "12.5"
+    }
+  ],
+  "reviewedAt": "2026-08-17T03:31:31.586Z",
+  "sourceDigest": "sha256:46df534edd66278c0e4cba6e58b7655e1e172f6549c9e7a1915320bc5aadca95",
+  "toolDigest": "sha256:615a886b8b64d8fa078866d1e5da007c31c9088effdb9684eb873b16162bebde",
+  "contentDigest": "sha256:7ccae9946b970e87b520144176cd469d8f59e86848f106b680f67514a5b42f3b"
+}

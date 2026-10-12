@@ -1,0 +1,16 @@
+{
+  "name": "@sage/chat-run-integration",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@sage/agent-api": "workspace:*",
+    "@sage/agent-client": "workspace:*",
+    "@sage/agent-contracts": "workspace:*",
+    "@sage/app-contracts": "workspace:*",
+    "@sage/chat-domain": "workspace:*",
+    "fastify": "5.11.3",
+    "pg": "8.23.0"
+  },
+  "devDependencies": { "@types/pg": "8.21.0" }
+}

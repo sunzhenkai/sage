@@ -1,0 +1,1 @@
+{"schemaVersion":"1","scenario":"delivery-retry","commands":["START","DISPATCH","RETRY","COMPLETE"],"expected":"COMPATIBLE"}
