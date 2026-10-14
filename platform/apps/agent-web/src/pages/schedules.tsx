@@ -12,7 +12,7 @@ import { StatusPill, toneFor } from '@/components/bui/atoms';
 import { PageContent, PageDescription, Quiet, Section } from '@/components/layout/page';
 import { FlowChip, Flowchart } from '@/components/bui/flowchart';
 import { TaskRows } from '@/components/bui/task-rows';
-import { DetailLayout, ListGroup, ListRow, Pill, Property, PropertyGroup, RowId, RowMeta, RowTitle } from '@/components/ui/list';
+import { DetailLayout, ListRow, Pill, Property, PropertyGroup, RowId, RowMeta, RowTitle } from '@/components/ui/list';
 import { StatusIcon } from '@/components/ui/status';
 import { api } from '@/lib/api';
 import { useSettings } from '@/lib/settings';
@@ -36,13 +36,14 @@ export function SchedulesPage() {
           <Button variant="secondary" size="sm" onClick={() => setOpen(true)}><Plus />New schedule</Button>
           <DialogContent title="New schedule" description="POST /v1/schedules — requires a service token."><CreateScheduleForm onDone={(id) => { setOpen(false); navigate(`/schedules/${id}`); }} /></DialogContent>
         </Dialog>} />
-      <PageContent flush>
+      <PageContent>
         {schedules.isLoading ? <Loading /> : schedules.error ? <ErrorState error={schedules.error} /> : !schedules.data?.schedules.length ? <Empty icon={CalendarClock} title="No schedules" hint="Run an agent app task on a cron or interval. Requires a service token." /> : (
           (['ACTIVE', 'PAUSED'] as const).map((state) => {
             const items = schedules.data.schedules.filter((x) => x.state === state);
             if (!items.length) return null;
             return (
-              <ListGroup key={state} icon={<StatusIcon status={state === 'ACTIVE' ? 'running' : 'paused'} />} label={state === 'ACTIVE' ? 'Active' : 'Paused'} count={items.length} onAdd={() => setOpen(true)}>
+              <Section card key={state} title={state === 'ACTIVE' ? 'Active' : 'Paused'} description={state === 'ACTIVE' ? 'Firing on their trigger.' : 'Will not fire until resumed.'} count={items.length}>
+                <div className="divide-y divide-line">
                 {items.map((x) => (
                   <ListRow key={x.definition.scheduleId} onClick={() => navigate(`/schedules/${x.definition.scheduleId}`)}>
                     <RowId>REV {x.revision}</RowId>
@@ -54,7 +55,8 @@ export function SchedulesPage() {
                     </RowMeta>
                   </ListRow>
                 ))}
-              </ListGroup>
+                </div>
+              </Section>
             );
           })
         )}

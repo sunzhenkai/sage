@@ -56,11 +56,11 @@ export function SessionList({ items, activeId }: { items: SessionListItem[]; act
     g.rows.push({ s, runs: d?.runs ?? [], messages: d?.messages.length ?? 0 });
   });
   return (
-    <div className="flex flex-col pb-2">
+    <div className="flex flex-col pb-3">
       {groups.map((g) => (
         <div key={g.label}>
-          <div className="t-meta sticky top-0 z-10 flex items-center gap-2 bg-panel px-2.5 pb-1 pt-3 font-medium">{g.label}<span className="tabular-nums font-normal">{g.rows.length}</span></div>
-          <div className="flex flex-col gap-0.5">
+          <div className="t-meta sticky top-0 z-10 flex items-center gap-2 bg-panel px-2 pb-1.5 pt-3 font-medium">{g.label}<span className="tabular-nums font-normal">{g.rows.length}</span></div>
+          <div className="flex flex-col gap-1.5">
             {g.rows.map(({ s, runs, messages }) => {
               const active = s.sessionId === activeId;
               const last = runs[runs.length - 1];
@@ -78,7 +78,7 @@ export function SessionList({ items, activeId }: { items: SessionListItem[]; act
                     <span className="mt-0.5 block truncate text-[12px] text-ink-2">{s.lastMessageRole === 'assistant' ? 'Agent: ' : s.lastMessageRole === 'user' ? 'You: ' : ''}{s.preview ?? '—'}</span>
                     <span className="mt-1.5 flex items-center gap-2 text-[11px] text-ink-3">
                       <span className="inline-flex items-center gap-1" style={{ color: toneColor[tone] }}><span className={cn('size-1.5 rounded-full', tone === 'active' && 'animate-pulse')} style={{ background: toneColor[tone] }} />{toneLabel[tone]}</span>
-                      <span className="rounded-[5px] bg-inset px-1 tabular-nums shadow-[inset_0_0_0_1px_var(--line)]">{runs.length} run{runs.length === 1 ? '' : 's'}</span>
+                      <span className="rounded-[5px] bg-surface px-1 tabular-nums shadow-[inset_0_0_0_1px_var(--line)]">{runs.length} run{runs.length === 1 ? '' : 's'}</span>
                       <span className="tabular-nums">{messages} msg</span>
                       <span className="ml-auto"><RunTicks runs={runs} /></span>
                     </span>
@@ -95,10 +95,10 @@ export function SessionList({ items, activeId }: { items: SessionListItem[]; act
 
 export function ArchiveToggle({ archived, onChange }: { archived: boolean; onChange: (v: boolean) => void }) {
   return (
-    <div className="flex rounded-control bg-inset p-0.5 shadow-[inset_0_0_0_1px_var(--line)]">
+    <div className="flex rounded-control bg-surface p-0.5 shadow-card">
       {[false, true].map((v) => (
         <button key={String(v)} type="button" onClick={() => onChange(v)}
-          className={cn('h-6 rounded-[6px] px-2 text-[12px] font-medium transition-colors', archived === v ? 'bg-surface text-ink shadow-btn' : 'text-ink-3 hover:text-ink')}>
+          className={cn('h-6 rounded-[6px] px-2 text-[12px] font-medium transition-colors', archived === v ? 'bg-hover-2 text-ink' : 'text-ink-3 hover:text-ink')}>
           {v ? 'Archived' : 'Active'}
         </button>
       ))}

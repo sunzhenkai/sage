@@ -23,7 +23,7 @@ export function RecordsTable<T>({ columns, rows, getKey, onRowClick, activeKey, 
   }, [rows, sort, columns]);
   const cycle = (key: string) => setSort((cur) => (cur?.key !== key ? { key, dir: 'asc' } : cur.dir === 'asc' ? { key, dir: 'desc' } : null));
   return (
-    <div className={cn('flex min-h-0 flex-col overflow-hidden', fill ? 'flex-1 bg-panel [--rt-bg:var(--panel)]' : 'rounded-card bg-surface shadow-card [--rt-bg:var(--surface)]', className)}>
+    <div className={cn('flex min-h-0 flex-col overflow-hidden', fill ? 'flex-1 bg-panel [--rt-bg:var(--panel)] [--rt-head:var(--table-head)]' : 'rounded-card bg-surface shadow-card [--rt-bg:var(--surface)] [--rt-head:var(--table-head)]', className)}>
       <div className="min-h-0 flex-1 overflow-auto">
         <table className="w-full border-separate border-spacing-0 text-[13px] font-medium text-ink" style={{ tableLayout: 'fixed', minWidth: 760 }}>
           <colgroup>
@@ -32,12 +32,12 @@ export function RecordsTable<T>({ columns, rows, getKey, onRowClick, activeKey, 
           </colgroup>
           <thead>
             <tr>
-              <th className="sticky left-0 top-0 z-20 h-9 border-b border-r border-line bg-[var(--rt-bg)]" />
+              <th className="sticky left-0 top-0 z-20 h-9 border-b border-r border-line border-b-line-strong bg-[var(--rt-head)]" />
               {columns.map((c, i) => {
                 const dir = sort?.key === c.key ? sort.dir : null;
                 return (
-                  <th key={c.key} className={cn('sticky top-0 z-10 h-9 border-b border-line bg-[var(--rt-bg)] p-0 text-left font-normal', i < columns.length - 1 && 'border-r')}>
-                    <button type="button" disabled={!c.sort} onClick={() => cycle(c.key)} className={cn('group/h flex h-9 w-full items-center gap-1.5 px-2 text-[13px] text-ink-2 transition-colors enabled:hover:bg-hover enabled:hover:text-ink', c.align === 'right' && 'justify-end')}>
+                  <th key={c.key} className={cn('sticky top-0 z-10 h-9 border-b border-line border-b-line-strong bg-[var(--rt-head)] p-0 text-left font-normal', i < columns.length - 1 && 'border-r')}>
+                    <button type="button" disabled={!c.sort} onClick={() => cycle(c.key)} className={cn('group/h flex h-9 w-full items-center gap-1.5 px-2 text-[12px] font-semibold text-ink transition-colors enabled:hover:bg-hover enabled:hover:text-ink', c.align === 'right' && 'justify-end')}>
                       {c.icon ? <span className="inline-flex shrink-0 text-ink-3 [&_svg]:size-3.5">{c.icon}</span> : null}
                       <span className="truncate">{c.label}</span>
                       {c.sort ? <SortIcon dir={dir} /> : null}

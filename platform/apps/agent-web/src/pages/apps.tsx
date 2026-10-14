@@ -22,11 +22,12 @@ export function AppsPage() {
   return (
     <>
       <PanelBar left={<><Boxes className="size-4 text-muted" strokeWidth={1.6} /><span className="text-[13px] font-medium">Apps</span></>} />
-      <div className="flex min-h-0 flex-1 flex-col">
+      <PageContent>
         {apps.isLoading ? <Loading /> : apps.error ? <ErrorState error={apps.error} /> : !items.length ? (
           <Empty icon={Boxes} title="No apps" hint="Register an agent package via agent-api (pnpm --filter @sage/agent-api register-package)." />
         ) : (
-          <RecordsTable fill rows={items} getKey={(a) => a.appId} onRowClick={(a) => { void navigate(`/apps/${a.appId}`); }}
+          <Section title="All apps" description="Registered agent apps. Click a row for releases, tasks and assets." count={items.length}>
+          <RecordsTable rows={items} getKey={(a) => a.appId} onRowClick={(a) => { void navigate(`/apps/${a.appId}`); }}
             columns={[
               { key: 'app', label: 'App', icon: <Boxes />, width: '32%', sort: (x, y) => x.appId.localeCompare(y.appId), render: (a) => <span className="flex min-w-0 items-center gap-2"><Monogram text={a.appId} /><span className="truncate">{a.appId}</span></span> },
               { key: 'status', label: 'Status', icon: <CircleDot />, width: 130, sort: (x, y) => x.status.localeCompare(y.status), render: (a) => <StatusPill tone={toneFor(a.status)}>{a.status[0]!.toUpperCase() + a.status.slice(1)}</StatusPill> },
@@ -36,8 +37,9 @@ export function AppsPage() {
               { key: 'updated', label: 'Last update', icon: <Clock />, width: 140, sort: (x, y) => x.updatedAt.localeCompare(y.updatedAt), render: (a) => <span className="text-ink-2">{relativeTime(a.updatedAt)}</span> }
             ]}
             footer={<span className="ml-auto">{statuses.map((st) => `${items.filter((a) => a.status === st).length} ${st}`).join(' · ')}</span>} />
+          </Section>
         )}
-      </div>
+      </PageContent>
     </>
   );
 }

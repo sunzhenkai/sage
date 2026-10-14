@@ -36,6 +36,23 @@
 - `SettingsGroup` = Section + 卡片 + `divide-y` 行。
 - 列表页（Tasks 等）：表格放在 Section 内的卡片表格中，不再贴满面板。
 
+## 2a. 内容表面规则（举一反三）
+
+凡是"内容"或可交互表面，一律 **白底（light）/ raised（dark）+ 1px 描边**；只有页面 chrome（页面底、页头、侧边栏、导航）留在灰底上。
+
+| 类型 | 实现 |
+|---|---|
+| 输入框 / 文本域 / 下拉选择 | `Input` / `Textarea` / `Select`：`bg-surface` + `border-line-strong`，focus accent ring |
+| 搜索 / 筛选框 | 使用 `Input`（如聊天会话筛选），不用透明底输入 |
+| 聊天输入框（PromptBar） | `bg-surface` + `shadow-raised`（含 1px ring） |
+| 分段控件 | `SegmentedTabs` / `ArchiveToggle`：白底 + `shadow-card`，选中项 `--hover-2` |
+| 下拉菜单 / popover / 对话框 / 命令面板 | `bg-surface` + `shadow-overlay`（含 1px ring），背后 `--scrim` |
+| 代码块 | `CodeBlock`：白底卡片 |
+| chip / 计数徽标 | 白底 + 1px hairline |
+| 用户消息气泡 | `UserBubble`：白底 + `shadow-card` |
+| 空状态（Section 内） | `Quiet`：白底描边卡片 |
+| 表格 / 列表 | 见第 5 节 |
+
 ## 2b. 字体角色
 
 | 角色 | 工具类 | 字号/行高 | 字重 | 颜色 |
@@ -60,7 +77,7 @@
 | 间距刻度 | 4 · 6 · 8 · 12 · 16 · 24 · 32 · 48（px） |
 | 详情页 | 两栏：主栏 `flex-1` + 属性侧栏 `--aside-w: 320px`（`DetailLayout`，`border-l`，同 Panel 背景） |
 | 设置页 / Providers | 720px 居中栏；`SettingsRow` 两列网格：标签列 `minmax(160px,220px)` + 控件列 `1fr`，输入框 `w-full` 填满控件列，开关/分段控件右对齐 |
-| Master-detail | 聊天页左侧会话列 300px（`SessionList`：按 Today/Yesterday/Earlier 分组；行 = 色相头像 + 最新 run 状态点 + 标题/预览 + 时间 + runs/消息计数 + 最近 5 次 run 色条；选中行为白色描边卡片；Active/Archived 分段切换） |
+| Master-detail | 聊天页左侧会话列 300px（`SessionList`：容器 `px-2.5`、行间距 6px，避免选中卡片描边被裁切；按 Today/Yesterday/Earlier 分组；行 = 色相头像 + 最新 run 状态点 + 标题/预览 + 时间 + runs/消息计数 + 最近 5 次 run 色条；选中行为白色描边卡片；Active/Archived 分段切换） |
 | 会话页头 | 单一页头 `SessionHeader`：头像 + 标题 + 状态点 + 灰色 meta，右侧操作；下方为安静下划线 tab（13px，active = ink + 2px accent 下划线，计数为小号灰色数字）；背景同页面底色，仅一条底部分隔线，不使用胶囊/卡片 tab |
 | 例外：阅读/表单类页面居中窄栏 | 设置页、Providers 页 `PageContent width="narrow"`（`--w-narrow: 720px`）；聊天消息流 + 输入框 `width="chat"`（`--w-chat: 760px`，会话列表侧栏不变）。宽度只能通过 `PageContent` / `PageColumn` 的 `width` 取得，页面里仍禁止 `max-w-*` / `mx-auto` |
 | 其余页面 | 列表、详情、Overview、Apps/Packages/Schedules **保持全宽** |
@@ -84,7 +101,9 @@
 |---|---|
 | 列表行 | `ListRow`：全宽，`gutter-x`，hover `bg-hover`，选中 `bg-hover-2` |
 | 分组头 | `ListGroup`：`bg-panel border-b`，sticky，同 gutter |
-| 页面表格 | 默认 `RecordsTable` 卡片模式放在 Section 内；fill 模式（贴满面板）仅用于 master-detail 类整屏表格 |
+| 表格即内容 | 所有表格/列表都放在白色描边卡片中（light 白 / dark raised）：`Section` + `RecordsTable`（卡片模式）或 `Section card` + 行；不允许表格直接铺在灰色页面底色上 |
+| 表头 | 背景 `--table-head`（冷色浅灰蓝 light `oklch(0.955 0.012 255)` / dark `oklch(0.295 0.012 265)`，与页面灰、白色数据行都可区分），12px · **600** · `--ink`，底部 1px `--line-strong`，sticky |
+| 数据行 | 背景 `--surface`（白），hover `--hover`，选中 `--accent-tint`，行间 1px `--line` |
 | 卡内表格 | `RecordsTable` card 模式：`--rt-bg` = surface |
 | 数字 | 等宽 + 右对齐（`tabular-nums`） |
 

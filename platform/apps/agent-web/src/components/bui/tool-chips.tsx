@@ -39,7 +39,7 @@ export function ToolChips({ header, steps, files, defaultOpen = true, className 
                       {expandable ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={cn('absolute transition-[opacity,transform] duration-150 group-hover/row:opacity-100', rowOpen ? 'opacity-100' : 'opacity-0')} style={{ transform: rowOpen ? 'rotate(0deg)' : 'rotate(-90deg)' }}><path d="M6 9l6 6 6-6" /></svg> : null}
                     </span>
                     <span className={cn('shrink-0 text-[12.5px] font-medium', row.active ? 'shimmer-label' : 'text-ink')}>{row.label}</span>
-                    {row.chip !== undefined ? <span className={cn('inline-flex h-[22px] min-w-0 flex-1 items-center truncate rounded-chip bg-field px-1.5 text-[11.5px] text-ink-2 shadow-hairline', row.mono && 'font-mono')}>{row.chip}</span> : <span className="flex-1" />}
+                    {row.chip !== undefined ? <span className={cn('inline-flex h-[22px] min-w-0 flex-1 items-center truncate rounded-chip bg-surface px-1.5 text-[11.5px] text-ink-2 shadow-hairline', row.mono && 'font-mono')}>{row.chip}</span> : <span className="flex-1" />}
                     {row.trailing}
                   </button>
                   {expandable ? (

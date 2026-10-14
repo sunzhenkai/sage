@@ -94,7 +94,7 @@ export function SegmentedTabs<T extends string>({ value, onChange, items, classN
   return (
     <div className={cn('flex w-fit items-center rounded-control bg-surface p-1 shadow-card', className)}>
       {items.map((it) => (
-        <button key={it.value} type="button" aria-pressed={value === it.value} onClick={() => onChange(it.value)} className={cn('rounded-[6px] px-2.5 py-[3px] text-[13px] text-ink transition-[background-color,opacity] duration-100', value === it.value ? 'bg-field' : 'opacity-50 hover:opacity-75')}>
+        <button key={it.value} type="button" aria-pressed={value === it.value} onClick={() => onChange(it.value)} className={cn('rounded-[6px] px-2.5 py-[3px] text-[13px] text-ink transition-[background-color,opacity] duration-100', value === it.value ? 'bg-hover-2' : 'opacity-50 hover:opacity-75')}>
           {it.label}
         </button>
       ))}
@@ -114,7 +114,7 @@ export function DetailLayout({ children, properties }: { children: React.ReactNo
 
 /** Small "empty/quiet" text line used inside content. */
 export function Quiet({ children }: { children: React.ReactNode }) {
-  return <p className="t-desc py-6">{children}</p>;
+  return <p className="t-desc rounded-card bg-surface px-4 py-6 text-center shadow-card">{children}</p>;
 }
 
 /** Lets a full-bleed list (rows with their own gutter) sit inside padded content, aligned to the gutter. */

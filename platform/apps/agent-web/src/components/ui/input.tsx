@@ -1,7 +1,7 @@
 import type { ComponentProps } from 'react';
 import { cn } from '@/lib/utils';
 
-const field = 'w-full rounded-md border border-line-strong bg-sunken px-2.5 text-[13px] text-fg placeholder:text-faint transition-[border-color,box-shadow] duration-150 hover:border-faint/60 focus:border-accent/70 focus:shadow-[0_0_0_3px_var(--accent-soft)] focus:outline-none disabled:opacity-50';
+const field = 'w-full rounded-md border border-line-strong bg-surface px-2.5 text-[13px] text-fg placeholder:text-faint transition-[border-color,box-shadow] duration-150 hover:border-faint/60 focus:border-accent/70 focus:shadow-[0_0_0_3px_var(--accent-soft)] focus:outline-none disabled:opacity-50';
 
 export function Input({ className, ...props }: ComponentProps<'input'>) {
   return <input className={cn(field, 'h-8', className)} {...props} />;

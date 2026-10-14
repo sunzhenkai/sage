@@ -3,7 +3,7 @@ import { Clock, Fingerprint, Hash, Package, Tags } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router';
 import { Crumb, PageHeader, PanelBar } from '@/components/layout/app-shell';
 import { Monogram, Tag } from '@/components/bui/atoms';
-import { PageContent, PageDescription } from '@/components/layout/page';
+import { PageContent, PageDescription, Section } from '@/components/layout/page';
 import { RecordsTable } from '@/components/bui/records-table';
 import { Empty, ErrorState, JsonView, Loading } from '@/components/ui/misc';
 import { api } from '@/lib/api';
@@ -16,9 +16,10 @@ export function PackagesPage() {
   return (
     <>
       <PanelBar left={<><Package className="size-4 text-muted" strokeWidth={1.6} /><span className="text-[13px] font-medium">Packages</span></>} />
-      <div className="flex min-h-0 flex-1 flex-col">
+      <PageContent>
         {packages.isLoading ? <Loading /> : packages.error ? <ErrorState error={packages.error} /> : !items.length ? <Empty icon={Package} title="No packages" /> : (
-          <RecordsTable fill rows={items} getKey={(x) => x.packageId} onRowClick={(x) => { void navigate(`/packages/${x.packageId}`); }}
+          <Section title="All packages" description="Published agent packages and their latest content digest." count={items.length}>
+          <RecordsTable rows={items} getKey={(x) => x.packageId} onRowClick={(x) => { void navigate(`/packages/${x.packageId}`); }}
             columns={[
               { key: 'pkg', label: 'Package', icon: <Package />, width: '30%', sort: (x, y) => x.packageId.localeCompare(y.packageId), render: (x) => <span className="flex min-w-0 items-center gap-2"><Monogram text={x.packageId} /><span className="truncate">{x.packageId}</span></span> },
               { key: 'version', label: 'Latest version', icon: <Tags />, width: 150, render: (x) => x.latestVersion ? <Tag>{`v${x.latestVersion}`}</Tag> : <span className="text-ink-3">—</span> },
@@ -26,8 +27,9 @@ export function PackagesPage() {
               { key: 'digest', label: 'Content digest', icon: <Fingerprint />, render: (x) => <span className="font-mono text-[12px] text-ink-2">{x.latestContentDigest ? `${x.latestContentDigest.slice(0, 19)}…` : '—'}</span> },
               { key: 'updated', label: 'Last update', icon: <Clock />, width: 140, sort: (x, y) => x.updatedAt.localeCompare(y.updatedAt), render: (x) => <span className="text-ink-2">{relativeTime(x.updatedAt)}</span> }
             ]} />
+          </Section>
         )}
-      </div>
+      </PageContent>
     </>
   );
 }

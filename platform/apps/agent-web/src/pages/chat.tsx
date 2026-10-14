@@ -5,6 +5,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { PageHeader } from '@/components/layout/app-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Empty, ErrorState, Kbd } from '@/components/ui/misc';
 import { LoadingState, formatElapsed } from '@/components/bui/loading-state';
 import { PageColumn, PageContent, Quiet } from '@/components/layout/page';
@@ -44,16 +45,11 @@ export function ChatPage() {
         <div className="flex items-center gap-1 border-b border-line px-2 py-1.5">
           <div className="relative flex-1">
             <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-faint" strokeWidth={1.75} />
-            <input
-              placeholder="Filter sessions"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              className="h-7 w-full rounded-md bg-transparent pl-7 pr-2 text-[12.5px] placeholder:text-faint hover:bg-hover focus:bg-hover focus:outline-none"
-            />
+            <Input placeholder="Filter sessions" value={q} onChange={(e) => setQ(e.target.value)} className="h-7 pl-7 text-[12.5px]" />
           </div>
           <ArchiveToggle archived={archived} onChange={setArchived} />
         </div>
-        <PageContent flush className="px-1.5">
+        <PageContent flush className="px-2.5 pt-0.5">
           {sessions.isLoading ? <SessionSkeleton /> : sessions.error ? <ErrorState error={sessions.error} /> : sessions.data?.items.length === 0 ? (
             <Empty icon={MessagesSquare} title={archived ? 'No archived sessions' : 'No sessions yet'} hint="Start a conversation with the run agent.">
               <Button size="sm" onClick={() => create.mutate()}><Plus />New session</Button>
