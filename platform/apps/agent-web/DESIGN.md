@@ -40,17 +40,17 @@ Light 主题内容区为纯白：卡片与面板同为白色，层级完全依�
 
 | 规则 | 值 |
 |---|---|
-| 宽度 | 面板内**全宽**（设置、聊天例外，见下），不使用临时居中容器 |
+| 宽度 | 面板内**全宽**（设置、Providers、聊天例外，见下），不使用临时居中容器 |
 | 唯一 gutter | `--gutter: 24px`（`gutter-x`），header / toolbar / 内容 / 列表行一致 |
 | Header 高度 | `--header-h: 44px`（PageHeader、PageToolbar 均为此高） |
 | 内容上下留白 | `PageContent`：`pt-6 pb-12`；`PageDescription` 下方 `pb-6` |
 | Section 间距 | `mt-8`（首个为 0），标题与内容 `mb-3` |
 | 间距刻度 | 4 · 6 · 8 · 12 · 16 · 24 · 32 · 48（px） |
 | 详情页 | 两栏：主栏 `flex-1` + 属性侧栏 `--aside-w: 320px`（`DetailLayout`，`border-l`，同 Panel 背景） |
-| 设置页 | 720px 居中栏；`SettingsRow` 两列网格：标签列 `minmax(160px,220px)` + 控件列 `1fr`，输入框 `w-full` 填满控件列，开关/分段控件右对齐 |
+| 设置页 / Providers | 720px 居中栏；`SettingsRow` 两列网格：标签列 `minmax(160px,220px)` + 控件列 `1fr`，输入框 `w-full` 填满控件列，开关/分段控件右对齐 |
 | Master-detail | 聊天页左侧会话列 280px，右侧全宽 |
-| 例外：阅读/表单类页面居中窄栏 | 设置页 `PageContent width="narrow"`（`--w-narrow: 720px`）；聊天消息流 + 输入框 `width="chat"`（`--w-chat: 760px`，会话列表侧栏不变）。宽度只能通过 `PageContent` / `PageColumn` 的 `width` 取得，页面里仍禁止 `max-w-*` / `mx-auto` |
-| 其余页面 | 列表、详情、Overview、Apps/Packages/Schedules/Providers **保持全宽** |
+| 例外：阅读/表单类页面居中窄栏 | 设置页、Providers 页 `PageContent width="narrow"`（`--w-narrow: 720px`）；聊天消息流 + 输入框 `width="chat"`（`--w-chat: 760px`，会话列表侧栏不变）。宽度只能通过 `PageContent` / `PageColumn` 的 `width` 取得，页面里仍禁止 `max-w-*` / `mx-auto` |
+| 其余页面 | 列表、详情、Overview、Apps/Packages/Schedules **保持全宽** |
 | `readable` | `--readable: 72ch`，仅限全宽块内的长正文 |
 
 原语：`PageShell` → `PageHeader`/`PageToolbar` → `PageContent`（`flush` 用于整页列表/表格）→ `PageDescription` → `Section`；辅助 `Bleed`（让列表在内容区内贴边）、`Quiet`（空/静默提示）、`SegmentedTabs`。
@@ -93,7 +93,7 @@ Light 主题内容区为纯白：卡片与面板同为白色，层级完全依�
 |---|---|
 | 用 `PageContent` / `Section` / `PageDescription` 组织页面 | 在页面里写 `px-6`、`pt-10`、`-mx-6` 等临时 padding |
 | 背景只用 panel；物件才用 Card | 给标题区、描述区单独上底色 |
-| 全宽布局；设置/聊天用 `width="narrow"/"chat"` | 页面里手写 `max-w-3xl mx-auto` |
+| 全宽布局；设置/Providers/聊天用 `width="narrow"/"chat"` | 页面里手写 `max-w-3xl mx-auto` |
 | 颜色只用 token 类 | 原始 hex、`bg-white`、`bg-zinc-900`、`bg-black/50` |
 | 滚动交给 `PageContent` | 页面里自建 `overflow-y-auto` |
 | 状态色按第 6 节语义使用 | 用颜色做装饰 |

@@ -28,7 +28,7 @@ export function ProvidersPage() {
   return (
     <>
       <PageHeader title="Providers" />
-      <PageContent>
+      <PageContent width="narrow">
         <PageDescription title="Providers" description="Model provider connections used by the run agent. API keys are sealed server-side and never returned."
           actions={<Dialog open={open} onOpenChange={setOpen}>
             <Button size="sm" onClick={() => setOpen(true)}><Plus />Add connection</Button>
@@ -55,7 +55,7 @@ export function ProvidersPage() {
 
         <SettingsGroup title="Run agent" description="Default connection used when a chat message does not choose one.">
           <SettingsRow label="Default connection" description={settings.data?.updatedBy ? `Updated ${formatTime(settings.data.updatedAt)} by ${settings.data.updatedBy}` : undefined}>
-            <Select className="w-[220px]" value={defaultId ?? ''} onChange={(e) => setDefault.mutate(e.target.value)} disabled={!settings.data}>
+            <Select className="w-full" value={defaultId ?? ''} onChange={(e) => setDefault.mutate(e.target.value)} disabled={!settings.data}>
               {settings.data?.unset ? <option value="">Unset</option> : null}
               {settings.data?.providers.map((p) => <option key={p.id} value={p.id} disabled={!p.available}>{p.name}</option>)}
             </Select>
