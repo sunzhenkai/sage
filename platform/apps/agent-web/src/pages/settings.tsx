@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Activity, Code2, Keyboard, Monitor, Moon, Palette, Plug, RotateCcw, Server, Sun, X } from 'lucide-react';
 import { useState } from 'react';
 import { Navigate, useParams } from 'react-router';
-import { PageHeader, ViewTab, ViewTabs } from '@/components/layout/app-shell';
+import { ViewTab, ViewTabs } from '@/components/layout/app-shell';
 import { SettingsCard, SettingsEmpty, SettingsFooter, SettingsItem, SettingsSearch, SettingsShell, SettingsTitle } from '@/components/layout/settings-shell';
 import { StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -38,9 +38,7 @@ export function SettingsPage() {
   const page = pages[id];
   const reset = id === 'appearance' ? () => updateSettings({ theme: 'system' }) : id === 'shortcuts' ? resetAllShortcuts : id === 'general' ? () => updateSettings({ apiBaseUrl: '', serviceToken: '', tenantId: 'tenant-local' }) : undefined;
   return (
-    <>
-      <PageHeader title="Settings" />
-      <SettingsShell groups={groups}>
+    <SettingsShell groups={groups} header={page.title}>
       <SettingsTitle title={page.title} description={page.description}
         toolbar={<>
           <SettingsSearch value={q} onChange={setQ} placeholder={`Search ${page.title.toLowerCase()}`} />
@@ -49,7 +47,6 @@ export function SettingsPage() {
         </>} />
       {id === 'appearance' ? <AppearanceSection q={q} /> : id === 'shortcuts' ? <ShortcutsSection q={q} /> : id === 'general' ? <ConnectionSection key={section} q={q} /> : id === 'status' ? <StatusSection q={q} /> : <DeveloperSection q={q} />}
     </SettingsShell>
-    </>
   );
 }
 

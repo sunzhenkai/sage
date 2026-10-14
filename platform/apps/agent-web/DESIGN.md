@@ -243,8 +243,13 @@
 
 ## 15. 设置页模式（参考 multica）
 
-- 三栏：主侧边栏 | 设置子导航（`SettingsShell`：200px、`bg-frame`、右侧 1px 描边，顶部 "Settings" 标题，分组小标签 + 图标项，选中 = `accent-tint` 底 + 强文字）| 内容。
+- 三栏：主侧边栏 | 设置子导航（`SettingsShell` 左栏 = `SubPane`，与聊天会话列表同一组件，顶部 "Settings" 标题，分组小标签 + 图标项，选中 = `accent-tint` 底 + 强文字）| 内容。
 - 分组：**Preferences** — Appearance、Shortcuts；**System** — Connection（`/settings/general`）、Providers（跳转 `/providers` ↗）、Status、Developer。
-- 设置页**保留**与其它页一致的顶部 `PageHeader`（齿轮图标 + "Settings"），子导航与内容位于其下；内容居中 `--w-settings: 760px`，顶部 `SettingsTitle`：22px 大标题（`h-9`，与子导航 "Settings" 标题行同高同 y）+ 一行灰色描述，下方工具行：左搜索（`SettingsSearch`，过滤当前页行），右操作（Reset to defaults）。
+- 与聊天页同构：左 `SubPane` 顶部是标准 `PageHeader`（齿轮 + "Settings"），右侧内容区顶部是同高 `PanelBar`（当前分类名），两者底边连成一线；内容居中 `--w-settings: 760px`，顶部 `SettingsTitle`：22px 大标题（`h-9`，与子导航 "Settings" 标题行同高同 y）+ 一行灰色描述，下方工具行：左搜索（`SettingsSearch`，过滤当前页行），右操作（Reset to defaults）。
 - 内容：每组小标题（12px semibold muted）+ 白底描边卡片（`SettingsCard`），行（`SettingsItem`）= 左侧标题+描述、右侧控件（Switch / Select / Input / Kbd 右对齐），行间 hairline。
 - Shortcuts：键帽 `Kbd` + 每行 Reset（恢复默认）与 Clear（清除）图标按钮；覆盖存储在 `sage.agent-web.shortcuts`，`G x` 导航实时读取。
+
+## 16. 次级窗格（SubPane）
+
+- `SubPane`（`components/layout/page.tsx`）：宽度 token `--w-subpane: 300px`、底色 `bg-panel`（与右侧内容同色）、右侧 1px `--line` hairline；首个子元素为 `--header-h` 高的窗格头。
+- 使用者：聊天会话列表、设置子导航。二者宽度、底色、分隔线、头部高度完全一致；改宽度只改 token。

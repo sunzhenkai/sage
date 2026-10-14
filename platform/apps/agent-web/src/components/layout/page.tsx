@@ -132,3 +132,8 @@ export function Quiet({ children }: { children: React.ReactNode }) {
 export function Bleed({ children }: { children: React.ReactNode }) {
   return <div className="-mx-[var(--gutter)]">{children}</div>;
 }
+
+/** Secondary pane (Chat session list, Settings sub-nav): shared width token, panel bg, hairline right divider. First child is its 44px header. */
+export function SubPane({ children, className }: { children: React.ReactNode; className?: string | undefined }) {
+  return <section className={cn('flex w-[var(--w-subpane)] shrink-0 flex-col border-r border-line bg-panel', className)}>{children}</section>;
+}

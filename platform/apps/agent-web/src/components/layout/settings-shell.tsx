@@ -2,31 +2,37 @@ import { Search } from 'lucide-react';
 import { NavLink } from 'react-router';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { contentCard } from './page';
+import { PageHeader, PanelBar } from './app-shell';
+import { contentCard, SubPane } from './page';
 
 export type SettingsNavItem = { to: string; label: string; icon: React.ComponentType<{ className?: string; strokeWidth?: number }>; external?: boolean };
 
-/** Settings pattern: sub-nav column (200px, frame bg, right border) | centered 760px content. No top header. */
-export function SettingsShell({ groups, children }: { groups: { label: string; items: SettingsNavItem[] }[]; children: React.ReactNode }) {
+/** Settings pattern: sub-nav column (248px, same panel bg as content, hairline divider) | centered 760px content. No top header. */
+export function SettingsShell({ groups, header, children }: { groups: { label: string; items: SettingsNavItem[] }[]; header: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="flex min-h-0 flex-1">
-      <aside className="flex w-[200px] shrink-0 flex-col overflow-y-auto border-r border-line bg-frame px-2.5 pb-4 pt-6">
-        <div className="flex h-9 items-center px-2 text-[15px] font-semibold tracking-[-0.01em] text-ink">Settings</div>
-        {groups.map((g) => (
-          <div key={g.label} className="mt-4">
-            <div className="px-2 pb-1 text-[11.5px] font-medium text-faint">{g.label}</div>
-            <nav className="flex flex-col gap-px">
-              {g.items.map(({ to, label, icon: Icon, external }) => (
-                <NavLink key={to} to={to} end={!external} className={({ isActive }) => cn('flex h-[30px] items-center gap-2 rounded-md px-2 text-[13px] font-medium text-muted transition-colors hover:bg-hover hover:text-fg', isActive && !external && 'bg-accent-tint font-semibold text-accent-ink hover:bg-accent-tint hover:text-accent-ink')}>
-                  {({ isActive }) => <><Icon className={cn('size-[15px] shrink-0', isActive && !external ? 'text-accent' : 'text-faint')} strokeWidth={isActive && !external ? 2 : 1.6} /><span className="flex-1 truncate">{label}</span>{external ? <span className="text-[11px] text-faint">↗</span> : null}</>}
-                </NavLink>
-              ))}
-            </nav>
-          </div>
-        ))}
-      </aside>
-      <div className="min-w-0 flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-[calc(var(--w-settings)+2*var(--gutter))] px-[var(--gutter)] pb-12 pt-6">{children}</div>
+      <SubPane>
+        <PageHeader title="Settings" />
+        <div className="flex-1 overflow-y-auto px-2.5 pb-4 pt-2">
+          {groups.map((g) => (
+            <div key={g.label} className="mt-3 first:mt-1">
+              <div className="px-2 pb-1 text-[11.5px] font-medium text-faint">{g.label}</div>
+              <nav className="flex flex-col gap-px">
+                {g.items.map(({ to, label, icon: Icon, external }) => (
+                  <NavLink key={to} to={to} end={!external} className={({ isActive }) => cn('flex h-[30px] items-center gap-2 rounded-md px-2 text-[13px] font-medium text-muted transition-colors hover:bg-hover hover:text-fg', isActive && !external && 'bg-accent-tint font-semibold text-accent-ink hover:bg-accent-tint hover:text-accent-ink')}>
+                    {({ isActive }) => <><Icon className={cn('size-[15px] shrink-0', isActive && !external ? 'text-accent' : 'text-faint')} strokeWidth={isActive && !external ? 2 : 1.6} /><span className="flex-1 truncate">{label}</span>{external ? <span className="text-[11px] text-faint">↗</span> : null}</>}
+                  </NavLink>
+                ))}
+              </nav>
+            </div>
+          ))}
+        </div>
+      </SubPane>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <PanelBar left={<span className="truncate text-[13px] font-medium tracking-[-0.01em] text-fg">{header}</span>} />
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="mx-auto w-full max-w-[calc(var(--w-settings)+2*var(--gutter))] px-[var(--gutter)] pb-12 pt-6">{children}</div>
+        </div>
       </div>
     </div>
   );

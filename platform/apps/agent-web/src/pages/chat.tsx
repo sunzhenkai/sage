@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Empty, ErrorState, Kbd } from '@/components/ui/misc';
 import { LoadingState, formatElapsed } from '@/components/bui/loading-state';
-import { CardPane, PageColumn, PageContent, Quiet } from '@/components/layout/page';
+import { CardPane, PageColumn, PageContent, Quiet, SubPane } from '@/components/layout/page';
 import { PromptBar, UserBubble, type PromptMenuItem, type PromptModel } from '@/components/bui/prompt-bar';
 import { ArchiveToggle, SessionHeader, SessionList } from '@/components/bui/session-list';
 import { StreamingText } from '@/components/bui/streaming-text';
@@ -41,7 +41,7 @@ export function ChatPage() {
 
   return (
     <div className="flex min-h-0 flex-1">
-      <section className="flex w-[300px] shrink-0 flex-col border-r border-line">
+      <SubPane>
         <PageHeader title="Chat" actions={<Button variant="ghost" size="icon" title="New session" onClick={() => create.mutate()} disabled={create.isPending}><Plus /></Button>} />
         <div className="flex items-center gap-1 border-b border-line px-2 py-1.5">
           <div className="relative flex-1">
@@ -59,7 +59,7 @@ export function ChatPage() {
             <SessionList items={sessions.data?.items ?? []} activeId={sessionId} />
           )}
         </PageContent>
-      </section>
+      </SubPane>
       <section className="flex min-w-0 flex-1 flex-col">
         {sessionId ? <SessionView key={sessionId} sessionId={sessionId} /> : (
           <Empty icon={MessageSquare} title="No session selected" hint="Pick a session from the list, or start a new one.">
