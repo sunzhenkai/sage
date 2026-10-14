@@ -14,6 +14,7 @@ const rules = [
   [/\boverflow-(?:y-)?auto\b/, 'ad-hoc scroll container — use PageContent'],
   [/<PanelBar\s+left=\{<><[A-Z]\w*\s|<PanelBar\s*$/, 'hand-built page header — use PageHeader (route icon is added automatically)'],
   [/<h1\b/, 'ad-hoc page title — use PageHeader / PageDescription'],
+  [/<header\b[^>]*\bh-\[\d+px\]/, 'hard-coded header height — use h-[var(--header-h)]'],
   [/\bbg-transparent\b/, 'transparent input/control — inputs & pickers are white content surfaces (Input / ViewTabs / SegmentedTabs)']
 ];
 let failures = 0;

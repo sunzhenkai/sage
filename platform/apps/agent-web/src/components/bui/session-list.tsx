@@ -119,7 +119,7 @@ export function SessionHeader<T extends string>({ id, title, lastRun, meta, acti
     if (n) { onTab(n.value); (e.currentTarget.querySelector(`[data-value="${n.value}"]`) as HTMLElement | null)?.focus(); }
   };
   return (
-    <header className="gutter-x flex h-[56px] shrink-0 items-center gap-2.5 border-b border-line bg-panel">
+    <header className="gutter-x flex h-[var(--header-h)] shrink-0 items-center gap-2.5 border-b border-line bg-panel">
       <Avatar id={id} title={title} tone={tone} />
       <h1 title="Session title" className="-mx-1 min-w-0 cursor-text truncate rounded-[6px] px-1 text-[15px] font-semibold tracking-[-0.015em] text-ink hover:bg-hover">{title}</h1>
       <span title={toneLabel[tone]} className={cn('size-2 shrink-0 rounded-full', tone === 'active' && 'animate-pulse')} style={{ background: toneColor[tone] }} />

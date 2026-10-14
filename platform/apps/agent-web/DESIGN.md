@@ -76,7 +76,7 @@
 |---|---|
 | 宽度 | 面板内**全宽**（设置、Providers、聊天例外，见下），不使用临时居中容器 |
 | 唯一 gutter | `--gutter: 24px`（`gutter-x`），header / toolbar / 内容 / 列表行一致 |
-| Header 高度 | `--header-h: 44px`（PageHeader、PageToolbar 均为此高） |
+| Header 高度 | **唯一** token `--header-h: 56px`：PageHeader、PageToolbar、SessionHeader 及所有窗格头都用 `h-[var(--header-h)]` + 底部 1px `--line`，相邻窗格（如聊天会话列表与会话头）底边连成一条线；筛选/切换等放在头部下方的工具行。禁止硬编码头部高度 |
 | 内容上下留白 | `PageContent`：`pt-6 pb-12`；`PageDescription` 下方 `pb-6` |
 | Section 间距 | `mt-8`（首个为 0），标题与内容 `mb-3` |
 | 间距刻度 | 4 · 6 · 8 · 12 · 16 · 24 · 32 · 48（px） |
