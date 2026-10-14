@@ -168,7 +168,7 @@ function SessionView({ sessionId }: { sessionId: string }) {
     <>
       <SessionHeader id={sessionId} title={session?.title ?? 'Untitled session'} lastRun={allRuns[allRuns.length - 1]}
         meta={<><StreamIndicator state={stream} />{session?.archivedAt ? <Badge>Archived</Badge> : null}<span>created {relativeTime(session?.createdAt)} · {allRuns.length} run{allRuns.length === 1 ? '' : 's'}</span></>}
-        tab={tab} onTab={setTab} tabs={[{ value: 'chat', label: 'Conversation' }, { value: 'runs', label: 'Runs', count: allRuns.length }]}
+        tab={tab} onTab={setTab} tabs={[{ value: 'chat', label: 'Chat', icon: <MessageSquare />, hint: 'Conversation' }, { value: 'runs', label: 'Runs', icon: <ListChecks />, count: allRuns.length, hint: 'Run history' }]}
         actions={<>
           <Button variant="ghost" size="icon" title={session?.archivedAt ? 'Unarchive' : 'Archive'} onClick={() => archive.mutate()}>{session?.archivedAt ? <ArchiveRestore /> : <Archive />}</Button>
           <Button variant="ghost" size="icon" title="Delete session" onClick={() => { if (confirm('Delete this session permanently?')) remove.mutate(); }}><Trash2 /></Button>

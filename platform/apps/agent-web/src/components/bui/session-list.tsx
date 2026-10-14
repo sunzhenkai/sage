@@ -106,29 +106,40 @@ export function ArchiveToggle({ archived, onChange }: { archived: boolean; onCha
   );
 }
 
-/** Single chat page header: identity row + quiet underline tabs, page bg, one bottom hairline. */
+/** Single chat page header: identity on the left; view switch (icon segmented control) + actions on the right. Page bg, one bottom hairline. */
 export function SessionHeader<T extends string>({ id, title, lastRun, meta, actions, tabs, tab, onTab }: {
   id: string; title: string; lastRun?: ChatRun | undefined; meta?: React.ReactNode; actions?: React.ReactNode;
-  tabs: Array<{ value: T; label: string; count?: number | undefined }>; tab: T; onTab: (v: T) => void;
+  tabs: Array<{ value: T; label: string; icon: React.ReactNode; count?: number | undefined; hint?: string | undefined }>; tab: T; onTab: (v: T) => void;
 }) {
   const tone: RunTone = lastRun ? (lastRun.status as RunTone) : 'none';
+  const onKey = (e: React.KeyboardEvent) => {
+    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+    e.preventDefault();
+    const i = tabs.findIndex((t) => t.value === tab); const n = tabs[(i + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length];
+    if (n) { onTab(n.value); (e.currentTarget.querySelector(`[data-value="${n.value}"]`) as HTMLElement | null)?.focus(); }
+  };
   return (
-    <header className="gutter-x shrink-0 border-b border-line bg-panel pt-2.5">
-      <div className="flex h-9 items-center gap-2.5">
-        <Avatar id={id} title={title} tone={tone} />
-        <h1 title="Session title" className="-mx-1 min-w-0 cursor-text truncate rounded-[6px] px-1 text-[15px] font-semibold tracking-[-0.015em] text-ink hover:bg-hover">{title}</h1>
-        <span title={toneLabel[tone]} className={cn('size-2 shrink-0 rounded-full', tone === 'active' && 'animate-pulse')} style={{ background: toneColor[tone] }} />
-        {meta ? <span className="t-meta flex min-w-0 items-center gap-1.5 truncate">{meta}</span> : null}
-        <div className="ml-auto flex shrink-0 items-center gap-0.5">{actions}</div>
+    <header className="gutter-x flex h-[56px] shrink-0 items-center gap-2.5 border-b border-line bg-panel">
+      <Avatar id={id} title={title} tone={tone} />
+      <h1 title="Session title" className="-mx-1 min-w-0 cursor-text truncate rounded-[6px] px-1 text-[15px] font-semibold tracking-[-0.015em] text-ink hover:bg-hover">{title}</h1>
+      <span title={toneLabel[tone]} className={cn('size-2 shrink-0 rounded-full', tone === 'active' && 'animate-pulse')} style={{ background: toneColor[tone] }} />
+      {meta ? <span className="t-meta flex min-w-0 items-center gap-1.5 truncate">{meta}</span> : null}
+      <div className="ml-auto flex shrink-0 items-center gap-2">
+        <div role="tablist" aria-label="Session view" onKeyDown={onKey} className="flex items-center gap-0.5 rounded-control bg-surface p-0.5 shadow-card">
+          {tabs.map((t) => {
+            const sel = tab === t.value;
+            return (
+              <button key={t.value} data-value={t.value} role="tab" type="button" aria-selected={sel} tabIndex={sel ? 0 : -1}
+                title={t.hint ?? t.label} aria-label={t.label} onClick={() => onTab(t.value)}
+                className={cn('flex h-7 items-center gap-1.5 rounded-[6px] px-2 text-[12.5px] font-medium outline-none transition-colors focus-visible:shadow-[0_0_0_2px_var(--accent)] [&_svg]:size-3.5', sel ? 'bg-hover-2 text-ink' : 'text-ink-3 hover:bg-hover hover:text-ink')}>
+                {t.icon}<span>{t.label}</span>{t.count !== undefined ? <span className="text-[11px] font-normal tabular-nums text-ink-3">{t.count}</span> : null}
+              </button>
+            );
+          })}
+        </div>
+        <span className="h-5 w-px bg-line" />
+        <div className="flex items-center gap-0.5">{actions}</div>
       </div>
-      <nav className="mt-1.5 flex gap-5" role="tablist">
-        {tabs.map((t) => (
-          <button key={t.value} role="tab" aria-selected={tab === t.value} type="button" onClick={() => onTab(t.value)}
-            className={cn('-mb-px flex items-center gap-1.5 border-b-2 pb-2 pt-1 text-[13px] font-medium transition-colors', tab === t.value ? 'border-accent text-ink' : 'border-transparent text-ink-3 hover:text-ink-2')}>
-            {t.label}{t.count !== undefined ? <span className="text-[11.5px] font-normal tabular-nums text-ink-3">{t.count}</span> : null}
-          </button>
-        ))}
-      </nav>
     </header>
   );
 }
