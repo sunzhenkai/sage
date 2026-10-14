@@ -6,6 +6,7 @@ import { OverviewPage } from './pages/overview';
 import { PackageDetailPage, PackagesPage } from './pages/packages';
 import { ProvidersPage } from './pages/providers';
 import { ScheduleDetailPage, SchedulesPage } from './pages/schedules';
+import { NotFoundPage } from './pages/not-found';
 import { SettingsPage } from './pages/settings';
 import { TaskDetailPage, TasksPage } from './pages/tasks';
 
@@ -28,7 +29,7 @@ export function App() {
           <Route path="schedules/:scheduleId" element={<ScheduleDetailPage />} />
           <Route path="providers" element={<ProvidersPage />} />
           <Route path="settings" element={<SettingsPage />} />
-          <Route path="*" element={<Navigate to="/overview" replace />} />
+          <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

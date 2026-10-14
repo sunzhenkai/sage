@@ -7,7 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Empty, ErrorState, Kbd, Mono } from '@/components/ui/misc';
 import { LoadingState, formatElapsed } from '@/components/bui/loading-state';
-import { PromptBar, type PromptMenuItem, type PromptModel } from '@/components/bui/prompt-bar';
+import { PageContent, Quiet, SegmentedTabs } from '@/components/layout/page';
+import { PromptBar, UserBubble, type PromptMenuItem, type PromptModel } from '@/components/bui/prompt-bar';
 import { StreamingText } from '@/components/bui/streaming-text';
 import { TaskRows } from '@/components/bui/task-rows';
 import { ThinkingTrace, type TraceRow } from '@/components/bui/thinking';
@@ -51,7 +52,7 @@ export function ChatPage() {
           </div>
           <Button variant="ghost" size="icon-sm" title={archived ? 'Showing archived' : 'Show archived'} className={cn(archived && 'bg-active text-fg')} onClick={() => setArchived((v) => !v)}><Archive /></Button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-1.5">
+        <PageContent flush className="p-1.5">
           {sessions.isLoading ? <SessionSkeleton /> : sessions.error ? <ErrorState error={sessions.error} /> : sessions.data?.items.length === 0 ? (
             <Empty icon={MessagesSquare} title={archived ? 'No archived sessions' : 'No sessions yet'} hint="Start a conversation with the run agent.">
               <Button size="sm" onClick={() => create.mutate()}><Plus />New session</Button>
@@ -76,7 +77,7 @@ export function ChatPage() {
               );
             })
           )}
-        </div>
+        </PageContent>
       </section>
       <section className="flex min-w-0 flex-1 flex-col">
         {sessionId ? <SessionView key={sessionId} sessionId={sessionId} /> : (
@@ -195,18 +196,11 @@ function SessionView({ sessionId }: { sessionId: string }) {
           <Button variant="ghost" size="icon" title="Delete session" onClick={() => { if (confirm('Delete this session permanently?')) remove.mutate(); }}><Trash2 /></Button>
         </>}
       />
-      <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto">
+      <PageContent scrollRef={scroller}>
         {detail.error ? <ErrorState error={detail.error} /> : null}
-        <div className="mx-auto max-w-[760px] px-6 pb-8 pt-8">
           <div className="mb-6 flex items-center justify-between">
-            <div className="flex items-center rounded-control bg-surface p-1 shadow-card">
-              {(['chat', 'runs'] as const).map((name) => (
-                <button key={name} type="button" aria-pressed={tab === name} onClick={() => setTab(name)} className={cn('rounded-[6px] px-2.5 py-[3px] text-[13px] text-ink transition-[background-color,opacity] duration-100', tab === name ? 'bg-field' : 'opacity-50 hover:opacity-75')}>
-                  {name === 'chat' ? 'Conversation' : `Runs ${allRuns.length}`}
-                </button>
-              ))}
-            </div>
-            <span className="text-[12px] text-ink-3">created {relativeTime(session?.createdAt)}</span>
+            <SegmentedTabs value={tab} onChange={setTab} items={[{ value: 'chat', label: 'Conversation' }, { value: 'runs', label: `Runs ${allRuns.length}` }]} />
+            <span className="t-meta">created {relativeTime(session?.createdAt)}</span>
           </div>
           {tab === 'runs' ? (
             allRuns.length ? <TaskRows variant="list" rows={[...allRuns].reverse().map((r, i) => ({
@@ -214,24 +208,23 @@ function SessionView({ sessionId }: { sessionId: string }) {
               label: <span className="font-mono text-[12.5px]">{shortId(r.runId, 14)}</span>,
               amount: r.completedAt ? formatElapsed(new Date(r.completedAt).getTime() - new Date(r.startedAt).getTime()) : r.status === 'active' ? <LoadingState label="Running" since={r.startedAt} /> : '—',
               details: [{ label: 'Started', meta: formatTime(r.startedAt) }, { label: 'Completed', meta: formatTime(r.completedAt) }, { label: 'Attempt', meta: r.attempt }, ...(r.error ? [{ label: r.error.code, meta: r.error.message }] : [])]
-            }))} /> : <p className="py-6 text-[13px] text-ink-3">No runs yet.</p>
+            }))} /> : <Quiet>No runs yet.</Quiet>
           ) : (
             <>
               {!loaded ? <ConversationSkeleton /> : groups.length === 0 ? (
-                <p className="py-6 text-[13px] text-ink-3">No activity yet. Write the first message below — each one starts a run you can follow live.</p>
+                <Quiet>No activity yet. Write the first message below — each one starts a run you can follow live.</Quiet>
               ) : null}
               <div className="flex flex-col gap-8">
                 {groups.map((group) => <RunBlock key={group.runId} group={group} run={runs.get(group.runId)} onRetry={() => retry.mutate(group.runId)} retrying={retry.isPending} onFollowUp={(t) => setDraft(t)} />)}
               </div>
             </>
           )}
-        </div>
-      </div>
-      <div className="px-6 pb-5 pt-1">
-        <div className="mx-auto max-w-[760px]">
+      </PageContent>
+      <div className="gutter-x pb-5 pt-1">
+        <div>
           <PromptBar value={draft} onChange={setDraft} onSubmit={submit} models={models} model={connectionId} onModel={setConnectionId} sources={sources} commands={commands} busy={send.isPending}
             placeholder={isMock() ? 'Mock mode is read-only — sending is disabled' : 'Ask the run agent — @ to reference a task, / for commands'}
-            status={send.error ? <span className="max-w-[220px] truncate text-[12px] text-red">{send.error.message}</span> : busy ? <LoadingState label="Running" className="mr-1 scale-90" /> : null} />
+            status={send.error ? <span className="w-[220px] truncate text-[12px] text-red">{send.error.message}</span> : busy ? <LoadingState label="Running" className="mr-1 scale-90" /> : null} />
         </div>
       </div>
     </>
@@ -266,10 +259,10 @@ function RunBlock({ group, run, onRetry, retrying, onFollowUp }: { group: RunGro
       : [{ key: 'end', primary: status === 'failed' ? 'Run failed' : 'Run completed', secondary: took, state: (status === 'failed' ? 'failed' : 'done') as TraceRow['state'] }])
   ];
   return (
-    <section className="flex flex-col gap-3" style={{ animation: 'fade-up 360ms cubic-bezier(0.23,1,0.32,1) both' }}>
+    <section className="readable flex flex-col gap-3" style={{ animation: 'fade-up 360ms cubic-bezier(0.23,1,0.32,1) both' }}>
       {group.userText.map((text, i) => (
-        <div key={i} className="flex justify-end pl-16">
-          <div className="whitespace-pre-wrap rounded-xl bg-field px-3 py-1.5 text-[14px] leading-[1.45] text-ink">{text}</div>
+        <div key={i} className="flex justify-end">
+          <UserBubble>{text}</UserBubble>
         </div>
       ))}
       <ThinkingTrace working={working} activeLabel="Thinking" doneLabel={status === 'failed' ? `Failed after ${took ?? '—'}` : `Worked for ${took ?? '—'}`} rows={trace} defaultOpen={working} />

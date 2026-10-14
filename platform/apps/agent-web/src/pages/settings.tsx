@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Monitor, Moon, Sun } from 'lucide-react';
 import { useState } from 'react';
 import { PageHeader } from '@/components/layout/app-shell';
-import { PageBody, PageTitle, SettingsGroup, SettingsRow } from '@/components/layout/page';
+import { PageContent, PageDescription, SettingsGroup, SettingsRow } from '@/components/layout/page';
 import { StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,8 +24,8 @@ export function SettingsPage() {
   return (
     <>
       <PageHeader title="Settings" />
-      <PageBody width="settings">
-        <PageTitle title="Settings" description="Connection, appearance and shortcuts for this browser. Stored in localStorage only." />
+      <PageContent>
+        <PageDescription title="Settings" description="Connection, appearance and shortcuts for this browser. Stored in localStorage only." />
 
         <SettingsGroup title="Connection" description="How the console reaches agent-api.">
           <SettingsRow label="API base URL" description="Empty = same origin; the dev/preview server proxies /v1 to agent-api (:9610).">
@@ -37,7 +37,7 @@ export function SettingsPage() {
           <SettingsRow label="Tenant ID" description="Must equal agent-api SAGE_TENANT_ID; used in schedule definitions.">
             <Input className="w-[260px]" value={draft.tenantId} onChange={(e) => setDraft({ ...draft, tenantId: e.target.value })} />
           </SettingsRow>
-          <div className="flex items-center justify-end gap-2 bg-panel/40 px-4 py-2.5">
+          <div className="flex items-center justify-end gap-2 py-3">
             {saved ? <span className="text-[12px] text-muted">Saved</span> : null}
             <Button size="sm" disabled={!dirty} onClick={save}>Save changes</Button>
           </div>
@@ -71,7 +71,7 @@ export function SettingsPage() {
             <SettingsRow key={keys} label={label}><span className="flex gap-1">{keys.split(' ').map((k) => <Kbd key={k}>{k}</Kbd>)}</span></SettingsRow>
           ))}
         </SettingsGroup>
-      </PageBody>
+      </PageContent>
     </>
   );
 }

@@ -69,3 +69,12 @@ export function ToolChips({ header, steps, files, defaultOpen = true, className 
     </div>
   );
 }
+
+/** File chip (tool-chips diff chip). */
+export function FileChip({ name, meta, active, onClick }: { name: ReactNode; meta?: ReactNode | undefined; active?: boolean; onClick?: () => void }) {
+  return (
+    <button type="button" onClick={onClick} className={cn('inline-flex h-8 items-center gap-1.5 rounded-control px-2.5 font-mono text-[12px] text-ink shadow-btn transition-colors', active ? 'bg-hover-2' : 'bg-surface hover:bg-inset')}>
+      {name}{meta !== undefined ? <span className="text-ink-3">{meta}</span> : null}
+    </button>
+  );
+}

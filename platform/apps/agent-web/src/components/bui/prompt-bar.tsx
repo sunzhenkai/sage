@@ -99,3 +99,8 @@ export function PromptBar({ value, onChange, onSubmit, placeholder = 'Ask anythi
     </div>
   );
 }
+
+/** Right-aligned user message bubble (chat-composer). */
+export function UserBubble({ children }: { children: ReactNode }) {
+  return <div className="readable whitespace-pre-wrap rounded-xl bg-field px-3 py-1.5 text-[14px] leading-[1.45] text-ink">{children}</div>;
+}

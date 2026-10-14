@@ -3,8 +3,9 @@ import { BarChart3 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { PanelBar, ViewTab } from '@/components/layout/app-shell';
-import { PageBody } from '@/components/layout/page';
+import { Bleed, PageContent, Section } from '@/components/layout/page';
 import { AreaTrend, BarList, ChartCard, GhostChart, Legend, LineTrend, StackedBars, StatTile, useChartTheme, type Series } from '@/components/charts';
+import { Card } from '@/components/ui/misc';
 import { StatusGlyph, ValuePill } from '@/components/bui/atoms';
 import { InsightCards, type InsightPage } from '@/components/bui/insight-cards';
 import { TaskRows } from '@/components/bui/task-rows';
@@ -94,7 +95,7 @@ export function OverviewPage() {
           {([7, 14, 30] as const).map((r) => <ViewTab key={r} active={range === r} onClick={() => setRange(r)}>{r}d</ViewTab>)}</>}
         right={<span className="pr-2 text-[12px] text-faint">{runs.length} runs from {details.length} sessions</span>}
       />
-      <PageBody width="wide" className="!pt-6">
+      <PageContent>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatTile label="Sessions" value={sessionsByDay.reduce((a, b) => a + b.sessions, 0)} delta={`last ${range}d`} spark={sessionsByDay.map((d) => d.sessions)} color={t.series[0]!} />
           <StatTile label="Run success rate" value={pct(succeeded, succeeded + failed)} delta={`${succeeded}/${succeeded + failed} runs`} spark={successByDay.map((d) => d.rate)} color={t.series[1]!} />
@@ -103,9 +104,9 @@ export function OverviewPage() {
         </div>
 
         <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
-          <section className="rounded-[12px] bg-inset p-3.5 shadow-hairline">
+          <Card className="p-4">
             {insights.length ? <InsightCards pages={insights} title="Insights" onPrompt={(p) => { void navigate(`/chat?new=1&q=${encodeURIComponent(p)}`); }} /> : <GhostChart height={300} label="Insights appear once runs exist" />}
-          </section>
+          </Card>
           <ChartCard className="lg:col-span-2" title="Runs by status" description="Chat runs started per day" actions={<Legend series={runSeries} />}>
             {has(runsByDay) ? <StackedBars data={runsByDay} series={runSeries} height={220} /> : <GhostChart height={220} />}
           </ChartCard>
@@ -146,9 +147,8 @@ export function OverviewPage() {
           </ChartCard>
         </div>
 
-        <div className="mt-8">
-          <div className="mb-1 flex h-7 items-center gap-2"><h2 className="text-[13px] font-medium">Recent sessions</h2><span className="text-[12.5px] text-faint">{sessions.data?.items.length ?? 0}</span></div>
-          <div className="-mx-6">
+        <Section className="mt-8" title="Recent sessions" count={sessions.data?.items.length ?? 0}>
+          <Bleed>
             {(sessions.data?.items ?? []).slice(0, 6).map((s) => (
               <ListRow key={s.sessionId} onClick={() => navigate(`/chat/${s.sessionId}`)}>
                 <StatusIcon status={s.status} />
@@ -156,9 +156,9 @@ export function OverviewPage() {
                 <RowMeta><span className="text-faint">{relativeTime(s.lastMessageAt ?? s.updatedAt)}</span></RowMeta>
               </ListRow>
             ))}
-          </div>
-        </div>
-      </PageBody>
+          </Bleed>
+        </Section>
+      </PageContent>
     </>
   );
 }

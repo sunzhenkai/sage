@@ -4,6 +4,8 @@ import { useNavigate, useParams } from 'react-router';
 import { Crumb, PageHeader, PanelBar } from '@/components/layout/app-shell';
 import { Monogram, StatusPill, Tag, toneFor } from '@/components/bui/atoms';
 import { RecordsTable } from '@/components/bui/records-table';
+import { CodeBlock } from '@/components/bui/code-block';
+import { Bleed, PageContent, PageDescription, Section } from '@/components/layout/page';
 import { StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DetailLayout, ListRow, Pill, Property, PropertyGroup, RowId, RowMeta, RowTitle } from '@/components/ui/list';
@@ -70,34 +72,33 @@ export function AppDetailPage() {
             <div className="flex flex-wrap gap-1 px-2">{list('capabilityRefs').map((s) => <Pill key={String(s)} color="var(--blue)">{String(s).replace(/^capability:\/\//, '')}</Pill>)}</div>
           </PropertyGroup>
         </>}>
-          <div className="mx-auto max-w-[760px] px-6 pb-16 pt-10">
-            <h2 className="text-[20px] font-semibold tracking-[-0.02em]">{appId}</h2>
-            <p className="mt-1 text-[13px] text-muted">{description ?? 'Agent app manifest, tasks, inputs and bundled assets.'}</p>
-
-            <h3 className="mb-1 mt-8 text-[13px] font-medium">Tasks</h3>
-            <div className="-mx-5">{list('tasks').map((t, i) => { const task = t as { name?: string; entry?: string }; return (
+          <PageContent>
+            <PageDescription title={appId} description={description ?? 'Agent app manifest, tasks, inputs and bundled assets.'} />
+            <Section title="Tasks" count={list('tasks').length}>
+            <Bleed>{list('tasks').map((t, i) => { const task = t as { name?: string; entry?: string }; return (
               <ListRow key={i}><StatusIcon kind="todo" /><RowTitle sub={task.entry}>{task.name ?? `task-${i}`}</RowTitle></ListRow>
-            ); })}</div>
-
-            <h3 className="mb-1 mt-6 text-[13px] font-medium">Inputs & data sources</h3>
-            <div className="-mx-5">
+            ); })}</Bleed>
+            </Section>
+            <Section title="Inputs & data sources">
+            <Bleed>
               {list('inputs').map((x, i) => { const v = x as { name?: string; type?: string; required?: boolean }; return <ListRow key={`i${i}`}><RowId>INPUT</RowId><RowTitle sub={v.type}>{v.name}</RowTitle><RowMeta>{v.required ? <Pill>required</Pill> : <span className="text-faint">optional</span>}</RowMeta></ListRow>; })}
               {list('dataSources').map((x, i) => { const v = x as { name?: string; url?: string }; return <ListRow key={`d${i}`}><RowId>SOURCE</RowId><RowTitle sub={v.url}>{v.name}</RowTitle></ListRow>; })}
-            </div>
-
-            <h3 className="mb-1 mt-6 text-[13px] font-medium">Assets <span className="font-normal text-faint">{app.data.assets?.length ?? 0}</span></h3>
-            <div className="-mx-5">{(app.data.assets ?? []).map((asset) => (
+            </Bleed>
+            </Section>
+            <Section title="Assets" count={app.data.assets?.length ?? 0}>
+            <Bleed>{(app.data.assets ?? []).map((asset) => (
               <details key={asset.relativePath} className="group/a">
-                <summary className="flex h-[38px] cursor-default list-none items-center gap-3 px-5 hover:bg-hover">
+                <summary className="flex h-[38px] cursor-default list-none items-center gap-3 gutter-x hover:bg-hover">
                   <RowId>{asset.kind.toUpperCase().slice(0, 10)}</RowId>
                   <RowTitle><Mono className="text-[12.5px]">{asset.relativePath}</Mono></RowTitle>
                   <RowMeta><span className="text-faint">{asset.bytes} B</span></RowMeta>
                 </summary>
-                {asset.preview ? <pre className="mx-5 mb-2 max-h-72 overflow-auto rounded-md border border-line bg-sunken p-3 font-mono text-[11.5px] text-fg-2">{asset.preview}</pre> : null}
+                {asset.preview ? <div className="gutter-x pb-2"><CodeBlock code={asset.preview} filename={asset.relativePath} maxHeight={288} /></div> : null}
               </details>
-            ))}</div>
-            <details className="mt-6"><summary className="cursor-pointer text-[12px] text-faint hover:text-muted">Raw manifest</summary><JsonView value={manifest} className="mt-2" /></details>
-          </div>
+            ))}</Bleed>
+            </Section>
+            <Section title="Raw manifest"><JsonView value={manifest} filename="manifest.json" /></Section>
+          </PageContent>
         </DetailLayout>
       ) : null}
     </>

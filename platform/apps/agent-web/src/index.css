@@ -102,7 +102,10 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 ::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 10px; border: 3px solid transparent; background-clip: content-box; }
 ::-webkit-scrollbar-track { background: transparent; }
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
-@keyframes pop-in-x { from { opacity: 0; transform: translateX(-50%) translateY(4px) scale(0.98); } to { opacity: 1; transform: translateX(-50%) scale(1); } }
+/* Centered dialogs get their x offset from Tailwind's `-translate-x-1/2` (`translate` property, v4).
+   The keyframes must only touch `transform` (y + scale) — repeating translateX(-50%) here stacks with
+   the utility and shifts the panel left until the animation ends. */
+@keyframes pop-in-x { from { opacity: 0; transform: translateY(4px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes shimmer { 0% { background-position: -400px 0; } 100% { background-position: 400px 0; } }
 .animate-fade-in { animation: fade-in 160ms var(--ease-out); }
 .animate-pop-in { animation: pop-in-x 160ms var(--ease-out); }
@@ -124,3 +127,17 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 .bui-tag { --tag-base: var(--accent); color: color-mix(in srgb, var(--tag-base) 92%, var(--ink)); background: color-mix(in srgb, var(--tag-base) 20%, var(--surface)); border: 1px solid color-mix(in srgb, var(--tag-base) 34%, var(--surface)); }
 .dark .bui-tag { color: color-mix(in srgb, var(--tag-base) 86%, white); background: color-mix(in srgb, var(--tag-base) 34%, var(--surface)); border-color: color-mix(in srgb, var(--tag-base) 34%, var(--surface)); }
 @media (prefers-reduced-motion: reduce) { .shimmer-label, .stream-caret { animation: none; } }
+
+/* ── Design language (see DESIGN.md): typography roles & layout tokens ── */
+:root { --scrim: oklch(0 0 0 / 0.5); }
+.dark { --scrim: oklch(0 0 0 / 0.65); }
+@theme inline { --color-scrim: var(--scrim); }
+:root { --gutter: 24px; --header-h: 44px; --aside-w: 320px; --readable: 72ch; }
+@utility t-title { font-size: 20px; line-height: 28px; font-weight: 600; letter-spacing: -0.02em; color: var(--ink); }
+@utility t-section { font-size: 13px; line-height: 20px; font-weight: 600; letter-spacing: -0.01em; color: var(--ink); }
+@utility t-desc { font-size: 13px; line-height: 20px; font-weight: 400; color: var(--ink-2); }
+@utility t-body { font-size: 13.5px; line-height: 21px; font-weight: 400; color: var(--ink); }
+@utility t-meta { font-size: 12px; line-height: 16px; font-weight: 400; color: var(--ink-3); }
+@utility t-mono { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0; }
+@utility gutter-x { padding-left: var(--gutter); padding-right: var(--gutter); }
+@utility readable { max-width: var(--readable); }

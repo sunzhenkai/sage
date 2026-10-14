@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { PageHeader } from '@/components/layout/app-shell';
-import { PageBody, PageTitle, SettingsGroup, SettingsRow } from '@/components/layout/page';
+import { PageContent, PageDescription, SettingsGroup, SettingsRow } from '@/components/layout/page';
 import { StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -28,8 +28,8 @@ export function ProvidersPage() {
   return (
     <>
       <PageHeader title="Providers" />
-      <PageBody width="settings">
-        <PageTitle title="Providers" description="Model provider connections used by the run agent. API keys are sealed server-side and never returned."
+      <PageContent>
+        <PageDescription title="Providers" description="Model provider connections used by the run agent. API keys are sealed server-side and never returned."
           actions={<Dialog open={open} onOpenChange={setOpen}>
             <Button size="sm" onClick={() => setOpen(true)}><Plus />Add connection</Button>
             <DialogContent title="Add provider connection" description="The API key is sealed server-side and never returned."><CreateConnection onDone={() => { setOpen(false); invalidate(); }} /></DialogContent>
@@ -38,7 +38,7 @@ export function ProvidersPage() {
 
         <SettingsGroup title="Connections" description={`${items.length} configured`}>
           {connections.isLoading ? <Loading rows={3} /> : connections.error ? <ErrorState error={connections.error} /> : !items.length ? <SettingsRow label="No connections" description="Add one to let the agent call a model." /> : items.map((c) => (
-            <div key={c.id} className="group flex items-center gap-3 px-4 py-3">
+            <div key={c.id} className="group flex items-center gap-3 py-3">
               <StatusIcon status={c.enabled && c.credentialPresent ? 'succeeded' : 'paused'} />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 text-[13px] text-fg">{c.name}{c.id === defaultId ? <Pill color="var(--accent)">Default</Pill> : null}{c.source === 'deployment-env' ? <Pill>env</Pill> : null}</div>
@@ -68,7 +68,7 @@ export function ProvidersPage() {
           <SettingsRow label="Last sync"><span className="text-[12.5px] text-muted">{formatTime(catalog.data?.lastSuccessAt)}</span></SettingsRow>
           <SettingsRow label="Next sync"><span className="text-[12.5px] text-muted">{formatTime(catalog.data?.nextSyncAt)}</span></SettingsRow>
         </SettingsGroup>
-      </PageBody>
+      </PageContent>
     </>
   );
 }

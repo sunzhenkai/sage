@@ -117,7 +117,7 @@ export function AppShell() {
 
       {/* Inset panel — the Linear signature */}
       <div className="flex min-w-0 flex-1 flex-col py-2 pr-2">
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[14px] bg-panel shadow-card">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[14px] bg-panel shadow-card" data-surface="panel">
           <Outlet />
         </div>
       </div>
@@ -130,7 +130,7 @@ export function AppShell() {
 /** Toolbar inside the inset panel (Linear view bar). */
 export function PanelBar({ left, right }: { left?: React.ReactNode; right?: React.ReactNode }) {
   return (
-    <div className="flex h-11 shrink-0 items-center gap-2 border-b border-line pl-6 pr-3">
+    <div className="flex h-[var(--header-h)] shrink-0 items-center gap-2 border-b border-line bg-panel gutter-x">
       <div className="flex min-w-0 flex-1 items-center gap-1.5">{left}</div>
       {right ? <div className="flex shrink-0 items-center gap-1">{right}</div> : null}
     </div>

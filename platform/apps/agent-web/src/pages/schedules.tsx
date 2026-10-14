@@ -9,6 +9,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Field, Input, Select, Textarea } from '@/components/ui/input';
 import { Empty, ErrorState, JsonView, Loading, Mono } from '@/components/ui/misc';
 import { StatusPill, toneFor } from '@/components/bui/atoms';
+import { PageContent, PageDescription, Quiet, Section } from '@/components/layout/page';
 import { FlowChip, Flowchart } from '@/components/bui/flowchart';
 import { TaskRows } from '@/components/bui/task-rows';
 import { DetailLayout, ListGroup, ListRow, Pill, Property, PropertyGroup, RowId, RowMeta, RowTitle } from '@/components/ui/list';
@@ -35,7 +36,7 @@ export function SchedulesPage() {
           <Button variant="secondary" size="sm" onClick={() => setOpen(true)}><Plus />New schedule</Button>
           <DialogContent title="New schedule" description="POST /v1/schedules — requires a service token."><CreateScheduleForm onDone={(id) => { setOpen(false); navigate(`/schedules/${id}`); }} /></DialogContent>
         </Dialog>} />
-      <div className="flex min-h-0 flex-1 flex-col overflow-auto">
+      <PageContent flush>
         {schedules.isLoading ? <Loading /> : schedules.error ? <ErrorState error={schedules.error} /> : !schedules.data?.schedules.length ? <Empty icon={CalendarClock} title="No schedules" hint="Run an agent app task on a cron or interval. Requires a service token." /> : (
           (['ACTIVE', 'PAUSED'] as const).map((state) => {
             const items = schedules.data.schedules.filter((x) => x.state === state);
@@ -57,7 +58,7 @@ export function SchedulesPage() {
             );
           })
         )}
-      </div>
+      </PageContent>
     </>
   );
 }
@@ -159,10 +160,9 @@ export function ScheduleDetailPage() {
               <Property label="Revision">{s.revision}</Property>
             </PropertyGroup>
           </>}>
-            <div className="mx-auto max-w-[760px] px-6 pb-16 pt-10">
-              <h2 className="text-[20px] font-semibold tracking-[-0.02em]">{s.definition.displayName ?? s.definition.scheduleId}</h2>
-              <p className="mt-1 text-[13px] text-muted"><Mono>{s.definition.scheduleId}</Mono> · {describeTrigger(s.definition.trigger)}</p>
-              <h3 className="mb-3 mt-8 text-[13px] font-semibold text-ink">Workflow</h3>
+            <PageContent>
+              <PageDescription title={s.definition.displayName ?? s.definition.scheduleId} description={<><Mono>{s.definition.scheduleId}</Mono> · {describeTrigger(s.definition.trigger)}</>} />
+              <Section title="Workflow">
               <Flowchart nodes={[
                 { key: 'trigger', kind: 'Trigger', tone: 'purple', icon: <Clock />, title: describeTrigger(s.definition.trigger), sub: s.state === 'PAUSED' ? 'Paused — will not fire' : `Next fire ${relativeTime(s.nextFireAtMs)}` },
                 { key: 'policy', kind: 'Policy', tone: 'amber', icon: <ShieldCheck />, title: 'Guard rails', sub: s.definition.targetConstraints.allowedEnvironments.join(', '),
@@ -170,8 +170,9 @@ export function ScheduleDetailPage() {
                 { key: 'task', kind: 'Run task', tone: 'green', icon: <Play />, title: s.definition.invocation.task, sub: s.definition.releaseBinding.strategy === 'FIXED' ? `Pinned ${s.definition.releaseBinding.releaseId}` : 'Follows latest release',
                   ...(s.definition.invocation.params ? { body: Object.entries(s.definition.invocation.params).map(([k, v]) => <FlowChip key={k}>{k}: {String(v)}</FlowChip>) } : {}) }
               ]} />
-              <h3 className="mb-3 mt-8 flex items-center gap-2 text-[13px] font-semibold text-ink">Trigger history{triggers.data ? <span className="font-normal text-ink-3">{triggers.data.events.length}</span> : null}</h3>
-              {triggers.isLoading ? <Loading rows={3} /> : triggers.error ? <ErrorState error={triggers.error} /> : !triggers.data?.events.length ? <p className="py-6 text-[13px] text-ink-3">No triggers yet.</p> : (
+              </Section>
+              <Section title="Trigger history" count={triggers.data?.events.length}>
+              {triggers.isLoading ? <Loading rows={3} /> : triggers.error ? <ErrorState error={triggers.error} /> : !triggers.data?.events.length ? <Quiet>No triggers yet.</Quiet> : (
                 <TaskRows variant="list" rows={triggers.data.events.slice(0, 30).map((e) => ({
                   key: e.occurrenceId, status: e.kind, label: formatTime(e.occurredAtMs), amount: e.taskId ? <span className="font-mono text-[12px]">{e.taskId}</span> : undefined,
                   pill: <StatusPill tone={toneFor(e.kind)}>{e.kind[0] + e.kind.slice(1).toLowerCase()}</StatusPill>,
@@ -179,8 +180,9 @@ export function ScheduleDetailPage() {
                   details: [{ label: 'Occurrence', meta: e.occurrenceId }, ...(e.errorCode ? [{ label: 'Error', meta: e.errorCode }] : []), ...(e.detail ? [{ label: 'Detail', meta: e.detail }] : [])]
                 }))} />
               )}
-              <details className="mt-6"><summary className="cursor-pointer text-[12px] text-faint hover:text-muted">Raw definition</summary><JsonView value={s.definition} className="mt-2" /></details>
-            </div>
+              </Section>
+              <Section title="Raw definition"><JsonView value={s.definition} filename={`${s.definition.scheduleId}.json`} /></Section>
+            </PageContent>
           </DetailLayout>
         ) : null}
       </div>

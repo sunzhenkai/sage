@@ -3,6 +3,7 @@ import { Ban, CircleDot, Clock, Hash, ListChecks, Pause, Play, RefreshCw, Rotate
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { Crumb, PageHeader, PanelBar, ViewTab } from '@/components/layout/app-shell';
+import { PageContent, PageDescription, Quiet, SegmentedTabs } from '@/components/layout/page';
 import { ApprovalCard } from '@/components/bui/approval-card';
 import { StatusGlyph, StatusPill, Tag, toneFor } from '@/components/bui/atoms';
 import { CodeBlock } from '@/components/bui/code-block';
@@ -10,7 +11,7 @@ import { LoadingState, formatElapsed } from '@/components/bui/loading-state';
 import { RecordsTable } from '@/components/bui/records-table';
 import { TaskRows } from '@/components/bui/task-rows';
 import { ThinkingTrace } from '@/components/bui/thinking';
-import { ToolChips } from '@/components/bui/tool-chips';
+import { FileChip, ToolChips } from '@/components/bui/tool-chips';
 import { StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DetailLayout, Pill, Property, PropertyGroup } from '@/components/ui/list';
@@ -44,9 +45,9 @@ export function TasksPage() {
         ) : (
           <>
             {active.length && view !== 'done' ? (
-              <div className="border-b border-line px-6 pb-4 pt-4">
-                <div className="mb-2 flex items-center gap-2 text-[12px] font-medium text-ink-3">In flight <span className="tabular-nums">{active.length}</span></div>
-                <TaskRows className="max-w-[760px]" rows={active.slice(0, 4).map((t) => ({
+              <div className="gutter-x border-b border-line pb-5 pt-5">
+                <h2 className="t-section mb-3 flex items-center gap-2">In flight <span className="t-meta font-normal tabular-nums">{active.length}</span></h2>
+                <TaskRows rows={active.slice(0, 4).map((t) => ({
                   key: t.taskId, status: t.status, step: t.attempt, label: t.taskId, amount: t.taskType, onOpen: () => { void navigate(`/tasks/${t.taskId}`); },
                   details: [{ label: 'Workflow', meta: t.workflowId ?? '—' }, { label: 'Target', meta: t.targetId ?? '—' }, { label: 'Updated', meta: relativeTime(t.projectionUpdatedAt) }]
                 }))} />
@@ -111,16 +112,10 @@ export function TaskDetailPage() {
             <Property label="Observed">{formatTime(t.historyObservedAt)}</Property>
           </PropertyGroup>
         </>}>
-          <div className="mx-auto max-w-[760px] px-6 pb-16 pt-10">
-            <div className="flex items-center gap-3">
-              <StatusGlyph status={t.status} size={26} step={t.attempt} />
-              <div className="min-w-0">
-                <h2 className="truncate text-[20px] font-semibold tracking-[-0.02em] text-ink">{t.taskId}</h2>
-                <p className="text-[13px] text-ink-2">{t.taskType ?? 'Task'} · {statusLabel[t.status]}{t.freshnessReason ? ` · ${t.freshnessReason}` : ''}</p>
-              </div>
-            </div>
+          <PageContent>
+            <PageDescription leading={<StatusGlyph status={t.status} size={26} step={t.attempt} />} title={t.taskId} description={<>{t.taskType ?? 'Task'} · {statusLabel[t.status]}{t.freshnessReason ? ` · ${t.freshnessReason}` : ''}</>} />
             {t.status === 'effect_unknown' || t.status === 'paused' ? (
-              <ApprovalCard className="mt-6"
+              <ApprovalCard className="mb-8"
                 eyebrow={<><span className="size-1.5 rounded-full bg-orange" />{t.status === 'paused' ? 'Paused — waiting for you' : 'Effect unknown — needs a decision'}</>}
                 question={t.status === 'paused' ? 'This task is paused. How should it continue?' : 'The last side effect could not be confirmed. How should the agent proceed?'}
                 options={t.status === 'paused'
@@ -129,17 +124,11 @@ export function TaskDetailPage() {
                 busy={control.isPending}
                 onConfirm={(k) => { if (k !== 'cancel' || confirm('Cancel this task?')) control.mutate(k as 'resume' | 'retry' | 'cancel'); }} />
             ) : null}
-            <div className="mt-7 flex w-fit items-center rounded-control bg-surface p-1 shadow-card">
-              {(['activity', 'run-logs', 'artifacts', 'raw'] as Tab[]).map((name) => (
-                <button key={name} type="button" aria-pressed={tab === name} onClick={() => setTab(name)} className={cn('rounded-[6px] px-2.5 py-[3px] text-[13px] text-ink transition-[background-color,opacity] duration-100', tab === name ? 'bg-field' : 'opacity-50 hover:opacity-75')}>
-                  {name === 'run-logs' ? 'Run logs' : name[0]!.toUpperCase() + name.slice(1)}
-                </button>
-              ))}
-            </div>
+            <SegmentedTabs value={tab} onChange={setTab} items={(['activity', 'run-logs', 'artifacts', 'raw'] as Tab[]).map((name) => ({ value: name, label: name === 'run-logs' ? 'Run logs' : name[0]!.toUpperCase() + name.slice(1) }))} />
             <div className="pt-5">
               {tab === 'activity' ? <TaskEvents taskId={taskId} status={t.status} /> : tab === 'run-logs' ? <RunLogs taskId={taskId} /> : tab === 'artifacts' ? <Artifacts taskId={taskId} /> : <JsonView value={t} filename={`${t.taskId}.json`} />}
             </div>
-          </div>
+          </PageContent>
         </DetailLayout>
       ) : null}
     </>
@@ -151,7 +140,7 @@ function TaskEvents({ taskId, status }: { taskId: string; status: TaskStatus }) 
   if (events.isLoading) return <Loading rows={4} />;
   if (events.error) return <ErrorState error={events.error} />;
   const list = events.data?.events ?? [];
-  if (!list.length) return <p className="py-6 text-[13px] text-ink-3">No activity yet.</p>;
+  if (!list.length) return <Quiet>No activity yet.</Quiet>;
   const running = status === 'running';
   const first = list[0] as Record<string, unknown>; const last = list.at(-1) as Record<string, unknown>;
   const at = (e: Record<string, unknown>) => (e['occurredAt'] ?? e['createdAt'] ?? e['recordedAt']) as string | undefined;
@@ -176,7 +165,7 @@ function RunLogs({ taskId }: { taskId: string }) {
   if (logs.isLoading) return <Loading rows={4} />;
   if (logs.error) return <ErrorState error={logs.error} />;
   const data = logs.data;
-  if (!data || data.attempts.length === 0) return <p className="py-6 text-[12.5px] text-muted">No run logs. Run logs exist only for durable coordinator (v2) tasks.</p>;
+  if (!data || data.attempts.length === 0) return <Quiet>No run logs. Run logs exist only for durable coordinator (v2) tasks.</Quiet>;
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap gap-1">
@@ -186,7 +175,7 @@ function RunLogs({ taskId }: { taskId: string }) {
         })}
       </div>
       <ToolChips header={`${data.events.length} events in ${shortId(data.selected?.attemptId ?? '')}`}
-        steps={data.events.map((e) => ({ key: e.eventId, icon: /tool/.test(e.type) ? 'run' : /model/.test(e.type) ? 'think' : /artifact|write/.test(e.type) ? 'write' : 'read', label: e.type, chip: `#${e.sequence}  ${JSON.stringify(e.payload).slice(0, 80)}`, mono: true, detail: JSON.stringify(e.payload, null, 2).split('\n').map((text) => ({ text })) }))} className="max-w-none" />
+        steps={data.events.map((e) => ({ key: e.eventId, icon: /tool/.test(e.type) ? 'run' : /model/.test(e.type) ? 'think' : /artifact|write/.test(e.type) ? 'write' : 'read', label: e.type, chip: `#${e.sequence}  ${JSON.stringify(e.payload).slice(0, 80)}`, mono: true, detail: JSON.stringify(e.payload, null, 2).split('\n').map((text) => ({ text })) }))} />
       {data.nextFromSequence ? <p className="text-[12px] text-ink-3">More events available…</p> : null}
     </div>
   );
@@ -199,15 +188,13 @@ function Artifacts({ taskId }: { taskId: string }) {
   if (artifacts.isLoading) return <Loading rows={3} />;
   if (artifacts.error) return <ErrorState error={artifacts.error} />;
   const list = artifacts.data?.artifacts ?? [];
-  if (!list.length) return <p className="py-6 text-[13px] text-ink-3">No artifacts.</p>;
+  if (!list.length) return <Quiet>No artifacts.</Quiet>;
   const current = list.find((a) => a.artifactId === open);
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap gap-1.5">
         {list.map((a) => (
-          <button key={a.artifactId} type="button" onClick={() => setOpen(a.artifactId)} className={cn('inline-flex h-8 items-center gap-1.5 rounded-control px-2.5 font-mono text-[12px] text-ink shadow-btn transition-colors', open === a.artifactId ? 'bg-hover-2' : 'bg-surface hover:bg-inset')}>
-            {a.name ?? a.artifactId}<span className="text-ink-3">{a.sizeBytes !== undefined ? `${Math.max(1, Math.round(a.sizeBytes / 1024))} KB` : ''}</span>
-          </button>
+          <FileChip key={a.artifactId} active={open === a.artifactId} onClick={() => setOpen(a.artifactId)} name={a.name ?? a.artifactId} meta={a.sizeBytes !== undefined ? `${Math.max(1, Math.round(a.sizeBytes / 1024))} KB` : undefined} />
         ))}
       </div>
       {open ? (content.isLoading ? <Loading rows={3} /> : content.error ? <ErrorState error={content.error} /> : (

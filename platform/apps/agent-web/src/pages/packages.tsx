@@ -3,6 +3,7 @@ import { Clock, Fingerprint, Hash, Package, Tags } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router';
 import { Crumb, PageHeader, PanelBar } from '@/components/layout/app-shell';
 import { Monogram, Tag } from '@/components/bui/atoms';
+import { PageContent, PageDescription } from '@/components/layout/page';
 import { RecordsTable } from '@/components/bui/records-table';
 import { Empty, ErrorState, JsonView, Loading } from '@/components/ui/misc';
 import { api } from '@/lib/api';
@@ -37,12 +38,10 @@ export function PackageDetailPage() {
   return (
     <>
       <PageHeader breadcrumb={<Crumb to="/packages">Packages</Crumb>} title={packageId} />
-      <div className="flex min-h-0 flex-1 flex-col overflow-auto">
-        <div className="mx-auto w-full max-w-[760px] px-6 pb-16 pt-10">
-          <h2 className="mb-4 text-[20px] font-semibold tracking-[-0.02em]">{packageId}</h2>
-          {pkg.isLoading ? <Loading /> : pkg.error ? <ErrorState error={pkg.error} /> : <JsonView value={pkg.data} />}
-        </div>
-      </div>
+      <PageContent>
+        <PageDescription title={packageId} description="Package registry record and releases." />
+        {pkg.isLoading ? <Loading /> : pkg.error ? <ErrorState error={pkg.error} /> : <JsonView value={pkg.data} filename={`${packageId}.json`} />}
+      </PageContent>
     </>
   );
 }

@@ -23,7 +23,7 @@ export function RecordsTable<T>({ columns, rows, getKey, onRowClick, activeKey, 
   }, [rows, sort, columns]);
   const cycle = (key: string) => setSort((cur) => (cur?.key !== key ? { key, dir: 'asc' } : cur.dir === 'asc' ? { key, dir: 'desc' } : null));
   return (
-    <div className={cn('flex min-h-0 flex-col overflow-hidden bg-surface', fill ? 'flex-1' : 'rounded-card shadow-card', className)}>
+    <div className={cn('flex min-h-0 flex-col overflow-hidden', fill ? 'flex-1 bg-panel [--rt-bg:var(--panel)]' : 'rounded-card bg-surface shadow-card [--rt-bg:var(--surface)]', className)}>
       <div className="min-h-0 flex-1 overflow-auto">
         <table className="w-full border-separate border-spacing-0 text-[13px] font-medium text-ink" style={{ tableLayout: 'fixed', minWidth: 760 }}>
           <colgroup>
@@ -32,11 +32,11 @@ export function RecordsTable<T>({ columns, rows, getKey, onRowClick, activeKey, 
           </colgroup>
           <thead>
             <tr>
-              <th className="sticky left-0 top-0 z-20 h-9 border-b border-r border-line bg-surface" />
+              <th className="sticky left-0 top-0 z-20 h-9 border-b border-r border-line bg-[var(--rt-bg)]" />
               {columns.map((c, i) => {
                 const dir = sort?.key === c.key ? sort.dir : null;
                 return (
-                  <th key={c.key} className={cn('sticky top-0 z-10 h-9 border-b border-line bg-surface p-0 text-left font-normal', i < columns.length - 1 && 'border-r')}>
+                  <th key={c.key} className={cn('sticky top-0 z-10 h-9 border-b border-line bg-[var(--rt-bg)] p-0 text-left font-normal', i < columns.length - 1 && 'border-r')}>
                     <button type="button" disabled={!c.sort} onClick={() => cycle(c.key)} className={cn('group/h flex h-9 w-full items-center gap-1.5 px-2 text-[13px] text-ink-2 transition-colors enabled:hover:bg-hover enabled:hover:text-ink', c.align === 'right' && 'justify-end')}>
                       {c.icon ? <span className="inline-flex shrink-0 text-ink-3 [&_svg]:size-3.5">{c.icon}</span> : null}
                       <span className="truncate">{c.label}</span>
@@ -53,11 +53,11 @@ export function RecordsTable<T>({ columns, rows, getKey, onRowClick, activeKey, 
               const active = key === activeKey;
               return (
                 <tr key={key} onClick={onRowClick ? () => onRowClick(row) : undefined} className={cn('group/r', onRowClick && 'cursor-pointer')}>
-                  <td className={cn('sticky left-0 z-[5] h-[35px] border-b border-r border-line text-center transition-colors', active ? 'bg-accent-tint' : 'bg-surface group-hover/r:bg-inset')}>
+                  <td className={cn('sticky left-0 z-[5] h-[35px] border-b border-r border-line text-center transition-colors', active ? 'bg-accent-tint' : 'bg-[var(--rt-bg)] group-hover/r:bg-hover')}>
                     <span className="inline-flex size-6 items-center justify-center text-[11.5px] tabular-nums text-ink-3">{idx + 1}</span>
                   </td>
                   {columns.map((c, i) => (
-                    <td key={c.key} className={cn('h-[35px] overflow-hidden text-ellipsis whitespace-nowrap border-b border-line px-2 transition-colors', i < columns.length - 1 && 'border-r', c.align === 'right' && 'text-right', active ? 'bg-accent-tint' : 'group-hover/r:bg-inset')}>
+                    <td key={c.key} className={cn('h-[35px] overflow-hidden text-ellipsis whitespace-nowrap border-b border-line px-2 transition-colors', i < columns.length - 1 && 'border-r', c.align === 'right' && 'text-right', active ? 'bg-accent-tint' : 'group-hover/r:bg-hover')}>
                       {c.render(row)}
                     </td>
                   ))}
