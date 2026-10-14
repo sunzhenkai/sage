@@ -8,19 +8,21 @@
 
 | 层 | Token（Tailwind 类） | Dark | Light | 用于 |
 |---|---|---|---|---|
-| App 背景 | `--canvas` / `--frame`（`bg-frame`） | `oklch(0.231 0.004 264.5)` | `oklch(0.961 0.002 247.8)` | 侧边栏 + 面板外框 |
-| Panel | `--page` / `--panel`（`bg-panel`） | `oklch(0.209 0.004 264.5)` | `oklch(0.985 0.001 286.4)` | 内嵌圆角面板，**页面唯一底色** |
+| App 背景 | `--canvas` / `--frame`（`bg-frame`） | `oklch(0.231 0.004 264.5)` | `oklch(0.955 0.003 264.5)`（浅灰，衬托白色面板） | 侧边栏 + 面板外框 |
+| Panel | `--page` / `--panel`（`bg-panel`） | `oklch(0.209 0.004 264.5)` | `#ffffff` 纯白 | 内嵌圆角面板，**页面唯一底色** |
 | Header 带 | 同 Panel | 同上 | 同上 | `PageHeader` / `PageToolbar`，仅以 `border-b border-line` 分隔 |
 | 描述区 | 同 Panel | 同上 | 同上 | `PageDescription`（不加底色、不加卡片） |
 | 内容区 | 同 Panel | 同上 | 同上 | `PageContent`、`Section`、列表、全宽表格、详情侧栏 |
-| 卡片 | `--surface`（`bg-surface` + `shadow-card`） | `oklch(0.26 0.006 271.2)` | `oklch(1 0 0)` | 图表、统计块、代码块、流程图、审批卡、任务胶囊 |
+| 卡片 | `--surface`（`bg-surface` + `shadow-card`） | `oklch(0.26 0.006 271.2)` | `#ffffff` + 1px `--line` ring + 轻阴影（白底上靠描边区分） | 图表、统计块、代码块、流程图、审批卡、任务胶囊 |
 | 浮层 | `--surface` + `shadow-overlay` | 同卡片 | 同卡片 | 命令面板、菜单、popover、tooltip 之外的弹层 |
 | 遮罩 | `--scrim`（`bg-scrim`） | `oklch(0 0 0 / .65)` | `oklch(0 0 0 / .5)` | Dialog / 命令面板背后 |
 | 输入框 | `--field`（`bg-field`） | `oklch(0.293 0.006 271.2)` | `oklch(0.961 0.001 286.4)` | 输入框、用户消息气泡 |
-| Hover | `--hover`（`bg-hover`） | `oklch(0.289 0.006 271.2)` | `oklch(0.97 0.002 247.8)` | 行/按钮悬停 |
-| Selected | `--hover-2`（`bg-hover-2` / `bg-active`） | `oklch(0.318 0.007 274.7)` | `oklch(0.933 0.003 247.9)` | 选中行、选中 tab、激活 chip |
+| Hover | `--hover`（`bg-hover`） | `oklch(0.289 0.006 271.2)` | `oklch(0.972 0.002 264.5)` | 行/按钮悬停 |
+| Selected | `--hover-2`（`bg-hover-2` / `bg-active`） | `oklch(0.318 0.007 274.7)` | `oklch(0.945 0.003 264.5)` | 选中行、选中 tab、激活 chip |
 
-分隔线：`--line`（常规）/ `--line-strong`（按钮描边、强调）。
+分隔线：`--line`（常规，light `oklch(0.928 0.004 264.5)`）/ `--line-strong`（按钮描边、强调，light `oklch(0.895 0.006 264.5)`）。代码/嵌入块用 `--inset`（light `oklch(0.982 0.002 264.5)`）。
+
+Light 主题内容区为纯白：卡片与面板同为白色，层级完全依靠 `shadow-card`（1px line ring + 轻阴影）；需要更弱的分组时用 `--inset` 浅灰底。
 
 ## 2. 字体角色
 
