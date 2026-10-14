@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Clock, Fingerprint, Hash, Package, Tags } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router';
-import { Crumb, PageHeader, PanelBar } from '@/components/layout/app-shell';
+import { Crumb, PageHeader } from '@/components/layout/app-shell';
 import { Monogram, Tag } from '@/components/bui/atoms';
 import { PageContent, PageDescription, Section } from '@/components/layout/page';
 import { RecordsTable } from '@/components/bui/records-table';
@@ -18,7 +18,7 @@ export function PackagesPage() {
   const ct = useChartTheme();
   return (
     <>
-      <PanelBar left={<><Package className="size-4 text-muted" strokeWidth={1.6} /><span className="text-[13px] font-medium">Packages</span></>} />
+      <PageHeader title="Packages" />
       <PageContent width="wide">
         {packages.isLoading ? <Loading /> : packages.error ? <ErrorState error={packages.error} /> : !items.length ? <Empty icon={Package} title="No packages" /> : (
           <Section title="All packages" description="Published agent packages and their latest content digest." count={items.length}>

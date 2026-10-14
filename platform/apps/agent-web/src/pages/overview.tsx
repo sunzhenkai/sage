@@ -1,8 +1,7 @@
 import { useQueries, useQuery } from '@tanstack/react-query';
-import { BarChart3 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { PanelBar, ViewTab } from '@/components/layout/app-shell';
+import { PageHeader, ViewTab } from '@/components/layout/app-shell';
 import { PageContent, Section } from '@/components/layout/page';
 import { AreaTrend, BarList, ChartCard, Delta, GhostChart, Heatmap, Legend, LineTrend, StackedBars, StatTile, useChartTheme, type Series } from '@/components/charts';
 import { Card } from '@/components/ui/misc';
@@ -98,10 +97,9 @@ export function OverviewPage() {
 
   return (
     <>
-      <PanelBar
-        left={<><BarChart3 className="size-4 text-muted" strokeWidth={1.6} /><span className="mr-2 text-[13px] font-medium">Overview</span>
-          {([7, 14, 30] as const).map((r) => <ViewTab key={r} active={range === r} onClick={() => setRange(r)}>{r}d</ViewTab>)}</>}
-        right={<span className="pr-2 text-[12px] text-faint">{runs.length} runs from {details.length} sessions</span>}
+      <PageHeader title="Overview"
+        tabs={<>{([7, 14, 30] as const).map((r) => <ViewTab key={r} active={range === r} onClick={() => setRange(r)}>{r}d</ViewTab>)}</>}
+        actions={<span className="pr-2 text-[12px] text-faint">{runs.length} runs from {details.length} sessions</span>}
       />
       <PageContent width="wide">
         {/* One 12-col grid: every row shares the same vertical tracks (3+3+3+3 / 4+8 / 4+4+4). */}
@@ -111,40 +109,40 @@ export function OverviewPage() {
           <div className="h-full lg:col-span-3"><StatTile label="Active tasks" value={allTasks.filter((x) => x.status === 'running' || x.status === 'paused').length} delta={`${allTasks.length} total`} spark={axis.map((d) => allTasks.filter((x) => String(x.projectionUpdatedAt ?? '').slice(0, 10) === d.key).length)} color={t.series[3]!} /></div>
           <div className="h-full lg:col-span-3"><StatTile label="Median run time" value={durations.length ? `${median.toFixed(1)}s` : '—'} delta={`${durations.length} completed`} spark={runsByDay.map((d) => d.succeeded + d.failed)} color={t.series[4]!} /></div>
 
-          <Card className="h-full p-4 lg:col-span-4">
+          <Card className="h-full p-4 lg:col-span-6">
             {insights.length ? <InsightCards pages={insights} title="Insights" onPrompt={(p) => { void navigate(`/chat?new=1&q=${encodeURIComponent(p)}`); }} /> : <GhostChart height={300} label="Insights appear once runs exist" />}
           </Card>
-          <ChartCard className="lg:col-span-8" title="Runs by status" description="Chat runs started per day" actions={<Legend series={runSeries} />}>
+          <ChartCard className="lg:col-span-6" title="Runs by status" description="Chat runs started per day" actions={<Legend series={runSeries} />}>
             {has(runsByDay) ? <StackedBars data={runsByDay} series={runSeries} height={220} /> : <GhostChart height={220} />}
           </ChartCard>
 
-          <ChartCard className="lg:col-span-4" title="Sessions per day">{has(sessionsByDay) ? <AreaTrend data={sessionsByDay} series={[{ key: 'sessions', label: 'Sessions', color: t.series[0]! }]} height={180} /> : <GhostChart height={180} />}</ChartCard>
-          <ChartCard className="lg:col-span-4" title="Success rate" description="Succeeded ÷ finished runs">{has(successByDay) ? <LineTrend data={successByDay} series={[{ key: 'rate', label: 'Success %', color: t.series[1]! }]} height={164} unit="%" /> : <GhostChart height={164} />}</ChartCard>
-          <ChartCard className="lg:col-span-4" title="Run duration" description={durations.length ? `median ${median.toFixed(1)}s` : 'Completed runs'}>{durations.length ? <StackedBars data={durationData} series={[{ key: 'runs', label: 'Runs', color: t.series[3]! }]} height={164} /> : <GhostChart height={164} />}</ChartCard>
+          <ChartCard className="lg:col-span-3" title="Sessions per day">{has(sessionsByDay) ? <AreaTrend data={sessionsByDay} series={[{ key: 'sessions', label: 'Sessions', color: t.series[0]! }]} height={180} /> : <GhostChart height={180} />}</ChartCard>
+          <ChartCard className="lg:col-span-3" title="Success rate" description="Succeeded ÷ finished runs">{has(successByDay) ? <LineTrend data={successByDay} series={[{ key: 'rate', label: 'Success %', color: t.series[1]! }]} height={164} unit="%" /> : <GhostChart height={164} />}</ChartCard>
+          <ChartCard className="lg:col-span-6" title="Run duration" description={durations.length ? `median ${median.toFixed(1)}s` : 'Completed runs'}>{durations.length ? <StackedBars data={durationData} series={[{ key: 'runs', label: 'Runs', color: t.series[3]! }]} height={164} /> : <GhostChart height={164} />}</ChartCard>
 
-          <ChartCard className="lg:col-span-4" title="Latency" description="Run duration per day · p50 / p95 (s)" value={durations.length ? `${q(durations, 0.95)}s` : '—'} delta={<span className="t-meta">p95</span>}
+          <ChartCard className="lg:col-span-6" title="Latency" description="Run duration per day · p50 / p95 (s)" value={durations.length ? `${q(durations, 0.95)}s` : '—'} delta={<span className="t-meta">p95</span>}
             actions={<Legend series={[{ key: 'p50', label: 'p50', color: t.series[0]! }, { key: 'p95', label: 'p95', color: t.series[3]! }]} />}>
             {has(latencyByDay) ? <LineTrend data={latencyByDay} series={[{ key: 'p50', label: 'p50', color: t.series[0]! }, { key: 'p95', label: 'p95', color: t.series[3]! }]} height={150} unit="s" /> : <GhostChart height={150} />}
           </ChartCard>
-          <ChartCard className="lg:col-span-4" title="Tokens & cost" description={isMock() ? 'Estimated from runs (mock)' : 'Not reported by agent-api yet'} value={isMock() ? `${totalK.toFixed(0)}k` : '—'} delta={isMock() ? <span className="t-meta">≈ ${(totalK * mockCostPer1k).toFixed(2)}</span> : undefined}>
+          <ChartCard className="lg:col-span-3" title="Tokens & cost" description={isMock() ? 'Estimated from runs (mock)' : 'Not reported by agent-api yet'} value={isMock() ? `${totalK.toFixed(0)}k` : '—'} delta={isMock() ? <span className="t-meta">≈ ${(totalK * mockCostPer1k).toFixed(2)}</span> : undefined}>
             {isMock() && has(tokensByDay) ? <AreaTrend data={tokensByDay} series={[{ key: 'tokens', label: 'k tokens', color: t.series[5]! }]} height={150} /> : <GhostChart height={150} label="Token usage is not exposed by the API" />}
           </ChartCard>
-          <ChartCard className="lg:col-span-4" title="Activity" description="Runs, sessions and task updates · last 12 weeks" value={activityAt.length} delta={<Delta value={sessTrend} />}>
+          <ChartCard className="lg:col-span-3" title="Activity" description="Runs, sessions and task updates · last 12 weeks" value={activityAt.length} delta={<Delta value={sessTrend} />}>
             <Heatmap days={heatDays.map((d) => d.toISOString().slice(0, 10))} values={heat} color={t.series[1]!} />
           </ChartCard>
 
-          <ChartCard className="lg:col-span-8" title="Schedule triggers" description={schedules.error ? 'Requires a service token' : `${triggers.length} occurrences across ${schedules.data?.schedules.length ?? 0} schedules`} actions={<Legend series={triggerSeries} />}>
+          <ChartCard className="lg:col-span-9" title="Schedule triggers" description={schedules.error ? 'Requires a service token' : `${triggers.length} occurrences across ${schedules.data?.schedules.length ?? 0} schedules`} actions={<Legend series={triggerSeries} />}>
             {has(triggersByDay) ? <StackedBars data={triggersByDay} series={triggerSeries} height={200} /> : <GhostChart height={200} label={schedules.error ? 'Add a service token in Settings' : 'No triggers in this range'} />}
           </ChartCard>
-          <ChartCard className="lg:col-span-4" title="Provider usage" description={isMock() ? 'Runs per connection' : 'Connections (per-run attribution not exposed by API)'}>
+          <ChartCard className="lg:col-span-3" title="Provider usage" description={isMock() ? 'Runs per connection' : 'Connections (per-run attribution not exposed by API)'}>
             {providerUsage.length ? <BarList items={providerUsage} color={t.series[0]!} /> : <GhostChart height={160} label="No providers" />}
             {tasksByType.length ? <><div className="mb-1 mt-4 px-2 text-[12px] font-medium text-ink-2">Top apps · tasks</div><BarList items={tasksByType.map(([name, value], i) => ({ name, value, color: t.series[i % 5] }))} color={t.series[1]!} /></> : null}
           </ChartCard>
 
-          <ChartCard className="lg:col-span-8" title="In flight" description={`${inflight.length} running or waiting · ${allTasks.length} tasks total`}>
+          <ChartCard className="lg:col-span-9" title="In flight" description={`${inflight.length} running or waiting · ${allTasks.length} tasks total`}>
             {inflight.length ? <TaskRows rows={inflight.slice(0, 5).map((x) => ({ key: x.taskId, status: x.status, step: x.attempt, label: x.taskId, amount: x.taskType, onOpen: () => { void navigate(`/tasks/${x.taskId}`); }, details: [{ label: 'Workflow', meta: x.workflowId ?? '—' }, { label: 'Updated', meta: relativeTime(x.projectionUpdatedAt) }] }))} /> : <GhostChart height={160} label="Nothing running" />}
           </ChartCard>
-          <ChartCard className="lg:col-span-4" title="Tasks by status" value={allTasks.length}>
+          <ChartCard className="lg:col-span-3" title="Tasks by status" value={allTasks.length}>
             {allTasks.length ? (
               <div className="flex flex-col">
                 {taskStatus.map((s) => { const n = allTasks.filter((x) => x.status === s).length; return (

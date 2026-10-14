@@ -70,7 +70,7 @@ export function PromptBar({ value, onChange, onSubmit, placeholder = 'Ask anythi
           className="block max-h-[200px] min-h-8 flex-1 resize-none bg-transparent py-[7px] text-[14px] leading-[18px] text-ink outline-none placeholder:text-ink-3" />
         <div className="relative flex shrink-0 items-center gap-1">
           {status}
-          <button type="button" onClick={(e) => { e.stopPropagation(); setModelOpen((o) => !o); }} className="flex h-8 max-w-[180px] items-center gap-1 rounded-full px-2.5 text-[13px] text-ink-2 transition-colors hover:bg-hover hover:text-ink" title="Provider connection">
+          <button type="button" onClick={(e) => { e.stopPropagation(); setModelOpen((o) => !o); }} className="flex h-8 max-w-[180px] items-center gap-1 rounded-full bg-surface px-2.5 text-[13px] text-ink-2 shadow-btn transition-colors hover:text-ink" title="Provider connection">
             <span className="truncate">{current?.label ?? 'Server default'}</span>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>
           </button>

@@ -38,14 +38,18 @@
 
 ## 2a. 内容表面规则（举一反三）
 
-凡是"内容"或可交互表面，一律 **白底（light）/ raised（dark）+ 1px 描边**；只有页面 chrome（页面底、页头、侧边栏、导航）留在灰底上。
+凡是"内容"或可交互表面，一律 **白底（light）/ raised（dark）+ 1px 描边**；页面底、页头、侧边栏底色与导航项留在灰底上。
+
+**输入规则（无例外）**：任何接受输入或打开输入/选择器的元素都必须是白底（dark：raised）+ 1px 描边的内容表面——侧边栏搜索触发器、命令面板输入框、所有搜索/筛选框、时间范围选择（7d/14d/30d）、select/combobox 触发器、日期选择、模型选择器、分段切换、分页控件、标签输入。禁止透明底、`bg-inset`/`bg-muted` 底或"仅 hover 才有底色"的输入控件；`check:design` 禁止页面中出现 `bg-transparent`。
 
 | 类型 | 实现 |
 |---|---|
 | 输入框 / 文本域 / 下拉选择 | `Input` / `Textarea` / `Select`：`bg-surface` + `border-line-strong`，focus accent ring |
 | 搜索 / 筛选框 | 使用 `Input`（如聊天会话筛选），不用透明底输入 |
 | 聊天输入框（PromptBar） | `bg-surface` + `shadow-raised`（含 1px ring） |
-| 分段控件 | `SegmentedTabs` / `ArchiveToggle`：白底 + `shadow-card`，选中项 `--hover-2` |
+| 分段控件 / 范围选择 | `SegmentedTabs` / `ArchiveToggle` / `ViewTabs`+`ViewTab`（`PageHeader tabs` 自动包裹）：白底 + `shadow-card`，选中项 `--hover-2` |
+| 侧边栏搜索 / 命令面板输入 | 白底 + `border-line-strong` + `shadow-btn`；命令面板输入是面板内独立描边输入框 |
+| 模型选择器 | 白底胶囊 + `shadow-btn` |
 | 下拉菜单 / popover / 对话框 / 命令面板 | `bg-surface` + `shadow-overlay`（含 1px ring），背后 `--scrim` |
 | 代码块 | `CodeBlock`：白底卡片 |
 | chip / 计数徽标 | 白底 + 1px hairline |
@@ -161,7 +165,7 @@
 | 变化 | `Delta`：+x% 绿底 / −x% 红底（`good="down"` 反转），或 `t-meta` 文本 |
 | 图例 | `Legend` 放在右上 actions，圆点 + 12px 文本 |
 | 高度 | 同一行卡片等高（grid stretch）；卡片 `h-full`，主体 `flex-1`，图表 `height` 为最小高度，`ResponsiveContainer` 填满剩余高度 |
-| 列对齐 | Overview 等图表页使用**单一** `grid-cols-12 gap-3`，所有行共享同一套竖直轨道（KPI 3+3+3+3，Insights/Runs 4+8，三列行 4+4+4），上下卡片左右边对齐 |
+| 列对齐 | 图表页使用**单一** `grid-cols-12 gap-3`，卡片左右边只能落在 0、¼、½、¾、1 线上（跨度 3/6/9/12，禁止 4/8 三分跨度），保证 KPI 行与下方所有行竖线一致。Overview：KPI 3+3+3+3；Insights/Runs 6+6；Sessions/Success/Duration 3+3+6；Latency/Tokens/Activity 6+3+3；Triggers 9+3；In flight 9+3。Tasks 3+9，Schedules 9+3。热力图在卡片内水平垂直居中 |
 
 ### 8.3 坐标轴 / 网格 / tooltip
 
@@ -212,3 +216,25 @@
 | 滑块 | `--scroll-thumb`（light `oklch(0 0 0 / .22)` / dark `oklch(1 0 0 / .2)`） |
 | 自动隐藏 | 默认滑块透明；容器 hover / focus-within 时变为 `--scroll-thumb`。只改变颜色，不改变宽度或 overflow → **显示/隐藏不引起重排** |
 | 禁止 | 页面内自定义 `::-webkit-scrollbar` 宽度、hover 时切换 `overflow` |
+
+
+## 11. 页面标题图标
+
+- 每个页面头部（`PageHeader`）标题左侧显示与侧边栏导航项**相同**的图标：16px（`size-4`）、`text-muted`、`strokeWidth 1.6`，与标题间距 `gap-1.5`。
+- 图标由 `PageHeader` 根据路由从 `nav.ts` 自动推导；详情页（`/tasks/:id`、`/apps/:id` 等）继承父级图标，放在面包屑之前；无匹配路由（Not found）使用 `FileQuestion`。
+- 页面不得手写头部图标或标题：视图切换用 `PageHeader tabs`，右侧操作用 `actions`。`check:design` 禁止页面内 `<PanelBar left={<><Icon …` 与 `<h1>`。
+
+- 折叠侧栏（56px）：顶部工具组与导航滚动区均用 `mx-2 items-center`，导航项 `size-8` 无额外 `px`，保证所有图标在轨道中水平居中。
+
+## 12. 导航选中态
+
+- 侧边栏导航与设置子导航共用：选中项 `bg-accent-tint` + `text-accent-ink` + `font-semibold`，图标 `text-accent`、描边 2；展开态左侧 2.5px accent 竖条；折叠态（`size-8` 方块）加 `ring-1 ring-inset ring-accent/35`。hover 仅 `--hover`，与选中态明显区分。
+
+## 13. 设置页结构
+
+- 设置按类别拆分为嵌套路由 `/settings/:section`：General（连接）、Appearance（主题）、Status（健康探针）、Developer（Mock 数据）、Shortcuts（快捷键）。`/settings` 默认 General，未知分类重定向。
+- 页面内左侧 168px 子导航（与侧边栏同款选中态），右侧仅渲染当前分类内容（`PageDescription` + `SettingsGroup`）。
+
+## 14. 品牌标识
+
+- `SageMark`（`src/components/brand/sage-mark.tsx`）：圆角方块 + 抽象 S，底色 `currentColor`（侧边栏用 `text-accent`），白色 S，明暗主题通用。favicon：`public/favicon.svg`、`favicon.ico`、`apple-touch-icon.png`。禁止用文字字母代替品牌标识。

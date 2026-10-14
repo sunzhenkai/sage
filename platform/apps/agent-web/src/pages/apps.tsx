@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Boxes, CircleDot, Clock, Hash, Tags, Trash2 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router';
-import { Crumb, PageHeader, PanelBar } from '@/components/layout/app-shell';
+import { Crumb, PageHeader } from '@/components/layout/app-shell';
 import { Monogram, StatusPill, Tag, toneFor } from '@/components/bui/atoms';
 import { RecordsTable } from '@/components/bui/records-table';
 import { CodeBlock } from '@/components/bui/code-block';
@@ -24,7 +24,7 @@ export function AppsPage() {
   const ct = useChartTheme();
   return (
     <>
-      <PanelBar left={<><Boxes className="size-4 text-muted" strokeWidth={1.6} /><span className="text-[13px] font-medium">Apps</span></>} />
+      <PageHeader title="Apps" />
       <PageContent width="wide">
         {apps.isLoading ? <Loading /> : apps.error ? <ErrorState error={apps.error} /> : !items.length ? (
           <Empty icon={Boxes} title="No apps" hint="Register an agent package via agent-api (pnpm --filter @sage/agent-api register-package)." />

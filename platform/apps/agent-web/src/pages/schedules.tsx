@@ -50,10 +50,10 @@ export function SchedulesPage() {
           <>
           <Section title="Activity" description="Trigger outcomes over the last 14 days and what fires next.">
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
-              <ChartCard className="lg:col-span-8" title="Trigger history" description={`${events.length} occurrences`} actions={<Legend series={trigSeries} />}>
+              <ChartCard className="lg:col-span-9" title="Trigger history" description={`${events.length} occurrences`} actions={<Legend series={trigSeries} />}>
                 <StackedBars data={trigByDay} series={trigSeries} height={176} />
               </ChartCard>
-              <ChartCard className="lg:col-span-4" title="Next runs" description="Minutes until next fire">
+              <ChartCard className="lg:col-span-3" title="Next runs" description="Minutes until next fire">
                 <BarList items={upcoming.map((x) => ({ name: x.definition.displayName ?? x.definition.scheduleId, value: Math.max(0, Math.round(((x.nextFireAtMs ?? 0) - Date.now()) / 60_000)) }))} color={ct.series[0]!} format={(n) => (n >= 60 ? `${Math.floor(n / 60)}h ${n % 60}m` : `${n}m`)} />
               </ChartCard>
             </div>

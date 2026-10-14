@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Ban, CircleDot, Clock, Hash, ListChecks, Pause, Play, RefreshCw, RotateCw, Server, Tags } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
-import { Crumb, PageHeader, PanelBar, ViewTab } from '@/components/layout/app-shell';
+import { Crumb, PageHeader, ViewTab, ViewTabs } from '@/components/layout/app-shell';
 import { PageContent, PageDescription, Quiet, Section, SegmentedTabs } from '@/components/layout/page';
 import { ApprovalCard } from '@/components/bui/approval-card';
 import { StatusGlyph, StatusPill, Tag, toneFor } from '@/components/bui/atoms';
@@ -40,12 +40,12 @@ export function TasksPage() {
     return { label: d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }), ...Object.fromEntries(trendSeries.map((s) => [s.key, inDay.filter((t) => t.status === s.key).length])) }; });
   return (
     <>
-      <PanelBar
-        left={<><ListChecks className="size-4 text-muted" strokeWidth={1.6} /><span className="mr-2 text-[13px] font-medium">Tasks</span>
+      <PageHeader title="Tasks"
+        tabs={<>
           <ViewTab active={view === 'all'} onClick={() => setView('all')}>All tasks</ViewTab>
           <ViewTab active={view === 'active'} onClick={() => setView('active')}>Active</ViewTab>
           <ViewTab active={view === 'done'} onClick={() => setView('done')}>Completed</ViewTab></>}
-        right={<Button variant="ghost" size="icon-sm" title="Refresh" onClick={() => void tasks.refetch()}><RefreshCw className={cn(tasks.isFetching && 'animate-spin')} /></Button>}
+        actions={<Button variant="ghost" size="icon-sm" title="Refresh" onClick={() => void tasks.refetch()}><RefreshCw className={cn(tasks.isFetching && 'animate-spin')} /></Button>}
       />
       <PageContent width="wide">
         {tasks.isLoading ? <Loading /> : tasks.error ? <ErrorState error={tasks.error} /> : filtered.length === 0 ? (
@@ -54,10 +54,10 @@ export function TasksPage() {
           <>
             <Section title="Health" description="Status mix and daily activity across all tasks.">
                 <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
-                  <ChartCard className="lg:col-span-4" title="Status distribution" description={`${all.length} tasks`}>
+                  <ChartCard className="lg:col-span-3" title="Status distribution" description={`${all.length} tasks`}>
                     <Donut items={dist} height={176} center={<><div className="text-[22px] font-semibold tabular-nums text-ink">{all.length ? Math.round((dist.find((d) => d.name === 'Succeeded')!.value / all.length) * 100) : 0}%</div><div className="t-meta">succeeded</div></>} />
                   </ChartCard>
-                  <ChartCard className="lg:col-span-8" title="Updates per day" description="Last 14 days, by current status" actions={<Legend series={trendSeries} />}>
+                  <ChartCard className="lg:col-span-9" title="Updates per day" description="Last 14 days, by current status" actions={<Legend series={trendSeries} />}>
                     <StackedBars data={trend} series={trendSeries} height={176} />
                   </ChartCard>
                 </div>
@@ -187,12 +187,12 @@ function RunLogs({ taskId }: { taskId: string }) {
   if (!data || data.attempts.length === 0) return <Quiet>No run logs. Run logs exist only for durable coordinator (v2) tasks.</Quiet>;
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap gap-1">
+      <ViewTabs>
         {data.attempts.map((a) => {
           const active = data.selected?.runId === a.runId && data.selected.attemptId === a.attemptId;
           return <ViewTab key={`${a.runId}|${a.attemptId}`} active={active} onClick={() => setSelected({ runId: a.runId, attemptId: a.attemptId })}>{shortId(a.runId)} · {shortId(a.attemptId)}</ViewTab>;
         })}
-      </div>
+      </ViewTabs>
       <ToolChips header={`${data.events.length} events in ${shortId(data.selected?.attemptId ?? '')}`}
         steps={data.events.map((e) => ({ key: e.eventId, icon: /tool/.test(e.type) ? 'run' : /model/.test(e.type) ? 'think' : /artifact|write/.test(e.type) ? 'write' : 'read', label: e.type, chip: `#${e.sequence}  ${JSON.stringify(e.payload).slice(0, 80)}`, mono: true, detail: JSON.stringify(e.payload, null, 2).split('\n').map((text) => ({ text })) }))} />
       {data.nextFromSequence ? <p className="text-[12px] text-ink-3">More events available…</p> : null}

@@ -22,10 +22,12 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
           <DialogPrimitive.Title className="sr-only">Command palette</DialogPrimitive.Title>
           <DialogPrimitive.Description className="sr-only">Navigate and run commands</DialogPrimitive.Description>
           <Command loop>
-            <div className="flex items-center gap-2.5 border-b border-line px-3.5">
-              <Search className="size-4 text-faint" strokeWidth={1.75} />
-              <Command.Input autoFocus placeholder="Type a command or search…" className="h-12 flex-1 bg-transparent text-[14px] tracking-[-0.01em] outline-none placeholder:text-faint" />
-              <Kbd>esc</Kbd>
+            <div className="border-b border-line p-2">
+              <div className="flex items-center gap-2.5 rounded-md border border-line-strong bg-surface px-3 focus-within:border-accent/70 focus-within:shadow-[0_0_0_3px_var(--accent-soft)]">
+                <Search className="size-4 text-faint" strokeWidth={1.75} />
+                <Command.Input autoFocus placeholder="Type a command or search…" className="h-10 flex-1 bg-surface text-[14px] tracking-[-0.01em] outline-none placeholder:text-faint" />
+                <Kbd>esc</Kbd>
+              </div>
             </div>
             <Command.List className="max-h-[380px] overflow-y-auto p-1.5">
               <Command.Empty className="py-10 text-center text-xs text-muted">No results.</Command.Empty>

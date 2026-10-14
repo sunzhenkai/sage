@@ -4,7 +4,7 @@
  * Header, description and content all sit on the same surface (bg-panel). Cards are opt-in (charts, code, flows).
  */
 import { cn } from '@/lib/utils';
-export { PageHeader, PanelBar as PageToolbar, Crumb, ViewTab } from './app-shell';
+export { PageHeader, PanelBar as PageToolbar, Crumb, ViewTab, ViewTabs } from './app-shell';
 
 export function PageShell({ children, className }: { children: React.ReactNode; className?: string }) {
   return <div className={cn('flex min-h-0 min-w-0 flex-1 flex-col bg-panel', className)}>{children}</div>;

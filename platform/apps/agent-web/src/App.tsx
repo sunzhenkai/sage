@@ -29,6 +29,7 @@ export function App() {
           <Route path="schedules/:scheduleId" element={<ScheduleDetailPage />} />
           <Route path="providers" element={<ProvidersPage />} />
           <Route path="settings" element={<SettingsPage />} />
+          <Route path="settings/:section" element={<SettingsPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Routes>

@@ -208,7 +208,7 @@ export function Heatmap({ days, values, color }: { days: string[]; values: numbe
   const max = Math.max(1, ...flat);
   const weeks = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   return (
-    <div className="overflow-x-auto px-1">
+    <div className="flex min-h-0 flex-1 items-center justify-center overflow-x-auto px-1">
       <div className="inline-grid gap-[3px]" style={{ gridTemplateColumns: `28px repeat(${days.length}, 12px)` }}>
         <span />
         {days.map((d, i) => <span key={i} className="truncate text-center text-[9px] text-ink-3" title={d}>{i % 3 === 0 ? d.slice(-2) : ''}</span>)}
