@@ -103,7 +103,7 @@ export function OverviewPage() {
           {([7, 14, 30] as const).map((r) => <ViewTab key={r} active={range === r} onClick={() => setRange(r)}>{r}d</ViewTab>)}</>}
         right={<span className="pr-2 text-[12px] text-faint">{runs.length} runs from {details.length} sessions</span>}
       />
-      <PageContent>
+      <PageContent width="wide">
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatTile label="Sessions" value={sessionsByDay.reduce((a, b) => a + b.sessions, 0)} delta={`last ${range}d`} spark={sessionsByDay.map((d) => d.sessions)} color={t.series[0]!} />
           <StatTile label="Run success rate" value={pct(succeeded, succeeded + failed)} delta={`${succeeded}/${succeeded + failed} runs`} spark={successByDay.map((d) => d.rate)} color={t.series[1]!} />

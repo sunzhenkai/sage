@@ -25,8 +25,8 @@ export function PageDescription({ title, description, leading, actions }: { titl
 }
 
 /** Scrollable content area. `flush` = edge-to-edge (lists/tables own their gutters); default pads with the gutter. */
-export type ContentWidth = 'full' | 'narrow' | 'chat';
-const widthClass: Record<ContentWidth, string> = { full: '', narrow: 'mx-auto w-full max-w-[calc(var(--w-narrow)+2*var(--gutter))]', chat: 'mx-auto w-full max-w-[calc(var(--w-chat)+2*var(--gutter))]' };
+export type ContentWidth = 'full' | 'wide' | 'narrow' | 'chat';
+const widthClass: Record<ContentWidth, string> = { full: '', wide: 'mx-auto w-full max-w-[calc(var(--w-wide)+2*var(--gutter))]', narrow: 'mx-auto w-full max-w-[calc(var(--w-narrow)+2*var(--gutter))]', chat: 'mx-auto w-full max-w-[calc(var(--w-chat)+2*var(--gutter))]' };
 
 /** Centered column for reading/form pages (settings, chat). Only allowed widths: narrow (720) / chat (760). */
 export function PageColumn({ width = 'full', className, children }: { width?: ContentWidth | undefined; className?: string | undefined; children: React.ReactNode }) {

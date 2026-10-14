@@ -19,7 +19,7 @@ export function PackagesPage() {
   return (
     <>
       <PanelBar left={<><Package className="size-4 text-muted" strokeWidth={1.6} /><span className="text-[13px] font-medium">Packages</span></>} />
-      <PageContent>
+      <PageContent width="wide">
         {packages.isLoading ? <Loading /> : packages.error ? <ErrorState error={packages.error} /> : !items.length ? <Empty icon={Package} title="No packages" /> : (
           <Section title="All packages" description="Published agent packages and their latest content digest." count={items.length}>
           <RecordsTable rows={items} getKey={(x) => x.packageId} onRowClick={(x) => { void navigate(`/packages/${x.packageId}`); }}

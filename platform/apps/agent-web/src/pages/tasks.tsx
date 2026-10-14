@@ -47,7 +47,7 @@ export function TasksPage() {
           <ViewTab active={view === 'done'} onClick={() => setView('done')}>Completed</ViewTab></>}
         right={<Button variant="ghost" size="icon-sm" title="Refresh" onClick={() => void tasks.refetch()}><RefreshCw className={cn(tasks.isFetching && 'animate-spin')} /></Button>}
       />
-      <PageContent>
+      <PageContent width="wide">
         {tasks.isLoading ? <Loading /> : tasks.error ? <ErrorState error={tasks.error} /> : filtered.length === 0 ? (
           <Empty icon={ListChecks} title="No tasks" hint="Tasks appear here when chat messages are promoted or schedules fire." />
         ) : (

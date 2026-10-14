@@ -25,7 +25,7 @@ export function AppsPage() {
   return (
     <>
       <PanelBar left={<><Boxes className="size-4 text-muted" strokeWidth={1.6} /><span className="text-[13px] font-medium">Apps</span></>} />
-      <PageContent>
+      <PageContent width="wide">
         {apps.isLoading ? <Loading /> : apps.error ? <ErrorState error={apps.error} /> : !items.length ? (
           <Empty icon={Boxes} title="No apps" hint="Register an agent package via agent-api (pnpm --filter @sage/agent-api register-package)." />
         ) : (

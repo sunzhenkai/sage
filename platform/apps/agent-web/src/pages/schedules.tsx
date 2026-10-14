@@ -45,7 +45,7 @@ export function SchedulesPage() {
           <Button variant="secondary" size="sm" onClick={() => setOpen(true)}><Plus />New schedule</Button>
           <DialogContent title="New schedule" description="POST /v1/schedules — requires a service token."><CreateScheduleForm onDone={(id) => { setOpen(false); navigate(`/schedules/${id}`); }} /></DialogContent>
         </Dialog>} />
-      <PageContent>
+      <PageContent width="wide">
         {schedules.isLoading ? <Loading /> : schedules.error ? <ErrorState error={schedules.error} /> : !schedules.data?.schedules.length ? <Empty icon={CalendarClock} title="No schedules" hint="Run an agent app task on a cron or interval. Requires a service token." /> : (
           <>
           <Section title="Activity" description="Trigger outcomes over the last 14 days and what fires next.">
