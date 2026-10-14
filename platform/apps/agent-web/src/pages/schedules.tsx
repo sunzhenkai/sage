@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Pause, Play, Plus, Trash2 } from 'lucide-react';
+import { CalendarClock, Pause, Play, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
-import { PageHeader } from '@/components/layout/app-shell';
+import { Crumb, PageHeader } from '@/components/layout/app-shell';
 import { Badge, StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -31,8 +31,8 @@ export function SchedulesPage() {
           <Button size="sm" onClick={() => setOpen(true)}><Plus />New schedule</Button>
           <DialogContent title="New schedule" description="POST /v1/schedules — requires a service token."><CreateScheduleForm onDone={(id) => { setOpen(false); navigate(`/schedules/${id}`); }} /></DialogContent>
         </Dialog>} />
-      <div className="min-h-0 flex-1 overflow-auto">
-        {schedules.isLoading ? <Loading /> : schedules.error ? <ErrorState error={schedules.error} /> : !schedules.data?.schedules.length ? <Empty title="No schedules" /> : (
+      <div className="flex min-h-0 flex-1 flex-col overflow-auto">
+        {schedules.isLoading ? <Loading /> : schedules.error ? <ErrorState error={schedules.error} /> : !schedules.data?.schedules.length ? <Empty icon={CalendarClock} title="No schedules" hint="Run an agent app task on a cron or interval. Requires a service token." /> : (
           <Table>
             <thead><tr><Th>Schedule</Th><Th>State</Th><Th>Trigger</Th><Th>Task</Th><Th>Next fire</Th><Th className="text-right">Updated</Th></tr></thead>
             <tbody>{schedules.data.schedules.map((s) => (
@@ -116,7 +116,7 @@ export function ScheduleDetailPage() {
   const s = schedule.data;
   return (
     <>
-      <PageHeader title={<span className="flex items-center gap-2"><Link to="/schedules" className="text-muted hover:text-fg">Schedules</Link><span className="text-muted">/</span><Mono>{scheduleId}</Mono></span>}
+      <PageHeader breadcrumb={<Crumb to="/schedules">Schedules</Crumb>} title={<Mono>{scheduleId}</Mono>}
         meta={s ? <><StatusBadge status={s.state} /><span>rev {s.revision}</span></> : null}
         actions={<>
           {s?.state === 'PAUSED'
@@ -125,7 +125,7 @@ export function ScheduleDetailPage() {
           <Button variant="danger" size="sm" disabled={!s || remove.isPending} onClick={() => { if (confirm(`Delete schedule ${scheduleId}?`)) remove.mutate(); }}><Trash2 />Delete</Button>
         </>} />
       {action.error ? <ErrorState error={action.error} /> : remove.error ? <ErrorState error={remove.error} /> : null}
-      <div className="min-h-0 flex-1 overflow-auto p-4">
+      <div className="min-h-0 flex-1 overflow-auto px-6 py-5">
         {schedule.isLoading ? <Loading /> : schedule.error ? <ErrorState error={schedule.error} /> : s ? (
           <div className="grid gap-4 lg:grid-cols-[1fr_1.2fr]">
             <Card><CardHeader title="Definition" /><div className="p-3"><KeyValue items={[

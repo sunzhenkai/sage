@@ -7,7 +7,7 @@ import { api } from '@/lib/api';
 import { updateSettings, useSettings } from '@/lib/settings';
 import { cn } from '@/lib/utils';
 import { CommandPalette } from './command-palette';
-import { navItems } from './nav';
+import { navGroups, navItems } from './nav';
 
 const goKeys: Record<string, string> = { c: '/chat', t: '/tasks', a: '/apps', p: '/packages', s: '/schedules', m: '/providers', ',': '/settings' };
 
@@ -38,48 +38,101 @@ export function AppShell() {
     return () => window.removeEventListener('keydown', onKey);
   }, [navigate]);
 
-  const dark = document.documentElement.classList.contains('dark');
+  const dark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
   const online = health.isSuccess;
 
   return (
-    <div className="flex h-full">
-      <aside className="flex w-[220px] shrink-0 flex-col border-r bg-subtle/60">
-        <div className="flex h-11 items-center gap-2 px-3">
-          <div className="grid size-5 place-items-center rounded bg-accent text-[11px] font-bold text-accent-fg">S</div>
-          <span className="text-[13px] font-semibold">Sage Console</span>
+    <div className="flex h-full bg-frame">
+      <aside className="flex w-[220px] shrink-0 flex-col border-r border-line bg-frame">
+        <div className="flex h-12 items-center gap-2.5 px-3.5">
+          <div className="grid size-[22px] place-items-center rounded-[6px] bg-accent text-[11px] font-bold tracking-tight text-accent-fg shadow-[inset_0_1px_0_rgb(255_255_255/0.18)]">S</div>
+          <div className="min-w-0 leading-tight">
+            <div className="truncate text-[13px] font-semibold tracking-[-0.02em]">Sage</div>
+            <div className="truncate text-[11px] text-faint">Agent Console</div>
+          </div>
         </div>
-        <button onClick={() => setPaletteOpen(true)} className="mx-2 mb-2 flex h-7 items-center gap-2 rounded-md border bg-panel px-2 text-xs text-muted hover:text-fg">
-          <Search className="size-3.5" />Search…<span className="ml-auto flex gap-0.5"><Kbd><CommandIcon className="size-2.5" /></Kbd><Kbd>K</Kbd></span>
+
+        <button
+          onClick={() => setPaletteOpen(true)}
+          className="mx-2.5 mb-2 flex h-8 items-center gap-2 rounded-md border border-line bg-panel/60 px-2 text-[12.5px] text-muted transition-colors hover:bg-hover hover:text-fg"
+        >
+          <Search className="size-3.5 text-faint" strokeWidth={1.75} />
+          <span className="flex-1 text-left">Search…</span>
+          <span className="flex items-center gap-0.5"><Kbd className="gap-0.5"><CommandIcon className="size-2.5" />K</Kbd></span>
         </button>
-        <nav className="flex flex-col gap-px px-2">
-          {navItems.map(({ to, label, icon: Icon }) => (
-            <NavLink key={to} to={to} className={({ isActive }) => cn('flex h-7 items-center gap-2 rounded-md px-2 text-[13px] text-muted transition-colors hover:bg-hover hover:text-fg', isActive && 'bg-hover font-medium text-fg')}>
-              <Icon className="size-3.5" />{label}
-            </NavLink>
+
+        <div className="flex flex-col gap-4 overflow-y-auto pt-1">
+          {navGroups.map((group) => (
+            <div key={group}>
+              <div className="px-3.5 pb-1 text-[11px] font-medium text-faint">{group}</div>
+              <nav className="flex flex-col gap-px px-2">
+                {navItems.filter((item) => item.group === group).map(({ to, label, icon: Icon }) => (
+                  <NavLink
+                    key={to}
+                    to={to}
+                    className={({ isActive }) => cn(
+                      'group flex h-[30px] items-center gap-2.5 rounded-md px-2 text-[13px] font-medium tracking-[-0.01em] text-muted transition-colors duration-100 hover:bg-hover hover:text-fg',
+                      isActive && 'bg-active text-fg'
+                    )}
+                  >
+                    {({ isActive }) => (
+                      <>
+                        <Icon className={cn('size-[15px] shrink-0', isActive ? 'text-fg' : 'text-faint group-hover:text-muted')} strokeWidth={1.75} />
+                        <span className="truncate">{label}</span>
+                      </>
+                    )}
+                  </NavLink>
+                ))}
+              </nav>
+            </div>
           ))}
-        </nav>
-        <div className="mt-auto flex items-center justify-between border-t px-3 py-2 text-[11px] text-muted">
-          <span className="flex items-center gap-1.5" title={settings.apiBaseUrl || 'same-origin proxy'}>
-            <span className={cn('size-1.5 rounded-full', online ? 'bg-success' : health.isLoading ? 'bg-muted' : 'bg-danger')} />
-            agent-api {online ? 'online' : health.isLoading ? '…' : 'offline'}
+        </div>
+
+        <div className="mt-auto flex items-center gap-1.5 border-t border-line px-3 py-2.5">
+          <span className="flex min-w-0 flex-1 items-center gap-1.5 text-[11.5px] text-muted" title={settings.apiBaseUrl || 'same-origin proxy'}>
+            <span className={cn('size-1.5 shrink-0 rounded-full', online ? 'bg-green' : health.isLoading ? 'bg-faint' : 'bg-red', online && 'shadow-[0_0_0_3px_color-mix(in_srgb,var(--green)_25%,transparent)]')} />
+            <span className="truncate">{online ? 'API online' : health.isLoading ? 'Connecting…' : 'API offline'}</span>
           </span>
-          <button className="rounded p-1 hover:bg-hover hover:text-fg" title="Toggle theme" onClick={() => updateSettings({ theme: dark ? 'light' : 'dark' })}>
-            {dark ? <Sun className="size-3.5" /> : <Moon className="size-3.5" />}
+          <button
+            className="grid size-7 place-items-center rounded-md text-faint transition-colors hover:bg-hover hover:text-fg"
+            title="Toggle theme"
+            onClick={() => updateSettings({ theme: dark ? 'light' : 'dark' })}
+          >
+            {dark ? <Sun className="size-3.5" strokeWidth={1.75} /> : <Moon className="size-3.5" strokeWidth={1.75} />}
           </button>
         </div>
       </aside>
-      <main className="flex min-w-0 flex-1 flex-col"><Outlet /></main>
+
+      <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-panel">
+        <Outlet />
+      </main>
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
     </div>
   );
 }
 
-export function PageHeader({ title, meta, actions }: { title: React.ReactNode; meta?: React.ReactNode; actions?: React.ReactNode }) {
+export function PageHeader({
+  title, meta, actions, breadcrumb
+}: {
+  title: React.ReactNode; meta?: React.ReactNode; actions?: React.ReactNode; breadcrumb?: React.ReactNode;
+}) {
   return (
-    <header className="flex h-11 shrink-0 items-center gap-3 border-b px-4">
-      <h1 className="truncate text-[13px] font-medium">{title}</h1>
-      {meta ? <div className="flex items-center gap-2 text-xs text-muted">{meta}</div> : null}
-      <div className="ml-auto flex items-center gap-1.5">{actions}</div>
+    <header className="flex h-12 shrink-0 items-center gap-3 border-b border-line px-5">
+      <div className="flex min-w-0 flex-1 items-center gap-2.5">
+        {breadcrumb}
+        <h1 className="truncate text-[14px] font-semibold tracking-[-0.02em] text-fg">{title}</h1>
+        {meta ? <div className="flex shrink-0 items-center gap-2 text-xs text-muted">{meta}</div> : null}
+      </div>
+      {actions ? <div className="flex shrink-0 items-center gap-1.5">{actions}</div> : null}
     </header>
+  );
+}
+
+export function Crumb({ to, children }: { to: string; children: React.ReactNode }) {
+  return (
+    <>
+      <NavLink to={to} className="text-[13px] font-medium text-muted transition-colors hover:text-fg">{children}</NavLink>
+      <span className="text-faint">/</span>
+    </>
   );
 }

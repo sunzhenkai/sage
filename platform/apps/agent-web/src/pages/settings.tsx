@@ -20,7 +20,7 @@ export function SettingsPage() {
   return (
     <>
       <PageHeader title="Settings" />
-      <div className="min-h-0 flex-1 overflow-auto p-4">
+      <div className="min-h-0 flex-1 overflow-auto px-6 py-5">
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
           <Card><CardHeader title="Connection" />
             <form className="flex flex-col gap-3 p-4" onSubmit={(e) => { e.preventDefault(); updateSettings(draft); setSaved(true); setTimeout(() => setSaved(false), 1500); }}>

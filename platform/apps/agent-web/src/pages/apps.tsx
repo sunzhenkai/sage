@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Trash2 } from 'lucide-react';
-import { Link, useNavigate, useParams } from 'react-router';
-import { PageHeader } from '@/components/layout/app-shell';
+import { Boxes, Trash2 } from 'lucide-react';
+import { useNavigate, useParams } from 'react-router';
+import { Crumb, PageHeader } from '@/components/layout/app-shell';
 import { Badge, StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, Empty, ErrorState, JsonView, KeyValue, Loading, Mono } from '@/components/ui/misc';
@@ -15,13 +15,13 @@ export function AppsPage() {
   return (
     <>
       <PageHeader title="Apps" meta={apps.data ? `${apps.data.apps.length}` : null} />
-      <div className="min-h-0 flex-1 overflow-auto">
-        {apps.isLoading ? <Loading /> : apps.error ? <ErrorState error={apps.error} /> : !apps.data?.apps.length ? <Empty title="No apps" hint="Register an agent package via agent-api (pnpm --filter @sage/agent-api register-package)." /> : (
+      <div className="flex min-h-0 flex-1 flex-col overflow-auto">
+        {apps.isLoading ? <Loading /> : apps.error ? <ErrorState error={apps.error} /> : !apps.data?.apps.length ? <Empty icon={Boxes} title="No apps" hint="Register an agent package via agent-api (pnpm --filter @sage/agent-api register-package)." /> : (
           <Table>
             <thead><tr><Th>App</Th><Th>Status</Th><Th>Latest version</Th><Th>Releases</Th><Th className="text-right">Updated</Th></tr></thead>
             <tbody>{apps.data.apps.map((a) => (
               <Tr key={a.appId} onClick={() => navigate(`/apps/${a.appId}`)}>
-                <Td className="font-medium">{a.appId}</Td><Td><StatusBadge status={a.status} /></Td>
+                <Td><span className="flex items-center gap-2.5"><span className="grid size-5 place-items-center rounded-[5px] border border-line-strong bg-raised text-[10px] font-semibold uppercase text-muted">{a.appId.slice(0, 1)}</span><span className="font-medium">{a.appId}</span></span></Td><Td><StatusBadge status={a.status} /></Td>
                 <Td><Mono>{a.latestVersion ?? '—'}</Mono></Td><Td className="text-muted">{a.releaseCount}</Td>
                 <Td className="text-right text-muted">{relativeTime(a.updatedAt)}</Td>
               </Tr>
@@ -43,11 +43,11 @@ export function AppDetailPage() {
   const list = (key: string) => (Array.isArray(manifest?.[key]) ? (manifest[key] as unknown[]) : []);
   return (
     <>
-      <PageHeader title={<span className="flex items-center gap-2"><Link to="/apps" className="text-muted hover:text-fg">Apps</Link><span className="text-muted">/</span>{appId}</span>}
+      <PageHeader breadcrumb={<Crumb to="/apps">Apps</Crumb>} title={appId}
         meta={app.data ? <StatusBadge status={app.data.status} /> : null}
         actions={<Button variant="danger" size="sm" disabled={remove.isPending} onClick={() => { if (confirm(`Delete app ${appId}?`)) remove.mutate(); }}><Trash2 />Delete</Button>} />
       {remove.error ? <ErrorState error={remove.error} /> : null}
-      <div className="min-h-0 flex-1 overflow-auto p-4">
+      <div className="min-h-0 flex-1 overflow-auto px-6 py-5">
         {app.isLoading ? <Loading /> : app.error ? <ErrorState error={app.error} /> : app.data ? (
           <div className="grid gap-4 lg:grid-cols-2">
             <Card><CardHeader title="Manifest" /><div className="p-3"><KeyValue items={[

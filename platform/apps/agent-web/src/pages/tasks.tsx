@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Ban, Pause, Play, RefreshCw, RotateCw } from 'lucide-react';
+import { Ban, ListChecks, Pause, Play, RefreshCw, RotateCw } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
-import { PageHeader } from '@/components/layout/app-shell';
+import { Crumb, PageHeader } from '@/components/layout/app-shell';
 import { StatusBadge } from '@/components/ui/badge';
+import { StatusIcon } from '@/components/ui/status';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/input';
 import { Card, CardHeader, Empty, ErrorState, JsonView, KeyValue, Loading, Mono } from '@/components/ui/misc';
@@ -27,14 +28,14 @@ export function TasksPage() {
         </Select>
         <Button variant="ghost" size="icon" title="Refresh" onClick={() => void tasks.refetch()}><RefreshCw className={cn(tasks.isFetching && 'animate-spin')} /></Button>
       </>} />
-      <div className="min-h-0 flex-1 overflow-auto">
-        {tasks.isLoading ? <Loading /> : tasks.error ? <ErrorState error={tasks.error} /> : tasks.data?.tasks.length === 0 ? <Empty title="No tasks" hint="Tasks appear here when chat messages are promoted or schedules fire." /> : (
+      <div className="flex min-h-0 flex-1 flex-col overflow-auto">
+        {tasks.isLoading ? <Loading /> : tasks.error ? <ErrorState error={tasks.error} /> : tasks.data?.tasks.length === 0 ? <Empty icon={ListChecks} title="No tasks" hint="Tasks appear here when chat messages are promoted or schedules fire." /> : (
           <Table>
             <thead><tr><Th>Task</Th><Th>Type</Th><Th>Status</Th><Th>Attempt</Th><Th>Freshness</Th><Th className="text-right">Updated</Th></tr></thead>
             <tbody>
               {tasks.data?.tasks.map((t) => (
                 <Tr key={t.taskId} onClick={() => navigate(`/tasks/${t.taskId}`)}>
-                  <Td><Mono>{t.taskId}</Mono></Td>
+                  <Td><span className="flex items-center gap-2.5"><StatusIcon status={t.status} /><Mono className="text-fg-2">{t.taskId}</Mono></span></Td>
                   <Td className="text-muted">{t.taskType ?? '—'}</Td>
                   <Td><StatusBadge status={t.status} /></Td>
                   <Td className="text-muted">{t.attempt ?? '—'}</Td>
@@ -64,7 +65,7 @@ export function TaskDetailPage() {
   const t = task.data;
   return (
     <>
-      <PageHeader title={<span className="flex items-center gap-2"><Link to="/tasks" className="text-muted hover:text-fg">Tasks</Link><span className="text-muted">/</span><Mono>{taskId}</Mono></span>}
+      <PageHeader breadcrumb={<Crumb to="/tasks">Tasks</Crumb>} title={<Mono>{taskId}</Mono>}
         meta={t ? <StatusBadge status={t.status} /> : null}
         actions={<>
           <Button variant="secondary" size="sm" disabled={t?.status !== 'running' || control.isPending} onClick={() => control.mutate('pause')}><Pause />Pause</Button>
@@ -81,7 +82,7 @@ export function TaskDetailPage() {
                 <button key={name} onClick={() => setTab(name)} className={cn('h-6 rounded px-2 text-xs capitalize text-muted hover:bg-hover hover:text-fg', tab === name && 'bg-hover text-fg')}>{name.replace('-', ' ')}</button>
               ))}
             </div>
-            <div className="min-h-0 flex-1 overflow-auto p-4">
+            <div className="min-h-0 flex-1 overflow-auto px-6 py-5">
               {tab === 'timeline' ? <TaskEvents taskId={taskId} /> : tab === 'run-logs' ? <RunLogs taskId={taskId} /> : tab === 'artifacts' ? <Artifacts taskId={taskId} /> : <JsonView value={t} />}
             </div>
           </div>

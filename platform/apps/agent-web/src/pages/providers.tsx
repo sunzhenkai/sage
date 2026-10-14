@@ -28,7 +28,7 @@ export function ProvidersPage() {
         <Button size="sm" onClick={() => setOpen(true)}><Plus />New connection</Button>
         <DialogContent title="New provider connection" description="The API key is sealed server-side and never returned."><CreateConnection onDone={() => { setOpen(false); invalidate(); }} /></DialogContent>
       </Dialog>} />
-      <div className="min-h-0 flex-1 overflow-auto p-4">
+      <div className="min-h-0 flex-1 overflow-auto px-6 py-5">
         <div className="flex flex-col gap-4">
           {setDefault.error ? <ErrorState error={setDefault.error} /> : remove.error ? <ErrorState error={remove.error} /> : null}
           <Card><CardHeader title="Connections" />

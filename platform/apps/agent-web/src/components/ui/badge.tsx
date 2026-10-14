@@ -1,16 +1,24 @@
 import { cn } from '@/lib/utils';
+import { StatusIcon } from './status';
 
 const tones = {
-  neutral: 'text-muted bg-subtle border-border',
-  accent: 'text-accent bg-accent/10 border-accent/25',
-  success: 'text-success bg-success/10 border-success/25',
-  warning: 'text-warning bg-warning/10 border-warning/25',
-  danger: 'text-danger bg-danger/10 border-danger/25'
+  neutral: 'text-fg-2 border-line-strong',
+  accent: 'text-accent border-accent/30 bg-accent-soft',
+  success: 'text-green border-green/25',
+  warning: 'text-amber border-amber/25',
+  danger: 'text-red border-red/25'
 } as const;
 export type Tone = keyof typeof tones;
+const dots: Record<Tone, string> = { neutral: 'bg-faint', accent: 'bg-accent', success: 'bg-green', warning: 'bg-amber', danger: 'bg-red' };
 
-export function Badge({ tone = 'neutral', className, children }: { tone?: Tone; className?: string; children: React.ReactNode }) {
-  return <span className={cn('inline-flex h-5 items-center gap-1 rounded border px-1.5 text-[11px] font-medium', tones[tone], className)}>{children}</span>;
+/** Linear "chip": hairline outline, tiny dot, medium weight. */
+export function Badge({ tone = 'neutral', dot = false, className, children }: { tone?: Tone; dot?: boolean; className?: string; children: React.ReactNode }) {
+  return (
+    <span className={cn('inline-flex h-[22px] max-w-full items-center gap-1.5 rounded-full border px-2 text-2xs font-medium tracking-[-0.003em]', tones[tone], className)}>
+      {dot ? <span className={cn('size-1.5 shrink-0 rounded-full', dots[tone])} /> : null}
+      <span className="truncate">{children}</span>
+    </span>
+  );
 }
 
 export function statusTone(status: string | undefined): Tone {
@@ -24,11 +32,15 @@ export function statusTone(status: string | undefined): Tone {
 }
 
 export function StatusDot({ status }: { status: string | undefined }) {
-  const tone = statusTone(status);
-  const color = { neutral: 'bg-muted', accent: 'bg-accent', success: 'bg-success', warning: 'bg-warning', danger: 'bg-danger' }[tone];
-  return <span className={cn('inline-block size-2 rounded-full', color, status === 'running' || status === 'active' ? 'animate-pulse' : '')} />;
+  return <StatusIcon status={status} />;
 }
 
+const label = (s: string) => s.replace(/_/g, ' ').toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
+
 export function StatusBadge({ status }: { status: string | undefined }) {
-  return <Badge tone={statusTone(status)}><StatusDot status={status} />{status ?? 'unknown'}</Badge>;
+  return (
+    <span className="inline-flex h-[22px] items-center gap-1.5 rounded-full border border-line-strong py-0 pl-1.5 pr-2 text-2xs font-medium text-fg-2">
+      <StatusIcon status={status} className="size-3" />{label(status ?? 'unknown')}
+    </span>
+  );
 }
