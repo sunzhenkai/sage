@@ -25,10 +25,18 @@ export function PageDescription({ title, description, leading, actions }: { titl
 }
 
 /** Scrollable content area. `flush` = edge-to-edge (lists/tables own their gutters); default pads with the gutter. */
-export function PageContent({ children, flush, className, scrollRef }: { children: React.ReactNode; flush?: boolean; className?: string; scrollRef?: React.Ref<HTMLDivElement> }) {
+export type ContentWidth = 'full' | 'narrow' | 'chat';
+const widthClass: Record<ContentWidth, string> = { full: '', narrow: 'mx-auto w-full max-w-[calc(var(--w-narrow)+2*var(--gutter))]', chat: 'mx-auto w-full max-w-[calc(var(--w-chat)+2*var(--gutter))]' };
+
+/** Centered column for reading/form pages (settings, chat). Only allowed widths: narrow (720) / chat (760). */
+export function PageColumn({ width = 'full', className, children }: { width?: ContentWidth | undefined; className?: string | undefined; children: React.ReactNode }) {
+  return <div className={cn('gutter-x', widthClass[width], className)}>{children}</div>;
+}
+
+export function PageContent({ children, flush, width = 'full', className, scrollRef }: { children: React.ReactNode; flush?: boolean; width?: ContentWidth | undefined; className?: string; scrollRef?: React.Ref<HTMLDivElement> }) {
   return (
     <div ref={scrollRef} className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-      <div className={cn(flush ? 'flex min-h-0 flex-1 flex-col' : 'gutter-x pb-12 pt-6', className)}>{children}</div>
+      <div className={cn(flush ? 'flex min-h-0 flex-1 flex-col' : cn('gutter-x pb-12 pt-6', widthClass[width]), className)}>{children}</div>
     </div>
   );
 }
@@ -61,7 +69,7 @@ export function SettingsGroup({ title, description, children }: { title?: string
 }
 export function SettingsRow({ label, description, children, stacked }: { label: React.ReactNode; description?: React.ReactNode; children?: React.ReactNode; stacked?: boolean }) {
   return (
-    <div className={cn('grid gap-x-8 gap-y-2 py-3.5', stacked ? 'grid-cols-1' : 'grid-cols-[minmax(200px,280px)_minmax(0,1fr)] items-center')}>
+    <div className={cn('grid gap-x-8 gap-y-2 py-3.5', stacked ? 'grid-cols-1' : 'grid-cols-[minmax(160px,220px)_minmax(0,1fr)] items-center')}>
       <div className="min-w-0">
         <div className="text-[13px] font-medium text-ink">{label}</div>
         {description ? <div className="t-meta mt-0.5">{description}</div> : null}

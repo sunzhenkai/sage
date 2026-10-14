@@ -24,18 +24,18 @@ export function SettingsPage() {
   return (
     <>
       <PageHeader title="Settings" />
-      <PageContent>
+      <PageContent width="narrow">
         <PageDescription title="Settings" description="Connection, appearance and shortcuts for this browser. Stored in localStorage only." />
 
         <SettingsGroup title="Connection" description="How the console reaches agent-api.">
           <SettingsRow label="API base URL" description="Empty = same origin; the dev/preview server proxies /v1 to agent-api (:9610).">
-            <Input className="w-[260px]" placeholder="Same origin" value={draft.apiBaseUrl} onChange={(e) => setDraft({ ...draft, apiBaseUrl: e.target.value })} />
+            <Input className="w-full" placeholder="Same origin" value={draft.apiBaseUrl} onChange={(e) => setDraft({ ...draft, apiBaseUrl: e.target.value })} />
           </SettingsRow>
           <SettingsRow label="Service token" description="Sent as Authorization: Bearer. Required for schedules.">
-            <Input className="w-[260px]" type="password" autoComplete="off" placeholder="Not set" value={draft.serviceToken} onChange={(e) => setDraft({ ...draft, serviceToken: e.target.value })} />
+            <Input className="w-full" type="password" autoComplete="off" placeholder="Not set" value={draft.serviceToken} onChange={(e) => setDraft({ ...draft, serviceToken: e.target.value })} />
           </SettingsRow>
           <SettingsRow label="Tenant ID" description="Must equal agent-api SAGE_TENANT_ID; used in schedule definitions.">
-            <Input className="w-[260px]" value={draft.tenantId} onChange={(e) => setDraft({ ...draft, tenantId: e.target.value })} />
+            <Input className="w-full" value={draft.tenantId} onChange={(e) => setDraft({ ...draft, tenantId: e.target.value })} />
           </SettingsRow>
           <div className="flex items-center justify-end gap-2 py-3">
             {saved ? <span className="text-[12px] text-muted">Saved</span> : null}

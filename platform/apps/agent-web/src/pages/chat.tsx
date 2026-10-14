@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Empty, ErrorState, Kbd, Mono } from '@/components/ui/misc';
 import { LoadingState, formatElapsed } from '@/components/bui/loading-state';
-import { PageContent, Quiet, SegmentedTabs } from '@/components/layout/page';
+import { PageColumn, PageContent, Quiet, SegmentedTabs } from '@/components/layout/page';
 import { PromptBar, UserBubble, type PromptMenuItem, type PromptModel } from '@/components/bui/prompt-bar';
 import { StreamingText } from '@/components/bui/streaming-text';
 import { TaskRows } from '@/components/bui/task-rows';
@@ -196,7 +196,7 @@ function SessionView({ sessionId }: { sessionId: string }) {
           <Button variant="ghost" size="icon" title="Delete session" onClick={() => { if (confirm('Delete this session permanently?')) remove.mutate(); }}><Trash2 /></Button>
         </>}
       />
-      <PageContent scrollRef={scroller}>
+      <PageContent width="chat" scrollRef={scroller}>
         {detail.error ? <ErrorState error={detail.error} /> : null}
           <div className="mb-6 flex items-center justify-between">
             <SegmentedTabs value={tab} onChange={setTab} items={[{ value: 'chat', label: 'Conversation' }, { value: 'runs', label: `Runs ${allRuns.length}` }]} />
@@ -220,13 +220,13 @@ function SessionView({ sessionId }: { sessionId: string }) {
             </>
           )}
       </PageContent>
-      <div className="gutter-x pb-5 pt-1">
+      <PageColumn width="chat" className="pb-5 pt-1">
         <div>
           <PromptBar value={draft} onChange={setDraft} onSubmit={submit} models={models} model={connectionId} onModel={setConnectionId} sources={sources} commands={commands} busy={send.isPending}
             placeholder={isMock() ? 'Mock mode is read-only — sending is disabled' : 'Ask the run agent — @ to reference a task, / for commands'}
             status={send.error ? <span className="w-[220px] truncate text-[12px] text-red">{send.error.message}</span> : busy ? <LoadingState label="Running" className="mr-1 scale-90" /> : null} />
         </div>
-      </div>
+      </PageColumn>
     </>
   );
 }
@@ -259,7 +259,7 @@ function RunBlock({ group, run, onRetry, retrying, onFollowUp }: { group: RunGro
       : [{ key: 'end', primary: status === 'failed' ? 'Run failed' : 'Run completed', secondary: took, state: (status === 'failed' ? 'failed' : 'done') as TraceRow['state'] }])
   ];
   return (
-    <section className="readable flex flex-col gap-3" style={{ animation: 'fade-up 360ms cubic-bezier(0.23,1,0.32,1) both' }}>
+    <section className="flex flex-col gap-3" style={{ animation: 'fade-up 360ms cubic-bezier(0.23,1,0.32,1) both' }}>
       {group.userText.map((text, i) => (
         <div key={i} className="flex justify-end">
           <UserBubble>{text}</UserBubble>
