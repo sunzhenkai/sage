@@ -21,10 +21,10 @@ function dayBucket(iso: string | undefined): 'Today' | 'Yesterday' | 'Earlier' {
   return t >= start ? 'Today' : t >= start - 86_400_000 ? 'Yesterday' : 'Earlier';
 }
 
-function Avatar({ id, title, tone }: { id: string; title: string; tone: RunTone }) {
+function Avatar({ id, title, tone, compact }: { id: string; title: string; tone: RunTone; compact?: boolean }) {
   const h = hueOf(id);
   return (
-    <span className="relative grid size-8 shrink-0 place-items-center rounded-[9px] text-[12.5px] font-semibold"
+    <span className={cn('relative grid shrink-0 place-items-center font-semibold', compact ? 'size-7 rounded-[8px] text-[12px]' : 'size-8 rounded-[9px] text-[12.5px]')}
       style={{ background: `oklch(0.68 0.13 ${h} / 0.16)`, color: `oklch(0.62 0.15 ${h})`, boxShadow: `inset 0 0 0 1px oklch(0.68 0.13 ${h} / 0.22)` }}>
       {title.trim()[0]?.toUpperCase() ?? <MessageSquare className="size-3.5" />}
       <span title={toneLabel[tone]} className={cn('absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full ring-2 ring-[var(--panel)]', tone === 'active' && 'animate-pulse')} style={{ background: toneColor[tone] }} />
@@ -120,8 +120,8 @@ export function SessionHeader<T extends string>({ id, title, lastRun, meta, acti
   };
   return (
     <header className="gutter-x flex h-[var(--header-h)] shrink-0 items-center gap-2.5 border-b border-line bg-panel">
-      <Avatar id={id} title={title} tone={tone} />
-      <h1 title="Session title" className="-mx-1 min-w-0 cursor-text truncate rounded-[6px] px-1 text-[15px] font-semibold tracking-[-0.015em] text-ink hover:bg-hover">{title}</h1>
+      <Avatar id={id} title={title} tone={tone} compact />
+      <h1 title="Session title" className="-mx-1 min-w-0 cursor-text truncate rounded-[6px] px-1 text-[14px] font-semibold tracking-[-0.01em] text-ink hover:bg-hover">{title}</h1>
       <span title={toneLabel[tone]} className={cn('size-2 shrink-0 rounded-full', tone === 'active' && 'animate-pulse')} style={{ background: toneColor[tone] }} />
       {meta ? <span className="t-meta flex min-w-0 items-center gap-1.5 truncate">{meta}</span> : null}
       <div className="ml-auto flex shrink-0 items-center gap-2">
@@ -131,7 +131,7 @@ export function SessionHeader<T extends string>({ id, title, lastRun, meta, acti
             return (
               <button key={t.value} data-value={t.value} role="tab" type="button" aria-selected={sel} tabIndex={sel ? 0 : -1}
                 title={t.hint ?? t.label} aria-label={t.label} onClick={() => onTab(t.value)}
-                className={cn('flex h-7 items-center gap-1.5 rounded-[6px] px-2 text-[12.5px] font-medium outline-none transition-colors focus-visible:shadow-[0_0_0_2px_var(--accent)] [&_svg]:size-3.5', sel ? 'bg-hover-2 text-ink' : 'text-ink-3 hover:bg-hover hover:text-ink')}>
+                className={cn('flex h-6 items-center gap-1.5 rounded-[5px] px-2 text-[12px] font-medium outline-none transition-colors focus-visible:shadow-[0_0_0_2px_var(--accent)] [&_svg]:size-3.5', sel ? 'bg-hover-2 text-ink' : 'text-ink-3 hover:bg-hover hover:text-ink')}>
                 {t.icon}<span>{t.label}</span>{t.count !== undefined ? <span className="text-[11px] font-normal tabular-nums text-ink-3">{t.count}</span> : null}
               </button>
             );

@@ -76,14 +76,14 @@
 |---|---|
 | 宽度 | 面板内**全宽**（设置、Providers、聊天例外，见下），不使用临时居中容器 |
 | 唯一 gutter | `--gutter: 24px`（`gutter-x`），header / toolbar / 内容 / 列表行一致 |
-| Header 高度 | **唯一** token `--header-h: 56px`：PageHeader、PageToolbar、SessionHeader 及所有窗格头都用 `h-[var(--header-h)]` + 底部 1px `--line`，相邻窗格（如聊天会话列表与会话头）底边连成一条线；筛选/切换等放在头部下方的工具行。禁止硬编码头部高度 |
+| Header 高度 | **唯一** token `--header-h: 44px`（紧凑；改高度只改此 token，头部内控件 ≤28px：分段 h-6、图标按钮 size-7、头像 ≤28px）：PageHeader、PageToolbar、SessionHeader 及所有窗格头都用 `h-[var(--header-h)]` + 底部 1px `--line`，相邻窗格（如聊天会话列表与会话头）底边连成一条线；筛选/切换等放在头部下方的工具行。禁止硬编码头部高度 |
 | 内容上下留白 | `PageContent`：`pt-6 pb-12`；`PageDescription` 下方 `pb-6` |
 | Section 间距 | `mt-8`（首个为 0），标题与内容 `mb-3` |
 | 间距刻度 | 4 · 6 · 8 · 12 · 16 · 24 · 32 · 48（px） |
 | 详情页 | 两栏：主栏 `flex-1` + 属性侧栏 `--aside-w: 320px`（`DetailLayout`，`border-l`，同 Panel 背景） |
 | 设置页 / Providers | 900px 居中栏；`SettingsRow` 两列网格：标签列 `minmax(160px,220px)` + 控件列 `1fr`，输入框 `w-full` 填满控件列，开关/分段控件右对齐 |
 | Master-detail | 聊天页左侧会话列 300px（`SessionList`：容器 `px-2.5`、组间距 8px、行间距 8px、组头与首行间 4px（sticky 组头不再盖住选中卡片的 1px 描边）；按 Today/Yesterday/Earlier 分组；行 = 色相头像 + 最新 run 状态点 + 标题/预览 + 时间 + runs/消息计数 + 最近 5 次 run 色条；每行均为白色描边卡片（8px 间距）；选中行加 accent ring；Active/Archived 分段切换） |
-| 会话页头 | 单一页头 `SessionHeader`：头像 + 标题 + 状态点 + 灰色 meta，右侧操作；右侧为视图切换图标分段控件（Chat `MessageSquare` / Runs `ListChecks` + 短标签 + 计数，白底描边，选中 `--hover-2`，tooltip，←/→ 键切换，role=tablist），竖线分隔后接操作按钮；页头单行 56px；背景同页面底色，仅一条底部分隔线，不使用胶囊/卡片 tab |
+| 会话页头 | 单一页头 `SessionHeader`：头像 + 标题 + 状态点 + 灰色 meta，右侧操作；右侧为视图切换图标分段控件（Chat `MessageSquare` / Runs `ListChecks` + 短标签 + 计数，白底描边，选中 `--hover-2`，tooltip，←/→ 键切换，role=tablist），竖线分隔后接操作按钮；页头单行 `--header-h`；背景同页面底色，仅一条底部分隔线，不使用胶囊/卡片 tab |
 | 例外：阅读/表单类页面居中窄栏 | 设置页、Providers 页 `PageContent width="narrow"`（`--w-narrow: 900px`）；聊天消息流 + 输入框 `width="chat"`（`--w-chat: 1000px`，会话列表侧栏不变）。宽度只能通过 `PageContent` / `PageColumn` 的 `width` 取得，页面里仍禁止 `max-w-*` / `mx-auto` |
 | 图表/列表页 | Overview、Tasks、Schedules、Apps、Packages 列表使用 `PageContent width="wide"`（`--w-wide: 1120px` + gutter），在剩余空间中**居中**；侧边栏折叠时内容不会拉伸到边缘 |
 | 其余页面 | 详情页（两栏 + 属性侧栏）保持全宽 |
