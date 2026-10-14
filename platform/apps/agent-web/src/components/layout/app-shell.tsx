@@ -117,7 +117,7 @@ export function AppShell() {
 
       {/* Inset panel — the Linear signature */}
       <div className="flex min-w-0 flex-1 flex-col py-2 pr-2">
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[10px] bg-panel shadow-panel">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[14px] bg-panel shadow-card">
           <Outlet />
         </div>
       </div>

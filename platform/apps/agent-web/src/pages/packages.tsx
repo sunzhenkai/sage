@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
-import { Package } from 'lucide-react';
+import { Clock, Fingerprint, Hash, Package, Tags } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router';
 import { Crumb, PageHeader, PanelBar } from '@/components/layout/app-shell';
-import { ListGroup, ListRow, Pill, RowId, RowMeta, RowTitle } from '@/components/ui/list';
+import { Monogram, Tag } from '@/components/bui/atoms';
+import { RecordsTable } from '@/components/bui/records-table';
 import { Empty, ErrorState, JsonView, Loading } from '@/components/ui/misc';
 import { api } from '@/lib/api';
 import { relativeTime } from '@/lib/utils';
@@ -14,17 +15,16 @@ export function PackagesPage() {
   return (
     <>
       <PanelBar left={<><Package className="size-4 text-muted" strokeWidth={1.6} /><span className="text-[13px] font-medium">Packages</span></>} />
-      <div className="flex min-h-0 flex-1 flex-col overflow-auto">
+      <div className="flex min-h-0 flex-1 flex-col">
         {packages.isLoading ? <Loading /> : packages.error ? <ErrorState error={packages.error} /> : !items.length ? <Empty icon={Package} title="No packages" /> : (
-          <ListGroup icon={<Package className="size-3.5 text-muted" />} label="Registered" count={items.length}>
-            {items.map((p) => (
-              <ListRow key={p.packageId} onClick={() => navigate(`/packages/${p.packageId}`)}>
-                <RowId>{p.latestContentDigest?.slice(7, 15) ?? 'PKG'}</RowId>
-                <RowTitle sub={`${p.releaseCount} release${p.releaseCount === 1 ? '' : 's'}`}>{p.packageId}</RowTitle>
-                <RowMeta>{p.latestVersion ? <Pill color="var(--green)">v{p.latestVersion}</Pill> : null}<span className="w-14 text-right text-faint">{relativeTime(p.updatedAt).replace(' ago', '')}</span></RowMeta>
-              </ListRow>
-            ))}
-          </ListGroup>
+          <RecordsTable fill rows={items} getKey={(x) => x.packageId} onRowClick={(x) => { void navigate(`/packages/${x.packageId}`); }}
+            columns={[
+              { key: 'pkg', label: 'Package', icon: <Package />, width: '30%', sort: (x, y) => x.packageId.localeCompare(y.packageId), render: (x) => <span className="flex min-w-0 items-center gap-2"><Monogram text={x.packageId} /><span className="truncate">{x.packageId}</span></span> },
+              { key: 'version', label: 'Latest version', icon: <Tags />, width: 150, render: (x) => x.latestVersion ? <Tag>{`v${x.latestVersion}`}</Tag> : <span className="text-ink-3">—</span> },
+              { key: 'releases', label: 'Releases', icon: <Hash />, width: 110, align: 'right', sort: (x, y) => x.releaseCount - y.releaseCount, render: (x) => <span className="tabular-nums text-ink-2">{x.releaseCount}</span> },
+              { key: 'digest', label: 'Content digest', icon: <Fingerprint />, render: (x) => <span className="font-mono text-[12px] text-ink-2">{x.latestContentDigest ? `${x.latestContentDigest.slice(0, 19)}…` : '—'}</span> },
+              { key: 'updated', label: 'Last update', icon: <Clock />, width: 140, sort: (x, y) => x.updatedAt.localeCompare(y.updatedAt), render: (x) => <span className="text-ink-2">{relativeTime(x.updatedAt)}</span> }
+            ]} />
         )}
       </div>
     </>

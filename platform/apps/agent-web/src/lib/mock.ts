@@ -39,26 +39,37 @@ export const mockSessions: SessionListItem[] = titles.map((title, i) => {
 const runsBySession = new Map<string, ChatRun[]>();
 const eventsBySession = new Map<string, TimelineEvent[]>();
 const messagesBySession = new Map<string, Message[]>();
-for (const s of mockSessions) {
-  const count = 1 + Math.floor(rnd() * 3);
+const toolPool = ['web-snapshot-reader', 'fx-rates.fetch', 'index-closes.fetch', 'artifact.write', 'search.news', 'calendar.lookup'];
+const ev = (s: SessionListItem, runId: string, seq: number, at: number, payload: TimelineEvent['payload']): TimelineEvent => ({ schemaVersion: '1', sessionId: s.sessionId, runId, sequence: seq, occurredAt: iso(at), payload });
+mockSessions.forEach((s, si) => {
+  const count = si === 0 ? 2 : 1 + Math.floor(rnd() * 3);
   const runs: ChatRun[] = []; const events: TimelineEvent[] = []; const messages: Message[] = []; let seq = 0;
   for (let k = 0; k < count; k++) {
-    const start = new Date(s.createdAt).getTime() + k * 900_000;
+    const live = si === 0 && k === count - 1;
+    const start = live ? NOW - 14_000 : new Date(s.createdAt).getTime() + k * 900_000;
     const runId = `run-${uuid()}`; const messageId = `message-${uuid()}`;
-    const status = rnd() < 0.78 ? 'succeeded' : 'failed';
+    const status = live ? 'active' : si === 0 ? 'succeeded' : rnd() < 0.78 ? 'succeeded' : 'failed';
     const dur = 2_000 + rnd() * 26_000;
-    runs.push({ schemaVersion: '1', runId, sessionId: s.sessionId, userMessageId: messageId, attempt: 1, status, startedAt: iso(start), completedAt: iso(start + dur), ...(status === 'failed' ? { error: { code: 'CHAT_AGENT_FAILED', message: 'Upstream provider timed out after 60s', retryable: true } } : {}) });
-    const text = pick(prompts);
+    runs.push({ schemaVersion: '1', runId, sessionId: s.sessionId, userMessageId: messageId, attempt: 1, status, startedAt: iso(start), ...(live ? {} : { completedAt: iso(start + dur) }), ...(status === 'failed' ? { error: { code: 'CHAT_AGENT_FAILED', message: 'Upstream provider timed out after 60s', retryable: true } } : {}) });
+    const text = si === 0 ? (k === 0 ? prompts[0]! : 'Now compare that with last week and flag anything unusual.') : pick(prompts);
     messages.push({ schemaVersion: '1', messageId, sessionId: s.sessionId, turn: k * 2 + 1, role: 'user', parts: [{ kind: 'text', text }], createdAt: iso(start) });
-    events.push({ schemaVersion: '1', sessionId: s.sessionId, runId, sequence: ++seq, occurredAt: iso(start), payload: { kind: 'text', text, messageId } });
-    events.push({ schemaVersion: '1', sessionId: s.sessionId, runId, sequence: ++seq, occurredAt: iso(start), payload: { kind: 'run', status: 'active', attempt: 1 } });
-    if (rnd() > 0.5) events.push({ schemaVersion: '1', sessionId: s.sessionId, runId, sequence: ++seq, occurredAt: iso(start + 900), payload: { kind: 'tool', toolName: 'web-snapshot-reader', status: 'completed' } });
-    if (status === 'succeeded') events.push({ schemaVersion: '1', sessionId: s.sessionId, runId, sequence: ++seq, occurredAt: iso(start + dur), payload: { kind: 'text', text: pick(answers) } });
-    else events.push({ schemaVersion: '1', sessionId: s.sessionId, runId, sequence: ++seq, occurredAt: iso(start + dur), payload: { kind: 'error', error: { code: 'CHAT_AGENT_FAILED', message: 'Upstream provider timed out after 60s', retryable: true } } });
-    events.push({ schemaVersion: '1', sessionId: s.sessionId, runId, sequence: ++seq, occurredAt: iso(start + dur), payload: { kind: 'run', status, attempt: 1 } });
+    events.push(ev(s, runId, ++seq, start, { kind: 'text', text, messageId }));
+    events.push(ev(s, runId, ++seq, start, { kind: 'run', status: 'active', attempt: 1 }));
+    const nTools = si === 0 ? 3 : Math.floor(rnd() * 4);
+    const used = si === 0 ? ['fx-rates.fetch', 'index-closes.fetch', 'artifact.write'] : Array.from({ length: nTools }, () => pick(toolPool));
+    used.forEach((toolName, ti) => {
+      const t0 = start + 600 + ti * 1800;
+      events.push(ev(s, runId, ++seq, t0, { kind: 'tool', toolName, status: 'started' }));
+      if (!(live && ti === used.length - 1)) events.push(ev(s, runId, ++seq, t0 + 1200, { kind: 'tool', toolName, status: 'completed', ...(toolName === 'artifact.write' ? { artifact: { artifactId: `art-${hex(6)}`, name: 'briefing.md', mediaType: 'text/markdown', sizeBytes: 4182 } } : {}) }));
+    });
+    if (!live && (si === 0 || rnd() > 0.6)) events.push(ev(s, runId, ++seq, start + dur - 500, { kind: 'artifact', artifact: { artifactId: `art-${hex(6)}`, name: pick(['briefing.md', 'summary.json', 'risks.csv']), mediaType: 'text/plain', sizeBytes: 900 + Math.floor(rnd() * 8000) } }));
+    if (live) events.push(ev(s, runId, ++seq, NOW - 2_000, { kind: 'text', text: 'Week over week, USD/CNY is down 0.4% while EUR/USD gained 1.1%. The S&P 500 is up 1.8%' }));
+    else if (status === 'succeeded') events.push(ev(s, runId, ++seq, start + dur, { kind: 'text', text: si === 0 ? answers[0]! : pick(answers) }));
+    else events.push(ev(s, runId, ++seq, start + dur, { kind: 'error', error: { code: 'CHAT_AGENT_FAILED', message: 'Upstream provider timed out after 60s', retryable: true } }));
+    if (!live) events.push(ev(s, runId, ++seq, start + dur, { kind: 'run', status, attempt: 1 }));
   }
   runsBySession.set(s.sessionId, runs); eventsBySession.set(s.sessionId, events); messagesBySession.set(s.sessionId, messages);
-}
+});
 
 const taskTypes = ['finance-brief', 'release-notes', 'incident-summary', 'data-sync'];
 const statusWeights: [TaskStatus, number][] = [['succeeded', 0.55], ['running', 0.14], ['failed', 0.12], ['paused', 0.07], ['cancelled', 0.07], ['effect_unknown', 0.05]];
@@ -68,6 +79,13 @@ export const mockTasks: TaskView[] = Array.from({ length: 46 }, (_, i) => {
   const taskType = pick(taskTypes);
   return { schemaVersion: '1', taskId: `task-${taskType}-${(4120 - i).toString()}`, taskType, workflowId: `wf-${hex(10)}`, targetId: pick(['worker-a', 'worker-b', 'worker-gpu']), attempt: rnd() > 0.8 ? 2 : 1, status: weighted(), revision: Math.floor(rnd() * 9), projectionSource: 'writer', projectionFreshness: 'fresh', lifecyclePath: 'DURABLE_COORDINATOR_V2', projectionUpdatedAt: iso(t), historyObservedAt: iso(t + 2000), sessionId: pick(mockSessions).sessionId };
 }).sort((a, b) => String(b.projectionUpdatedAt).localeCompare(String(a.projectionUpdatedAt)));
+
+{
+  const s0 = mockSessions[0]!; const evs = eventsBySession.get(s0.sessionId)!; const first = evs[0]!; const t = mockTasks.find((x) => x.taskType === 'finance-brief') ?? mockTasks[0]!;
+  const runEnd = evs.findIndex((e) => e.runId === first.runId && e.payload.kind === 'run' && e.payload.status !== 'active');
+  evs.splice(runEnd, 0, { ...first, sequence: 0, occurredAt: first.occurredAt, payload: { kind: 'task', taskId: t.taskId, title: 'Schedule daily FX briefing', status: 'promoted', promotionMode: 'explicit' } });
+  evs.forEach((e, i) => { e.sequence = i + 1; });
+}
 
 const def = (scheduleId: string, displayName: string, trigger: ScheduleSnapshot['definition']['trigger'], task: string): ScheduleSnapshot['definition'] => ({
   schemaVersion: '1', scheduleId, tenantId: 'tenant-local', displayName, trigger, overlapPolicy: 'SKIP', misfirePolicy: 'CATCH_UP_ONE', releaseBinding: { strategy: 'FOLLOW' },

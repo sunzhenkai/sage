@@ -1,15 +1,22 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Ban, ListChecks, Pause, Play, RefreshCw, RotateCw } from 'lucide-react';
+import { Ban, CircleDot, Clock, Hash, ListChecks, Pause, Play, RefreshCw, RotateCw, Server, Tags } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { Crumb, PageHeader, PanelBar, ViewTab } from '@/components/layout/app-shell';
+import { ApprovalCard } from '@/components/bui/approval-card';
+import { StatusGlyph, StatusPill, Tag, toneFor } from '@/components/bui/atoms';
+import { CodeBlock } from '@/components/bui/code-block';
+import { LoadingState, formatElapsed } from '@/components/bui/loading-state';
+import { RecordsTable } from '@/components/bui/records-table';
+import { TaskRows } from '@/components/bui/task-rows';
+import { ThinkingTrace } from '@/components/bui/thinking';
+import { ToolChips } from '@/components/bui/tool-chips';
 import { StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { DetailLayout, ListGroup, ListRow, Pill, Property, PropertyGroup, RowId, RowMeta, RowTitle } from '@/components/ui/list';
+import { DetailLayout, Pill, Property, PropertyGroup } from '@/components/ui/list';
 import { Empty, ErrorState, JsonView, Loading, Mono } from '@/components/ui/misc';
-import { StatusIcon } from '@/components/ui/status';
 import { api } from '@/lib/api';
-import type { TaskStatus, TaskView } from '@/lib/types';
+import type { TaskStatus } from '@/lib/types';
 import { cn, formatTime, relativeTime, shortId } from '@/lib/utils';
 
 const statuses: TaskStatus[] = ['running', 'paused', 'effect_unknown', 'failed', 'succeeded', 'cancelled'];
@@ -21,7 +28,7 @@ export function TasksPage() {
   const tasks = useQuery({ queryKey: ['tasks'], queryFn: () => api.tasks.list({ limit: 200 }), refetchInterval: 10_000 });
   const all = tasks.data?.tasks ?? [];
   const filtered = all.filter((t) => view === 'all' || (view === 'active' ? ['running', 'paused', 'effect_unknown'].includes(t.status) : ['succeeded', 'failed', 'cancelled'].includes(t.status)));
-  const groups = statuses.map((s) => [s, filtered.filter((t) => t.status === s)] as const).filter(([, items]) => items.length > 0);
+  const active = filtered.filter((t) => ['running', 'paused', 'effect_unknown'].includes(t.status));
   return (
     <>
       <PanelBar
@@ -31,31 +38,34 @@ export function TasksPage() {
           <ViewTab active={view === 'done'} onClick={() => setView('done')}>Completed</ViewTab></>}
         right={<Button variant="ghost" size="icon-sm" title="Refresh" onClick={() => void tasks.refetch()}><RefreshCw className={cn(tasks.isFetching && 'animate-spin')} /></Button>}
       />
-      <div className="flex min-h-0 flex-1 flex-col overflow-auto">
-        {tasks.isLoading ? <Loading /> : tasks.error ? <ErrorState error={tasks.error} /> : groups.length === 0 ? (
+      <div className="flex min-h-0 flex-1 flex-col">
+        {tasks.isLoading ? <Loading /> : tasks.error ? <ErrorState error={tasks.error} /> : filtered.length === 0 ? (
           <Empty icon={ListChecks} title="No tasks" hint="Tasks appear here when chat messages are promoted or schedules fire." />
-        ) : groups.map(([status, items]) => (
-          <ListGroup key={status} icon={<StatusIcon status={status} />} label={statusLabel[status]} count={items.length}>
-            {items.map((t) => <TaskRow key={t.taskId} task={t} onClick={() => navigate(`/tasks/${t.taskId}`)} />)}
-          </ListGroup>
-        ))}
+        ) : (
+          <>
+            {active.length && view !== 'done' ? (
+              <div className="border-b border-line px-6 pb-4 pt-4">
+                <div className="mb-2 flex items-center gap-2 text-[12px] font-medium text-ink-3">In flight <span className="tabular-nums">{active.length}</span></div>
+                <TaskRows className="max-w-[760px]" rows={active.slice(0, 4).map((t) => ({
+                  key: t.taskId, status: t.status, step: t.attempt, label: t.taskId, amount: t.taskType, onOpen: () => { void navigate(`/tasks/${t.taskId}`); },
+                  details: [{ label: 'Workflow', meta: t.workflowId ?? '—' }, { label: 'Target', meta: t.targetId ?? '—' }, { label: 'Updated', meta: relativeTime(t.projectionUpdatedAt) }]
+                }))} />
+              </div>
+            ) : null}
+            <RecordsTable fill rows={filtered} getKey={(t) => t.taskId} onRowClick={(t) => { void navigate(`/tasks/${t.taskId}`); }}
+              columns={[
+                { key: 'task', label: 'Task', icon: <ListChecks />, width: '34%', sort: (x, y) => x.taskId.localeCompare(y.taskId), render: (t) => <span className="flex min-w-0 items-center gap-2"><StatusGlyph status={t.status} size={16} /><span className="truncate">{t.taskId}</span></span> },
+                { key: 'status', label: 'Status', icon: <CircleDot />, width: 140, sort: (x, y) => statuses.indexOf(x.status) - statuses.indexOf(y.status), render: (t) => <StatusPill tone={toneFor(t.status)}>{statusLabel[t.status]}</StatusPill> },
+                { key: 'type', label: 'Type', icon: <Tags />, width: 160, sort: (x, y) => String(x.taskType).localeCompare(String(y.taskType)), render: (t) => t.taskType ? <Tag>{t.taskType}</Tag> : <span className="text-ink-3">—</span> },
+                { key: 'target', label: 'Target', icon: <Server />, width: 130, render: (t) => <span className="font-mono text-[12px] text-ink-2">{t.targetId ?? '—'}</span> },
+                { key: 'attempt', label: 'Attempt', icon: <Hash />, width: 90, align: 'right', sort: (x, y) => (x.attempt ?? 0) - (y.attempt ?? 0), render: (t) => <span className="tabular-nums text-ink-2">{t.attempt ?? '—'}</span> },
+                { key: 'updated', label: 'Last update', icon: <Clock />, width: 130, sort: (x, y) => String(x.projectionUpdatedAt).localeCompare(String(y.projectionUpdatedAt)), render: (t) => <span className="text-ink-2">{relativeTime(t.projectionUpdatedAt)}</span> }
+              ]}
+              footer={<span className="ml-auto">{active.length} in flight · {filtered.filter((t) => t.status === 'failed').length} failed</span>} />
+          </>
+        )}
       </div>
     </>
-  );
-}
-
-function TaskRow({ task: t, onClick }: { task: TaskView; onClick: () => void }) {
-  return (
-    <ListRow onClick={onClick}>
-      <RowId>{shortId(t.taskId, 8).toUpperCase()}</RowId>
-      <StatusIcon status={t.status} />
-      <RowTitle sub={t.workflowId}>{t.taskId}</RowTitle>
-      <RowMeta>
-        {t.taskType ? <Pill color="var(--accent)">{t.taskType}</Pill> : null}
-        {t.attempt && t.attempt > 1 ? <Pill>attempt {t.attempt}</Pill> : null}
-        <span className="w-14 text-right text-faint">{relativeTime(t.projectionUpdatedAt).replace(' ago', '')}</span>
-      </RowMeta>
-    </ListRow>
   );
 }
 
@@ -102,13 +112,32 @@ export function TaskDetailPage() {
           </PropertyGroup>
         </>}>
           <div className="mx-auto max-w-[760px] px-6 pb-16 pt-10">
-            <h2 className="text-[20px] font-semibold tracking-[-0.02em] text-fg">{t.taskId}</h2>
-            <p className="mt-1 text-[13px] text-muted">{t.taskType ?? 'Task'} · {statusLabel[t.status]}{t.freshnessReason ? ` · ${t.freshnessReason}` : ''}</p>
-            <div className="mt-6 flex items-center gap-1 border-b border-line pb-2">
-              {(['activity', 'run-logs', 'artifacts', 'raw'] as Tab[]).map((name) => <ViewTab key={name} active={tab === name} onClick={() => setTab(name)}>{name === 'run-logs' ? 'Run logs' : name[0]!.toUpperCase() + name.slice(1)}</ViewTab>)}
+            <div className="flex items-center gap-3">
+              <StatusGlyph status={t.status} size={26} step={t.attempt} />
+              <div className="min-w-0">
+                <h2 className="truncate text-[20px] font-semibold tracking-[-0.02em] text-ink">{t.taskId}</h2>
+                <p className="text-[13px] text-ink-2">{t.taskType ?? 'Task'} · {statusLabel[t.status]}{t.freshnessReason ? ` · ${t.freshnessReason}` : ''}</p>
+              </div>
             </div>
-            <div className="pt-4">
-              {tab === 'activity' ? <TaskEvents taskId={taskId} /> : tab === 'run-logs' ? <RunLogs taskId={taskId} /> : tab === 'artifacts' ? <Artifacts taskId={taskId} /> : <JsonView value={t} />}
+            {t.status === 'effect_unknown' || t.status === 'paused' ? (
+              <ApprovalCard className="mt-6"
+                eyebrow={<><span className="size-1.5 rounded-full bg-orange" />{t.status === 'paused' ? 'Paused — waiting for you' : 'Effect unknown — needs a decision'}</>}
+                question={t.status === 'paused' ? 'This task is paused. How should it continue?' : 'The last side effect could not be confirmed. How should the agent proceed?'}
+                options={t.status === 'paused'
+                  ? [{ key: 'resume', label: 'Resume', description: 'Send the resume signal and continue from the checkpoint' }, { key: 'cancel', label: 'Cancel task', description: 'Stop the workflow; it will not run again', danger: true }]
+                  : [{ key: 'retry', label: 'Retry the task', description: 'Start a new attempt (the effect may happen twice)' }, { key: 'cancel', label: 'Cancel task', description: 'Stop here and investigate the run logs', danger: true }]}
+                busy={control.isPending}
+                onConfirm={(k) => { if (k !== 'cancel' || confirm('Cancel this task?')) control.mutate(k as 'resume' | 'retry' | 'cancel'); }} />
+            ) : null}
+            <div className="mt-7 flex w-fit items-center rounded-control bg-surface p-1 shadow-card">
+              {(['activity', 'run-logs', 'artifacts', 'raw'] as Tab[]).map((name) => (
+                <button key={name} type="button" aria-pressed={tab === name} onClick={() => setTab(name)} className={cn('rounded-[6px] px-2.5 py-[3px] text-[13px] text-ink transition-[background-color,opacity] duration-100', tab === name ? 'bg-field' : 'opacity-50 hover:opacity-75')}>
+                  {name === 'run-logs' ? 'Run logs' : name[0]!.toUpperCase() + name.slice(1)}
+                </button>
+              ))}
+            </div>
+            <div className="pt-5">
+              {tab === 'activity' ? <TaskEvents taskId={taskId} status={t.status} /> : tab === 'run-logs' ? <RunLogs taskId={taskId} /> : tab === 'artifacts' ? <Artifacts taskId={taskId} /> : <JsonView value={t} filename={`${t.taskId}.json`} />}
             </div>
           </div>
         </DetailLayout>
@@ -117,29 +146,27 @@ export function TaskDetailPage() {
   );
 }
 
-function TaskEvents({ taskId }: { taskId: string }) {
+function TaskEvents({ taskId, status }: { taskId: string; status: TaskStatus }) {
   const events = useQuery({ queryKey: ['task', taskId, 'events'], queryFn: () => api.tasks.events(taskId), refetchInterval: 5_000 });
   if (events.isLoading) return <Loading rows={4} />;
   if (events.error) return <ErrorState error={events.error} />;
-  if (!events.data?.events.length) return <p className="py-6 text-[12.5px] text-muted">No activity yet.</p>;
+  const list = events.data?.events ?? [];
+  if (!list.length) return <p className="py-6 text-[13px] text-ink-3">No activity yet.</p>;
+  const running = status === 'running';
+  const first = list[0] as Record<string, unknown>; const last = list.at(-1) as Record<string, unknown>;
+  const at = (e: Record<string, unknown>) => (e['occurredAt'] ?? e['createdAt'] ?? e['recordedAt']) as string | undefined;
+  const span = at(first) && at(last) ? formatElapsed(new Date(at(last)!).getTime() - new Date(at(first)!).getTime()) : undefined;
   return (
-    <ol className="relative">
-      <span className="absolute bottom-2 left-[7px] top-2 w-px bg-line-strong" />
-      {events.data.events.map((event, index) => {
-        const e = event as Record<string, unknown>;
-        const kind = String(e['type'] ?? e['kind'] ?? e['eventType'] ?? 'event');
-        const at = (e['occurredAt'] ?? e['createdAt'] ?? e['recordedAt']) as string | undefined;
-        return (
-          <li key={String(e['eventId'] ?? index)} className="relative flex gap-3 py-1.5 pl-0">
-            <span className="relative z-10 mt-[3px] grid size-[15px] place-items-center rounded-full bg-panel"><span className="size-[7px] rounded-full border border-faint bg-panel" /></span>
-            <div className="min-w-0 flex-1">
-              <div className="text-[12.5px]"><span className="font-medium text-fg-2">{kind}</span><span className="ml-2 text-faint">{relativeTime(at)}</span></div>
-              <details className="mt-0.5"><summary className="cursor-pointer text-[11.5px] text-faint hover:text-muted">Details</summary><JsonView value={event} className="mt-1" /></details>
-            </div>
-          </li>
-        );
-      })}
-    </ol>
+    <div className="flex flex-col gap-4">
+      <ThinkingTrace working={running} activeLabel="Running" doneLabel={`${list.length} steps${span ? ` over ${span}` : ''}`} defaultOpen
+        rows={list.map((event, index) => {
+          const e = event as Record<string, unknown>;
+          const kind = String(e['type'] ?? e['kind'] ?? e['eventType'] ?? 'event');
+          const isLast = index === list.length - 1;
+          return { key: String(e['eventId'] ?? index), primary: kind, secondary: relativeTime(at(e)), state: isLast && running ? 'active' : /fail|error/i.test(kind) ? 'failed' : 'done', detail: <JsonView value={event} filename={`${kind}.json`} /> };
+        })} />
+      {running ? <LoadingState label="Waiting for the next step" since={at(last)} /> : null}
+    </div>
   );
 }
 
@@ -158,15 +185,9 @@ function RunLogs({ taskId }: { taskId: string }) {
           return <ViewTab key={`${a.runId}|${a.attemptId}`} active={active} onClick={() => setSelected({ runId: a.runId, attemptId: a.attemptId })}>{shortId(a.runId)} · {shortId(a.attemptId)}</ViewTab>;
         })}
       </div>
-      <div className="font-mono text-[11.5px]">
-        {data.events.map((e) => (
-          <details key={e.eventId} className="rounded px-2 py-1 hover:bg-hover">
-            <summary className="cursor-pointer"><span className="mr-3 text-faint">{String(e.sequence).padStart(4, ' ')}</span><span className="text-fg-2">{e.type}</span></summary>
-            <JsonView value={e.payload} className="my-1" />
-          </details>
-        ))}
-        {data.nextFromSequence ? <p className="px-2 py-1 text-faint">More events available…</p> : null}
-      </div>
+      <ToolChips header={`${data.events.length} events in ${shortId(data.selected?.attemptId ?? '')}`}
+        steps={data.events.map((e) => ({ key: e.eventId, icon: /tool/.test(e.type) ? 'run' : /model/.test(e.type) ? 'think' : /artifact|write/.test(e.type) ? 'write' : 'read', label: e.type, chip: `#${e.sequence}  ${JSON.stringify(e.payload).slice(0, 80)}`, mono: true, detail: JSON.stringify(e.payload, null, 2).split('\n').map((text) => ({ text })) }))} className="max-w-none" />
+      {data.nextFromSequence ? <p className="text-[12px] text-ink-3">More events available…</p> : null}
     </div>
   );
 }
@@ -177,22 +198,23 @@ function Artifacts({ taskId }: { taskId: string }) {
   const content = useQuery({ queryKey: ['task', taskId, 'artifact', open], queryFn: () => api.tasks.artifact(taskId, open ?? ''), enabled: !!open });
   if (artifacts.isLoading) return <Loading rows={3} />;
   if (artifacts.error) return <ErrorState error={artifacts.error} />;
-  if (!artifacts.data?.artifacts.length) return <p className="py-6 text-[12.5px] text-muted">No artifacts.</p>;
+  const list = artifacts.data?.artifacts ?? [];
+  if (!list.length) return <p className="py-6 text-[13px] text-ink-3">No artifacts.</p>;
+  const current = list.find((a) => a.artifactId === open);
   return (
-    <div className="-mx-5 flex flex-col">
-      {artifacts.data.artifacts.map((a) => (
-        <ListRow key={a.artifactId} active={open === a.artifactId} onClick={() => setOpen(a.artifactId)}>
-          <RowTitle sub={a.mediaType}>{a.name ?? a.artifactId}</RowTitle>
-          <RowMeta>{a.sizeBytes !== undefined ? `${a.sizeBytes} B` : null}
-            <a className="text-accent hover:underline" onClick={(e) => e.stopPropagation()} href={`/v1/tasks/${encodeURIComponent(taskId)}/artifacts/${encodeURIComponent(a.artifactId)}?download=1`}>Download</a>
-          </RowMeta>
-        </ListRow>
-      ))}
-      {open ? <div className="px-5 pt-3">{content.isLoading ? <Loading rows={3} /> : content.error ? <ErrorState error={content.error} /> : (
-        content.data?.content !== undefined && content.data.encoding !== 'base64'
-          ? <pre className="overflow-auto rounded-md border border-line bg-sunken p-3 font-mono text-[11.5px]">{content.data.content}</pre>
-          : <JsonView value={content.data} />
-      )}</div> : null}
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap gap-1.5">
+        {list.map((a) => (
+          <button key={a.artifactId} type="button" onClick={() => setOpen(a.artifactId)} className={cn('inline-flex h-8 items-center gap-1.5 rounded-control px-2.5 font-mono text-[12px] text-ink shadow-btn transition-colors', open === a.artifactId ? 'bg-hover-2' : 'bg-surface hover:bg-inset')}>
+            {a.name ?? a.artifactId}<span className="text-ink-3">{a.sizeBytes !== undefined ? `${Math.max(1, Math.round(a.sizeBytes / 1024))} KB` : ''}</span>
+          </button>
+        ))}
+      </div>
+      {open ? (content.isLoading ? <Loading rows={3} /> : content.error ? <ErrorState error={content.error} /> : (
+        <CodeBlock filename={current?.name ?? open} language={/json/.test(String(current?.mediaType)) ? 'json' : 'text'}
+          code={content.data?.content !== undefined && content.data.encoding !== 'base64' ? String(content.data.content) : JSON.stringify(content.data, null, 2)}
+          actions={<a className="flex h-6 items-center rounded-[6px] px-1.5 text-[12px] font-medium text-ink-3 hover:bg-hover hover:text-ink" href={`/v1/tasks/${encodeURIComponent(taskId)}/artifacts/${encodeURIComponent(open)}?download=1`}>Download</a>} />
+      )) : <p className="text-[12.5px] text-ink-3">Select an artifact to preview it.</p>}
     </div>
   );
 }

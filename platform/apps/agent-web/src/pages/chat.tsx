@@ -1,18 +1,22 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Archive, ArchiveRestore, ArrowUp, MessageSquare, MessagesSquare, Plus, RotateCw, Search, Sparkles, Trash2, Wrench } from 'lucide-react';
+import { Activity, Archive, ArchiveRestore, ListChecks, MessageSquare, MessagesSquare, Plus, RotateCw, Search, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { Crumb, PageHeader } from '@/components/layout/app-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Select } from '@/components/ui/input';
-import { Empty, ErrorState, Kbd, Mono, Spinner } from '@/components/ui/misc';
-import { StatusIcon } from '@/components/ui/status';
+import { Empty, ErrorState, Kbd, Mono } from '@/components/ui/misc';
+import { LoadingState, formatElapsed } from '@/components/bui/loading-state';
+import { PromptBar, type PromptMenuItem, type PromptModel } from '@/components/bui/prompt-bar';
+import { StreamingText } from '@/components/bui/streaming-text';
+import { TaskRows } from '@/components/bui/task-rows';
+import { ThinkingTrace, type TraceRow } from '@/components/bui/thinking';
+import { ToolChips } from '@/components/bui/tool-chips';
 import { api } from '@/lib/api';
 import { isMock } from '@/lib/mock';
 import { streamTimeline, type StreamState } from '@/lib/sse';
 import type { ChatRun, TimelineEvent } from '@/lib/types';
-import { cn, relativeTime, shortId } from '@/lib/utils';
+import { cn, formatTime, relativeTime, shortId } from '@/lib/utils';
 
 export function ChatPage() {
   const { sessionId } = useParams();
@@ -24,11 +28,11 @@ export function ChatPage() {
   const sessions = useQuery({ queryKey: ['chat', 'sessions', { q, archived }], queryFn: () => api.chat.listSessions({ limit: 50, q: q || undefined, archived }) });
   const create = useMutation({
     mutationFn: () => api.chat.createSession(),
-    onSuccess: (session) => { void queryClient.invalidateQueries({ queryKey: ['chat', 'sessions'] }); navigate(`/chat/${session.sessionId}`); }
+    onSuccess: (session) => { void queryClient.invalidateQueries({ queryKey: ['chat', 'sessions'] }); const q = search.get('q'); void navigate(`/chat/${session.sessionId}${q ? `?q=${encodeURIComponent(q)}` : ''}`); }
   });
 
   useEffect(() => {
-    if (search.get('new') === '1' && !create.isPending) { setSearch({}, { replace: true }); create.mutate(); }
+    if (search.get('new') === '1' && !create.isPending) { const q = search.get('q'); setSearch(q ? { q } : {}, { replace: true }); create.mutate(); }
   }, [search, setSearch, create]);
 
   return (
@@ -123,9 +127,11 @@ function SessionView({ sessionId }: { sessionId: string }) {
   const [events, setEvents] = useState<TimelineEvent[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [stream, setStream] = useState<StreamState>('connecting');
-  const [draft, setDraft] = useState('');
+  const [params] = useSearchParams();
+  const [draft, setDraft] = useState(() => params.get('q') ?? '');
   const scroller = useRef<HTMLDivElement>(null);
-  const textarea = useRef<HTMLTextAreaElement>(null);
+  const [tab, setTab] = useState<'chat' | 'runs'>('chat');
+  const tasks = useQuery({ queryKey: ['tasks'], queryFn: () => api.tasks.list({ limit: 200 }), retry: false });
 
   useEffect(() => { if (!connectionId && providers.data?.providerConnectionId) setConnectionId(providers.data.providerConnectionId); }, [providers.data, connectionId]);
 
@@ -147,10 +153,6 @@ function SessionView({ sessionId }: { sessionId: string }) {
   }, [sessionId, queryClient]);
 
   useEffect(() => { scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: 'smooth' }); }, [events.length]);
-  useEffect(() => {
-    const el = textarea.current;
-    if (el) { el.style.height = 'auto'; el.style.height = `${Math.min(el.scrollHeight, 220)}px`; }
-  }, [draft]);
 
   const send = useMutation({
     mutationFn: (text: string) => api.chat.submit(sessionId, text, connectionId || undefined),
@@ -168,9 +170,18 @@ function SessionView({ sessionId }: { sessionId: string }) {
 
   const groups = useMemo(() => groupTimeline(events), [events]);
   const runs = useMemo(() => new Map<string, ChatRun>((detail.data?.runs ?? []).map((r) => [r.runId, r])), [detail.data]);
-  const busy = groups.some((g) => g.status === 'active');
+  const busy = groups.some((g) => (g.status ?? runs.get(g.runId)?.status) === 'active');
   const session = detail.data?.session;
   const submit = () => { const text = draft.trim(); if (text && !send.isPending) send.mutate(text); };
+  const models: PromptModel[] = (providers.data?.providers ?? []).map((p) => ({ id: p.id, label: p.name, disabled: !p.available }));
+  const sources: PromptMenuItem[] = (tasks.data?.tasks ?? []).slice(0, 8).map((t) => ({ key: t.taskId, icon: <ListChecks strokeWidth={1.75} />, label: t.taskId, hint: `${t.taskType ?? 'task'} · ${t.status}`, insert: `@${t.taskId}` }));
+  const commands: PromptMenuItem[] = [
+    { key: 'new', icon: <Plus strokeWidth={1.75} />, label: '/new', hint: 'Start a new session', run: () => { void navigate('/chat?new=1'); } },
+    { key: 'archive', icon: <Archive strokeWidth={1.75} />, label: '/archive', hint: session?.archivedAt ? 'Unarchive this session' : 'Archive this session', run: () => archive.mutate() },
+    { key: 'retry', icon: <RotateCw strokeWidth={1.75} />, label: '/retry', hint: 'Retry the last failed run', disabled: !groups.some((g) => (g.status ?? runs.get(g.runId)?.status) === 'failed'), run: () => { const last = [...groups].reverse().find((g) => (g.status ?? runs.get(g.runId)?.status) === 'failed'); if (last) retry.mutate(last.runId); } },
+    { key: 'runs', icon: <Activity strokeWidth={1.75} />, label: '/runs', hint: 'Show run history', run: () => setTab('runs') }
+  ];
+  const allRuns = detail.data?.runs ?? [];
 
   return (
     <>
@@ -186,95 +197,100 @@ function SessionView({ sessionId }: { sessionId: string }) {
       />
       <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto">
         {detail.error ? <ErrorState error={detail.error} /> : null}
-        <div className="mx-auto max-w-[760px] px-6 pb-6 pt-10">
-          <h2 className="text-[20px] font-semibold tracking-[-0.02em] text-fg">{session?.title ?? 'Untitled session'}</h2>
-          <p className="mt-1 text-[12.5px] text-muted">{groups.length} run{groups.length === 1 ? '' : 's'} · created {relativeTime(session?.createdAt)}</p>
-          <div className="mb-3 mt-7 flex items-center gap-2 border-b border-line pb-2 text-[13px] font-medium text-fg">Activity</div>
-          {!loaded ? <ConversationSkeleton /> : groups.length === 0 ? (
-            <p className="py-6 text-[12.5px] text-muted">No activity yet. Write the first message below — each one starts a run you can follow live.</p>
-          ) : null}
-          <ol className="relative">
-            {groups.length ? <span className="absolute bottom-6 left-[11.5px] top-6 w-px bg-line-strong" /> : null}
-            {groups.map((group) => {
-              const run = runs.get(group.runId);
-              const status = group.status ?? run?.status;
-              const tools = group.events.filter((e) => e.payload.kind === 'tool' || e.payload.kind === 'task' || e.payload.kind === 'artifact');
-              const errors = group.events.flatMap((e) => (e.payload.kind === 'error' ? [{ seq: e.sequence, error: e.payload.error }] : []));
-              return (
-                <li key={group.runId} className="animate-fade-in">
-                  {group.userText.map((text, i) => (
-                    <FeedItem key={i} avatar={<span className="grid size-6 place-items-center rounded-full bg-[#4f5bc4] text-[10.5px] font-semibold text-white">Y</span>} who="You" at={group.at}>
-                      <div className="whitespace-pre-wrap text-[13.5px] leading-[21px] text-fg-2">{text}</div>
-                    </FeedItem>
-                  ))}
-                  <FeedItem
-                    avatar={<span className="grid size-6 place-items-center rounded-full border border-line-strong bg-panel text-muted"><Sparkles className="size-3" strokeWidth={1.75} /></span>}
-                    who="Agent"
-                    at={run?.completedAt ?? group.at}
-                    meta={<span className="inline-flex items-center gap-1"><StatusIcon status={status} className="size-3" />{status ?? 'pending'}{group.attempt && group.attempt > 1 ? ` · attempt ${group.attempt}` : ''} · <Mono className="text-faint">{shortId(group.runId)}</Mono></span>}
-                    action={status === 'failed' ? <button type="button" onClick={() => retry.mutate(group.runId)} disabled={retry.isPending} className="inline-flex h-6 items-center gap-1 rounded-md px-1.5 text-[12px] text-muted hover:bg-hover hover:text-fg"><RotateCw className="size-3" />Retry</button> : null}
-                  >
-                    {tools.map((e) => (
-                      <div key={e.sequence} className="flex items-center gap-2 py-0.5 text-[12.5px] text-muted">
-                        <Wrench className="size-3 text-faint" />
-                        {e.payload.kind === 'tool' ? <><span className="font-mono text-fg-2">{e.payload.toolName}</span>{e.payload.status}</>
-                          : e.payload.kind === 'task' ? <><span className="text-fg-2">{e.payload.title}</span><StatusIcon status={e.payload.status} className="size-3" />{e.payload.status}{e.payload.taskId ? <Link className="text-accent hover:underline" to={`/tasks/${e.payload.taskId}`}>Open</Link> : null}</>
-                          : e.payload.kind === 'artifact' ? <span className="text-fg-2">{e.payload.artifact.name}</span> : null}
-                      </div>
-                    ))}
-                    {group.assistantText ? <div className="whitespace-pre-wrap text-[13.5px] leading-[21px] text-fg-2">{group.assistantText}</div>
-                      : status === 'active' ? <div className="flex items-center gap-2 text-[12.5px] text-muted"><Spinner className="size-3" />Thinking…</div> : null}
-                    {errors.map(({ seq, error }) => (
-                      <div key={seq} className="text-[12.5px] leading-[19px] text-muted">
-                        <span className="font-medium text-red">{error.code}</span> <span>{error.message}</span>
-                      </div>
-                    ))}
-                  </FeedItem>
-                </li>
-              );
-            })}
-          </ol>
+        <div className="mx-auto max-w-[760px] px-6 pb-8 pt-8">
+          <div className="mb-6 flex items-center justify-between">
+            <div className="flex items-center rounded-control bg-surface p-1 shadow-card">
+              {(['chat', 'runs'] as const).map((name) => (
+                <button key={name} type="button" aria-pressed={tab === name} onClick={() => setTab(name)} className={cn('rounded-[6px] px-2.5 py-[3px] text-[13px] text-ink transition-[background-color,opacity] duration-100', tab === name ? 'bg-field' : 'opacity-50 hover:opacity-75')}>
+                  {name === 'chat' ? 'Conversation' : `Runs ${allRuns.length}`}
+                </button>
+              ))}
+            </div>
+            <span className="text-[12px] text-ink-3">created {relativeTime(session?.createdAt)}</span>
+          </div>
+          {tab === 'runs' ? (
+            allRuns.length ? <TaskRows variant="list" rows={[...allRuns].reverse().map((r, i) => ({
+              key: r.runId, status: r.status, step: allRuns.length - i,
+              label: <span className="font-mono text-[12.5px]">{shortId(r.runId, 14)}</span>,
+              amount: r.completedAt ? formatElapsed(new Date(r.completedAt).getTime() - new Date(r.startedAt).getTime()) : r.status === 'active' ? <LoadingState label="Running" since={r.startedAt} /> : '—',
+              details: [{ label: 'Started', meta: formatTime(r.startedAt) }, { label: 'Completed', meta: formatTime(r.completedAt) }, { label: 'Attempt', meta: r.attempt }, ...(r.error ? [{ label: r.error.code, meta: r.error.message }] : [])]
+            }))} /> : <p className="py-6 text-[13px] text-ink-3">No runs yet.</p>
+          ) : (
+            <>
+              {!loaded ? <ConversationSkeleton /> : groups.length === 0 ? (
+                <p className="py-6 text-[13px] text-ink-3">No activity yet. Write the first message below — each one starts a run you can follow live.</p>
+              ) : null}
+              <div className="flex flex-col gap-8">
+                {groups.map((group) => <RunBlock key={group.runId} group={group} run={runs.get(group.runId)} onRetry={() => retry.mutate(group.runId)} retrying={retry.isPending} onFollowUp={(t) => setDraft(t)} />)}
+              </div>
+            </>
+          )}
         </div>
       </div>
-      <div className="px-6 pb-5">
-        <div className="mx-auto max-w-[760px] rounded-lg border border-line-strong bg-sunken transition-colors focus-within:border-faint/70">
-          <textarea
-            ref={textarea}
-            rows={1}
-            className="block max-h-[220px] min-h-[44px] w-full resize-none bg-transparent px-3.5 pb-1 pt-3 text-[13.5px] leading-[21px] text-fg placeholder:text-faint focus:outline-none"
-            placeholder="Leave a message…"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); submit(); } }}
-          />
-          <div className="flex items-center gap-2 px-2 pb-2">
-            <Select className="h-6 w-auto max-w-[200px] border-transparent bg-transparent px-1.5 text-[12px] text-muted hover:bg-hover" value={connectionId} onChange={(e) => setConnectionId(e.target.value)} title="Provider connection">
-              <option value="">Server default</option>
-              {providers.data?.providers.map((p) => <option key={p.id} value={p.id} disabled={!p.available}>{p.name}{p.available ? '' : ' (unavailable)'}</option>)}
-            </Select>
-            {send.error ? <span className="truncate text-[12px] text-red">{send.error.message}</span> : busy ? <span className="flex items-center gap-1.5 text-[12px] text-muted"><Spinner className="size-3" />Run in progress</span> : null}
-            <Button size="icon-sm" variant={draft.trim() ? 'default' : 'ghost'} className="ml-auto rounded-full" onClick={submit} disabled={!draft.trim() || send.isPending} title="Send (Enter)">{send.isPending ? <Spinner className="size-3" /> : <ArrowUp strokeWidth={2} />}</Button>
-          </div>
+      <div className="px-6 pb-5 pt-1">
+        <div className="mx-auto max-w-[760px]">
+          <PromptBar value={draft} onChange={setDraft} onSubmit={submit} models={models} model={connectionId} onModel={setConnectionId} sources={sources} commands={commands} busy={send.isPending}
+            placeholder={isMock() ? 'Mock mode is read-only — sending is disabled' : 'Ask the run agent — @ to reference a task, / for commands'}
+            status={send.error ? <span className="max-w-[220px] truncate text-[12px] text-red">{send.error.message}</span> : busy ? <LoadingState label="Running" className="mr-1 scale-90" /> : null} />
         </div>
       </div>
     </>
   );
 }
 
-function FeedItem({ avatar, who, at, meta, action, children }: { avatar: React.ReactNode; who: string; at?: string | undefined; meta?: React.ReactNode; action?: React.ReactNode; children: React.ReactNode }) {
+const toolIcon = (name: string) => (/read|fetch|snapshot|get|search/i.test(name) ? 'read' : /write|edit|create|save/i.test(name) ? 'write' : 'run');
+
+function RunBlock({ group, run, onRetry, retrying, onFollowUp }: { group: RunGroup; run: ChatRun | undefined; onRetry: () => void; retrying: boolean; onFollowUp: (t: string) => void }) {
+  const status = group.status ?? run?.status;
+  const working = status === 'active';
+  const started = run?.startedAt ?? group.at;
+  const ended = run?.completedAt ?? (working ? undefined : group.events.at(-1)?.occurredAt);
+  const took = ended ? formatElapsed(new Date(ended).getTime() - new Date(started).getTime()) : undefined;
+  // tool events: pair started/completed by tool name
+  const tools: { key: string; name: string; done: boolean; artifact?: string | undefined }[] = [];
+  for (const e of group.events) {
+    const p = e.payload;
+    if (p.kind !== 'tool') continue;
+    const open = tools.find((t) => t.name === p.toolName && !t.done);
+    if (p.status === 'completed' && open) { open.done = true; open.artifact = p.artifact?.name; }
+    else tools.push({ key: String(e.sequence), name: p.toolName, done: p.status === 'completed', artifact: p.artifact?.name });
+  }
+  const artifacts = group.events.flatMap((e) => (e.payload.kind === 'artifact' ? [e.payload.artifact] : []));
+  const taskEvents = group.events.flatMap((e) => (e.payload.kind === 'task' ? [{ seq: e.sequence, ...e.payload }] : []));
+  const errors = group.events.flatMap((e) => (e.payload.kind === 'error' ? [{ seq: e.sequence, error: e.payload.error }] : []));
+  const trace: TraceRow[] = [
+    { key: 'start', primary: 'Run started', secondary: `attempt ${group.attempt ?? run?.attempt ?? 1}`, state: 'done' },
+    ...tools.map((t) => ({ key: `t${t.key}`, primary: t.done ? `Called ${t.name}` : `Calling ${t.name}`, secondary: t.artifact, mono: true, state: (t.done || !working ? 'done' : 'active') as TraceRow['state'] })),
+    ...taskEvents.map((t) => ({ key: `k${t.seq}`, primary: `Task ${t.status.replace(/_/g, ' ')}`, secondary: t.title, state: 'done' as const })),
+    ...(working ? [{ key: 'gen', primary: group.assistantText ? 'Writing the answer' : 'Waiting for the model', state: 'active' as const }]
+      : [{ key: 'end', primary: status === 'failed' ? 'Run failed' : 'Run completed', secondary: took, state: (status === 'failed' ? 'failed' : 'done') as TraceRow['state'] }])
+  ];
   return (
-    <div className="relative flex gap-3 py-2.5">
-      <div className="relative z-10 shrink-0 rounded-full bg-panel ring-4 ring-panel">{avatar}</div>
-      <div className="min-w-0 flex-1">
-        <div className="flex h-6 items-center gap-1.5 text-[12.5px]">
-          <span className="font-medium text-fg">{who}</span>
-          {meta ? <span className="text-muted">{meta}</span> : null}
-          <span className="text-faint">· {relativeTime(at)}</span>
-          {action ? <span className="ml-auto">{action}</span> : null}
+    <section className="flex flex-col gap-3" style={{ animation: 'fade-up 360ms cubic-bezier(0.23,1,0.32,1) both' }}>
+      {group.userText.map((text, i) => (
+        <div key={i} className="flex justify-end pl-16">
+          <div className="whitespace-pre-wrap rounded-xl bg-field px-3 py-1.5 text-[14px] leading-[1.45] text-ink">{text}</div>
         </div>
-        <div className="mt-0.5 flex flex-col gap-1">{children}</div>
-      </div>
-    </div>
+      ))}
+      <ThinkingTrace working={working} activeLabel="Thinking" doneLabel={status === 'failed' ? `Failed after ${took ?? '—'}` : `Worked for ${took ?? '—'}`} rows={trace} defaultOpen={working} />
+      {tools.length || artifacts.length ? (
+        <ToolChips header={`${tools.length} tool call${tools.length === 1 ? '' : 's'}${artifacts.length ? `, ${artifacts.length} artifact${artifacts.length === 1 ? '' : 's'}` : ''}`}
+          steps={tools.map((t) => ({ key: t.key, icon: toolIcon(t.name), label: t.done ? 'Called' : 'Calling', chip: t.name, mono: true, active: !t.done && working, ...(t.artifact ? { detail: [{ text: `→ ${t.artifact}` }] } : {}) }))}
+          files={artifacts.map((a) => ({ name: a.name, meta: `${Math.max(1, Math.round(a.sizeBytes / 1024))} KB` }))} />
+      ) : null}
+      {taskEvents.length ? (
+        <TaskRows rows={taskEvents.map((t) => ({ key: String(t.seq), label: t.title, status: t.status, amount: t.promotionMode, ...(t.taskId ? { onOpen: () => { window.location.assign(`/tasks/${t.taskId}`); } } : {}), details: [{ label: 'Task', meta: t.taskId ?? '—' }, ...(t.reason ? [{ label: 'Reason', meta: t.reason }] : [])] }))} />
+      ) : null}
+      {group.assistantText ? <StreamingText text={group.assistantText} streaming={working} followUps={working ? [] : ['Summarize that in 3 bullets', 'What should I do next?']} onFollowUp={onFollowUp} />
+        : working ? <LoadingState label="Generating" since={started} /> : null}
+      {errors.map(({ seq, error }) => (
+        <div key={seq} className="flex items-start gap-2.5 rounded-card bg-red-tint px-3 py-2.5 text-[13px]">
+          <span className="mt-0.5 grid size-4 shrink-0 place-items-center rounded-full bg-red text-white"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round"><path d="M12 6v8M12 18.5v.5" /></svg></span>
+          <div className="min-w-0 flex-1"><span className="font-medium text-red">{error.code}</span> <span className="text-ink-2">{error.message}</span></div>
+          {status === 'failed' ? <Button size="sm" variant="secondary" onClick={onRetry} disabled={retrying}><RotateCw />Retry</Button> : null}
+        </div>
+      ))}
+    </section>
   );
 }
 
@@ -282,9 +298,9 @@ function ConversationSkeleton() {
   return (
     <div className="flex flex-col gap-8">
       {[0, 1].map((i) => (
-        <div key={i} className="flex flex-col gap-4">
-          <div className="skeleton ml-auto h-9 w-48 rounded-[14px]" />
-          <div className="flex gap-3"><div className="skeleton size-6 rounded-full" /><div className="flex flex-1 flex-col gap-2"><div className="skeleton h-2.5 w-32" /><div className="skeleton h-2.5 w-4/5" /><div className="skeleton h-2.5 w-3/5" /></div></div>
+        <div key={i} className="flex flex-col gap-3">
+          <div className="skeleton ml-auto h-8 w-56 rounded-xl" />
+          <div className="skeleton h-3 w-32" /><div className="skeleton h-2.5 w-4/5" /><div className="skeleton h-2.5 w-3/5" />
         </div>
       ))}
     </div>
@@ -304,4 +320,3 @@ function StreamIndicator({ state }: { state: StreamState }) {
     </span>
   );
 }
-

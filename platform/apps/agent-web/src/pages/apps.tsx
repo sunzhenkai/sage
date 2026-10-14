@@ -1,10 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Boxes, Trash2 } from 'lucide-react';
+import { Boxes, CircleDot, Clock, Hash, Tags, Trash2 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router';
 import { Crumb, PageHeader, PanelBar } from '@/components/layout/app-shell';
+import { Monogram, StatusPill, Tag, toneFor } from '@/components/bui/atoms';
+import { RecordsTable } from '@/components/bui/records-table';
 import { StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { DetailLayout, ListGroup, ListRow, Pill, Property, PropertyGroup, RowId, RowMeta, RowTitle } from '@/components/ui/list';
+import { DetailLayout, ListRow, Pill, Property, PropertyGroup, RowId, RowMeta, RowTitle } from '@/components/ui/list';
 import { Empty, ErrorState, JsonView, Loading, Mono } from '@/components/ui/misc';
 import { StatusIcon } from '@/components/ui/status';
 import { api } from '@/lib/api';
@@ -18,27 +20,21 @@ export function AppsPage() {
   return (
     <>
       <PanelBar left={<><Boxes className="size-4 text-muted" strokeWidth={1.6} /><span className="text-[13px] font-medium">Apps</span></>} />
-      <div className="flex min-h-0 flex-1 flex-col overflow-auto">
+      <div className="flex min-h-0 flex-1 flex-col">
         {apps.isLoading ? <Loading /> : apps.error ? <ErrorState error={apps.error} /> : !items.length ? (
           <Empty icon={Boxes} title="No apps" hint="Register an agent package via agent-api (pnpm --filter @sage/agent-api register-package)." />
-        ) : statuses.map((status) => {
-          const group = items.filter((a) => a.status === status);
-          return (
-            <ListGroup key={status} icon={<StatusIcon status={status} />} label={status[0]!.toUpperCase() + status.slice(1)} count={group.length}>
-              {group.map((a) => (
-                <ListRow key={a.appId} onClick={() => navigate(`/apps/${a.appId}`)}>
-                  <RowId>APP</RowId>
-                  <StatusIcon status={a.status} />
-                  <RowTitle sub={`${a.releaseCount} release${a.releaseCount === 1 ? '' : 's'}`}>{a.appId}</RowTitle>
-                  <RowMeta>
-                    {a.latestVersion ? <Pill color="var(--green)">v{a.latestVersion}</Pill> : null}
-                    <span className="w-14 text-right text-faint">{relativeTime(a.updatedAt).replace(' ago', '')}</span>
-                  </RowMeta>
-                </ListRow>
-              ))}
-            </ListGroup>
-          );
-        })}
+        ) : (
+          <RecordsTable fill rows={items} getKey={(a) => a.appId} onRowClick={(a) => { void navigate(`/apps/${a.appId}`); }}
+            columns={[
+              { key: 'app', label: 'App', icon: <Boxes />, width: '32%', sort: (x, y) => x.appId.localeCompare(y.appId), render: (a) => <span className="flex min-w-0 items-center gap-2"><Monogram text={a.appId} /><span className="truncate">{a.appId}</span></span> },
+              { key: 'status', label: 'Status', icon: <CircleDot />, width: 130, sort: (x, y) => x.status.localeCompare(y.status), render: (a) => <StatusPill tone={toneFor(a.status)}>{a.status[0]!.toUpperCase() + a.status.slice(1)}</StatusPill> },
+              { key: 'version', label: 'Latest version', icon: <Tags />, width: 150, render: (a) => a.latestVersion ? <Tag>{`v${a.latestVersion}`}</Tag> : <span className="text-ink-3">—</span> },
+              { key: 'releases', label: 'Releases', icon: <Hash />, width: 110, align: 'right', sort: (x, y) => x.releaseCount - y.releaseCount, render: (a) => <span className="tabular-nums text-ink-2">{a.releaseCount}</span> },
+              { key: 'created', label: 'Created', icon: <Clock />, width: 140, sort: (x, y) => x.createdAt.localeCompare(y.createdAt), render: (a) => <span className="text-ink-2">{relativeTime(a.createdAt)}</span> },
+              { key: 'updated', label: 'Last update', icon: <Clock />, width: 140, sort: (x, y) => x.updatedAt.localeCompare(y.updatedAt), render: (a) => <span className="text-ink-2">{relativeTime(a.updatedAt)}</span> }
+            ]}
+            footer={<span className="ml-auto">{statuses.map((st) => `${items.filter((a) => a.status === st).length} ${st}`).join(' · ')}</span>} />
+        )}
       </div>
     </>
   );

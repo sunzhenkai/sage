@@ -3,35 +3,69 @@
 @import "tailwindcss";
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* Measured from Linear product screenshots (dark):
-   frame/sidebar ≈ #08090a, panel ≈ #0f1011–#111113, border ≈ rgba(255,255,255,0.07),
-   muted text ≈ #8a8f98, faint ≈ #62666d, title ≈ #e8e8ea, accent indigo #5e6ad2,
-   inset margin ≈ 8px, panel radius ≈ 10–12px, list row ≈ 36–40px, nav item ≈ 13px. */
+/* Design tokens adopted from Beautiful UI (https://www.beautifului.dev, MIT © 2026 Shane Levine),
+   registry item "foundation" (app/beautifui/foundation.css). Cool blue-tinted neutrals, solid hairlines,
+   layered low-opacity shadows, neutral ink ramp, semantic color used sparingly.
+   Legacy names (frame/panel/fg/muted/faint…) alias the Beautiful UI tokens so every page shares one system. */
 :root {
-  --frame: #f5f5f6; --panel: #ffffff; --raised: #ffffff; --sunken: #f7f7f8;
-  --hover: rgb(0 0 0 / 0.04); --active: rgb(0 0 0 / 0.07);
-  --line: rgb(0 0 0 / 0.08); --line-strong: rgb(0 0 0 / 0.12);
-  --fg: #1a1a1c; --fg-2: #3c3e45; --muted: #6b6f76; --faint: #8a8f98;
-  --accent: #5e6ad2; --accent-hover: #4f5bc4; --accent-soft: rgb(94 106 210 / 0.1); --accent-fg: #fff;
-  --green: #27a068; --red: #d4534b; --amber: #c98813; --blue: #4b8fe2; --violet: #8b5cf6;
-  --shadow-panel: 0 0 0 1px rgb(0 0 0 / 0.06), 0 1px 2px rgb(0 0 0 / 0.04);
-  --chart-1: #5e6ad2; --chart-2: #2f9e8f; --chart-3: #d9773e; --chart-4: #c9a227; --chart-5: #c45b93; --chart-6: #a3a6ae;
-  --chart-grid: rgb(0 0 0 / 0.06); --chart-axis: #8a8f98; --tile: #fbfbfc;
-  --shadow-pop: 0 0 0 1px rgb(0 0 0 / 0.08), 0 12px 40px -8px rgb(0 0 0 / 0.2);
+  --page: oklch(0.985 0.001 286.376); --canvas: oklch(0.961 0.002 247.84); --surface: oklch(1 0 0);
+  --inset: oklch(0.979 0.002 247.839); --hover: oklch(0.97 0.002 247.839); --hover-2: oklch(0.933 0.003 247.86);
+  --ink: oklch(0.247 0.006 258.361); --ink-2: oklch(0.506 0.01 264.477); --ink-3: oklch(0.695 0.009 264.505);
+  --line: oklch(0.946 0.003 264.542); --line-strong: oklch(0.912 0.005 258.326); --line-soft: oklch(0.966 0.002 264.542);
+  --field: oklch(0.961 0.001 286.375);
+  --accent: oklch(0.626 0.205 254.947); --accent-ink: oklch(0.556 0.187 255.617); --accent-tint: oklch(0.96 0.019 252.878);
+  --green: oklch(0.603 0.155 150.883); --green-tint: oklch(0.958 0.017 159.118);
+  --orange: oklch(0.689 0.179 49.902); --orange-tint: oklch(0.964 0.021 67.581);
+  --red: oklch(0.621 0.192 23.042); --red-tint: oklch(0.956 0.017 17.462);
+  --purple: #9a5cff;
+  --tooltip-bg: oklch(0.272 0.008 264.435); --tooltip-fg: oklch(0.976 0.002 247.839); --tooltip-muted: oklch(0.731 0.008 260.731); --tooltip-border: oklch(0.356 0.007 264.474);
+  --shadow-xs: 0 1px 1px oklch(0 0 0 / 0.03), 0 1px 2px oklch(0 0 0 / 0.04);
+  --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.04), 0 2px 4px oklch(0 0 0 / 0.03), 0 4px 8px oklch(0 0 0 / 0.02);
+  --shadow-md: 0 1px 2px oklch(0 0 0 / 0.04), 0 4px 8px oklch(0 0 0 / 0.04), 0 8px 16px oklch(0 0 0 / 0.04);
+  --shadow-lg: 0 2px 4px oklch(0 0 0 / 0.04), 0 8px 16px oklch(0 0 0 / 0.06), 0 16px 32px oklch(0 0 0 / 0.08);
+  --shadow-hairline: 0 0 0 1px var(--line);
+  --shadow-btn: 0 0 0 1px var(--line-strong), var(--shadow-xs);
+  --shadow-card: 0 0 0 1px var(--line), var(--shadow-sm);
+  --shadow-raised: 0 0 0 1px var(--line), var(--shadow-md);
+  --shadow-overlay: 0 0 0 1px var(--line), var(--shadow-lg);
+  --shadow-inset-field: inset 0 1px 2px oklch(0 0 0 / 0.12);
 }
 .dark {
-  --frame: #08090a; --panel: #0f1011; --raised: #141516; --sunken: #0c0d0e;
-  --hover: rgb(255 255 255 / 0.035); --active: rgb(255 255 255 / 0.06);
-  --line: rgb(255 255 255 / 0.065); --line-strong: rgb(255 255 255 / 0.1);
-  --fg: #ebebec; --fg-2: #d0d1d3; --muted: #8a8f98; --faint: #62666d;
-  --accent: #5e6ad2; --accent-hover: #6d78db; --accent-soft: rgb(94 106 210 / 0.15); --accent-fg: #fff;
-  --green: #4cb782; --red: #eb5757; --amber: #f2c94c; --blue: #5e9ceb; --violet: #a78bfa;
-  --shadow-panel: 0 0 0 1px rgb(255 255 255 / 0.065), 0 1px 0 rgb(255 255 255 / 0.02) inset;
-  --chart-1: #7c84e8; --chart-2: #4fb6a7; --chart-3: #e0915c; --chart-4: #dcc060; --chart-5: #d27fab; --chart-6: #4b4e55;
-  --chart-grid: rgb(255 255 255 / 0.055); --chart-axis: #62666d; --tile: #131416;
-  --shadow-pop: 0 0 0 1px rgb(255 255 255 / 0.08), 0 16px 48px -8px rgb(0 0 0 / 0.7);
+  --page: oklch(0.209 0.004 264.477); --canvas: oklch(0.231 0.004 264.487); --surface: oklch(0.26 0.006 271.191);
+  --inset: oklch(0.243 0.004 264.492); --hover: oklch(0.289 0.006 271.22); --hover-2: oklch(0.318 0.007 274.747);
+  --ink: oklch(0.964 0.002 247.839); --ink-2: oklch(0.731 0.008 260.731); --ink-3: oklch(0.541 0.01 264.484);
+  --line: oklch(0.308 0.006 258.354); --line-strong: oklch(0.356 0.007 264.474); --line-soft: oklch(0.278 0.006 258.354);
+  --field: oklch(0.293 0.006 271.223);
+  --accent: oklch(0.68 0.173 253.301); --accent-ink: oklch(0.788 0.113 248.33); --accent-tint: oklch(0.68 0.173 253.301 / 0.16);
+  --green: oklch(0.705 0.154 153.814); --green-tint: oklch(0.705 0.154 153.814 / 0.14);
+  --orange: oklch(0.746 0.156 55.642); --orange-tint: oklch(0.746 0.156 55.642 / 0.14);
+  --red: oklch(0.666 0.18 21.433); --red-tint: oklch(0.666 0.18 21.433 / 0.14);
+  --purple: #a77bff;
+  --tooltip-bg: oklch(0.182 0.004 264.459); --tooltip-fg: oklch(0.964 0.002 247.839); --tooltip-muted: oklch(0.731 0.008 260.731); --tooltip-border: oklch(0.308 0.006 258.354);
+  --shadow-btn: 0 0 0 1px oklch(1 0 0 / 0.1), 0 1px 2px oklch(0 0 0 / 0.3);
+  --shadow-card: 0 0 0 1px oklch(1 0 0 / 0.11), 0 1px 2px oklch(0 0 0 / 0.2), 0 2px 6px oklch(0 0 0 / 0.2);
+  --shadow-raised: 0 0 0 1px oklch(1 0 0 / 0.13), 0 2px 10px oklch(0 0 0 / 0.22);
+  --shadow-overlay: 0 0 0 1px oklch(1 0 0 / 0.15), 0 8px 28px oklch(0 0 0 / 0.34);
+  --shadow-inset-field: inset 0 1px 2px oklch(0 0 0 / 0.4);
+}
+/* legacy aliases → Beautiful UI */
+:root, .dark {
+  --frame: var(--canvas); --panel: var(--page); --raised: var(--surface); --sunken: var(--inset); --active: var(--hover-2);
+  --fg: var(--ink); --fg-2: color-mix(in oklch, var(--ink) 82%, var(--ink-2)); --muted: var(--ink-2); --faint: var(--ink-3);
+  --accent-hover: var(--accent-ink); --accent-soft: var(--accent-tint); --accent-fg: #fff;
+  --amber: var(--orange); --blue: var(--accent); --violet: var(--purple);
+  --shadow-panel: var(--shadow-card); --shadow-pop: var(--shadow-overlay); --tile: var(--surface);
+  --chart-1: var(--accent); --chart-2: var(--green); --chart-3: var(--orange); --chart-4: var(--purple); --chart-5: var(--red); --chart-6: var(--line-strong);
+  --chart-grid: var(--line); --chart-axis: var(--ink-3);
 }
 @theme inline {
+  --color-page: var(--page); --color-canvas: var(--canvas); --color-surface: var(--surface); --color-inset: var(--inset);
+  --color-ink: var(--ink); --color-ink-2: var(--ink-2); --color-ink-3: var(--ink-3); --color-hover-2: var(--hover-2); --color-field: var(--field);
+  --color-accent-ink: var(--accent-ink); --color-accent-tint: var(--accent-tint); --color-green-tint: var(--green-tint);
+  --color-orange: var(--orange); --color-orange-tint: var(--orange-tint); --color-red-tint: var(--red-tint); --color-purple: var(--purple);
+  --shadow-hairline: var(--shadow-hairline); --shadow-btn: var(--shadow-btn); --shadow-card: var(--shadow-card); --shadow-raised: var(--shadow-raised); --shadow-overlay: var(--shadow-overlay); --shadow-inset-field: var(--shadow-inset-field);
+  --radius-chip: 6px; --radius-control: 8px; --radius-card: 10px; --radius-window: 14px;
+  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
   --color-frame: var(--frame); --color-panel: var(--panel); --color-raised: var(--raised); --color-sunken: var(--sunken);
   --color-hover: var(--hover); --color-active: var(--active);
   --color-line: var(--line); --color-line-strong: var(--line-strong);
@@ -42,7 +76,7 @@
   --color-chart-1: var(--chart-1); --color-chart-2: var(--chart-2); --color-chart-3: var(--chart-3); --color-chart-4: var(--chart-4); --color-chart-5: var(--chart-5); --color-chart-6: var(--chart-6); --shadow-pop: var(--shadow-pop);
   --font-sans: "Inter Variable", Inter, ui-sans-serif, system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
   --font-mono: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
-  --radius-sm: 4px; --radius-md: 6px; --radius-lg: 10px; --radius-xl: 12px;
+  --radius-sm: 4px; --radius-md: 8px; --radius-lg: 10px; --radius-xl: 14px;
   --text-2xs: 11px; --text-2xs--line-height: 16px;
   --text-xs: 12px; --text-xs--line-height: 16px;
   --text-sm: 13px; --text-sm--line-height: 18px;
@@ -56,7 +90,7 @@ html { color-scheme: light; } html.dark { color-scheme: dark; }
 body {
   background: var(--frame); color: var(--fg);
   font-family: var(--font-sans); font-size: 13px; line-height: 18px; letter-spacing: -0.01em;
-  font-feature-settings: "cv01","cv02","ss03","calt";
+  font-feature-settings: "cv11","ss01";
   -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
 }
 * { border-color: var(--line); }
@@ -68,11 +102,25 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 ::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 10px; border: 3px solid transparent; background-clip: content-box; }
 ::-webkit-scrollbar-track { background: transparent; }
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
-@keyframes pop-in { from { opacity: 0; transform: translateX(-50%) translateY(4px) scale(0.98); } to { opacity: 1; transform: translateX(-50%) scale(1); } }
+@keyframes pop-in-x { from { opacity: 0; transform: translateX(-50%) translateY(4px) scale(0.98); } to { opacity: 1; transform: translateX(-50%) scale(1); } }
 @keyframes shimmer { 0% { background-position: -400px 0; } 100% { background-position: 400px 0; } }
 .animate-fade-in { animation: fade-in 160ms var(--ease-out); }
-.animate-pop-in { animation: pop-in 160ms var(--ease-out); }
+.animate-pop-in { animation: pop-in-x 160ms var(--ease-out); }
 .skeleton { background: linear-gradient(90deg, var(--hover) 0%, var(--active) 50%, var(--hover) 100%); background-size: 800px 100%; animation: shimmer 1.4s linear infinite; border-radius: 4px; }
 
 .recharts-wrapper, .recharts-surface { outline: none; }
 .recharts-tooltip-cursor { fill: var(--hover); }
+
+/* ── Beautiful UI shared keyframes & helpers (foundation.css, MIT) ── */
+@keyframes shimmer-text { from { background-position: 150% center; } to { background-position: -50% center; } }
+@keyframes fade-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes pop-in { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes pixel-on { 0%, 100% { opacity: 0.15; } 18%, 42% { opacity: 1; } 62% { opacity: 0.15; } }
+@keyframes caret-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+.shimmer-label { background-image: linear-gradient(90deg, var(--ink-3) 35%, var(--ink) 50%, var(--ink-3) 65%); background-size: 200% 100%; animation: shimmer-text 1.4s linear infinite; background-clip: text; -webkit-background-clip: text; color: transparent; }
+.stream-caret { display: inline-block; width: 2px; height: 1.05em; margin-left: 1.5px; translate: 0 -0.5px; border-radius: 1px; background: var(--ink); vertical-align: text-bottom; animation: caret-blink 1s step-end infinite; }
+.dotted-canvas { background-color: var(--inset); background-image: radial-gradient(var(--line-strong) 1px, transparent 1px); background-size: 16px 16px; }
+.bui-tag { --tag-base: var(--accent); color: color-mix(in srgb, var(--tag-base) 92%, var(--ink)); background: color-mix(in srgb, var(--tag-base) 20%, var(--surface)); border: 1px solid color-mix(in srgb, var(--tag-base) 34%, var(--surface)); }
+.dark .bui-tag { color: color-mix(in srgb, var(--tag-base) 86%, white); background: color-mix(in srgb, var(--tag-base) 34%, var(--surface)); border-color: color-mix(in srgb, var(--tag-base) 34%, var(--surface)); }
+@media (prefers-reduced-motion: reduce) { .shimmer-label, .stream-caret { animation: none; } }

@@ -50,3 +50,12 @@ Not surfaced (yet): `POST /v1/tasks` (needs a pre-staged `task-input://` ref), `
 
 - `/overview` (default landing) — stat tiles with sparklines and charts (recharts, themed via `--chart-*` tokens) computed from sessions, session runs, tasks, schedules/triggers. Empty data renders ghost charts.
 - Mock mode (dev only, read-only): open any URL with `?mock=1` (persists in localStorage, `?mock=0` or the sidebar "Exit" clears it), or start with `VITE_MOCK=1 pnpm dev`. All GETs are served from a deterministic in-memory dataset; every write is rejected client-side (`MOCK_READ_ONLY`) so agent-api is never called.
+
+## Beautiful UI
+
+Visual system and AI-native primitives adapted from [Beautiful UI](https://www.beautifului.dev) (shadcn registry at
+`/r/registry.json`, MIT © 2026 Shane Levine — see `src/components/bui/LICENSE`). Tokens from the registry `foundation`
+item live in `src/index.css`; data-driven ports of loading-state, thinking-state, tool-chips, task-rows, streaming-text,
+prompt-bar/chat-composer, approval-card, records-table, insight-cards, code-block and flowchart live in `src/components/bui/`.
+The registry sources are scripted demos with extra deps (liveline, glimm, shadow-plugin, iconoir), so they were ported rather
+than installed verbatim.

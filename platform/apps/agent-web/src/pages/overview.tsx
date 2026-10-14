@@ -5,6 +5,9 @@ import { useNavigate } from 'react-router';
 import { PanelBar, ViewTab } from '@/components/layout/app-shell';
 import { PageBody } from '@/components/layout/page';
 import { AreaTrend, BarList, ChartCard, GhostChart, Legend, LineTrend, StackedBars, StatTile, useChartTheme, type Series } from '@/components/charts';
+import { StatusGlyph, ValuePill } from '@/components/bui/atoms';
+import { InsightCards, type InsightPage } from '@/components/bui/insight-cards';
+import { TaskRows } from '@/components/bui/task-rows';
 import { ListRow, RowMeta, RowTitle } from '@/components/ui/list';
 import { StatusIcon } from '@/components/ui/status';
 import { api } from '@/lib/api';
@@ -60,6 +63,30 @@ export function OverviewPage() {
   const has = (rows: Record<string, string | number>[]) => rows.some((r) => Object.entries(r).some(([k, v]) => k !== 'label' && typeof v === 'number' && v > 0));
   const providerUsage = isMock() ? mockProviderUsage : (providers.data?.connections ?? []).map((c) => ({ name: c.name, value: runs.length ? Math.round(runs.length / Math.max(1, providers.data?.connections.length ?? 1)) : 0 }));
 
+  const inflight = allTasks.filter((x) => ['running', 'paused', 'effect_unknown'].includes(x.status));
+  const half = Math.floor(axis.length / 2);
+  const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
+  const trend = (xs: number[]) => { const a = sum(xs.slice(0, half)); const b = sum(xs.slice(half)); return a === 0 ? (b > 0 ? 100 : 0) : Math.round(((b - a) / a) * 100); };
+  const signed = (n: number, unit = '%') => `${n > 0 ? '+' : n < 0 ? '−' : '±'}${Math.abs(n)}${unit}`;
+  const sessTrend = trend(sessionsByDay.map((d) => d.sessions));
+  const failTrend = trend(runsByDay.map((d) => d.failed));
+  const trigOk = triggers.filter((e) => e.occurredAtMs >= since && e.kind === 'SUCCEEDED').length;
+  const trigBad = triggers.filter((e) => e.occurredAtMs >= since && (e.kind === 'FAILED' || e.kind === 'MISSED')).length;
+  const insights: InsightPage[] = [
+    ...(succeeded + failed ? [{ key: 'runs', snapshot: `Runs per day · last ${range}d`, prompt: 'Why did the failed runs fail?',
+      sentence: <>Run success over the last {range} days is <ValuePill value={pct(succeeded, succeeded + failed)} positive={succeeded >= failed * 3} /> — failures are {failTrend > 0 ? 'up' : 'down'} <ValuePill value={signed(failTrend)} positive={failTrend <= 0} /> versus the first half of the range.</>,
+      series: [{ name: 'Succeeded', color: t.series[0]!, value: succeeded, delta: `${pct(succeeded, succeeded + failed)} of finished`, positive: true, data: runsByDay.map((d) => d.succeeded) },
+        { name: 'Failed', color: t.series[2]!, value: failed, delta: signed(failTrend), positive: false, data: runsByDay.map((d) => d.failed) }] }] : []),
+    ...(sum(sessionsByDay.map((d) => d.sessions)) ? [{ key: 'sessions', snapshot: `Sessions per day · last ${range}d`, prompt: 'Summarize this week\u2019s sessions',
+      sentence: <>You started <ValuePill value={sum(sessionsByDay.map((d) => d.sessions))} /> sessions, {sessTrend >= 0 ? 'up' : 'down'} <ValuePill value={signed(sessTrend)} positive={sessTrend >= 0} /> in the recent half; median run takes <ValuePill value={durations.length ? `${median.toFixed(1)}s` : '—'} />.</>,
+      series: [{ name: 'Sessions', color: t.series[0]!, value: sum(sessionsByDay.map((d) => d.sessions)), delta: signed(sessTrend), positive: sessTrend >= 0, data: sessionsByDay.map((d) => d.sessions) },
+        { name: 'Runs', color: t.series[1]!, value: recentRuns.length, data: runsByDay.map((d) => d.succeeded + d.failed + d.active) }] }] : []),
+    ...(trigOk + trigBad ? [{ key: 'schedules', snapshot: 'Schedule triggers per day', prompt: 'Which schedules are unhealthy?',
+      sentence: <>Schedules fired <ValuePill value={trigOk + trigBad} /> times; <ValuePill value={trigBad} positive={trigBad === 0} /> failed or were missed across {schedules.data?.schedules.length ?? 0} schedules.</>,
+      series: [{ name: 'Succeeded', color: t.series[1]!, value: trigOk, positive: true, data: triggersByDay.map((d) => Number(d.SUCCEEDED)) },
+        { name: 'Failed / missed', color: t.series[4]!, value: trigBad, positive: trigBad === 0, data: triggersByDay.map((d) => Number(d.FAILED) + Number(d.MISSED)) }] }] : [])
+  ];
+
   return (
     <>
       <PanelBar
@@ -76,28 +103,18 @@ export function OverviewPage() {
         </div>
 
         <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
+          <section className="rounded-[12px] bg-inset p-3.5 shadow-hairline">
+            {insights.length ? <InsightCards pages={insights} title="Insights" onPrompt={(p) => { void navigate(`/chat?new=1&q=${encodeURIComponent(p)}`); }} /> : <GhostChart height={300} label="Insights appear once runs exist" />}
+          </section>
           <ChartCard className="lg:col-span-2" title="Runs by status" description="Chat runs started per day" actions={<Legend series={runSeries} />}>
             {has(runsByDay) ? <StackedBars data={runsByDay} series={runSeries} height={220} /> : <GhostChart height={220} />}
-          </ChartCard>
-          <ChartCard title="Tasks by status" value={allTasks.length}>
-            {allTasks.length ? (
-              <div className="flex flex-col">
-                {taskStatus.map((s) => { const n = allTasks.filter((x) => x.status === s).length; return (
-                  <button key={s} type="button" onClick={() => navigate('/tasks')} className="flex h-8 items-center gap-2.5 rounded-md px-2 text-[12.5px] hover:bg-hover">
-                    <StatusIcon status={s} /><span className="flex-1 text-left capitalize text-fg-2">{s.replace('_', ' ')}</span>
-                    <span className="h-1 w-20 overflow-hidden rounded-full bg-hover"><span className="block h-full rounded-full" style={{ width: `${(n / allTasks.length) * 100}%`, background: t.series[0] }} /></span>
-                    <span className="tabular w-8 text-right text-muted">{n}</span>
-                  </button>
-                ); })}
-              </div>
-            ) : <GhostChart height={196} label="No tasks yet" />}
           </ChartCard>
         </div>
 
         <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
           <ChartCard title="Sessions per day">{has(sessionsByDay) ? <AreaTrend data={sessionsByDay} series={[{ key: 'sessions', label: 'Sessions', color: t.series[0]! }]} height={180} /> : <GhostChart height={180} />}</ChartCard>
           <ChartCard title="Success rate" description="Succeeded ÷ finished runs">{has(successByDay) ? <LineTrend data={successByDay} series={[{ key: 'rate', label: 'Success %', color: t.series[1]! }]} height={164} unit="%" /> : <GhostChart height={164} />}</ChartCard>
-          <ChartCard title="Run duration" description={durations.length ? `median ${median.toFixed(1)}s` : 'Completed runs'}>{durations.length ? <StackedBars data={durationData} series={[{ key: 'runs', label: 'Runs', color: t.series[4]! }]} height={164} /> : <GhostChart height={164} />}</ChartCard>
+          <ChartCard title="Run duration" description={durations.length ? `median ${median.toFixed(1)}s` : 'Completed runs'}>{durations.length ? <StackedBars data={durationData} series={[{ key: 'runs', label: 'Runs', color: t.series[3]! }]} height={164} /> : <GhostChart height={164} />}</ChartCard>
         </div>
 
         <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
@@ -107,6 +124,25 @@ export function OverviewPage() {
           <ChartCard title="Provider usage" description={isMock() ? 'Runs per connection' : 'Connections (per-run attribution not exposed by API)'}>
             {providerUsage.length ? <BarList items={providerUsage} color={t.series[0]!} /> : <GhostChart height={160} label="No providers" />}
             {tasksByType.length ? <><div className="mb-1 mt-4 px-2 text-[12px] text-muted">Tasks by type</div><BarList items={tasksByType.map(([name, value], i) => ({ name, value, color: t.series[i % 5] }))} color={t.series[1]!} /></> : null}
+          </ChartCard>
+        </div>
+
+        <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
+          <ChartCard className="lg:col-span-2" title="In flight" description={`${inflight.length} running or waiting · ${allTasks.length} tasks total`}>
+            {inflight.length ? <TaskRows rows={inflight.slice(0, 5).map((x) => ({ key: x.taskId, status: x.status, step: x.attempt, label: x.taskId, amount: x.taskType, onOpen: () => { void navigate(`/tasks/${x.taskId}`); }, details: [{ label: 'Workflow', meta: x.workflowId ?? '—' }, { label: 'Updated', meta: relativeTime(x.projectionUpdatedAt) }] }))} /> : <GhostChart height={160} label="Nothing running" />}
+          </ChartCard>
+          <ChartCard title="Tasks by status" value={allTasks.length}>
+            {allTasks.length ? (
+              <div className="flex flex-col">
+                {taskStatus.map((s) => { const n = allTasks.filter((x) => x.status === s).length; return (
+                  <button key={s} type="button" onClick={() => { void navigate('/tasks'); }} className="flex h-8 items-center gap-2.5 rounded-control px-2 text-[12.5px] hover:bg-hover">
+                    <StatusGlyph status={s} size={16} /><span className="flex-1 text-left capitalize text-ink">{s.replace('_', ' ')}</span>
+                    <span className="h-1.5 w-20 overflow-hidden rounded-full bg-field"><span className="block h-full rounded-full" style={{ width: `${(n / allTasks.length) * 100}%`, background: t.series[0] }} /></span>
+                    <span className="tabular w-8 text-right text-ink-2">{n}</span>
+                  </button>
+                ); })}
+              </div>
+            ) : <GhostChart height={196} label="No tasks yet" />}
           </ChartCard>
         </div>
 

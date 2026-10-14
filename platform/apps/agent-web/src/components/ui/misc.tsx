@@ -1,10 +1,11 @@
 import { AlertCircle, Inbox, KeyRound, type LucideIcon } from 'lucide-react';
 import { Link } from 'react-router';
+import { CodeBlock } from '@/components/bui/code-block';
 import { ApiError } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 export function Card({ className, children }: { className?: string; children: React.ReactNode }) {
-  return <section className={cn('overflow-hidden rounded-lg border border-line', className)}>{children}</section>;
+  return <section className={cn('overflow-hidden rounded-card bg-surface shadow-card', className)}>{children}</section>;
 }
 export function CardHeader({ title, description, actions }: { title: React.ReactNode; description?: React.ReactNode; actions?: React.ReactNode }) {
   return (
@@ -80,8 +81,8 @@ export function ErrorState({ error }: { error: unknown }) {
     </div>
   );
 }
-export function JsonView({ value, className }: { value: unknown; className?: string }) {
-  return <pre className={cn('overflow-auto rounded-md border border-line bg-sunken p-3 font-mono text-[11.5px] leading-[18px] text-fg-2', className)}>{JSON.stringify(value, null, 2)}</pre>;
+export function JsonView({ value, className, filename = 'data.json' }: { value: unknown; className?: string; filename?: string }) {
+  return <CodeBlock code={JSON.stringify(value, null, 2) ?? 'undefined'} language="json" filename={filename} {...(className ? { className } : {})} />;
 }
 export function Mono({ children, className }: { children: React.ReactNode; className?: string }) {
   return <span className={cn('font-mono text-[11.5px] tracking-normal', className)}>{children}</span>;
