@@ -49,11 +49,11 @@ export function SchedulesPage() {
         {schedules.isLoading ? <Loading /> : schedules.error ? <ErrorState error={schedules.error} /> : !schedules.data?.schedules.length ? <Empty icon={CalendarClock} title="No schedules" hint="Run an agent app task on a cron or interval. Requires a service token." /> : (
           <>
           <Section title="Activity" description="Trigger outcomes over the last 14 days and what fires next.">
-            <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-              <ChartCard className="lg:col-span-2" title="Trigger history" description={`${events.length} occurrences`} actions={<Legend series={trigSeries} />}>
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
+              <ChartCard className="lg:col-span-8" title="Trigger history" description={`${events.length} occurrences`} actions={<Legend series={trigSeries} />}>
                 <StackedBars data={trigByDay} series={trigSeries} height={176} />
               </ChartCard>
-              <ChartCard title="Next runs" description="Minutes until next fire">
+              <ChartCard className="lg:col-span-4" title="Next runs" description="Minutes until next fire">
                 <BarList items={upcoming.map((x) => ({ name: x.definition.displayName ?? x.definition.scheduleId, value: Math.max(0, Math.round(((x.nextFireAtMs ?? 0) - Date.now()) / 60_000)) }))} color={ct.series[0]!} format={(n) => (n >= 60 ? `${Math.floor(n / 60)}h ${n % 60}m` : `${n}m`)} />
               </ChartCard>
             </div>

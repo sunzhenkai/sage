@@ -5,7 +5,7 @@ import { ApiError } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 export function Card({ className, children }: { className?: string; children: React.ReactNode }) {
-  return <section className={cn('overflow-hidden rounded-card bg-surface shadow-card', className)}>{children}</section>;
+  return <section className={cn('flex h-full min-w-0 flex-col overflow-hidden rounded-card bg-surface shadow-card', className)}>{children}</section>;
 }
 export function CardHeader({ title, description, actions }: { title: React.ReactNode; description?: React.ReactNode; actions?: React.ReactNode }) {
   return (

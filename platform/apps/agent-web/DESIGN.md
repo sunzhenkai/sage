@@ -160,6 +160,8 @@
 | 数值 | 24px · 600 · tabular（可选） |
 | 变化 | `Delta`：+x% 绿底 / −x% 红底（`good="down"` 反转），或 `t-meta` 文本 |
 | 图例 | `Legend` 放在右上 actions，圆点 + 12px 文本 |
+| 高度 | 同一行卡片等高（grid stretch）；卡片 `h-full`，主体 `flex-1`，图表 `height` 为最小高度，`ResponsiveContainer` 填满剩余高度 |
+| 列对齐 | Overview 等图表页使用**单一** `grid-cols-12 gap-3`，所有行共享同一套竖直轨道（KPI 3+3+3+3，Insights/Runs 4+8，三列行 4+4+4），上下卡片左右边对齐 |
 
 ### 8.3 坐标轴 / 网格 / tooltip
 

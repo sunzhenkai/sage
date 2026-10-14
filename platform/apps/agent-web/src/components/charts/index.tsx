@@ -44,7 +44,7 @@ function ChartTooltip({ active, payload, label, series }: { active?: boolean; pa
 export function StackedBars({ data, series, xKey = 'label', height = 200 }: { data: Record<string, string | number>[]; series: Series[]; xKey?: string; height?: number }) {
   const t = useChartTheme();
   return (
-    <ResponsiveContainer width="100%" height={height}>
+    <div className="flex min-h-0 flex-1 flex-col" style={{ minHeight: height }}><ResponsiveContainer width="100%" height="100%" minHeight={height}>
       <BarChart data={data} margin={{ top: 8, right: 0, bottom: 0, left: -18 }} barCategoryGap="28%">
         <CartesianGrid vertical={false} stroke={t.grid} />
         <XAxis dataKey={xKey} {...axisProps(t.axis)} interval="preserveStartEnd" minTickGap={16} />
@@ -52,14 +52,14 @@ export function StackedBars({ data, series, xKey = 'label', height = 200 }: { da
         <Tooltip cursor={{ fill: 'var(--hover)' }} content={(p) => <ChartTooltip {...(p as object)} series={series} />} />
         {series.map((s, i) => <Bar key={s.key} dataKey={s.key} stackId="a" fill={s.color} radius={i === series.length - 1 ? [2, 2, 0, 0] : 0} isAnimationActive={false} />)}
       </BarChart>
-    </ResponsiveContainer>
+    </ResponsiveContainer></div>
   );
 }
 
 export function AreaTrend({ data, series, xKey = 'label', height = 200 }: { data: Record<string, string | number>[]; series: Series[]; xKey?: string; height?: number }) {
   const t = useChartTheme();
   return (
-    <ResponsiveContainer width="100%" height={height}>
+    <div className="flex min-h-0 flex-1 flex-col" style={{ minHeight: height }}><ResponsiveContainer width="100%" height="100%" minHeight={height}>
       <AreaChart data={data} margin={{ top: 8, right: 0, bottom: 0, left: -18 }}>
         <defs>
           {series.map((s) => (
@@ -75,14 +75,14 @@ export function AreaTrend({ data, series, xKey = 'label', height = 200 }: { data
         <Tooltip cursor={{ stroke: t.grid }} content={(p) => <ChartTooltip {...(p as object)} series={series} />} />
         {series.map((s) => <Area key={s.key} type="monotone" dataKey={s.key} stroke={s.color} strokeWidth={1.5} fill={`url(#g-${s.key})`} isAnimationActive={false} dot={false} activeDot={{ r: 3, strokeWidth: 0 }} />)}
       </AreaChart>
-    </ResponsiveContainer>
+    </ResponsiveContainer></div>
   );
 }
 
 export function LineTrend({ data, series, xKey = 'label', height = 200, unit = '' }: { data: Record<string, string | number>[]; series: Series[]; xKey?: string; height?: number; unit?: string }) {
   const t = useChartTheme();
   return (
-    <ResponsiveContainer width="100%" height={height}>
+    <div className="flex min-h-0 flex-1 flex-col" style={{ minHeight: height }}><ResponsiveContainer width="100%" height="100%" minHeight={height}>
       <LineChart data={data} margin={{ top: 8, right: 4, bottom: 0, left: unit ? -6 : -18 }}>
         <CartesianGrid vertical={false} stroke={t.grid} />
         <XAxis dataKey={xKey} {...axisProps(t.axis)} interval="preserveStartEnd" minTickGap={16} />
@@ -90,7 +90,7 @@ export function LineTrend({ data, series, xKey = 'label', height = 200, unit = '
         <Tooltip cursor={{ stroke: t.grid }} content={(p) => <ChartTooltip {...(p as object)} series={series} />} />
         {series.map((s) => <Line key={s.key} type="monotone" dataKey={s.key} stroke={s.color} strokeWidth={1.5} dot={false} isAnimationActive={false} activeDot={{ r: 3, strokeWidth: 0 }} />)}
       </LineChart>
-    </ResponsiveContainer>
+    </ResponsiveContainer></div>
   );
 }
 
@@ -135,7 +135,7 @@ export function Legend({ series }: { series: Series[] }) {
 export function GhostChart({ height = 200, label = 'No data in this range' }: { height?: number; label?: string }) {
   const bars = [32, 48, 26, 60, 42, 70, 38, 54, 30, 64, 46, 58, 36, 50];
   return (
-    <div className="relative" style={{ height }}>
+    <div className="relative min-h-0 flex-1" style={{ minHeight: height }}>
       <div className="absolute inset-x-0 bottom-0 flex h-full items-end gap-[6%] px-2 pb-5 opacity-[0.5]">
         {bars.map((h, i) => <div key={i} className="flex-1 rounded-t-[2px] bg-hover" style={{ height: `${h}%` }} />)}
       </div>
@@ -153,7 +153,7 @@ export function Delta({ value, good }: { value: number; good?: 'up' | 'down' | u
 /** Chart card anatomy: title + description (header), optional value + delta, chart body. White bordered content card. */
 export function ChartCard({ title, description, value, delta, actions, children, className }: { title: string; description?: ReactNode; value?: ReactNode; delta?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <section className={cn('flex min-w-0 flex-col rounded-card bg-surface shadow-card', className)}>
+    <section className={cn('flex h-full min-w-0 flex-col rounded-card bg-surface shadow-card', className)}>
       <header className="flex items-start gap-3 px-4 pb-1 pt-3.5">
         <div className="min-w-0 flex-1">
           <h3 className="text-[13px] font-semibold tracking-[-0.01em] text-ink">{title}</h3>
@@ -162,14 +162,14 @@ export function ChartCard({ title, description, value, delta, actions, children,
         {actions}
       </header>
       {value !== undefined ? <div className="flex items-baseline gap-2 px-4 pt-1"><span className="tabular text-[24px] font-semibold tracking-[-0.02em] text-ink">{value}</span>{delta}</div> : null}
-      <div className="px-3 pb-3 pt-2">{children}</div>
+      <div className="flex min-h-0 flex-1 flex-col px-3 pb-3 pt-2">{children}</div>
     </section>
   );
 }
 
 export function StatTile({ label, value, delta, spark, color }: { label: string; value: ReactNode; delta?: ReactNode; spark?: number[]; color: string }) {
   return (
-    <section className="flex min-w-0 flex-col rounded-card bg-surface px-4 pb-3 pt-3.5 shadow-card">
+    <section className="flex h-full min-w-0 flex-col rounded-card bg-surface px-4 pb-3 pt-3.5 shadow-card">
       <div className="text-[12.5px] font-medium text-ink-2">{label}</div>
       <div className="mt-1.5 flex items-end gap-3">
         <div className="tabular text-[24px] font-semibold leading-7 tracking-[-0.02em] text-ink">{value}</div>
@@ -184,8 +184,8 @@ export function Donut({ items, height = 180, center }: { items: { name: string; 
   const total = items.reduce((a, b) => a + b.value, 0) || 1;
   const data = items.filter((i) => i.value > 0);
   return (
-    <div className="relative" style={{ height }}>
-      <ResponsiveContainer width="100%" height={height}>
+    <div className="relative flex min-h-0 flex-1 flex-col" style={{ minHeight: height }}>
+      <ResponsiveContainer width="100%" height="100%" minHeight={height}>
         <PieChart>
           <Pie data={data} dataKey="value" nameKey="name" innerRadius="62%" outerRadius="88%" paddingAngle={2} stroke="none" isAnimationActive={false}>
             {data.map((d) => <Cell key={d.name} fill={d.color} />)}

@@ -53,11 +53,11 @@ export function TasksPage() {
         ) : (
           <>
             <Section title="Health" description="Status mix and daily activity across all tasks.">
-                <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-                  <ChartCard title="Status distribution" description={`${all.length} tasks`}>
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
+                  <ChartCard className="lg:col-span-4" title="Status distribution" description={`${all.length} tasks`}>
                     <Donut items={dist} height={176} center={<><div className="text-[22px] font-semibold tabular-nums text-ink">{all.length ? Math.round((dist.find((d) => d.name === 'Succeeded')!.value / all.length) * 100) : 0}%</div><div className="t-meta">succeeded</div></>} />
                   </ChartCard>
-                  <ChartCard className="lg:col-span-2" title="Updates per day" description="Last 14 days, by current status" actions={<Legend series={trendSeries} />}>
+                  <ChartCard className="lg:col-span-8" title="Updates per day" description="Last 14 days, by current status" actions={<Legend series={trendSeries} />}>
                     <StackedBars data={trend} series={trendSeries} height={176} />
                   </ChartCard>
                 </div>
