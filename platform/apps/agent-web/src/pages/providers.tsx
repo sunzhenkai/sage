@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { PageHeader } from '@/components/layout/app-shell';
-import { CardRow, PageContent, PageDescription, SettingsGroup, SettingsRow } from '@/components/layout/page';
+import { CardRow, PageContent, PageDescription, Quiet, Section, SettingsGroup, SettingsRow } from '@/components/layout/page';
 import { StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -10,7 +10,9 @@ import { Field, Input, Select } from '@/components/ui/input';
 import { Pill } from '@/components/ui/list';
 import { ErrorState, Loading, Mono } from '@/components/ui/misc';
 import { StatusIcon } from '@/components/ui/status';
+import { ChartCard, Legend, StackedBars, useChartTheme } from '@/components/charts';
 import { api } from '@/lib/api';
+import { isMock, mockSeries } from '@/lib/mock';
 import type { ProviderConnectionWrite } from '@/lib/types';
 import { formatTime, relativeTime } from '@/lib/utils';
 
@@ -53,6 +55,10 @@ export function ProvidersPage() {
           ))}
         </SettingsGroup>
 
+        <Section title="Usage" description={isMock() ? 'Requests and errors per provider connection · last 14 days (mock).' : 'Per-provider request metrics are not exposed by agent-api yet.'}>
+          {isMock() && items.length ? <ProviderUsage names={items.map((c) => c.name)} /> : <Quiet>No usage metrics available.</Quiet>}
+        </Section>
+
         <SettingsGroup title="Run agent" description="Default connection used when a chat message does not choose one.">
           <SettingsRow label="Default connection" description={settings.data?.updatedBy ? `Updated ${formatTime(settings.data.updatedAt)} by ${settings.data.updatedBy}` : undefined}>
             <Select className="w-full" value={defaultId ?? ''} onChange={(e) => setDefault.mutate(e.target.value)} disabled={!settings.data}>
@@ -87,5 +93,16 @@ function CreateConnection({ onDone }: { onDone: () => void }) {
       {create.error ? <ErrorState error={create.error} /> : null}
       <div className="flex justify-end"><Button type="submit" disabled={create.isPending}>Create</Button></div>
     </form>
+  );
+}
+
+function ProviderUsage({ names }: { names: string[] }) {
+  const ct = useChartTheme();
+  const series = [{ key: 'requests', label: 'Requests', color: ct.series[0]! }, { key: 'errors', label: 'Errors', color: ct.status.failed! }];
+  const data = names.map((name) => { const req = mockSeries(name, 14, 40).reduce((a, b) => a + b, 0); return { label: name, requests: req, errors: Math.round(req * (0.01 + (mockSeries(`${name}-e`, 1, 5)[0]! / 100))) }; });
+  return (
+    <ChartCard title="Requests by provider" description={`${data.reduce((a, b) => a + b.requests, 0)} requests · ${data.reduce((a, b) => a + b.errors, 0)} errors`} actions={<Legend series={series} />}>
+      <StackedBars data={data} series={series} height={170} />
+    </ChartCard>
   );
 }

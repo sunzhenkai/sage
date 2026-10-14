@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { PanelBar, ViewTab } from '@/components/layout/app-shell';
 import { PageContent, Section } from '@/components/layout/page';
-import { AreaTrend, BarList, ChartCard, GhostChart, Legend, LineTrend, StackedBars, StatTile, useChartTheme, type Series } from '@/components/charts';
+import { AreaTrend, BarList, ChartCard, Delta, GhostChart, Heatmap, Legend, LineTrend, StackedBars, StatTile, useChartTheme, type Series } from '@/components/charts';
 import { Card } from '@/components/ui/misc';
 import { StatusGlyph, ValuePill } from '@/components/bui/atoms';
 import { InsightCards, type InsightPage } from '@/components/bui/insight-cards';
@@ -12,7 +12,7 @@ import { TaskRows } from '@/components/bui/task-rows';
 import { ListRow, RowMeta, RowTitle } from '@/components/ui/list';
 import { StatusIcon } from '@/components/ui/status';
 import { api } from '@/lib/api';
-import { isMock, mockProviderUsage } from '@/lib/mock';
+import { isMock, mockCostPer1k, mockProviderUsage, mockTokensPerRun } from '@/lib/mock';
 import type { ChatRun, TaskStatus } from '@/lib/types';
 import { relativeTime } from '@/lib/utils';
 
@@ -59,6 +59,14 @@ export function OverviewPage() {
   const median = durations.length ? [...durations].sort((a, b) => a - b)[Math.floor(durations.length / 2)]! : 0;
 
   const recentRuns = runs.filter((r) => new Date(r.startedAt).getTime() >= since);
+  const q = (xs: number[], p: number) => { if (!xs.length) return 0; const s = [...xs].sort((a, b) => a - b); return Math.round(s[Math.min(s.length - 1, Math.floor(p * s.length))]! * 10) / 10; };
+  const latencyByDay = axis.map((d) => { const xs = runs.filter((r) => r.completedAt && r.startedAt.slice(0, 10) === d.key).map((r) => (new Date(r.completedAt!).getTime() - new Date(r.startedAt).getTime()) / 1000); return { label: d.label, p50: q(xs, 0.5), p95: q(xs, 0.95) }; });
+  const tokensByDay = runsByDay.map((d) => ({ label: d.label, tokens: Math.round((d.succeeded + d.failed + d.active) * mockTokensPerRun / 100) / 10 }));
+  const totalK = tokensByDay.reduce((a, b) => a + b.tokens, 0);
+  const WEEKS = 12;
+  const heatDays = Array.from({ length: WEEKS }, (_, w) => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7) - (WEEKS - 1 - w) * 7); return d; });
+  const activityAt = [...runs.map((r) => r.startedAt), ...(sessions.data?.items ?? []).map((s) => s.createdAt), ...(tasks.data?.tasks ?? []).map((x) => String(x.projectionUpdatedAt ?? ''))].filter(Boolean).map((x) => new Date(x));
+  const heat = heatDays.map((start) => Array.from({ length: 7 }, (_, wd) => { const lo = start.getTime() + wd * DAY; return activityAt.filter((x) => x.getTime() >= lo && x.getTime() < lo + DAY).length; }));
   const succeeded = recentRuns.filter((r) => r.status === 'succeeded').length;
   const failed = recentRuns.filter((r) => r.status === 'failed').length;
   const has = (rows: Record<string, string | number>[]) => rows.some((r) => Object.entries(r).some(([k, v]) => k !== 'label' && typeof v === 'number' && v > 0));
@@ -119,12 +127,25 @@ export function OverviewPage() {
         </div>
 
         <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
+          <ChartCard title="Latency" description="Run duration per day · p50 / p95 (s)" value={durations.length ? `${q(durations, 0.95)}s` : '—'} delta={<span className="t-meta">p95</span>}
+            actions={<Legend series={[{ key: 'p50', label: 'p50', color: t.series[0]! }, { key: 'p95', label: 'p95', color: t.series[3]! }]} />}>
+            {has(latencyByDay) ? <LineTrend data={latencyByDay} series={[{ key: 'p50', label: 'p50', color: t.series[0]! }, { key: 'p95', label: 'p95', color: t.series[3]! }]} height={150} unit="s" /> : <GhostChart height={150} />}
+          </ChartCard>
+          <ChartCard title="Tokens & cost" description={isMock() ? 'Estimated from runs (mock)' : 'Not reported by agent-api yet'} value={isMock() ? `${totalK.toFixed(0)}k` : '—'} delta={isMock() ? <span className="t-meta">≈ ${(totalK * mockCostPer1k).toFixed(2)}</span> : undefined}>
+            {isMock() && has(tokensByDay) ? <AreaTrend data={tokensByDay} series={[{ key: 'tokens', label: 'k tokens', color: t.series[5]! }]} height={150} /> : <GhostChart height={150} label="Token usage is not exposed by the API" />}
+          </ChartCard>
+          <ChartCard title="Activity" description="Runs, sessions and task updates · last 12 weeks" value={activityAt.length} delta={<Delta value={sessTrend} />}>
+            <Heatmap days={heatDays.map((d) => d.toISOString().slice(0, 10))} values={heat} color={t.series[1]!} />
+          </ChartCard>
+        </div>
+
+        <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
           <ChartCard className="lg:col-span-2" title="Schedule triggers" description={schedules.error ? 'Requires a service token' : `${triggers.length} occurrences across ${schedules.data?.schedules.length ?? 0} schedules`} actions={<Legend series={triggerSeries} />}>
             {has(triggersByDay) ? <StackedBars data={triggersByDay} series={triggerSeries} height={200} /> : <GhostChart height={200} label={schedules.error ? 'Add a service token in Settings' : 'No triggers in this range'} />}
           </ChartCard>
           <ChartCard title="Provider usage" description={isMock() ? 'Runs per connection' : 'Connections (per-run attribution not exposed by API)'}>
             {providerUsage.length ? <BarList items={providerUsage} color={t.series[0]!} /> : <GhostChart height={160} label="No providers" />}
-            {tasksByType.length ? <><div className="mb-1 mt-4 px-2 text-[12px] text-muted">Tasks by type</div><BarList items={tasksByType.map(([name, value], i) => ({ name, value, color: t.series[i % 5] }))} color={t.series[1]!} /></> : null}
+            {tasksByType.length ? <><div className="mb-1 mt-4 px-2 text-[12px] font-medium text-ink-2">Top apps · tasks</div><BarList items={tasksByType.map(([name, value], i) => ({ name, value, color: t.series[i % 5] }))} color={t.series[1]!} /></> : null}
           </ChartCard>
         </div>
 

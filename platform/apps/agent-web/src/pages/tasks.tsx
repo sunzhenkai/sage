@@ -20,6 +20,8 @@ import { api } from '@/lib/api';
 import type { TaskStatus } from '@/lib/types';
 import { cn, formatTime, relativeTime, shortId } from '@/lib/utils';
 
+import { ChartCard, Donut, Legend, StackedBars, useChartTheme, type Series } from '@/components/charts';
+
 const statuses: TaskStatus[] = ['running', 'paused', 'effect_unknown', 'failed', 'succeeded', 'cancelled'];
 const statusLabel: Record<TaskStatus, string> = { running: 'Running', paused: 'Paused', effect_unknown: 'Effect unknown', failed: 'Failed', succeeded: 'Succeeded', cancelled: 'Cancelled' };
 
@@ -30,6 +32,12 @@ export function TasksPage() {
   const all = tasks.data?.tasks ?? [];
   const filtered = all.filter((t) => view === 'all' || (view === 'active' ? ['running', 'paused', 'effect_unknown'].includes(t.status) : ['succeeded', 'failed', 'cancelled'].includes(t.status)));
   const active = filtered.filter((t) => ['running', 'paused', 'effect_unknown'].includes(t.status));
+  const ct = useChartTheme();
+  const dist = statuses.map((s) => ({ name: statusLabel[s], value: all.filter((t) => t.status === s).length, color: ct.status[s] ?? ct.series[5]! }));
+  const trendSeries: Series[] = (['succeeded', 'failed', 'running', 'paused'] as TaskStatus[]).map((s) => ({ key: s, label: statusLabel[s], color: ct.status[s]! }));
+  const trend = Array.from({ length: 14 }, (_, i) => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - 13 + i); const key = d.toISOString().slice(0, 10);
+    const inDay = all.filter((t) => String(t.projectionUpdatedAt ?? '').slice(0, 10) === key);
+    return { label: d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }), ...Object.fromEntries(trendSeries.map((s) => [s.key, inDay.filter((t) => t.status === s.key).length])) }; });
   return (
     <>
       <PanelBar
@@ -44,8 +52,18 @@ export function TasksPage() {
           <Empty icon={ListChecks} title="No tasks" hint="Tasks appear here when chat messages are promoted or schedules fire." />
         ) : (
           <>
+            <Section title="Health" description="Status mix and daily activity across all tasks.">
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+                  <ChartCard title="Status distribution" description={`${all.length} tasks`}>
+                    <Donut items={dist} height={176} center={<><div className="text-[22px] font-semibold tabular-nums text-ink">{all.length ? Math.round((dist.find((d) => d.name === 'Succeeded')!.value / all.length) * 100) : 0}%</div><div className="t-meta">succeeded</div></>} />
+                  </ChartCard>
+                  <ChartCard className="lg:col-span-2" title="Updates per day" description="Last 14 days, by current status" actions={<Legend series={trendSeries} />}>
+                    <StackedBars data={trend} series={trendSeries} height={176} />
+                  </ChartCard>
+                </div>
+              </Section>
             {active.length && view !== 'done' ? (
-              <Section title="In flight" description="Running or waiting tasks, newest first." count={active.length}>
+              <Section className="mt-8" title="In flight" description="Running or waiting tasks, newest first." count={active.length}>
                 <TaskRows rows={active.slice(0, 4).map((t) => ({
                   key: t.taskId, status: t.status, step: t.attempt, label: t.taskId, amount: t.taskType, onOpen: () => { void navigate(`/tasks/${t.taskId}`); },
                   details: [{ label: 'Workflow', meta: t.workflowId ?? '—' }, { label: 'Target', meta: t.targetId ?? '—' }, { label: 'Updated', meta: relativeTime(t.projectionUpdatedAt) }]

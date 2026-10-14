@@ -6,13 +6,16 @@ import { Monogram, Tag } from '@/components/bui/atoms';
 import { PageContent, PageDescription, Section } from '@/components/layout/page';
 import { RecordsTable } from '@/components/bui/records-table';
 import { Empty, ErrorState, JsonView, Loading } from '@/components/ui/misc';
+import { Sparkline, useChartTheme } from '@/components/charts';
 import { api } from '@/lib/api';
+import { isMock, mockSeries } from '@/lib/mock';
 import { relativeTime } from '@/lib/utils';
 
 export function PackagesPage() {
   const navigate = useNavigate();
   const packages = useQuery({ queryKey: ['packages'], queryFn: api.packages.list });
   const items = packages.data?.packages ?? [];
+  const ct = useChartTheme();
   return (
     <>
       <PanelBar left={<><Package className="size-4 text-muted" strokeWidth={1.6} /><span className="text-[13px] font-medium">Packages</span></>} />
@@ -23,6 +26,7 @@ export function PackagesPage() {
             columns={[
               { key: 'pkg', label: 'Package', icon: <Package />, width: '30%', sort: (x, y) => x.packageId.localeCompare(y.packageId), render: (x) => <span className="flex min-w-0 items-center gap-2"><Monogram text={x.packageId} /><span className="truncate">{x.packageId}</span></span> },
               { key: 'version', label: 'Latest version', icon: <Tags />, width: 150, render: (x) => x.latestVersion ? <Tag>{`v${x.latestVersion}`}</Tag> : <span className="text-ink-3">—</span> },
+              { key: 'usage', label: 'Installs · 14d', icon: <Hash />, width: 150, render: (x) => isMock() ? <span className="block h-5 w-full"><Sparkline values={mockSeries(x.packageId, 14, 3)} color={ct.series[3]!} height={20} /></span> : <span className="text-ink-3">—</span> },
               { key: 'releases', label: 'Releases', icon: <Hash />, width: 110, align: 'right', sort: (x, y) => x.releaseCount - y.releaseCount, render: (x) => <span className="tabular-nums text-ink-2">{x.releaseCount}</span> },
               { key: 'digest', label: 'Content digest', icon: <Fingerprint />, render: (x) => <span className="font-mono text-[12px] text-ink-2">{x.latestContentDigest ? `${x.latestContentDigest.slice(0, 19)}…` : '—'}</span> },
               { key: 'updated', label: 'Last update', icon: <Clock />, width: 140, sort: (x, y) => x.updatedAt.localeCompare(y.updatedAt), render: (x) => <span className="text-ink-2">{relativeTime(x.updatedAt)}</span> }

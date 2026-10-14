@@ -20,6 +20,7 @@ import { isMock } from '@/lib/mock';
 import { streamTimeline, type StreamState } from '@/lib/sse';
 import type { ChatRun, TimelineEvent } from '@/lib/types';
 import { cn, formatTime, relativeTime, shortId } from '@/lib/utils';
+import { ChartCard, StackedBars, useChartTheme } from '@/components/charts';
 
 export function ChatPage() {
   const { sessionId } = useParams();
@@ -178,12 +179,12 @@ function SessionView({ sessionId }: { sessionId: string }) {
       <CardPane width="chat" scrollRef={scroller}>
         {detail.error ? <ErrorState error={detail.error} /> : null}
           {tab === 'runs' ? (
-            allRuns.length ? <TaskRows variant="list" rows={[...allRuns].reverse().map((r, i) => ({
+            allRuns.length ? <><RunDurations runs={allRuns} /><TaskRows variant="list" rows={[...allRuns].reverse().map((r, i) => ({
               key: r.runId, status: r.status, step: allRuns.length - i,
               label: <span className="font-mono text-[12.5px]">{shortId(r.runId, 14)}</span>,
               amount: r.completedAt ? formatElapsed(new Date(r.completedAt).getTime() - new Date(r.startedAt).getTime()) : r.status === 'active' ? <LoadingState label="Running" since={r.startedAt} /> : '—',
               details: [{ label: 'Started', meta: formatTime(r.startedAt) }, { label: 'Completed', meta: formatTime(r.completedAt) }, { label: 'Attempt', meta: r.attempt }, ...(r.error ? [{ label: r.error.code, meta: r.error.message }] : [])]
-            }))} /> : <Quiet>No runs yet.</Quiet>
+            }))} /></> : <Quiet>No runs yet.</Quiet>
           ) : (
             <>
               {!loaded ? <ConversationSkeleton /> : groups.length === 0 ? (
@@ -286,5 +287,18 @@ function StreamIndicator({ state }: { state: StreamState }) {
       </span>
       {label}
     </span>
+  );
+}
+
+function RunDurations({ runs }: { runs: ChatRun[] }) {
+  const ct = useChartTheme();
+  const data = runs.map((r, i) => {
+    const s = r.completedAt ? Math.round((new Date(r.completedAt).getTime() - new Date(r.startedAt).getTime()) / 100) / 10 : Math.round((Date.now() - new Date(r.startedAt).getTime()) / 100) / 10;
+    return { label: `#${i + 1}`, succeeded: r.status === 'succeeded' ? s : 0, failed: r.status === 'failed' ? s : 0, active: r.status === 'active' || r.status === 'paused' ? s : 0 };
+  });
+  return (
+    <ChartCard className="mb-5" title="Run duration" description="Seconds per run, colored by outcome">
+      <StackedBars data={data} series={[{ key: 'succeeded', label: 'Succeeded', color: ct.status.succeeded! }, { key: 'failed', label: 'Failed', color: ct.status.failed! }, { key: 'active', label: 'Running', color: ct.status.active! }]} height={130} />
+    </ChartCard>
   );
 }

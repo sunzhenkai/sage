@@ -11,7 +11,9 @@ import { Button } from '@/components/ui/button';
 import { DetailLayout, ListRow, Pill, Property, PropertyGroup, RowId, RowMeta, RowTitle } from '@/components/ui/list';
 import { Empty, ErrorState, JsonView, Loading, Mono } from '@/components/ui/misc';
 import { StatusIcon } from '@/components/ui/status';
+import { Sparkline, useChartTheme } from '@/components/charts';
 import { api } from '@/lib/api';
+import { isMock, mockSeries } from '@/lib/mock';
 import { formatTime, relativeTime } from '@/lib/utils';
 
 export function AppsPage() {
@@ -19,6 +21,7 @@ export function AppsPage() {
   const apps = useQuery({ queryKey: ['apps'], queryFn: api.apps.list });
   const items = apps.data?.apps ?? [];
   const statuses = [...new Set(items.map((a) => a.status))];
+  const ct = useChartTheme();
   return (
     <>
       <PanelBar left={<><Boxes className="size-4 text-muted" strokeWidth={1.6} /><span className="text-[13px] font-medium">Apps</span></>} />
@@ -32,6 +35,7 @@ export function AppsPage() {
               { key: 'app', label: 'App', icon: <Boxes />, width: '32%', sort: (x, y) => x.appId.localeCompare(y.appId), render: (a) => <span className="flex min-w-0 items-center gap-2"><Monogram text={a.appId} /><span className="truncate">{a.appId}</span></span> },
               { key: 'status', label: 'Status', icon: <CircleDot />, width: 130, sort: (x, y) => x.status.localeCompare(y.status), render: (a) => <StatusPill tone={toneFor(a.status)}>{a.status[0]!.toUpperCase() + a.status.slice(1)}</StatusPill> },
               { key: 'version', label: 'Latest version', icon: <Tags />, width: 150, render: (a) => a.latestVersion ? <Tag>{`v${a.latestVersion}`}</Tag> : <span className="text-ink-3">—</span> },
+              { key: 'usage', label: 'Runs · 14d', icon: <Hash />, width: 150, render: (a) => isMock() ? <span className="block h-5 w-full"><Sparkline values={mockSeries(a.appId, 14)} color={a.status === 'active' ? ct.series[0]! : ct.series[5]!} height={20} /></span> : <span className="text-ink-3">—</span> },
               { key: 'releases', label: 'Releases', icon: <Hash />, width: 110, align: 'right', sort: (x, y) => x.releaseCount - y.releaseCount, render: (a) => <span className="tabular-nums text-ink-2">{a.releaseCount}</span> },
               { key: 'created', label: 'Created', icon: <Clock />, width: 140, sort: (x, y) => x.createdAt.localeCompare(y.createdAt), render: (a) => <span className="text-ink-2">{relativeTime(a.createdAt)}</span> },
               { key: 'updated', label: 'Last update', icon: <Clock />, width: 140, sort: (x, y) => x.updatedAt.localeCompare(y.updatedAt), render: (a) => <span className="text-ink-2">{relativeTime(a.updatedAt)}</span> }

@@ -152,3 +152,12 @@ export function mockGet(path: string): unknown {
 
 /** Mock "provider usage" — runs attributed to connections (not available from the real API). */
 export const mockProviderUsage = [{ name: 'openai-prod', value: 182 }, { name: 'anthropic', value: 97 }, { name: 'minimax-cn', value: 41 }];
+
+/** Deterministic pseudo-usage series for mock mode (sparklines, provider metrics). */
+export function mockSeries(seed: string, n: number, base = 6): number[] {
+  let h = 2166136261; for (let i = 0; i < seed.length; i++) h = Math.imul(h ^ seed.charCodeAt(i), 16777619);
+  const r = () => { h ^= h << 13; h ^= h >>> 17; h ^= h << 5; return ((h >>> 0) % 1000) / 1000; };
+  return Array.from({ length: n }, (_, i) => Math.max(0, Math.round(base * (0.55 + r() * 0.9) * (0.75 + (i / n) * 0.5))));
+}
+export const mockTokensPerRun = 3_800;
+export const mockCostPer1k = 0.0042;

@@ -68,7 +68,7 @@ export function SessionList({ items, activeId }: { items: SessionListItem[]; act
               const title = s.title ?? 'Untitled session';
               return (
                 <Link key={s.sessionId} to={`/chat/${s.sessionId}`}
-                  className={cn('group flex items-start gap-2.5 rounded-[10px] px-2 py-2 transition-colors duration-75', active ? 'bg-surface shadow-card' : 'hover:bg-hover')}>
+                  className={cn('group flex items-start gap-2.5 rounded-[10px] px-2 py-2 transition-colors duration-75', active ? 'bg-surface shadow-card ring-1 ring-accent' : 'bg-surface shadow-card hover:bg-hover')}>
                   <Avatar id={s.sessionId} title={title} tone={tone} />
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-2">

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { ChevronDown, ChevronRight, Command as CommandIcon, FlaskConical, Moon, Plus, Search, Sun } from 'lucide-react';
+import { ChevronDown, ChevronRight, Command as CommandIcon, FlaskConical, Moon, PanelLeftClose, PanelLeftOpen, Plus, Search, Sun } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router';
 import { Kbd } from '@/components/ui/misc';
@@ -20,6 +20,8 @@ function isTyping(target: EventTarget | null): boolean {
 export function AppShell() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => { try { return JSON.parse(localStorage.getItem('sage.agent-web.nav') ?? '{}') as Record<string, boolean>; } catch { return {}; } });
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('sage.agent-web.sidebar') === '1');
+  const toggleSidebar = () => setSidebarCollapsed((v) => { const next = !v; localStorage.setItem('sage.agent-web.sidebar', next ? '1' : '0'); return next; });
   const toggleGroup = (g: string) => setCollapsed((c) => { const next = { ...c, [g]: !c[g] }; localStorage.setItem('sage.agent-web.nav', JSON.stringify(next)); return next; });
   const navigate = useNavigate();
   const settings = useSettings();
@@ -31,6 +33,8 @@ export function AppShell() {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); setPaletteOpen((o) => !o); return; }
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'b') { event.preventDefault(); toggleSidebar(); return; }
+      if (!isTyping(event.target) && !event.metaKey && !event.ctrlKey && !event.altKey && event.key === '[') { event.preventDefault(); toggleSidebar(); return; }
       if (isTyping(event.target) || event.metaKey || event.ctrlKey || event.altKey) return;
       if (event.key === 'g') { pendingG.current = Date.now(); return; }
       if (Date.now() - pendingG.current < 1200) {
@@ -40,56 +44,56 @@ export function AppShell() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [navigate]);
+  }, [navigate, sidebarCollapsed]);
 
   return (
     <div className="flex h-full bg-frame p-0">
       {/* Sidebar — flush with frame, no border */}
-      <aside className="flex w-[220px] shrink-0 flex-col bg-frame">
-        <button
-          type="button"
-          onClick={() => setPaletteOpen(true)}
-          className="mx-2 mt-2 flex h-8 items-center gap-2 rounded-md px-1.5 text-left transition-colors hover:bg-hover"
-        >
-          <div className="grid size-[18px] place-items-center rounded-[4px] bg-accent text-[10px] font-bold text-accent-fg">S</div>
-          <span className="min-w-0 flex-1 truncate text-[13px] font-medium tracking-[-0.01em] text-fg">Sage</span>
-          <ChevronDown className="size-3.5 text-faint" strokeWidth={1.75} />
-        </button>
-
-        <div className="mx-2 mt-1 flex items-center gap-0.5">
-          <button type="button" onClick={() => setPaletteOpen(true)} className="flex h-7 flex-1 items-center gap-1.5 rounded-md px-1.5 text-[12.5px] text-muted transition-colors hover:bg-hover hover:text-fg">
-            <Search className="size-3.5 text-faint" strokeWidth={1.75} />
-            <span className="flex-1 text-left">Search</span>
-            <Kbd className="gap-0"><CommandIcon className="size-2.5" />K</Kbd>
+      <aside className={cn("flex shrink-0 flex-col bg-frame transition-[width] duration-200 ease-out", sidebarCollapsed ? "w-[56px]" : "w-[220px]")}>
+        <div className={cn('mx-2 mt-2 flex h-8 items-center gap-1', sidebarCollapsed && 'justify-center')}>
+          <button type="button" onClick={() => setPaletteOpen(true)} className={cn('flex h-8 min-w-0 items-center gap-2 rounded-md px-1.5 text-left transition-colors hover:bg-hover', sidebarCollapsed ? 'size-8 justify-center px-0' : 'flex-1')} title="Sage">
+            <div className="grid size-[18px] place-items-center rounded-[4px] bg-accent text-[10px] font-bold text-accent-fg">S</div>
+            {!sidebarCollapsed ? <><span className="min-w-0 flex-1 truncate text-[13px] font-medium tracking-[-0.01em] text-fg">Sage</span><ChevronDown className="size-3.5 text-faint" strokeWidth={1.75} /></> : null}
           </button>
-          <button type="button" onClick={() => navigate('/chat?new=1')} className="grid size-7 place-items-center rounded-md text-faint transition-colors hover:bg-hover hover:text-fg" title="New session">
+          {!sidebarCollapsed ? <button type="button" onClick={toggleSidebar} title="Collapse sidebar (⌘B)" className="grid size-7 shrink-0 place-items-center rounded-md text-faint hover:bg-hover hover:text-fg"><PanelLeftClose className="size-3.5" strokeWidth={1.6} /></button> : null}
+        </div>
+
+        <div className={cn('mx-2 mt-1 flex items-center gap-0.5', sidebarCollapsed && 'flex-col')}>
+          <button type="button" onClick={() => setPaletteOpen(true)} title="Search (⌘K)" className={cn('flex h-7 items-center gap-1.5 rounded-md px-1.5 text-[12.5px] text-muted transition-colors hover:bg-hover hover:text-fg', sidebarCollapsed ? 'size-8 justify-center px-0' : 'flex-1')}>
+            <Search className="size-3.5 text-faint" strokeWidth={1.75} />
+            {!sidebarCollapsed ? <><span className="flex-1 text-left">Search</span><Kbd className="gap-0"><CommandIcon className="size-2.5" />K</Kbd></> : null}
+          </button>
+          <button type="button" onClick={() => navigate('/chat?new=1')} className={cn('grid place-items-center rounded-md text-faint transition-colors hover:bg-hover hover:text-fg', sidebarCollapsed ? 'size-8' : 'size-7')} title="New session">
             <Plus className="size-3.5" strokeWidth={1.75} />
           </button>
+          {sidebarCollapsed ? <button type="button" onClick={toggleSidebar} title="Expand sidebar (⌘B)" className="grid size-8 place-items-center rounded-md text-faint hover:bg-hover hover:text-fg"><PanelLeftOpen className="size-3.5" strokeWidth={1.6} /></button> : null}
         </div>
 
         <div className="mt-3 flex flex-1 flex-col gap-4 overflow-y-auto pb-2">
           {navGroups.map((group) => (
             <div key={group}>
-              {group !== 'Workspace' ? (
+              {group !== 'Workspace' && !sidebarCollapsed ? (
                 <button type="button" onClick={() => toggleGroup(group)} className="group/h mx-2 mb-0.5 flex h-6 w-[calc(100%-16px)] items-center gap-1 rounded-md px-1.5 text-[11.5px] font-medium text-faint hover:bg-hover hover:text-muted">
                   {group}
                   <ChevronRight className={cn('size-3 opacity-0 transition-transform group-hover/h:opacity-100', !collapsed[group] && 'rotate-90')} />
                 </button>
               ) : null}
-              <nav className={cn('flex flex-col gap-px px-2', collapsed[group] && 'hidden')}>
+              <nav className={cn('flex flex-col gap-px px-2', collapsed[group] && !sidebarCollapsed && 'hidden')}>
                 {navItems.filter((i) => i.group === group).map(({ to, label, icon: Icon }) => (
                   <NavLink
                     key={to}
                     to={to}
+                    title={label}
                     className={({ isActive }) => cn(
                       'group flex h-[30px] items-center gap-2 rounded-md px-2 text-[13px] font-medium tracking-[-0.01em] text-muted transition-colors hover:bg-hover hover:text-fg',
+                      sidebarCollapsed && 'size-8 justify-center px-0',
                       isActive && 'bg-active text-fg'
                     )}
                   >
                     {({ isActive }) => (
                       <>
-                        <Icon className={cn('size-[15px]', isActive ? 'text-fg' : 'text-faint group-hover:text-muted')} strokeWidth={1.6} />
-                        <span className="truncate">{label}</span>
+                        <Icon className={cn('size-[15px] shrink-0', isActive ? 'text-fg' : 'text-faint group-hover:text-muted')} strokeWidth={1.6} />
+                        {!sidebarCollapsed ? <span className="truncate">{label}</span> : null}
                       </>
                     )}
                   </NavLink>
@@ -100,16 +104,16 @@ export function AppShell() {
         </div>
 
         {isMock() ? (
-          <button type="button" onClick={exitMock} title="Demo data — click to exit mock mode" className="mx-2 mb-1 flex h-7 items-center gap-1.5 rounded-md border border-dashed border-line-strong px-2 text-[11.5px] text-muted hover:bg-hover hover:text-fg">
-            <FlaskConical className="size-3.5 text-amber" strokeWidth={1.75} />Mock data · read-only<span className="ml-auto text-faint">Exit</span>
+          <button type="button" onClick={exitMock} title="Demo data — click to exit mock mode" className={cn('mx-2 mb-1 flex items-center gap-1.5 rounded-md border border-dashed border-line-strong text-[11.5px] text-muted hover:bg-hover hover:text-fg', sidebarCollapsed ? 'size-8 justify-center px-0' : 'h-7 px-2')}>
+            <FlaskConical className="size-3.5 shrink-0 text-amber" strokeWidth={1.75} />{!sidebarCollapsed ? <>Mock data · read-only<span className="ml-auto text-faint">Exit</span></> : null}
           </button>
         ) : null}
-        <div className="flex items-center gap-1 px-2.5 py-2">
-          <span className="flex min-w-0 flex-1 items-center gap-1.5 px-1 text-[11.5px] text-faint" title={settings.apiBaseUrl || 'same-origin'}>
+        <div className={cn('flex items-center gap-1 py-2', sidebarCollapsed ? 'flex-col px-2' : 'px-2.5')}>
+          <span className={cn('flex items-center gap-1.5 text-[11.5px] text-faint', sidebarCollapsed ? 'justify-center' : 'min-w-0 flex-1 px-1')} title={settings.apiBaseUrl || 'same-origin'}>
             <span className={cn('size-1.5 rounded-full', online ? 'bg-green' : health.isLoading ? 'bg-faint' : 'bg-red')} />
-            <span className="truncate">{online ? 'Online' : health.isLoading ? '…' : 'Offline'}</span>
+            {!sidebarCollapsed ? <span className="truncate">{online ? 'Online' : health.isLoading ? '…' : 'Offline'}</span> : null}
           </span>
-          <button type="button" className="grid size-7 place-items-center rounded-md text-faint hover:bg-hover hover:text-fg" onClick={() => updateSettings({ theme: dark ? 'light' : 'dark' })}>
+          <button type="button" title="Toggle theme" className="grid size-7 place-items-center rounded-md text-faint hover:bg-hover hover:text-fg" onClick={() => updateSettings({ theme: dark ? 'light' : 'dark' })}>
             {dark ? <Sun className="size-3.5" strokeWidth={1.6} /> : <Moon className="size-3.5" strokeWidth={1.6} />}
           </button>
         </div>

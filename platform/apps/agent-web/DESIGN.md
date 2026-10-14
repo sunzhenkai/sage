@@ -77,10 +77,10 @@
 | Section 间距 | `mt-8`（首个为 0），标题与内容 `mb-3` |
 | 间距刻度 | 4 · 6 · 8 · 12 · 16 · 24 · 32 · 48（px） |
 | 详情页 | 两栏：主栏 `flex-1` + 属性侧栏 `--aside-w: 320px`（`DetailLayout`，`border-l`，同 Panel 背景） |
-| 设置页 / Providers | 720px 居中栏；`SettingsRow` 两列网格：标签列 `minmax(160px,220px)` + 控件列 `1fr`，输入框 `w-full` 填满控件列，开关/分段控件右对齐 |
-| Master-detail | 聊天页左侧会话列 300px（`SessionList`：容器 `px-2.5`、组间距 8px、行间距 8px、组头与首行间 4px（sticky 组头不再盖住选中卡片的 1px 描边）；按 Today/Yesterday/Earlier 分组；行 = 色相头像 + 最新 run 状态点 + 标题/预览 + 时间 + runs/消息计数 + 最近 5 次 run 色条；选中行为白色描边卡片；Active/Archived 分段切换） |
+| 设置页 / Providers | 900px 居中栏；`SettingsRow` 两列网格：标签列 `minmax(160px,220px)` + 控件列 `1fr`，输入框 `w-full` 填满控件列，开关/分段控件右对齐 |
+| Master-detail | 聊天页左侧会话列 300px（`SessionList`：容器 `px-2.5`、组间距 8px、行间距 8px、组头与首行间 4px（sticky 组头不再盖住选中卡片的 1px 描边）；按 Today/Yesterday/Earlier 分组；行 = 色相头像 + 最新 run 状态点 + 标题/预览 + 时间 + runs/消息计数 + 最近 5 次 run 色条；每行均为白色描边卡片（8px 间距）；选中行加 accent ring；Active/Archived 分段切换） |
 | 会话页头 | 单一页头 `SessionHeader`：头像 + 标题 + 状态点 + 灰色 meta，右侧操作；右侧为视图切换图标分段控件（Chat `MessageSquare` / Runs `ListChecks` + 短标签 + 计数，白底描边，选中 `--hover-2`，tooltip，←/→ 键切换，role=tablist），竖线分隔后接操作按钮；页头单行 56px；背景同页面底色，仅一条底部分隔线，不使用胶囊/卡片 tab |
-| 例外：阅读/表单类页面居中窄栏 | 设置页、Providers 页 `PageContent width="narrow"`（`--w-narrow: 720px`）；聊天消息流 + 输入框 `width="chat"`（`--w-chat: 760px`，会话列表侧栏不变）。宽度只能通过 `PageContent` / `PageColumn` 的 `width` 取得，页面里仍禁止 `max-w-*` / `mx-auto` |
+| 例外：阅读/表单类页面居中窄栏 | 设置页、Providers 页 `PageContent width="narrow"`（`--w-narrow: 900px`）；聊天消息流 + 输入框 `width="chat"`（`--w-chat: 1000px`，会话列表侧栏不变）。宽度只能通过 `PageContent` / `PageColumn` 的 `width` 取得，页面里仍禁止 `max-w-*` / `mx-auto` |
 | 其余页面 | 列表、详情、Overview、Apps/Packages/Schedules **保持全宽** |
 | `readable` | `--readable: 72ch`，仅限全宽块内的长正文 |
 
@@ -132,3 +132,80 @@
 | 状态色按第 6 节语义使用 | 用颜色做装饰 |
 
 确需例外时在该行加注释 `design-ok` 并说明原因。
+
+## 8. 图表系统（`src/components/charts`）
+
+### 8.1 调色板
+
+| Token | Light | Dark | 用途 |
+|---|---|---|---|
+| `--chart-1` | `oklch(0.6 0.19 256)` 蓝 | `oklch(0.7 0.16 256)` | 主序列 / 单序列默认 |
+| `--chart-2` | `oklch(0.66 0.15 165)` 青绿 | `oklch(0.74 0.14 165)` | 第二序列、热力图 |
+| `--chart-3` | `oklch(0.72 0.16 60)` 琥珀 | `oklch(0.79 0.14 65)` | 第三序列 |
+| `--chart-4` | `oklch(0.6 0.2 295)` 紫 | `oklch(0.71 0.17 295)` | p95 等对比线 |
+| `--chart-5` | `oklch(0.65 0.19 22)` 珊瑚 | `oklch(0.71 0.17 22)` | 第五序列 |
+| `--chart-6` | `oklch(0.7 0.12 215)` 青 | `oklch(0.78 0.11 215)` | token / 成本 |
+| `--chart-success` / `-fail` / `-running` / `-warn` / `-muted` | = green / red / accent / orange / line-strong | 同 | **状态语义色，按状态着色时必须使用**（`useChartTheme().status[...]`） |
+
+序列按 1→6 顺序取；同一图最多 4 个序列；状态堆叠图只用语义色。
+
+### 8.2 图表卡片结构（`ChartCard`）
+
+| 部分 | 样式 |
+|---|---|
+| 容器 | 白底描边卡片（`rounded-card bg-surface shadow-card`），放在 Section 网格内（`gap-3`） |
+| 标题 | 13px · 600 · `--ink` |
+| 描述 | 12px · `--ink-2`，一句话说明口径 |
+| 数值 | 24px · 600 · tabular（可选） |
+| 变化 | `Delta`：+x% 绿底 / −x% 红底（`good="down"` 反转），或 `t-meta` 文本 |
+| 图例 | `Legend` 放在右上 actions，圆点 + 12px 文本 |
+
+### 8.3 坐标轴 / 网格 / tooltip
+
+| 元素 | 规则 |
+|---|---|
+| 轴 | 11px `--chart-axis`（ink-3），无轴线、无刻度线；X 轴 `preserveStartEnd` |
+| 网格 | 仅水平线，1px `--chart-grid`（line） |
+| Tooltip | `--tooltip-bg` 深色浮层，8px 圆角，圆点 + 标签 + 数值（tabular） |
+| hover 光标 | `--hover` 填充 |
+| 动画 | 仅首次挂载；sparkline 关闭动画 |
+
+### 8.4 图表类型与用途
+
+| 类型 | 组件 | 用于 |
+|---|---|---|
+| KPI + sparkline | `StatTile` / `Sparkline` | Overview 指标块；Apps/Packages 列表 14 天用量列 |
+| 面积趋势 | `AreaTrend` | 会话数、token 用量 |
+| 折线 | `LineTrend` | 成功率、延迟 p50/p95 |
+| 状态堆叠柱 | `StackedBars` | 按天运行/任务/触发结果；Providers 请求/错误；Chat Runs 单次耗时 |
+| 环形占比 | `Donut`（中心放主数字） | Tasks 状态分布 |
+| 条形列表 | `BarList` | Top apps、Provider 用量、下次触发 |
+| 热力图 | `Heatmap`（周 × 星期） | Overview 12 周活跃度 |
+
+### 8.5 空 / 加载状态
+
+| 状态 | 规则 |
+|---|---|
+| 加载 | `ChartSkeleton`：`--inset` 脉冲块，高度与图表一致 |
+| 无数据 | `GhostChart`：保留高度的虚线占位 + 一句原因（如 "Token usage is not exposed by the API"） |
+| API 不提供 | 不伪造：非 mock 模式显示 GhostChart / `Quiet` 说明；mock 模式使用确定性 `mockSeries` |
+
+## 9. 侧边栏
+
+| 状态 | 规则 |
+|---|---|
+| 展开 | 220px，分组标题 + 图标 + 文本 |
+| 折叠 | 56px 图标栏，所有项有 `title` tooltip；分组标题隐藏 |
+| 切换 | 顶部 `PanelLeftClose/Open` 按钮，⌘/Ctrl+B 或 `[`；`transition-[width] 200ms`；状态存 `localStorage['sage.agent-web.sidebar']` |
+| 内容 | 面板 `flex-1` 自动适应；窄栏页面仍按 `--w-*` 居中 |
+
+## 10. 滚动条
+
+| 规则 | 实现 |
+|---|---|
+| 统一 | 全局 `*` 规则，作用于所有滚动容器（侧边栏、会话列表、聊天卡片、表格、对话框、命令面板、页面） |
+| 尺寸 | `scrollbar-width: thin`，宽度恒定 |
+| 轨道 | 永远透明 |
+| 滑块 | `--scroll-thumb`（light `oklch(0 0 0 / .22)` / dark `oklch(1 0 0 / .2)`） |
+| 自动隐藏 | 默认滑块透明；容器 hover / focus-within 时变为 `--scroll-thumb`。只改变颜色，不改变宽度或 overflow → **显示/隐藏不引起重排** |
+| 禁止 | 页面内自定义 `::-webkit-scrollbar` 宽度、hover 时切换 `overflow` |

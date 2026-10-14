@@ -1,4 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { BarList, ChartCard, Legend, StackedBars, useChartTheme, type Series } from '@/components/charts';
 import { CalendarClock, Clock, Pause, Play, Plus, ShieldCheck, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
@@ -28,6 +29,14 @@ export function SchedulesPage() {
   const [search, setSearch] = useSearchParams();
   const [open, setOpen] = useState(false);
   const schedules = useQuery({ queryKey: ['schedules'], queryFn: api.schedules.list, retry: false });
+  const ct = useChartTheme();
+  const trigQs = useQueries({ queries: (schedules.data?.schedules ?? []).map((s) => ({ queryKey: ['schedule', s.definition.scheduleId, 'triggers'], queryFn: () => api.schedules.triggers(s.definition.scheduleId, 200), retry: false, staleTime: 60_000 })) });
+  const events = trigQs.flatMap((q) => q.data?.events ?? []);
+  const trigSeries: Series[] = [{ key: 'SUCCEEDED', label: 'Succeeded', color: ct.status.succeeded! }, { key: 'FAILED', label: 'Failed', color: ct.status.failed! }, { key: 'MISSED', label: 'Missed', color: ct.status.paused! }, { key: 'SKIPPED', label: 'Skipped', color: ct.status.cancelled! }];
+  const trigByDay = Array.from({ length: 14 }, (_, i) => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - 13 + i); const lo = d.getTime();
+    const inDay = events.filter((e) => e.occurredAtMs >= lo && e.occurredAtMs < lo + 86_400_000);
+    return { label: d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }), ...Object.fromEntries(trigSeries.map((s) => [s.key, inDay.filter((e) => e.kind === s.key).length])) }; });
+  const upcoming = (schedules.data?.schedules ?? []).filter((x) => x.state === 'ACTIVE' && x.nextFireAtMs).sort((a, b) => (a.nextFireAtMs ?? 0) - (b.nextFireAtMs ?? 0)).slice(0, 6);
   useEffect(() => { if (search.get('new') === '1') { setOpen(true); setSearch({}, { replace: true }); } }, [search, setSearch]);
   return (
     <>
@@ -38,7 +47,18 @@ export function SchedulesPage() {
         </Dialog>} />
       <PageContent>
         {schedules.isLoading ? <Loading /> : schedules.error ? <ErrorState error={schedules.error} /> : !schedules.data?.schedules.length ? <Empty icon={CalendarClock} title="No schedules" hint="Run an agent app task on a cron or interval. Requires a service token." /> : (
-          (['ACTIVE', 'PAUSED'] as const).map((state) => {
+          <>
+          <Section title="Activity" description="Trigger outcomes over the last 14 days and what fires next.">
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+              <ChartCard className="lg:col-span-2" title="Trigger history" description={`${events.length} occurrences`} actions={<Legend series={trigSeries} />}>
+                <StackedBars data={trigByDay} series={trigSeries} height={176} />
+              </ChartCard>
+              <ChartCard title="Next runs" description="Minutes until next fire">
+                <BarList items={upcoming.map((x) => ({ name: x.definition.displayName ?? x.definition.scheduleId, value: Math.max(0, Math.round(((x.nextFireAtMs ?? 0) - Date.now()) / 60_000)) }))} color={ct.series[0]!} format={(n) => (n >= 60 ? `${Math.floor(n / 60)}h ${n % 60}m` : `${n}m`)} />
+              </ChartCard>
+            </div>
+          </Section>
+          {(['ACTIVE', 'PAUSED'] as const).map((state) => {
             const items = schedules.data.schedules.filter((x) => x.state === state);
             if (!items.length) return null;
             return (
@@ -58,7 +78,8 @@ export function SchedulesPage() {
                 </div>
               </Section>
             );
-          })
+          })}
+          </>
         )}
       </PageContent>
     </>
