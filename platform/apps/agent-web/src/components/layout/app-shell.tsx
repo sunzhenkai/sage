@@ -1,15 +1,16 @@
 import { useQuery } from '@tanstack/react-query';
-import { ChevronDown, Command as CommandIcon, Moon, Plus, Search, Sun } from 'lucide-react';
+import { ChevronDown, ChevronRight, Command as CommandIcon, FlaskConical, Moon, Plus, Search, Sun } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router';
 import { Kbd } from '@/components/ui/misc';
 import { api } from '@/lib/api';
+import { exitMock, isMock } from '@/lib/mock';
 import { updateSettings, useSettings } from '@/lib/settings';
 import { cn } from '@/lib/utils';
 import { CommandPalette } from './command-palette';
 import { navGroups, navItems } from './nav';
 
-const goKeys: Record<string, string> = { c: '/chat', t: '/tasks', a: '/apps', p: '/packages', s: '/schedules', m: '/providers', ',': '/settings' };
+const goKeys: Record<string, string> = { o: '/overview', c: '/chat', t: '/tasks', a: '/apps', p: '/packages', s: '/schedules', m: '/providers', ',': '/settings' };
 
 function isTyping(target: EventTarget | null): boolean {
   const el = target as HTMLElement | null;
@@ -18,6 +19,8 @@ function isTyping(target: EventTarget | null): boolean {
 
 export function AppShell() {
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => { try { return JSON.parse(localStorage.getItem('sage.agent-web.nav') ?? '{}') as Record<string, boolean>; } catch { return {}; } });
+  const toggleGroup = (g: string) => setCollapsed((c) => { const next = { ...c, [g]: !c[g] }; localStorage.setItem('sage.agent-web.nav', JSON.stringify(next)); return next; });
   const navigate = useNavigate();
   const settings = useSettings();
   const pendingG = useRef(0);
@@ -67,8 +70,13 @@ export function AppShell() {
         <div className="mt-3 flex flex-1 flex-col gap-4 overflow-y-auto pb-2">
           {navGroups.map((group) => (
             <div key={group}>
-              {group !== 'Workspace' ? <div className="mb-0.5 px-3.5 text-[11px] font-medium text-faint">{group}</div> : null}
-              <nav className="flex flex-col gap-px px-2">
+              {group !== 'Workspace' ? (
+                <button type="button" onClick={() => toggleGroup(group)} className="group/h mx-2 mb-0.5 flex h-6 w-[calc(100%-16px)] items-center gap-1 rounded-md px-1.5 text-[11.5px] font-medium text-faint hover:bg-hover hover:text-muted">
+                  {group}
+                  <ChevronRight className={cn('size-3 opacity-0 transition-transform group-hover/h:opacity-100', !collapsed[group] && 'rotate-90')} />
+                </button>
+              ) : null}
+              <nav className={cn('flex flex-col gap-px px-2', collapsed[group] && 'hidden')}>
                 {navItems.filter((i) => i.group === group).map(({ to, label, icon: Icon }) => (
                   <NavLink
                     key={to}
@@ -91,6 +99,11 @@ export function AppShell() {
           ))}
         </div>
 
+        {isMock() ? (
+          <button type="button" onClick={exitMock} title="Demo data — click to exit mock mode" className="mx-2 mb-1 flex h-7 items-center gap-1.5 rounded-md border border-dashed border-line-strong px-2 text-[11.5px] text-muted hover:bg-hover hover:text-fg">
+            <FlaskConical className="size-3.5 text-amber" strokeWidth={1.75} />Mock data · read-only<span className="ml-auto text-faint">Exit</span>
+          </button>
+        ) : null}
         <div className="flex items-center gap-1 px-2.5 py-2">
           <span className="flex min-w-0 flex-1 items-center gap-1.5 px-1 text-[11.5px] text-faint" title={settings.apiBaseUrl || 'same-origin'}>
             <span className={cn('size-1.5 rounded-full', online ? 'bg-green' : health.isLoading ? 'bg-faint' : 'bg-red')} />
@@ -117,7 +130,7 @@ export function AppShell() {
 /** Toolbar inside the inset panel (Linear view bar). */
 export function PanelBar({ left, right }: { left?: React.ReactNode; right?: React.ReactNode }) {
   return (
-    <div className="flex h-10 shrink-0 items-center gap-2 border-b border-line px-3">
+    <div className="flex h-11 shrink-0 items-center gap-2 border-b border-line pl-6 pr-3">
       <div className="flex min-w-0 flex-1 items-center gap-1.5">{left}</div>
       {right ? <div className="flex shrink-0 items-center gap-1">{right}</div> : null}
     </div>

@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
 import { AppShell } from './components/layout/app-shell';
 import { AppDetailPage, AppsPage } from './pages/apps';
 import { ChatPage } from './pages/chat';
+import { OverviewPage } from './pages/overview';
 import { PackageDetailPage, PackagesPage } from './pages/packages';
 import { ProvidersPage } from './pages/providers';
 import { ScheduleDetailPage, SchedulesPage } from './pages/schedules';
@@ -13,7 +14,8 @@ export function App() {
     <BrowserRouter>
       <Routes>
         <Route element={<AppShell />}>
-          <Route index element={<Navigate to="/chat" replace />} />
+          <Route index element={<Navigate to="/overview" replace />} />
+          <Route path="overview" element={<OverviewPage />} />
           <Route path="chat" element={<ChatPage />} />
           <Route path="chat/:sessionId" element={<ChatPage />} />
           <Route path="tasks" element={<TasksPage />} />
@@ -26,7 +28,7 @@ export function App() {
           <Route path="schedules/:scheduleId" element={<ScheduleDetailPage />} />
           <Route path="providers" element={<ProvidersPage />} />
           <Route path="settings" element={<SettingsPage />} />
-          <Route path="*" element={<Navigate to="/chat" replace />} />
+          <Route path="*" element={<Navigate to="/overview" replace />} />
         </Route>
       </Routes>
     </BrowserRouter>

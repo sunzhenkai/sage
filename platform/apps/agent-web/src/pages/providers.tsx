@@ -2,12 +2,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { PageHeader } from '@/components/layout/app-shell';
-import { Badge, StatusBadge } from '@/components/ui/badge';
+import { PageBody, PageTitle, SettingsGroup, SettingsRow } from '@/components/layout/page';
+import { StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Field, Input, Select } from '@/components/ui/input';
-import { Card, CardHeader, Empty, ErrorState, KeyValue, Loading, Mono } from '@/components/ui/misc';
-import { ListRow, Pill, RowId, RowMeta, RowTitle } from '@/components/ui/list';
+import { Pill } from '@/components/ui/list';
+import { ErrorState, Loading, Mono } from '@/components/ui/misc';
 import { StatusIcon } from '@/components/ui/status';
 import { api } from '@/lib/api';
 import type { ProviderConnectionWrite } from '@/lib/types';
@@ -23,53 +24,51 @@ export function ProvidersPage() {
   const setDefault = useMutation({ mutationFn: api.providers.updateSettings, onSuccess: invalidate });
   const remove = useMutation({ mutationFn: api.providers.remove, onSuccess: invalidate });
   const defaultId = settings.data?.providerConnectionId;
+  const items = connections.data?.connections ?? [];
   return (
     <>
-      <PageHeader title="Providers" actions={<Dialog open={open} onOpenChange={setOpen}>
-        <Button size="sm" onClick={() => setOpen(true)}><Plus />New connection</Button>
-        <DialogContent title="New provider connection" description="The API key is sealed server-side and never returned."><CreateConnection onDone={() => { setOpen(false); invalidate(); }} /></DialogContent>
-      </Dialog>} />
-      <div className="min-h-0 flex-1 overflow-auto px-6 py-5">
-        <div className="flex flex-col gap-4">
-          {setDefault.error ? <ErrorState error={setDefault.error} /> : remove.error ? <ErrorState error={remove.error} /> : null}
-          <Card><CardHeader title="Connections" />
-            {connections.isLoading ? <Loading /> : connections.error ? <ErrorState error={connections.error} /> : !connections.data?.connections.length ? <Empty title="No provider connections" /> : (
-              <div>{connections.data.connections.map((c) => (
-                  <ListRow key={c.id}>
-                    <RowId>{c.adapterKind === 'anthropic' ? 'ANTHROPIC' : 'OPENAI'}</RowId>
-                    <StatusIcon status={c.enabled && c.credentialPresent ? 'succeeded' : 'paused'} />
-                    <RowTitle sub={c.baseUrl}>{c.name}</RowTitle>
-                    <RowMeta>
-                      {c.id === defaultId ? <Pill color="var(--accent)">Default</Pill> : null}
-                      {c.source === 'deployment-env' ? <Pill>env</Pill> : null}
-                      <Pill color={c.credentialPresent ? 'var(--green)' : 'var(--red)'}>{c.modelId}</Pill>
-                      <span className="w-12 text-right text-faint">{relativeTime(c.updatedAt).replace(' ago', '')}</span>
-                      <span className="flex w-16 justify-end opacity-0 transition-opacity group-hover:opacity-100">
-                        {c.id !== defaultId ? <Button size="icon-sm" variant="ghost" title="Make default" disabled={setDefault.isPending} onClick={() => setDefault.mutate(c.id)}><Check /></Button> : null}
-                        {c.source === 'user' ? <Button size="icon-sm" variant="ghost" title="Delete" onClick={() => { if (confirm(`Delete ${c.name}?`)) remove.mutate(c.id); }}><Trash2 /></Button> : null}
-                      </span>
-                    </RowMeta>
-                  </ListRow>
-                ))}</div>
-            )}
-          </Card>
-          <div className="grid gap-4 lg:grid-cols-2">
-            <Card><CardHeader title="Run agent settings" /><div className="p-3">
-              {settings.isLoading ? <Loading /> : settings.error ? <ErrorState error={settings.error} /> : settings.data ? <KeyValue items={[
-                ['Default connection', settings.data.unset ? 'unset' : <Mono key="d">{settings.data.providerConnectionId}</Mono>],
-                ['Updated', formatTime(settings.data.updatedAt)], ['Updated by', settings.data.updatedBy],
-                ['Providers', <span key="p" className="flex flex-wrap gap-1">{settings.data.providers.map((p) => <Badge key={p.id} tone={p.available ? 'success' : 'danger'}>{p.name}</Badge>)}</span>]
-              ]} /> : null}
-            </div></Card>
-            <Card><CardHeader title="Provider catalog (models.dev)" /><div className="p-3">
-              {catalog.isLoading ? <Loading /> : catalog.error ? <ErrorState error={catalog.error} /> : catalog.data ? <KeyValue items={[
-                ['Availability', <StatusBadge key="a" status={catalog.data.availability} />], ['Projection', catalog.data.projection], ['Providers', catalog.data.providerCount], ['Models', catalog.data.modelCount],
-                ['Last success', formatTime(catalog.data.lastSuccessAt)], ['Next sync', formatTime(catalog.data.nextSyncAt)]
-              ]} /> : null}
-            </div></Card>
-          </div>
-        </div>
-      </div>
+      <PageHeader title="Providers" />
+      <PageBody width="settings">
+        <PageTitle title="Providers" description="Model provider connections used by the run agent. API keys are sealed server-side and never returned."
+          actions={<Dialog open={open} onOpenChange={setOpen}>
+            <Button size="sm" onClick={() => setOpen(true)}><Plus />Add connection</Button>
+            <DialogContent title="Add provider connection" description="The API key is sealed server-side and never returned."><CreateConnection onDone={() => { setOpen(false); invalidate(); }} /></DialogContent>
+          </Dialog>} />
+        {setDefault.error ? <ErrorState error={setDefault.error} /> : remove.error ? <ErrorState error={remove.error} /> : null}
+
+        <SettingsGroup title="Connections" description={`${items.length} configured`}>
+          {connections.isLoading ? <Loading rows={3} /> : connections.error ? <ErrorState error={connections.error} /> : !items.length ? <SettingsRow label="No connections" description="Add one to let the agent call a model." /> : items.map((c) => (
+            <div key={c.id} className="group flex items-center gap-3 px-4 py-3">
+              <StatusIcon status={c.enabled && c.credentialPresent ? 'succeeded' : 'paused'} />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 text-[13px] text-fg">{c.name}{c.id === defaultId ? <Pill color="var(--accent)">Default</Pill> : null}{c.source === 'deployment-env' ? <Pill>env</Pill> : null}</div>
+                <div className="mt-0.5 truncate text-[12px] text-muted"><Mono>{c.modelId}</Mono> · {c.adapterKind} · {c.baseUrl}</div>
+              </div>
+              <span className="text-[12px] text-faint">{relativeTime(c.updatedAt)}</span>
+              <span className="flex w-14 justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                {c.id !== defaultId ? <Button size="icon-sm" variant="ghost" title="Make default" disabled={setDefault.isPending} onClick={() => setDefault.mutate(c.id)}><Check /></Button> : null}
+                {c.source === 'user' ? <Button size="icon-sm" variant="ghost" title="Delete" onClick={() => { if (confirm(`Delete ${c.name}?`)) remove.mutate(c.id); }}><Trash2 /></Button> : null}
+              </span>
+            </div>
+          ))}
+        </SettingsGroup>
+
+        <SettingsGroup title="Run agent" description="Default connection used when a chat message does not choose one.">
+          <SettingsRow label="Default connection" description={settings.data?.updatedBy ? `Updated ${formatTime(settings.data.updatedAt)} by ${settings.data.updatedBy}` : undefined}>
+            <Select className="w-[220px]" value={defaultId ?? ''} onChange={(e) => setDefault.mutate(e.target.value)} disabled={!settings.data}>
+              {settings.data?.unset ? <option value="">Unset</option> : null}
+              {settings.data?.providers.map((p) => <option key={p.id} value={p.id} disabled={!p.available}>{p.name}</option>)}
+            </Select>
+          </SettingsRow>
+        </SettingsGroup>
+
+        <SettingsGroup title="Model catalog" description="models.dev snapshot used for provider and model metadata.">
+          <SettingsRow label="Availability">{catalog.data ? <StatusBadge status={catalog.data.availability} /> : null}</SettingsRow>
+          <SettingsRow label="Providers / models"><span className="tabular text-[13px] text-fg-2">{catalog.data?.providerCount ?? '—'} / {catalog.data?.modelCount ?? '—'}</span></SettingsRow>
+          <SettingsRow label="Last sync"><span className="text-[12.5px] text-muted">{formatTime(catalog.data?.lastSuccessAt)}</span></SettingsRow>
+          <SettingsRow label="Next sync"><span className="text-[12.5px] text-muted">{formatTime(catalog.data?.nextSyncAt)}</span></SettingsRow>
+        </SettingsGroup>
+      </PageBody>
     </>
   );
 }

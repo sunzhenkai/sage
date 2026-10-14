@@ -9,6 +9,7 @@ import { Select } from '@/components/ui/input';
 import { Empty, ErrorState, Kbd, Mono, Spinner } from '@/components/ui/misc';
 import { StatusIcon } from '@/components/ui/status';
 import { api } from '@/lib/api';
+import { isMock } from '@/lib/mock';
 import { streamTimeline, type StreamState } from '@/lib/sse';
 import type { ChatRun, TimelineEvent } from '@/lib/types';
 import { cn, relativeTime, shortId } from '@/lib/utils';
@@ -136,6 +137,7 @@ function SessionView({ sessionId }: { sessionId: string }) {
       setEvents(initial);
       setLoaded(true);
       const last = initial.at(-1)?.sequence ?? 0;
+      if (isMock()) { setStream('live'); return; }
       stop = streamTimeline((after) => api.chat.timelineUrl(sessionId, after), last, (event) => {
         setEvents((prev) => (prev.some((e) => e.sequence === event.sequence) ? prev : [...prev, event]));
         if (event.payload.kind === 'run') void queryClient.invalidateQueries({ queryKey: ['chat', 'session', sessionId] });
@@ -184,7 +186,7 @@ function SessionView({ sessionId }: { sessionId: string }) {
       />
       <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto">
         {detail.error ? <ErrorState error={detail.error} /> : null}
-        <div className="mx-auto max-w-[720px] px-10 pb-6 pt-8">
+        <div className="mx-auto max-w-[760px] px-6 pb-6 pt-10">
           <h2 className="text-[20px] font-semibold tracking-[-0.02em] text-fg">{session?.title ?? 'Untitled session'}</h2>
           <p className="mt-1 text-[12.5px] text-muted">{groups.length} run{groups.length === 1 ? '' : 's'} · created {relativeTime(session?.createdAt)}</p>
           <div className="mb-3 mt-7 flex items-center gap-2 border-b border-line pb-2 text-[13px] font-medium text-fg">Activity</div>
@@ -192,7 +194,7 @@ function SessionView({ sessionId }: { sessionId: string }) {
             <p className="py-6 text-[12.5px] text-muted">No activity yet. Write the first message below — each one starts a run you can follow live.</p>
           ) : null}
           <ol className="relative">
-            {groups.length ? <span className="absolute bottom-3 left-[11px] top-3 w-px bg-line" /> : null}
+            {groups.length ? <span className="absolute bottom-6 left-[11.5px] top-6 w-px bg-line-strong" /> : null}
             {groups.map((group) => {
               const run = runs.get(group.runId);
               const status = group.status ?? run?.status;
@@ -234,8 +236,8 @@ function SessionView({ sessionId }: { sessionId: string }) {
           </ol>
         </div>
       </div>
-      <div className="px-10 pb-5">
-        <div className="mx-auto max-w-[720px] rounded-lg border border-line-strong bg-sunken transition-colors focus-within:border-faint/70">
+      <div className="px-6 pb-5">
+        <div className="mx-auto max-w-[760px] rounded-lg border border-line-strong bg-sunken transition-colors focus-within:border-faint/70">
           <textarea
             ref={textarea}
             rows={1}
@@ -262,7 +264,7 @@ function SessionView({ sessionId }: { sessionId: string }) {
 function FeedItem({ avatar, who, at, meta, action, children }: { avatar: React.ReactNode; who: string; at?: string | undefined; meta?: React.ReactNode; action?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="relative flex gap-3 py-2.5">
-      <div className="relative z-10 shrink-0 bg-panel py-px">{avatar}</div>
+      <div className="relative z-10 shrink-0 rounded-full bg-panel ring-4 ring-panel">{avatar}</div>
       <div className="min-w-0 flex-1">
         <div className="flex h-6 items-center gap-1.5 text-[12.5px]">
           <span className="font-medium text-fg">{who}</span>

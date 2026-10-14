@@ -1,6 +1,7 @@
-import { Boxes, CalendarClock, ListChecks, MessageSquare, Package, Plug, Settings } from 'lucide-react';
+import { BarChart3, Boxes, CalendarClock, ListChecks, MessageSquare, Package, Plug, Settings } from 'lucide-react';
 
 export const navItems = [
+  { to: '/overview', label: 'Overview', icon: BarChart3, shortcut: 'G O', group: 'Workspace' },
   { to: '/chat', label: 'Chat', icon: MessageSquare, shortcut: 'G C', group: 'Workspace' },
   { to: '/tasks', label: 'Tasks', icon: ListChecks, shortcut: 'G T', group: 'Workspace' },
   { to: '/schedules', label: 'Schedules', icon: CalendarClock, shortcut: 'G S', group: 'Workspace' },

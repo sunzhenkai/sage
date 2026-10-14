@@ -45,3 +45,8 @@ Not surfaced (yet): `POST /v1/tasks` (needs a pre-staged `task-input://` ref), `
 - SSE uses a `fetch` stream reader (not `EventSource`) so the bearer token can be sent; reconnects with backoff.
 - Keyboard: `⌘/Ctrl+K` palette, `G` then `C/T/A/P/S/M/,` to navigate, `Enter` to send.
 - The app is not part of the root `tsc -b` project graph (it is a bundled DOM app with `noEmit`); use the package scripts.
+
+## Overview & mock mode
+
+- `/overview` (default landing) — stat tiles with sparklines and charts (recharts, themed via `--chart-*` tokens) computed from sessions, session runs, tasks, schedules/triggers. Empty data renders ghost charts.
+- Mock mode (dev only, read-only): open any URL with `?mock=1` (persists in localStorage, `?mock=0` or the sidebar "Exit" clears it), or start with `VITE_MOCK=1 pnpm dev`. All GETs are served from a deterministic in-memory dataset; every write is rejected client-side (`MOCK_READ_ONLY`) so agent-api is never called.

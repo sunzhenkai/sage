@@ -38,7 +38,7 @@ export function PackageDetailPage() {
     <>
       <PageHeader breadcrumb={<Crumb to="/packages">Packages</Crumb>} title={packageId} />
       <div className="flex min-h-0 flex-1 flex-col overflow-auto">
-        <div className="mx-auto w-full max-w-[860px] px-10 py-8">
+        <div className="mx-auto w-full max-w-[760px] px-6 pb-16 pt-10">
           <h2 className="mb-4 text-[20px] font-semibold tracking-[-0.02em]">{packageId}</h2>
           {pkg.isLoading ? <Loading /> : pkg.error ? <ErrorState error={pkg.error} /> : <JsonView value={pkg.data} />}
         </div>

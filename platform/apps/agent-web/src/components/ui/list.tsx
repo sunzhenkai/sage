@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 export function ListGroup({ icon, label, count, onAdd, children }: { icon?: React.ReactNode; label: React.ReactNode; count?: number; onAdd?: () => void; children: React.ReactNode }) {
   return (
     <section>
-      <div className="sticky top-0 z-10 flex h-9 items-center gap-2 bg-[color-mix(in_srgb,var(--panel)_92%,var(--fg)_3%)] px-5">
+      <div className="sticky top-0 z-10 flex h-9 items-center gap-2 bg-[color-mix(in_srgb,var(--panel)_94%,var(--fg)_3%)] px-6">
         {icon}
         <span className="text-[13px] font-medium tracking-[-0.01em] text-fg">{label}</span>
         {count !== undefined ? <span className="tabular text-[12.5px] text-faint">{count}</span> : null}
@@ -23,7 +23,7 @@ export function ListRow({ onClick, children, className, active }: { onClick?: ((
       tabIndex={onClick ? 0 : undefined}
       onClick={onClick}
       onKeyDown={(e) => { if (onClick && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onClick(); } }}
-      className={cn('group flex h-[38px] items-center gap-3 px-5 text-[13px] outline-none transition-colors duration-75 focus-visible:bg-hover', onClick && 'cursor-default hover:bg-hover', active && 'bg-active', className)}
+      className={cn('group flex h-[38px] items-center gap-3 px-6 text-[13px] outline-none transition-colors duration-75 focus-visible:bg-hover', onClick && 'cursor-default hover:bg-hover', active && 'bg-active', className)}
     >
       {children}
     </div>

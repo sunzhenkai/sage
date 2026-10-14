@@ -101,7 +101,7 @@ export function TaskDetailPage() {
             <Property label="Observed">{formatTime(t.historyObservedAt)}</Property>
           </PropertyGroup>
         </>}>
-          <div className="mx-auto max-w-[760px] px-10 py-8">
+          <div className="mx-auto max-w-[760px] px-6 pb-16 pt-10">
             <h2 className="text-[20px] font-semibold tracking-[-0.02em] text-fg">{t.taskId}</h2>
             <p className="mt-1 text-[13px] text-muted">{t.taskType ?? 'Task'} · {statusLabel[t.status]}{t.freshnessReason ? ` · ${t.freshnessReason}` : ''}</p>
             <div className="mt-6 flex items-center gap-1 border-b border-line pb-2">

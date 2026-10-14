@@ -1,3 +1,4 @@
+import { isMock, mockGet } from './mock';
 import { getSettings } from './settings';
 import type {
   AppDetail, AppSummary, CatalogStatus, ChatRun, Message, PackageSummary, ProviderConnection, ProviderConnectionWrite, RunAgentSettings,
@@ -28,6 +29,13 @@ export function authHeaders(): Record<string, string> {
 type Query = Record<string, string | number | boolean | undefined>;
 
 async function request<T>(method: string, path: string, options: { query?: Query; body?: unknown } = {}): Promise<T> {
+  if (isMock()) {
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    if (method !== 'GET') throw new ApiError(400, 'MOCK_READ_ONLY', 'Mock mode is read-only — nothing is sent to agent-api.');
+    const data = mockGet(path);
+    if (data === undefined) throw new ApiError(404, 'MOCK_NOT_FOUND', `No mock data for ${path}`);
+    return data as T;
+  }
   const headers: Record<string, string> = { accept: 'application/json', ...authHeaders() };
   const init: RequestInit = { method, headers };
   if (options.body !== undefined) { headers['content-type'] = 'application/json'; init.body = JSON.stringify(options.body); }

@@ -156,7 +156,7 @@ export function ScheduleDetailPage() {
               <Property label="Revision">{s.revision}</Property>
             </PropertyGroup>
           </>}>
-            <div className="mx-auto max-w-[760px] px-10 py-8">
+            <div className="mx-auto max-w-[760px] px-6 pb-16 pt-10">
               <h2 className="text-[20px] font-semibold tracking-[-0.02em]">{s.definition.displayName ?? s.definition.scheduleId}</h2>
               <p className="mt-1 text-[13px] text-muted"><Mono>{s.definition.scheduleId}</Mono> · {describeTrigger(s.definition.trigger)}</p>
               <h3 className="mb-1 mt-8 border-b border-line pb-2 text-[13px] font-medium">Trigger history</h3>

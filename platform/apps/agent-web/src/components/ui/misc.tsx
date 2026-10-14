@@ -44,7 +44,7 @@ export function Loading({ rows = 6, label }: { rows?: number; label?: string }) 
   return (
     <div className="animate-fade-in flex flex-col" aria-label={label ?? 'Loading'}>
       {Array.from({ length: rows }, (_, i) => (
-        <div key={i} className="flex h-[38px] items-center gap-3 px-5">
+        <div key={i} className="flex h-[38px] items-center gap-3 px-6">
           <div className="skeleton size-3.5 rounded-full" />
           <div className="skeleton h-2.5" style={{ width: `${28 + ((i * 37) % 40)}%` }} />
           <div className="skeleton ml-auto h-2.5 w-14" />
@@ -69,7 +69,7 @@ export function ErrorState({ error }: { error: unknown }) {
   const authHint = isApi && (error.status === 401 || error.code.includes('AUTHENTICATION'));
   const Icon = authHint ? KeyRound : AlertCircle;
   return (
-    <div className="animate-fade-in flex items-start gap-2.5 px-5 py-4 text-[12.5px]">
+    <div className="animate-fade-in flex items-start gap-2.5 px-6 py-4 text-[12.5px]">
       <Icon className={cn('mt-px size-3.5 shrink-0', authHint ? 'text-muted' : 'text-red')} strokeWidth={1.75} />
       <div className="min-w-0">
         <span className="font-medium text-fg-2">{authHint ? 'Service token required. ' : 'Request failed. '}</span>

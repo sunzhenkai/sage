@@ -15,6 +15,8 @@
   --accent: #5e6ad2; --accent-hover: #4f5bc4; --accent-soft: rgb(94 106 210 / 0.1); --accent-fg: #fff;
   --green: #27a068; --red: #d4534b; --amber: #c98813; --blue: #4b8fe2; --violet: #8b5cf6;
   --shadow-panel: 0 0 0 1px rgb(0 0 0 / 0.06), 0 1px 2px rgb(0 0 0 / 0.04);
+  --chart-1: #5e6ad2; --chart-2: #2f9e8f; --chart-3: #d9773e; --chart-4: #c9a227; --chart-5: #c45b93; --chart-6: #a3a6ae;
+  --chart-grid: rgb(0 0 0 / 0.06); --chart-axis: #8a8f98; --tile: #fbfbfc;
   --shadow-pop: 0 0 0 1px rgb(0 0 0 / 0.08), 0 12px 40px -8px rgb(0 0 0 / 0.2);
 }
 .dark {
@@ -25,6 +27,8 @@
   --accent: #5e6ad2; --accent-hover: #6d78db; --accent-soft: rgb(94 106 210 / 0.15); --accent-fg: #fff;
   --green: #4cb782; --red: #eb5757; --amber: #f2c94c; --blue: #5e9ceb; --violet: #a78bfa;
   --shadow-panel: 0 0 0 1px rgb(255 255 255 / 0.065), 0 1px 0 rgb(255 255 255 / 0.02) inset;
+  --chart-1: #7c84e8; --chart-2: #4fb6a7; --chart-3: #e0915c; --chart-4: #dcc060; --chart-5: #d27fab; --chart-6: #4b4e55;
+  --chart-grid: rgb(255 255 255 / 0.055); --chart-axis: #62666d; --tile: #131416;
   --shadow-pop: 0 0 0 1px rgb(255 255 255 / 0.08), 0 16px 48px -8px rgb(0 0 0 / 0.7);
 }
 @theme inline {
@@ -34,7 +38,8 @@
   --color-fg: var(--fg); --color-fg-2: var(--fg-2); --color-muted: var(--muted); --color-faint: var(--faint);
   --color-accent: var(--accent); --color-accent-hover: var(--accent-hover); --color-accent-soft: var(--accent-soft); --color-accent-fg: var(--accent-fg);
   --color-green: var(--green); --color-red: var(--red); --color-amber: var(--amber); --color-blue: var(--blue); --color-violet: var(--violet);
-  --shadow-panel: var(--shadow-panel); --shadow-pop: var(--shadow-pop);
+  --shadow-panel: var(--shadow-panel); --color-tile: var(--tile);
+  --color-chart-1: var(--chart-1); --color-chart-2: var(--chart-2); --color-chart-3: var(--chart-3); --color-chart-4: var(--chart-4); --color-chart-5: var(--chart-5); --color-chart-6: var(--chart-6); --shadow-pop: var(--shadow-pop);
   --font-sans: "Inter Variable", Inter, ui-sans-serif, system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
   --font-mono: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
   --radius-sm: 4px; --radius-md: 6px; --radius-lg: 10px; --radius-xl: 12px;
@@ -68,3 +73,6 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 .animate-fade-in { animation: fade-in 160ms var(--ease-out); }
 .animate-pop-in { animation: pop-in 160ms var(--ease-out); }
 .skeleton { background: linear-gradient(90deg, var(--hover) 0%, var(--active) 50%, var(--hover) 100%); background-size: 800px 100%; animation: shimmer 1.4s linear infinite; border-radius: 4px; }
+
+.recharts-wrapper, .recharts-surface { outline: none; }
+.recharts-tooltip-cursor { fill: var(--hover); }

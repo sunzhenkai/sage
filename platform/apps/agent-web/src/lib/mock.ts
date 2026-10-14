@@ -1,0 +1,136 @@
+/**
+ * Dev-only demo data. Enabled by `?mock=1` (persisted in localStorage, `?mock=0` to leave) or VITE_MOCK=1.
+ * Mock mode is read-only: it never calls agent-api, and write operations are rejected locally.
+ */
+import type { ChatRun, Message, ScheduleSnapshot, ScheduleTriggerEvent, SessionListItem, TaskStatus, TaskView, TimelineEvent } from './types';
+
+const KEY = 'sage.agent-web.mock';
+
+function initMock(): boolean {
+  if (typeof window === 'undefined') return false;
+  const param = new URLSearchParams(window.location.search).get('mock');
+  if (param === '1') localStorage.setItem(KEY, '1');
+  if (param === '0') localStorage.removeItem(KEY);
+  return import.meta.env.VITE_MOCK === '1' || localStorage.getItem(KEY) === '1';
+}
+const enabled = initMock();
+export const isMock = (): boolean => enabled;
+export function exitMock(): void { localStorage.removeItem(KEY); window.location.search = ''; }
+
+// ---- deterministic data ----
+let seed = 42;
+const rnd = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+const pick = <T,>(xs: readonly T[]): T => xs[Math.floor(rnd() * xs.length)]!;
+const hex = (n: number) => Array.from({ length: n }, () => Math.floor(rnd() * 16).toString(16)).join('');
+const uuid = () => `${hex(8)}-${hex(4)}-${hex(4)}-${hex(4)}-${hex(12)}`;
+const NOW = Date.now();
+const DAY = 86_400_000;
+const iso = (ms: number) => new Date(ms).toISOString();
+
+const titles = ['Weekly finance briefing', 'Summarize incident INC-2291', 'Draft release notes v2.4', 'Compare FX moves vs last week', 'Triage support backlog', 'Explain temporal retry policy', 'Refactor schedule binding', 'Market open checklist', 'Postgres migration plan', 'Evaluate provider latency', 'Investigate SSE reconnects', 'Generate onboarding doc'];
+const prompts = ['Give me a concise briefing on today\u2019s FX moves and index closes.', 'What changed between release 2.3 and 2.4?', 'Summarize the root cause and follow-ups.', 'List the top 5 risks for the migration.'];
+const answers = ['Here is today\u2019s briefing:\n\n• USD/CNY 7.12 (−0.18%)\n• EUR/USD 1.0874 (+0.22%)\n• S&P 500 closed +0.6% led by semis; Hang Seng −0.4%.\n\nNet: risk-on tone in US hours, Asia lagging on property headlines.', 'Release 2.4 adds durable coordinator v2, schedule FOLLOW bindings and run-log pagination. Two breaking changes: the singular /signal route is deprecated and provider selection is now required.', 'Root cause: the artifact store briefly returned 503 during a rolling restart; workers retried without backoff. Follow-ups: add jitter, alert on sage_artifact_store_unavailable_total.'];
+
+export const mockSessions: SessionListItem[] = titles.map((title, i) => {
+  const t = NOW - i * 0.55 * DAY - rnd() * 3_600_000;
+  return { schemaVersion: '1', sessionId: `session-${uuid()}`, status: 'open', title, preview: pick(prompts), lastMessageRole: rnd() > 0.3 ? 'assistant' : 'user', lastMessageAt: iso(t), createdAt: iso(t - 3_600_000), updatedAt: iso(t) };
+});
+
+const runsBySession = new Map<string, ChatRun[]>();
+const eventsBySession = new Map<string, TimelineEvent[]>();
+const messagesBySession = new Map<string, Message[]>();
+for (const s of mockSessions) {
+  const count = 1 + Math.floor(rnd() * 3);
+  const runs: ChatRun[] = []; const events: TimelineEvent[] = []; const messages: Message[] = []; let seq = 0;
+  for (let k = 0; k < count; k++) {
+    const start = new Date(s.createdAt).getTime() + k * 900_000;
+    const runId = `run-${uuid()}`; const messageId = `message-${uuid()}`;
+    const status = rnd() < 0.78 ? 'succeeded' : 'failed';
+    const dur = 2_000 + rnd() * 26_000;
+    runs.push({ schemaVersion: '1', runId, sessionId: s.sessionId, userMessageId: messageId, attempt: 1, status, startedAt: iso(start), completedAt: iso(start + dur), ...(status === 'failed' ? { error: { code: 'CHAT_AGENT_FAILED', message: 'Upstream provider timed out after 60s', retryable: true } } : {}) });
+    const text = pick(prompts);
+    messages.push({ schemaVersion: '1', messageId, sessionId: s.sessionId, turn: k * 2 + 1, role: 'user', parts: [{ kind: 'text', text }], createdAt: iso(start) });
+    events.push({ schemaVersion: '1', sessionId: s.sessionId, runId, sequence: ++seq, occurredAt: iso(start), payload: { kind: 'text', text, messageId } });
+    events.push({ schemaVersion: '1', sessionId: s.sessionId, runId, sequence: ++seq, occurredAt: iso(start), payload: { kind: 'run', status: 'active', attempt: 1 } });
+    if (rnd() > 0.5) events.push({ schemaVersion: '1', sessionId: s.sessionId, runId, sequence: ++seq, occurredAt: iso(start + 900), payload: { kind: 'tool', toolName: 'web-snapshot-reader', status: 'completed' } });
+    if (status === 'succeeded') events.push({ schemaVersion: '1', sessionId: s.sessionId, runId, sequence: ++seq, occurredAt: iso(start + dur), payload: { kind: 'text', text: pick(answers) } });
+    else events.push({ schemaVersion: '1', sessionId: s.sessionId, runId, sequence: ++seq, occurredAt: iso(start + dur), payload: { kind: 'error', error: { code: 'CHAT_AGENT_FAILED', message: 'Upstream provider timed out after 60s', retryable: true } } });
+    events.push({ schemaVersion: '1', sessionId: s.sessionId, runId, sequence: ++seq, occurredAt: iso(start + dur), payload: { kind: 'run', status, attempt: 1 } });
+  }
+  runsBySession.set(s.sessionId, runs); eventsBySession.set(s.sessionId, events); messagesBySession.set(s.sessionId, messages);
+}
+
+const taskTypes = ['finance-brief', 'release-notes', 'incident-summary', 'data-sync'];
+const statusWeights: [TaskStatus, number][] = [['succeeded', 0.55], ['running', 0.14], ['failed', 0.12], ['paused', 0.07], ['cancelled', 0.07], ['effect_unknown', 0.05]];
+const weighted = (): TaskStatus => { let r = rnd(); for (const [s, w] of statusWeights) { if ((r -= w) <= 0) return s; } return 'succeeded'; };
+export const mockTasks: TaskView[] = Array.from({ length: 46 }, (_, i) => {
+  const t = NOW - rnd() * 13 * DAY;
+  const taskType = pick(taskTypes);
+  return { schemaVersion: '1', taskId: `task-${taskType}-${(4120 - i).toString()}`, taskType, workflowId: `wf-${hex(10)}`, targetId: pick(['worker-a', 'worker-b', 'worker-gpu']), attempt: rnd() > 0.8 ? 2 : 1, status: weighted(), revision: Math.floor(rnd() * 9), projectionSource: 'writer', projectionFreshness: 'fresh', lifecyclePath: 'DURABLE_COORDINATOR_V2', projectionUpdatedAt: iso(t), historyObservedAt: iso(t + 2000), sessionId: pick(mockSessions).sessionId };
+}).sort((a, b) => String(b.projectionUpdatedAt).localeCompare(String(a.projectionUpdatedAt)));
+
+const def = (scheduleId: string, displayName: string, trigger: ScheduleSnapshot['definition']['trigger'], task: string): ScheduleSnapshot['definition'] => ({
+  schemaVersion: '1', scheduleId, tenantId: 'tenant-local', displayName, trigger, overlapPolicy: 'SKIP', misfirePolicy: 'CATCH_UP_ONE', releaseBinding: { strategy: 'FOLLOW' },
+  targetConstraints: { allowedEnvironments: ['local'] }, budget: { limits: [{ dimension: 'runs', limit: 48 }] }, invocation: { task }
+});
+export const mockSchedules: ScheduleSnapshot[] = [
+  { schemaVersion: '1', definition: def('finance.morning', 'Morning finance brief', { kind: 'cron', expression: '0 8 * * 1-5', timezone: 'Asia/Shanghai' }, 'finance-brief'), revision: 4, state: 'ACTIVE', contentDigest: `sha256:${hex(64)}`, createdAtMs: NOW - 20 * DAY, updatedAtMs: NOW - 2 * DAY, nextFireAtMs: NOW + 9 * 3_600_000 },
+  { schemaVersion: '1', definition: def('release.notes', 'Release notes digest', { kind: 'cron', expression: '0 18 * * 5', timezone: 'Asia/Shanghai' }, 'release-notes'), revision: 2, state: 'ACTIVE', contentDigest: `sha256:${hex(64)}`, createdAtMs: NOW - 12 * DAY, updatedAtMs: NOW - 5 * DAY, nextFireAtMs: NOW + 2 * DAY },
+  { schemaVersion: '1', definition: def('sync.hourly', 'Hourly data sync', { kind: 'interval', everyMs: 3_600_000 }, 'data-sync'), revision: 7, state: 'ACTIVE', contentDigest: `sha256:${hex(64)}`, createdAtMs: NOW - 30 * DAY, updatedAtMs: NOW - DAY, nextFireAtMs: NOW + 1_200_000 },
+  { schemaVersion: '1', definition: def('incident.weekly', 'Weekly incident review', { kind: 'cron', expression: '0 10 * * 1', timezone: 'UTC' }, 'incident-summary'), revision: 1, state: 'PAUSED', contentDigest: `sha256:${hex(64)}`, createdAtMs: NOW - 8 * DAY, updatedAtMs: NOW - 3 * DAY }
+];
+export const mockTriggers: Record<string, ScheduleTriggerEvent[]> = Object.fromEntries(mockSchedules.map((s) => [s.definition.scheduleId, Array.from({ length: 28 }, (_, i) => {
+  const r = rnd();
+  return { scheduleId: s.definition.scheduleId, occurrenceId: `occ-${hex(8)}`, kind: r < 0.8 ? 'SUCCEEDED' : r < 0.9 ? 'FAILED' : r < 0.96 ? 'SKIPPED' : 'MISSED', occurredAtMs: NOW - i * (s.definition.trigger.kind === 'interval' ? 0.45 : 0.5) * DAY - rnd() * 3_600_000, taskId: pick(mockTasks).taskId } as ScheduleTriggerEvent;
+})]));
+
+const providers = [
+  { id: 'conn-openai', name: 'openai-prod', source: 'user', adapterKind: 'openai-compatible', baseUrl: 'https://api.openai.com/v1', modelId: 'gpt-4o-mini', enabled: true, credentialPresent: true, createdAt: iso(NOW - 30 * DAY), updatedAt: iso(NOW - 2 * DAY) },
+  { id: 'conn-anthropic', name: 'anthropic', source: 'user', adapterKind: 'anthropic', baseUrl: 'https://api.anthropic.com', modelId: 'claude-sonnet', enabled: true, credentialPresent: true, createdAt: iso(NOW - 20 * DAY), updatedAt: iso(NOW - 6 * DAY) },
+  { id: 'conn-env', name: 'minimax-cn', source: 'deployment-env', adapterKind: 'openai-compatible', baseUrl: 'https://api.minimax.chat/v1', modelId: 'MiniMax-M3', enabled: true, credentialPresent: true, createdAt: iso(NOW - 40 * DAY), updatedAt: iso(NOW - 40 * DAY) }
+];
+
+/** Resolve a GET path to demo data. Returns undefined for unknown paths. */
+export function mockGet(path: string): unknown {
+  const p = path.split('?')[0]!;
+  const m = (re: RegExp) => p.match(re);
+  if (p === '/livez') return { status: 'alive' };
+  if (p === '/readyz') return { status: 'ready', mode: 'mock' };
+  if (p === '/v1/chat/sessions') return { schemaVersion: '1', items: mockSessions, nextCursor: null };
+  let r = m(/^\/v1\/chat\/sessions\/([^/]+)\/events$/); if (r) return { events: eventsBySession.get(decodeURIComponent(r[1]!)) ?? [] };
+  r = m(/^\/v1\/chat\/sessions\/([^/]+)$/); if (r) {
+    const id = decodeURIComponent(r[1]!); const s = mockSessions.find((x) => x.sessionId === id);
+    return s ? { session: s, messages: messagesBySession.get(id) ?? [], runs: runsBySession.get(id) ?? [], summaries: [] } : undefined;
+  }
+  if (p === '/v1/tasks') return { tasks: mockTasks };
+  r = m(/^\/v1\/tasks\/([^/]+)\/events$/); if (r) {
+    const t = mockTasks.find((x) => x.taskId === decodeURIComponent(r![1]!)); const base = new Date(String(t?.projectionUpdatedAt ?? iso(NOW))).getTime() - 600_000;
+    return { events: ['task.created', 'task.routed', 'attempt.started', 'checkpoint.saved', 'tool.completed', `task.${t?.status ?? 'succeeded'}`].map((type, i) => ({ eventId: `evt-${i}`, type, occurredAt: iso(base + i * 95_000) })) };
+  }
+  r = m(/^\/v1\/tasks\/([^/]+)\/run-logs$/); if (r) return { attempts: [{ runId: 'run-1', attemptId: 'attempt-1' }], selected: { runId: 'run-1', attemptId: 'attempt-1' }, events: ['agent.started', 'model.request', 'model.response', 'tool.call', 'tool.result', 'agent.completed'].map((type, i) => ({ eventId: `rl-${i}`, runId: 'run-1', attemptId: 'attempt-1', sequence: i + 1, type, payload: { tokens: 120 + i * 37 } })) };
+  r = m(/^\/v1\/tasks\/([^/]+)\/artifacts$/); if (r) return { artifacts: [{ artifactId: 'art-1', name: 'briefing.md', mediaType: 'text/markdown', sizeBytes: 4182 }, { artifactId: 'art-2', name: 'output.json', mediaType: 'application/json', sizeBytes: 912 }] };
+  r = m(/^\/v1\/tasks\/([^/]+)\/artifacts\/([^/]+)$/); if (r) return { artifactId: r[2], name: 'briefing.md', mediaType: 'text/markdown', content: '# Morning brief\n\nUSD/CNY 7.12 …', encoding: 'utf8' };
+  r = m(/^\/v1\/tasks\/([^/]+)$/); if (r) return mockTasks.find((x) => x.taskId === decodeURIComponent(r![1]!));
+  if (p === '/v1/apps') return { apps: [
+    { appId: 'finance-briefing', status: 'active', releaseCount: 3, latestVersion: '2.0.0', createdAt: iso(NOW - 30 * DAY), updatedAt: iso(NOW - 3 * DAY) },
+    { appId: 'release-notes', status: 'active', releaseCount: 5, latestVersion: '1.4.2', createdAt: iso(NOW - 25 * DAY), updatedAt: iso(NOW - DAY) },
+    { appId: 'incident-summary', status: 'active', releaseCount: 2, latestVersion: '0.9.0', createdAt: iso(NOW - 9 * DAY), updatedAt: iso(NOW - 4 * DAY) },
+    { appId: 'data-sync', status: 'disabled', releaseCount: 1, latestVersion: '0.1.0', createdAt: iso(NOW - 6 * DAY), updatedAt: iso(NOW - 6 * DAY) }
+  ] };
+  r = m(/^\/v1\/apps\/([^/]+)$/); if (r) return { appId: r[1], status: 'active', createdAt: iso(NOW - 30 * DAY), manifest: { id: r[1], version: '2.0.0', description: 'Daily cross-market briefing generated from FX and index data sources.', entry: 'prompts/system.md', modelRoute: { provider: 'minimax-cn', model: 'MiniMax-M3' }, skillRefs: ['skill://finance-brief/v1'], capabilityRefs: ['capability://web-snapshot-reader/v1'], inputs: [{ name: 'focus', type: 'string', required: false }], dataSources: [{ name: 'fx-rates', url: 'https://api.frankfurter.dev/v1/latest' }], tasks: [{ name: 'finance-brief', entry: 'prompts/system.md' }] }, assets: [{ relativePath: 'prompts/system.md', kind: 'prompt', digest: `sha256:${hex(64)}`, bytes: 2306, preview: 'You are a finance analyst…' }] };
+  if (p === '/v1/packages') return { packages: [
+    { packageId: 'finance-briefing', latestVersion: '2.0.0', releaseCount: 3, latestContentDigest: `sha256:${hex(64)}`, updatedAt: iso(NOW - 3 * DAY) },
+    { packageId: 'release-notes', latestVersion: '1.4.2', releaseCount: 5, latestContentDigest: `sha256:${hex(64)}`, updatedAt: iso(NOW - DAY) }
+  ] };
+  r = m(/^\/v1\/packages\/([^/]+)$/); if (r) return { packageId: r[1], releases: [] };
+  if (p === '/v1/schedules') return { schemaVersion: 'ScheduleListResult.v1', schedules: mockSchedules };
+  r = m(/^\/v1\/schedules\/([^/]+)\/triggers$/); if (r) return { schemaVersion: 'ScheduleTriggerHistory.v1', scheduleId: r[1], events: mockTriggers[decodeURIComponent(r[1]!)] ?? [] };
+  r = m(/^\/v1\/schedules\/([^/]+)$/); if (r) return mockSchedules.find((s) => s.definition.scheduleId === decodeURIComponent(r![1]!));
+  if (p === '/v1/provider-connections') return { schemaVersion: 'ProviderConnections.v1', connections: providers };
+  if (p === '/v1/run-agent/settings') return { schemaVersion: 'RunAgentSettings.v2', unset: false, providerConnectionId: 'conn-openai', updatedAt: iso(NOW - 2 * DAY), updatedBy: 'principal://demo', providers: providers.map((x) => ({ id: x.id, name: x.name, available: true })) };
+  if (p === '/v1/provider-catalog/status') return { source: 'models-dev', availability: 'available', projection: 'ready', providerCount: 229, modelCount: 8832, lastSuccessAt: iso(NOW - 6 * 3_600_000), nextSyncAt: iso(NOW + 18 * 3_600_000) };
+  return undefined;
+}
+
+/** Mock "provider usage" — runs attributed to connections (not available from the real API). */
+export const mockProviderUsage = [{ name: 'openai-prod', value: 182 }, { name: 'anthropic', value: 97 }, { name: 'minimax-cn', value: 41 }];

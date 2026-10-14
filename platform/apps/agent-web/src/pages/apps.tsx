@@ -74,7 +74,7 @@ export function AppDetailPage() {
             <div className="flex flex-wrap gap-1 px-2">{list('capabilityRefs').map((s) => <Pill key={String(s)} color="var(--blue)">{String(s).replace(/^capability:\/\//, '')}</Pill>)}</div>
           </PropertyGroup>
         </>}>
-          <div className="mx-auto max-w-[760px] px-10 py-8">
+          <div className="mx-auto max-w-[760px] px-6 pb-16 pt-10">
             <h2 className="text-[20px] font-semibold tracking-[-0.02em]">{appId}</h2>
             <p className="mt-1 text-[13px] text-muted">{description ?? 'Agent app manifest, tasks, inputs and bundled assets.'}</p>
 
