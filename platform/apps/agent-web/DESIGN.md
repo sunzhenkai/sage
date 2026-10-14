@@ -9,11 +9,11 @@
 | 层 | Token（Tailwind 类） | Dark | Light | 用于 |
 |---|---|---|---|---|
 | App 背景 | `--canvas` / `--frame`（`bg-frame`） | `oklch(0.231 0.004 264.5)` | `oklch(0.955 0.003 264.5)`（浅灰，衬托白色面板） | 侧边栏 + 面板外框 |
-| Panel | `--page` / `--panel`（`bg-panel`） | `oklch(0.209 0.004 264.5)` | `#ffffff` 纯白 | 内嵌圆角面板，**页面唯一底色** |
+| Panel | `--page` / `--panel`（`bg-panel`） | `oklch(0.209 0.004 264.5)` | `oklch(0.977 0.002 264.5)` 浅灰（让白色卡片浮出） | 内嵌圆角面板，**页面唯一底色** |
 | Header 带 | 同 Panel | 同上 | 同上 | `PageHeader` / `PageToolbar`，仅以 `border-b border-line` 分隔 |
 | 描述区 | 同 Panel | 同上 | 同上 | `PageDescription`（不加底色、不加卡片） |
 | 内容区 | 同 Panel | 同上 | 同上 | `PageContent`、`Section`、列表、全宽表格、详情侧栏 |
-| 卡片 | `--surface`（`bg-surface` + `shadow-card`） | `oklch(0.26 0.006 271.2)` | `#ffffff` + 1px `--line` ring + 轻阴影（白底上靠描边区分） | 图表、统计块、代码块、流程图、审批卡、任务胶囊 |
+| 卡片 | `--surface`（`bg-surface` + `shadow-card`） | `oklch(0.26 0.006 271.2)` | `#ffffff`，1px `--line` 描边 + 几乎无阴影（`0 1px 2px / 3%`） | 图表、统计块、代码块、流程图、审批卡、任务胶囊 |
 | 浮层 | `--surface` + `shadow-overlay` | 同卡片 | 同卡片 | 命令面板、菜单、popover、tooltip 之外的弹层 |
 | 遮罩 | `--scrim`（`bg-scrim`） | `oklch(0 0 0 / .65)` | `oklch(0 0 0 / .5)` | Dialog / 命令面板背后 |
 | 输入框 | `--field`（`bg-field`） | `oklch(0.293 0.006 271.2)` | `oklch(0.961 0.001 286.4)` | 输入框、用户消息气泡 |
@@ -22,9 +22,21 @@
 
 分隔线：`--line`（常规，light `oklch(0.928 0.004 264.5)`）/ `--line-strong`（按钮描边、强调，light `oklch(0.895 0.006 264.5)`）。代码/嵌入块用 `--inset`（light `oklch(0.982 0.002 264.5)`）。
 
-Light 主题内容区为纯白：卡片与面板同为白色，层级完全依靠 `shadow-card`（1px line ring + 轻阴影）；需要更弱的分组时用 `--inset` 浅灰底。
+## 2. 内容块三要素（Section）
 
-## 2. 字体角色
+每个内容块 = **标题 + 描述 + 内容**，由 `Section` 原语统一渲染（`title` / `description` / `card`）。
+
+| 角色 | 字体 | 颜色 | 背景 | 说明 |
+|---|---|---|---|---|
+| 标题 | `t-section` 13/20 · 600 | `--ink` | 页面底色（`--panel` 浅灰） | 可带计数（`t-meta`）与右侧操作 |
+| 描述 | `t-desc` 13/20 · 400 | `--ink-2` | 页面底色 | 一句话说明，紧贴标题下方 |
+| 内容 | `t-body` 13.5/21 | `--ink` | **卡片**：`--surface`（light 白 / dark raised）+ 1px `--line` + 圆角 10 | 优先 `card`；行用 `SettingsRow` / `CardRow`（`px-4`），表格用 `RecordsTable` 卡片模式 |
+
+- 内容本身已是卡片（图表、代码 `JsonView`、流程图、审批卡、任务胶囊）时不再套卡片。
+- `SettingsGroup` = Section + 卡片 + `divide-y` 行。
+- 列表页（Tasks 等）：表格放在 Section 内的卡片表格中，不再贴满面板。
+
+## 2b. 字体角色
 
 | 角色 | 工具类 | 字号/行高 | 字重 | 颜色 |
 |---|---|---|---|---|
@@ -48,7 +60,8 @@ Light 主题内容区为纯白：卡片与面板同为白色，层级完全依�
 | 间距刻度 | 4 · 6 · 8 · 12 · 16 · 24 · 32 · 48（px） |
 | 详情页 | 两栏：主栏 `flex-1` + 属性侧栏 `--aside-w: 320px`（`DetailLayout`，`border-l`，同 Panel 背景） |
 | 设置页 / Providers | 720px 居中栏；`SettingsRow` 两列网格：标签列 `minmax(160px,220px)` + 控件列 `1fr`，输入框 `w-full` 填满控件列，开关/分段控件右对齐 |
-| Master-detail | 聊天页左侧会话列 280px，右侧全宽 |
+| Master-detail | 聊天页左侧会话列 300px（`SessionList`：按 Today/Yesterday/Earlier 分组；行 = 色相头像 + 最新 run 状态点 + 标题/预览 + 时间 + runs/消息计数 + 最近 5 次 run 色条；选中行为白色描边卡片；Active/Archived 分段切换） |
+| 会话页头 | 单一页头 `SessionHeader`：头像 + 标题 + 状态点 + 灰色 meta，右侧操作；下方为安静下划线 tab（13px，active = ink + 2px accent 下划线，计数为小号灰色数字）；背景同页面底色，仅一条底部分隔线，不使用胶囊/卡片 tab |
 | 例外：阅读/表单类页面居中窄栏 | 设置页、Providers 页 `PageContent width="narrow"`（`--w-narrow: 720px`）；聊天消息流 + 输入框 `width="chat"`（`--w-chat: 760px`，会话列表侧栏不变）。宽度只能通过 `PageContent` / `PageColumn` 的 `width` 取得，页面里仍禁止 `max-w-*` / `mx-auto` |
 | 其余页面 | 列表、详情、Overview、Apps/Packages/Schedules **保持全宽** |
 | `readable` | `--readable: 72ch`，仅限全宽块内的长正文 |
@@ -59,7 +72,7 @@ Light 主题内容区为纯白：卡片与面板同为白色，层级完全依�
 
 | 场景 | 用法 |
 |---|---|
-| 文本、属性、键值、列表、设置 | **Section**（无底色、无边框），列表用 `Bleed` 贴边 + `border-y` |
+| 列表、设置、键值、时间线 | **Section card**：标题+描述在灰底上，内容在白色描边卡片里 |
 | 图表、统计块、代码、流程图、审批、文件/任务胶囊 | **Card**：`bg-surface rounded-card shadow-card` |
 | 边框 | 只用 1px `--line` 分隔（`border-b`、`divide-y`）；卡片描边由 `shadow-card` 的 ring 提供，不再叠 `border` |
 | 圆角 | chip 6 · control 8 · card 10 · window/面板 14 |
@@ -71,7 +84,7 @@ Light 主题内容区为纯白：卡片与面板同为白色，层级完全依�
 |---|---|
 | 列表行 | `ListRow`：全宽，`gutter-x`，hover `bg-hover`，选中 `bg-hover-2` |
 | 分组头 | `ListGroup`：`bg-panel border-b`，sticky，同 gutter |
-| 整页表格 | `RecordsTable` fill 模式：贴满面板（flush），行号列即左 gutter，sticky 单元格用 `--rt-bg` = panel |
+| 页面表格 | 默认 `RecordsTable` 卡片模式放在 Section 内；fill 模式（贴满面板）仅用于 master-detail 类整屏表格 |
 | 卡内表格 | `RecordsTable` card 模式：`--rt-bg` = surface |
 | 数字 | 等宽 + 右对齐（`tabular-nums`） |
 
@@ -92,7 +105,7 @@ Light 主题内容区为纯白：卡片与面板同为白色，层级完全依�
 | ✅ Do | ❌ Don't |
 |---|---|
 | 用 `PageContent` / `Section` / `PageDescription` 组织页面 | 在页面里写 `px-6`、`pt-10`、`-mx-6` 等临时 padding |
-| 背景只用 panel；物件才用 Card | 给标题区、描述区单独上底色 |
+| 标题/描述放灰底，内容放白卡片（`Section card`） | 标题区、描述区上底色；内容直接铺在灰底上 |
 | 全宽布局；设置/Providers/聊天用 `width="narrow"/"chat"` | 页面里手写 `max-w-3xl mx-auto` |
 | 颜色只用 token 类 | 原始 hex、`bg-white`、`bg-zinc-900`、`bg-black/50` |
 | 滚动交给 `PageContent` | 页面里自建 `overflow-y-auto` |

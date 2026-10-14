@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { PageHeader } from '@/components/layout/app-shell';
-import { PageContent, PageDescription, SettingsGroup, SettingsRow } from '@/components/layout/page';
+import { CardRow, PageContent, PageDescription, SettingsGroup, SettingsRow } from '@/components/layout/page';
 import { StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -38,7 +38,7 @@ export function ProvidersPage() {
 
         <SettingsGroup title="Connections" description={`${items.length} configured`}>
           {connections.isLoading ? <Loading rows={3} /> : connections.error ? <ErrorState error={connections.error} /> : !items.length ? <SettingsRow label="No connections" description="Add one to let the agent call a model." /> : items.map((c) => (
-            <div key={c.id} className="group flex items-center gap-3 py-3">
+            <CardRow key={c.id} className="group">
               <StatusIcon status={c.enabled && c.credentialPresent ? 'succeeded' : 'paused'} />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 text-[13px] text-fg">{c.name}{c.id === defaultId ? <Pill color="var(--accent)">Default</Pill> : null}{c.source === 'deployment-env' ? <Pill>env</Pill> : null}</div>
@@ -49,7 +49,7 @@ export function ProvidersPage() {
                 {c.id !== defaultId ? <Button size="icon-sm" variant="ghost" title="Make default" disabled={setDefault.isPending} onClick={() => setDefault.mutate(c.id)}><Check /></Button> : null}
                 {c.source === 'user' ? <Button size="icon-sm" variant="ghost" title="Delete" onClick={() => { if (confirm(`Delete ${c.name}?`)) remove.mutate(c.id); }}><Trash2 /></Button> : null}
               </span>
-            </div>
+            </CardRow>
           ))}
         </SettingsGroup>
 

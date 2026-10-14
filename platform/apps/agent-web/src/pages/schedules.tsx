@@ -162,7 +162,7 @@ export function ScheduleDetailPage() {
           </>}>
             <PageContent>
               <PageDescription title={s.definition.displayName ?? s.definition.scheduleId} description={<><Mono>{s.definition.scheduleId}</Mono> · {describeTrigger(s.definition.trigger)}</>} />
-              <Section title="Workflow">
+              <Section title="Workflow" description="Trigger → guard rails → task.">
               <Flowchart nodes={[
                 { key: 'trigger', kind: 'Trigger', tone: 'purple', icon: <Clock />, title: describeTrigger(s.definition.trigger), sub: s.state === 'PAUSED' ? 'Paused — will not fire' : `Next fire ${relativeTime(s.nextFireAtMs)}` },
                 { key: 'policy', kind: 'Policy', tone: 'amber', icon: <ShieldCheck />, title: 'Guard rails', sub: s.definition.targetConstraints.allowedEnvironments.join(', '),
@@ -171,7 +171,7 @@ export function ScheduleDetailPage() {
                   ...(s.definition.invocation.params ? { body: Object.entries(s.definition.invocation.params).map(([k, v]) => <FlowChip key={k}>{k}: {String(v)}</FlowChip>) } : {}) }
               ]} />
               </Section>
-              <Section title="Trigger history" count={triggers.data?.events.length}>
+              <Section card padded title="Trigger history" description="Most recent 30 occurrences." count={triggers.data?.events.length}>
               {triggers.isLoading ? <Loading rows={3} /> : triggers.error ? <ErrorState error={triggers.error} /> : !triggers.data?.events.length ? <Quiet>No triggers yet.</Quiet> : (
                 <TaskRows variant="list" rows={triggers.data.events.slice(0, 30).map((e) => ({
                   key: e.occurrenceId, status: e.kind, label: formatTime(e.occurredAtMs), amount: e.taskId ? <span className="font-mono text-[12px]">{e.taskId}</span> : undefined,

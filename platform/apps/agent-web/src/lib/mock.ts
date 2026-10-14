@@ -42,7 +42,7 @@ const messagesBySession = new Map<string, Message[]>();
 const toolPool = ['web-snapshot-reader', 'fx-rates.fetch', 'index-closes.fetch', 'artifact.write', 'search.news', 'calendar.lookup'];
 const ev = (s: SessionListItem, runId: string, seq: number, at: number, payload: TimelineEvent['payload']): TimelineEvent => ({ schemaVersion: '1', sessionId: s.sessionId, runId, sequence: seq, occurredAt: iso(at), payload });
 mockSessions.forEach((s, si) => {
-  const count = si === 0 ? 2 : 1 + Math.floor(rnd() * 3);
+  const count = si === 0 ? 2 : 1 + Math.floor(rnd() * 5);
   const runs: ChatRun[] = []; const events: TimelineEvent[] = []; const messages: Message[] = []; let seq = 0;
   for (let k = 0; k < count; k++) {
     const live = si === 0 && k === count - 1;

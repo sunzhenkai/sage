@@ -1,14 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Activity, Archive, ArchiveRestore, ListChecks, MessageSquare, MessagesSquare, Plus, RotateCw, Search, Trash2 } from 'lucide-react';
+import { Activity, Archive, ArchiveRestore, ListChecks, MessageSquare, MoreHorizontal, MessagesSquare, Plus, RotateCw, Search, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
-import { Crumb, PageHeader } from '@/components/layout/app-shell';
+import { useNavigate, useParams, useSearchParams } from 'react-router';
+import { PageHeader } from '@/components/layout/app-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Empty, ErrorState, Kbd, Mono } from '@/components/ui/misc';
+import { Empty, ErrorState, Kbd } from '@/components/ui/misc';
 import { LoadingState, formatElapsed } from '@/components/bui/loading-state';
-import { PageColumn, PageContent, Quiet, SegmentedTabs } from '@/components/layout/page';
+import { PageColumn, PageContent, Quiet } from '@/components/layout/page';
 import { PromptBar, UserBubble, type PromptMenuItem, type PromptModel } from '@/components/bui/prompt-bar';
+import { ArchiveToggle, SessionHeader, SessionList } from '@/components/bui/session-list';
 import { StreamingText } from '@/components/bui/streaming-text';
 import { TaskRows } from '@/components/bui/task-rows';
 import { ThinkingTrace, type TraceRow } from '@/components/bui/thinking';
@@ -38,7 +39,7 @@ export function ChatPage() {
 
   return (
     <div className="flex min-h-0 flex-1">
-      <section className="flex w-[280px] shrink-0 flex-col border-r border-line">
+      <section className="flex w-[300px] shrink-0 flex-col border-r border-line">
         <PageHeader title="Chat" actions={<Button variant="ghost" size="icon" title="New session" onClick={() => create.mutate()} disabled={create.isPending}><Plus /></Button>} />
         <div className="flex items-center gap-1 border-b border-line px-2 py-1.5">
           <div className="relative flex-1">
@@ -50,32 +51,15 @@ export function ChatPage() {
               className="h-7 w-full rounded-md bg-transparent pl-7 pr-2 text-[12.5px] placeholder:text-faint hover:bg-hover focus:bg-hover focus:outline-none"
             />
           </div>
-          <Button variant="ghost" size="icon-sm" title={archived ? 'Showing archived' : 'Show archived'} className={cn(archived && 'bg-active text-fg')} onClick={() => setArchived((v) => !v)}><Archive /></Button>
+          <ArchiveToggle archived={archived} onChange={setArchived} />
         </div>
-        <PageContent flush className="p-1.5">
+        <PageContent flush className="px-1.5">
           {sessions.isLoading ? <SessionSkeleton /> : sessions.error ? <ErrorState error={sessions.error} /> : sessions.data?.items.length === 0 ? (
             <Empty icon={MessagesSquare} title={archived ? 'No archived sessions' : 'No sessions yet'} hint="Start a conversation with the run agent.">
               <Button size="sm" onClick={() => create.mutate()}><Plus />New session</Button>
             </Empty>
           ) : (
-            sessions.data?.items.map((s) => {
-              const active = s.sessionId === sessionId;
-              return (
-                <Link
-                  key={s.sessionId}
-                  to={`/chat/${s.sessionId}`}
-                  className={cn('group flex flex-col gap-0.5 rounded-md px-2.5 py-[7px] transition-colors duration-75 hover:bg-hover', active && 'bg-active hover:bg-active')}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className={cn('truncate text-[13px] font-medium tracking-[-0.01em]', active ? 'text-fg' : 'text-fg-2')}>{s.title ?? 'Untitled session'}</span>
-                    <span className="tabular ml-auto shrink-0 text-[11px] text-faint">{relativeTime(s.lastMessageAt ?? s.updatedAt).replace(' ago', '')}</span>
-                  </div>
-                  <span className="truncate text-xs text-muted">
-                    {s.lastMessageRole === 'assistant' ? 'Agent: ' : s.lastMessageRole === 'user' ? 'You: ' : ''}{s.preview ?? shortId(s.sessionId)}
-                  </span>
-                </Link>
-              );
-            })
+            <SessionList items={sessions.data?.items ?? []} activeId={sessionId} />
           )}
         </PageContent>
       </section>
@@ -186,22 +170,17 @@ function SessionView({ sessionId }: { sessionId: string }) {
 
   return (
     <>
-      <PageHeader
-        breadcrumb={<Crumb to="/chat">Chat</Crumb>}
-        title={session?.title ?? 'Untitled session'}
-        meta={<><StreamIndicator state={stream} />{session?.archivedAt ? <Badge>Archived</Badge> : null}</>}
+      <SessionHeader id={sessionId} title={session?.title ?? 'Untitled session'} lastRun={allRuns[allRuns.length - 1]}
+        meta={<><StreamIndicator state={stream} />{session?.archivedAt ? <Badge>Archived</Badge> : null}<span>created {relativeTime(session?.createdAt)} · {allRuns.length} run{allRuns.length === 1 ? '' : 's'}</span></>}
+        tab={tab} onTab={setTab} tabs={[{ value: 'chat', label: 'Conversation' }, { value: 'runs', label: 'Runs', count: allRuns.length }]}
         actions={<>
-          <Mono className="mr-1 text-faint">{shortId(sessionId, 12)}</Mono>
           <Button variant="ghost" size="icon" title={session?.archivedAt ? 'Unarchive' : 'Archive'} onClick={() => archive.mutate()}>{session?.archivedAt ? <ArchiveRestore /> : <Archive />}</Button>
           <Button variant="ghost" size="icon" title="Delete session" onClick={() => { if (confirm('Delete this session permanently?')) remove.mutate(); }}><Trash2 /></Button>
+          <Button variant="ghost" size="icon" title={`Session ${sessionId}`} onClick={() => { void navigator.clipboard?.writeText(sessionId); }}><MoreHorizontal /></Button>
         </>}
       />
       <PageContent width="chat" scrollRef={scroller}>
         {detail.error ? <ErrorState error={detail.error} /> : null}
-          <div className="mb-6 flex items-center justify-between">
-            <SegmentedTabs value={tab} onChange={setTab} items={[{ value: 'chat', label: 'Conversation' }, { value: 'runs', label: `Runs ${allRuns.length}` }]} />
-            <span className="t-meta">created {relativeTime(session?.createdAt)}</span>
-          </div>
           {tab === 'runs' ? (
             allRuns.length ? <TaskRows variant="list" rows={[...allRuns].reverse().map((r, i) => ({
               key: r.runId, status: r.status, step: allRuns.length - i,

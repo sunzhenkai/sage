@@ -3,7 +3,7 @@ import { BarChart3 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { PanelBar, ViewTab } from '@/components/layout/app-shell';
-import { Bleed, PageContent, Section } from '@/components/layout/page';
+import { PageContent, Section } from '@/components/layout/page';
 import { AreaTrend, BarList, ChartCard, GhostChart, Legend, LineTrend, StackedBars, StatTile, useChartTheme, type Series } from '@/components/charts';
 import { Card } from '@/components/ui/misc';
 import { StatusGlyph, ValuePill } from '@/components/bui/atoms';
@@ -147,8 +147,8 @@ export function OverviewPage() {
           </ChartCard>
         </div>
 
-        <Section className="mt-8" title="Recent sessions" count={sessions.data?.items.length ?? 0}>
-          <Bleed>
+        <Section card className="mt-8" title="Recent sessions" count={sessions.data?.items.length ?? 0}>
+          <>
             {(sessions.data?.items ?? []).slice(0, 6).map((s) => (
               <ListRow key={s.sessionId} onClick={() => navigate(`/chat/${s.sessionId}`)}>
                 <StatusIcon status={s.status} />
@@ -156,7 +156,7 @@ export function OverviewPage() {
                 <RowMeta><span className="text-faint">{relativeTime(s.lastMessageAt ?? s.updatedAt)}</span></RowMeta>
               </ListRow>
             ))}
-          </Bleed>
+          </>
         </Section>
       </PageContent>
     </>

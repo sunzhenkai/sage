@@ -5,7 +5,7 @@ import { Crumb, PageHeader, PanelBar } from '@/components/layout/app-shell';
 import { Monogram, StatusPill, Tag, toneFor } from '@/components/bui/atoms';
 import { RecordsTable } from '@/components/bui/records-table';
 import { CodeBlock } from '@/components/bui/code-block';
-import { Bleed, PageContent, PageDescription, Section } from '@/components/layout/page';
+import { PageContent, PageDescription, Section } from '@/components/layout/page';
 import { StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DetailLayout, ListRow, Pill, Property, PropertyGroup, RowId, RowMeta, RowTitle } from '@/components/ui/list';
@@ -74,19 +74,19 @@ export function AppDetailPage() {
         </>}>
           <PageContent>
             <PageDescription title={appId} description={description ?? 'Agent app manifest, tasks, inputs and bundled assets.'} />
-            <Section title="Tasks" count={list('tasks').length}>
-            <Bleed>{list('tasks').map((t, i) => { const task = t as { name?: string; entry?: string }; return (
+            <Section card title="Tasks" count={list('tasks').length}>
+            <>{list('tasks').map((t, i) => { const task = t as { name?: string; entry?: string }; return (
               <ListRow key={i}><StatusIcon kind="todo" /><RowTitle sub={task.entry}>{task.name ?? `task-${i}`}</RowTitle></ListRow>
-            ); })}</Bleed>
+            ); })}</>
             </Section>
-            <Section title="Inputs & data sources">
-            <Bleed>
+            <Section card title="Inputs & data sources">
+            <>
               {list('inputs').map((x, i) => { const v = x as { name?: string; type?: string; required?: boolean }; return <ListRow key={`i${i}`}><RowId>INPUT</RowId><RowTitle sub={v.type}>{v.name}</RowTitle><RowMeta>{v.required ? <Pill>required</Pill> : <span className="text-faint">optional</span>}</RowMeta></ListRow>; })}
               {list('dataSources').map((x, i) => { const v = x as { name?: string; url?: string }; return <ListRow key={`d${i}`}><RowId>SOURCE</RowId><RowTitle sub={v.url}>{v.name}</RowTitle></ListRow>; })}
-            </Bleed>
+            </>
             </Section>
-            <Section title="Assets" count={app.data.assets?.length ?? 0}>
-            <Bleed>{(app.data.assets ?? []).map((asset) => (
+            <Section card title="Assets" count={app.data.assets?.length ?? 0}>
+            <>{(app.data.assets ?? []).map((asset) => (
               <details key={asset.relativePath} className="group/a">
                 <summary className="flex h-[38px] cursor-default list-none items-center gap-3 gutter-x hover:bg-hover">
                   <RowId>{asset.kind.toUpperCase().slice(0, 10)}</RowId>
@@ -95,7 +95,7 @@ export function AppDetailPage() {
                 </summary>
                 {asset.preview ? <div className="gutter-x pb-2"><CodeBlock code={asset.preview} filename={asset.relativePath} maxHeight={288} /></div> : null}
               </details>
-            ))}</Bleed>
+            ))}</>
             </Section>
             <Section title="Raw manifest"><JsonView value={manifest} filename="manifest.json" /></Section>
           </PageContent>

@@ -8,7 +8,7 @@
    layered low-opacity shadows, neutral ink ramp, semantic color used sparingly.
    Legacy names (frame/panel/fg/muted/faint…) alias the Beautiful UI tokens so every page shares one system. */
 :root {
-  --page: oklch(1 0 0); --canvas: oklch(0.955 0.003 264.5); --surface: oklch(1 0 0);
+  --page: oklch(0.977 0.002 264.5); --canvas: oklch(0.955 0.003 264.5); --surface: oklch(1 0 0);
   --inset: oklch(0.982 0.002 264.5); --hover: oklch(0.972 0.002 264.5); --hover-2: oklch(0.945 0.003 264.5);
   --ink: oklch(0.247 0.006 258.361); --ink-2: oklch(0.506 0.01 264.477); --ink-3: oklch(0.695 0.009 264.505);
   --line: oklch(0.928 0.004 264.5); --line-strong: oklch(0.895 0.006 264.5); --line-soft: oklch(0.955 0.003 264.5);
@@ -25,7 +25,7 @@
   --shadow-lg: 0 2px 4px oklch(0 0 0 / 0.04), 0 8px 16px oklch(0 0 0 / 0.06), 0 16px 32px oklch(0 0 0 / 0.08);
   --shadow-hairline: 0 0 0 1px var(--line);
   --shadow-btn: 0 0 0 1px var(--line-strong), var(--shadow-xs);
-  --shadow-card: 0 0 0 1px var(--line), 0 1px 2px oklch(0 0 0 / 0.04), 0 2px 6px oklch(0 0 0 / 0.04);
+  --shadow-card: 0 0 0 1px var(--line), 0 1px 2px oklch(0 0 0 / 0.03);
   --shadow-raised: 0 0 0 1px var(--line), var(--shadow-md);
   --shadow-overlay: 0 0 0 1px var(--line), var(--shadow-lg);
   --shadow-inset-field: inset 0 1px 2px oklch(0 0 0 / 0.12);

@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Monitor, Moon, Sun } from 'lucide-react';
 import { useState } from 'react';
 import { PageHeader } from '@/components/layout/app-shell';
-import { PageContent, PageDescription, SettingsGroup, SettingsRow } from '@/components/layout/page';
+import { CardRow, PageContent, PageDescription, SettingsGroup, SettingsRow } from '@/components/layout/page';
 import { StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,13 +37,13 @@ export function SettingsPage() {
           <SettingsRow label="Tenant ID" description="Must equal agent-api SAGE_TENANT_ID; used in schedule definitions.">
             <Input className="w-full" value={draft.tenantId} onChange={(e) => setDraft({ ...draft, tenantId: e.target.value })} />
           </SettingsRow>
-          <div className="flex items-center justify-end gap-2 py-3">
+          <CardRow className="justify-end gap-2">
             {saved ? <span className="text-[12px] text-muted">Saved</span> : null}
             <Button size="sm" disabled={!dirty} onClick={save}>Save changes</Button>
-          </div>
+          </CardRow>
         </SettingsGroup>
 
-        <SettingsGroup title="Appearance">
+        <SettingsGroup title="Appearance" description="Theme for this browser.">
           <SettingsRow label="Theme" description="System follows your OS preference.">
             <div className="flex rounded-md border border-line-strong p-0.5">
               {themes.map(([value, label, Icon]) => (
@@ -55,18 +55,18 @@ export function SettingsPage() {
           </SettingsRow>
         </SettingsGroup>
 
-        <SettingsGroup title="Health">
+        <SettingsGroup title="Health" description="Live probes against agent-api.">
           <SettingsRow label="Liveness" description="GET /livez">{live.error ? <span className="text-[12.5px] text-red">Unreachable</span> : <StatusBadge status={live.data?.status} />}</SettingsRow>
           <SettingsRow label="Readiness" description="GET /readyz" stacked>{ready.error ? <span className="text-[12.5px] text-red">{ready.error.message}</span> : <JsonView value={ready.data ?? null} className="w-full" />}</SettingsRow>
         </SettingsGroup>
 
-        <SettingsGroup title="Developer">
+        <SettingsGroup title="Developer" description="Tools for UI development.">
           <SettingsRow label="Mock data" description="Read-only demo dataset for screenshots and UI work. Toggle with ?mock=1 / ?mock=0.">
             {isMock() ? <Button size="sm" variant="secondary" onClick={exitMock}>Exit mock mode</Button> : <Button size="sm" variant="secondary" onClick={() => { window.location.search = '?mock=1'; }}>Enable</Button>}
           </SettingsRow>
         </SettingsGroup>
 
-        <SettingsGroup title="Keyboard shortcuts">
+        <SettingsGroup title="Keyboard shortcuts" description="Available anywhere in the console.">
           {[['⌘ K', 'Command menu'], ['G O', 'Overview'], ['G C', 'Chat'], ['G T', 'Tasks'], ['G S', 'Schedules'], ['G A', 'Apps'], ['G P', 'Packages'], ['G M', 'Providers'], ['G ,', 'Settings'], ['↵', 'Send message']].map(([keys = '', label]) => (
             <SettingsRow key={keys} label={label}><span className="flex gap-1">{keys.split(' ').map((k) => <Kbd key={k}>{k}</Kbd>)}</span></SettingsRow>
           ))}

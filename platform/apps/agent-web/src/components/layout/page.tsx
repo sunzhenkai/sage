@@ -41,35 +41,45 @@ export function PageContent({ children, flush, width = 'full', className, scroll
   );
 }
 
-/** Plain section: heading + optional description; no background, no border. */
-export function Section({ title, description, count, actions, children, className }: { title?: React.ReactNode; description?: React.ReactNode; count?: React.ReactNode; actions?: React.ReactNode; children: React.ReactNode; className?: string }) {
+/** Content card: 1px line ring, white (light) / raised (dark), radius 10, near-zero shadow. */
+export const contentCard = 'overflow-hidden rounded-card bg-surface shadow-card';
+
+/**
+ * Section = three roles: title (t-section, ink) + description (t-desc, ink-2) on the page bg,
+ * then content — inside a bordered card when `card` (preferred) or bare when the children are already cards.
+ */
+export function Section({ title, description, count, actions, children, className, card, padded }: { title?: React.ReactNode; description?: React.ReactNode; count?: React.ReactNode; actions?: React.ReactNode; children: React.ReactNode; className?: string | undefined; card?: boolean | undefined; padded?: boolean | undefined }) {
   return (
     <section className={cn('mt-8 first:mt-0', className)}>
       {title ? (
         <div className="mb-3 flex min-h-7 items-center gap-2">
           <div className="min-w-0 flex-1">
             <h2 className="t-section flex items-center gap-2">{title}{count !== undefined ? <span className="t-meta font-normal tabular-nums">{count}</span> : null}</h2>
-            {description ? <p className="t-meta mt-0.5">{description}</p> : null}
+            {description ? <p className="t-desc mt-0.5">{description}</p> : null}
           </div>
           {actions ? <div className="flex shrink-0 items-center gap-1">{actions}</div> : null}
         </div>
       ) : null}
-      {children}
+      {card ? <div className={cn(contentCard, padded && 'p-4')}>{children}</div> : children}
     </section>
   );
 }
 
-/** Settings section: full width, hairline-divided rows with a fixed label column. No card. */
+/** Settings section: title + description, then a card of hairline-divided rows with a label column. */
 export function SettingsGroup({ title, description, children }: { title?: string; description?: string; children: React.ReactNode }) {
   return (
-    <Section title={title} description={description}>
-      <div className="divide-y divide-line border-y border-line">{children}</div>
+    <Section title={title} description={description} card>
+      <div className="divide-y divide-line">{children}</div>
     </Section>
   );
 }
+/** Free-form row inside a content card (same inset as SettingsRow). */
+export function CardRow({ children, className }: { children: React.ReactNode; className?: string | undefined }) {
+  return <div className={cn('flex items-center gap-3 px-4 py-3', className)}>{children}</div>;
+}
 export function SettingsRow({ label, description, children, stacked }: { label: React.ReactNode; description?: React.ReactNode; children?: React.ReactNode; stacked?: boolean }) {
   return (
-    <div className={cn('grid gap-x-8 gap-y-2 py-3.5', stacked ? 'grid-cols-1' : 'grid-cols-[minmax(160px,220px)_minmax(0,1fr)] items-center')}>
+    <div className={cn('grid gap-x-8 gap-y-2 px-4 py-3.5', stacked ? 'grid-cols-1' : 'grid-cols-[minmax(160px,220px)_minmax(0,1fr)] items-center')}>
       <div className="min-w-0">
         <div className="text-[13px] font-medium text-ink">{label}</div>
         {description ? <div className="t-meta mt-0.5">{description}</div> : null}

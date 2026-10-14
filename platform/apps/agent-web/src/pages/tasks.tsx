@@ -3,7 +3,7 @@ import { Ban, CircleDot, Clock, Hash, ListChecks, Pause, Play, RefreshCw, Rotate
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { Crumb, PageHeader, PanelBar, ViewTab } from '@/components/layout/app-shell';
-import { PageContent, PageDescription, Quiet, SegmentedTabs } from '@/components/layout/page';
+import { PageContent, PageDescription, Quiet, Section, SegmentedTabs } from '@/components/layout/page';
 import { ApprovalCard } from '@/components/bui/approval-card';
 import { StatusGlyph, StatusPill, Tag, toneFor } from '@/components/bui/atoms';
 import { CodeBlock } from '@/components/bui/code-block';
@@ -39,21 +39,21 @@ export function TasksPage() {
           <ViewTab active={view === 'done'} onClick={() => setView('done')}>Completed</ViewTab></>}
         right={<Button variant="ghost" size="icon-sm" title="Refresh" onClick={() => void tasks.refetch()}><RefreshCw className={cn(tasks.isFetching && 'animate-spin')} /></Button>}
       />
-      <div className="flex min-h-0 flex-1 flex-col">
+      <PageContent>
         {tasks.isLoading ? <Loading /> : tasks.error ? <ErrorState error={tasks.error} /> : filtered.length === 0 ? (
           <Empty icon={ListChecks} title="No tasks" hint="Tasks appear here when chat messages are promoted or schedules fire." />
         ) : (
           <>
             {active.length && view !== 'done' ? (
-              <div className="gutter-x border-b border-line pb-5 pt-5">
-                <h2 className="t-section mb-3 flex items-center gap-2">In flight <span className="t-meta font-normal tabular-nums">{active.length}</span></h2>
+              <Section title="In flight" description="Running or waiting tasks, newest first." count={active.length}>
                 <TaskRows rows={active.slice(0, 4).map((t) => ({
                   key: t.taskId, status: t.status, step: t.attempt, label: t.taskId, amount: t.taskType, onOpen: () => { void navigate(`/tasks/${t.taskId}`); },
                   details: [{ label: 'Workflow', meta: t.workflowId ?? '—' }, { label: 'Target', meta: t.targetId ?? '—' }, { label: 'Updated', meta: relativeTime(t.projectionUpdatedAt) }]
                 }))} />
-              </div>
+              </Section>
             ) : null}
-            <RecordsTable fill rows={filtered} getKey={(t) => t.taskId} onRowClick={(t) => { void navigate(`/tasks/${t.taskId}`); }}
+            <Section title="All tasks" description="Click a row to open the task." count={filtered.length}>
+            <RecordsTable rows={filtered} getKey={(t) => t.taskId} onRowClick={(t) => { void navigate(`/tasks/${t.taskId}`); }}
               columns={[
                 { key: 'task', label: 'Task', icon: <ListChecks />, width: '34%', sort: (x, y) => x.taskId.localeCompare(y.taskId), render: (t) => <span className="flex min-w-0 items-center gap-2"><StatusGlyph status={t.status} size={16} /><span className="truncate">{t.taskId}</span></span> },
                 { key: 'status', label: 'Status', icon: <CircleDot />, width: 140, sort: (x, y) => statuses.indexOf(x.status) - statuses.indexOf(y.status), render: (t) => <StatusPill tone={toneFor(t.status)}>{statusLabel[t.status]}</StatusPill> },
@@ -63,9 +63,10 @@ export function TasksPage() {
                 { key: 'updated', label: 'Last update', icon: <Clock />, width: 130, sort: (x, y) => String(x.projectionUpdatedAt).localeCompare(String(y.projectionUpdatedAt)), render: (t) => <span className="text-ink-2">{relativeTime(t.projectionUpdatedAt)}</span> }
               ]}
               footer={<span className="ml-auto">{active.length} in flight · {filtered.filter((t) => t.status === 'failed').length} failed</span>} />
+            </Section>
           </>
         )}
-      </div>
+      </PageContent>
     </>
   );
 }
@@ -126,7 +127,7 @@ export function TaskDetailPage() {
             ) : null}
             <SegmentedTabs value={tab} onChange={setTab} items={(['activity', 'run-logs', 'artifacts', 'raw'] as Tab[]).map((name) => ({ value: name, label: name === 'run-logs' ? 'Run logs' : name[0]!.toUpperCase() + name.slice(1) }))} />
             <div className="pt-5">
-              {tab === 'activity' ? <TaskEvents taskId={taskId} status={t.status} /> : tab === 'run-logs' ? <RunLogs taskId={taskId} /> : tab === 'artifacts' ? <Artifacts taskId={taskId} /> : <JsonView value={t} filename={`${t.taskId}.json`} />}
+              {tab === 'activity' ? <Section card padded><TaskEvents taskId={taskId} status={t.status} /></Section> : tab === 'run-logs' ? <Section card padded><RunLogs taskId={taskId} /></Section> : tab === 'artifacts' ? <Artifacts taskId={taskId} /> : <JsonView value={t} filename={`${t.taskId}.json`} />}
             </div>
           </PageContent>
         </DetailLayout>
