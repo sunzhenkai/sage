@@ -1,14 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CalendarClock, Pause, Play, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
+import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { Crumb, PageHeader } from '@/components/layout/app-shell';
-import { Badge, StatusBadge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Field, Input, Select, Textarea } from '@/components/ui/input';
-import { Card, CardHeader, Empty, ErrorState, JsonView, KeyValue, Loading, Mono } from '@/components/ui/misc';
-import { Table, Td, Th, Tr } from '@/components/ui/table';
+import { Empty, ErrorState, JsonView, Loading, Mono } from '@/components/ui/misc';
+import { DetailLayout, ListGroup, ListRow, Pill, Property, PropertyGroup, RowId, RowMeta, RowTitle } from '@/components/ui/list';
+import { StatusIcon } from '@/components/ui/status';
 import { api } from '@/lib/api';
 import { useSettings } from '@/lib/settings';
 import type { ScheduleDefinition, ScheduleTrigger } from '@/lib/types';
@@ -28,22 +29,30 @@ export function SchedulesPage() {
     <>
       <PageHeader title="Schedules" meta={schedules.data ? `${schedules.data.schedules.length}` : null}
         actions={<Dialog open={open} onOpenChange={setOpen}>
-          <Button size="sm" onClick={() => setOpen(true)}><Plus />New schedule</Button>
+          <Button variant="secondary" size="sm" onClick={() => setOpen(true)}><Plus />New schedule</Button>
           <DialogContent title="New schedule" description="POST /v1/schedules — requires a service token."><CreateScheduleForm onDone={(id) => { setOpen(false); navigate(`/schedules/${id}`); }} /></DialogContent>
         </Dialog>} />
       <div className="flex min-h-0 flex-1 flex-col overflow-auto">
         {schedules.isLoading ? <Loading /> : schedules.error ? <ErrorState error={schedules.error} /> : !schedules.data?.schedules.length ? <Empty icon={CalendarClock} title="No schedules" hint="Run an agent app task on a cron or interval. Requires a service token." /> : (
-          <Table>
-            <thead><tr><Th>Schedule</Th><Th>State</Th><Th>Trigger</Th><Th>Task</Th><Th>Next fire</Th><Th className="text-right">Updated</Th></tr></thead>
-            <tbody>{schedules.data.schedules.map((s) => (
-              <Tr key={s.definition.scheduleId} onClick={() => navigate(`/schedules/${s.definition.scheduleId}`)}>
-                <Td><div className="font-medium">{s.definition.displayName ?? s.definition.scheduleId}</div><Mono className="text-muted">{s.definition.scheduleId}</Mono></Td>
-                <Td><StatusBadge status={s.state} /></Td><Td className="text-muted">{describeTrigger(s.definition.trigger)}</Td>
-                <Td><Badge>{s.definition.invocation.task}</Badge></Td><Td className="text-muted">{formatTime(s.nextFireAtMs)}</Td>
-                <Td className="text-right text-muted">{relativeTime(s.updatedAtMs)}</Td>
-              </Tr>
-            ))}</tbody>
-          </Table>
+          (['ACTIVE', 'PAUSED'] as const).map((state) => {
+            const items = schedules.data.schedules.filter((x) => x.state === state);
+            if (!items.length) return null;
+            return (
+              <ListGroup key={state} icon={<StatusIcon status={state === 'ACTIVE' ? 'running' : 'paused'} />} label={state === 'ACTIVE' ? 'Active' : 'Paused'} count={items.length} onAdd={() => setOpen(true)}>
+                {items.map((x) => (
+                  <ListRow key={x.definition.scheduleId} onClick={() => navigate(`/schedules/${x.definition.scheduleId}`)}>
+                    <RowId>REV {x.revision}</RowId>
+                    <StatusIcon status={state === 'ACTIVE' ? 'running' : 'paused'} />
+                    <RowTitle sub={describeTrigger(x.definition.trigger)}>{x.definition.displayName ?? x.definition.scheduleId}</RowTitle>
+                    <RowMeta>
+                      <Pill color="var(--violet)">{x.definition.invocation.task}</Pill>
+                      <span className="w-28 text-right text-faint">{x.nextFireAtMs ? `next ${relativeTime(x.nextFireAtMs)}` : '—'}</span>
+                    </RowMeta>
+                  </ListRow>
+                ))}
+              </ListGroup>
+            );
+          })
         )}
       </div>
     </>
@@ -120,32 +129,49 @@ export function ScheduleDetailPage() {
         meta={s ? <><StatusBadge status={s.state} /><span>rev {s.revision}</span></> : null}
         actions={<>
           {s?.state === 'PAUSED'
-            ? <Button variant="secondary" size="sm" onClick={() => action.mutate('resume')} disabled={action.isPending}><Play />Resume</Button>
-            : <Button variant="secondary" size="sm" onClick={() => action.mutate('pause')} disabled={!s || action.isPending}><Pause />Pause</Button>}
-          <Button variant="danger" size="sm" disabled={!s || remove.isPending} onClick={() => { if (confirm(`Delete schedule ${scheduleId}?`)) remove.mutate(); }}><Trash2 />Delete</Button>
+            ? <Button variant="ghost" size="sm" onClick={() => action.mutate('resume')} disabled={action.isPending}><Play />Resume</Button>
+            : <Button variant="ghost" size="sm" onClick={() => action.mutate('pause')} disabled={!s || action.isPending}><Pause />Pause</Button>}
+          <Button variant="ghost" size="sm" className="hover:text-red" disabled={!s || remove.isPending} onClick={() => { if (confirm(`Delete schedule ${scheduleId}?`)) remove.mutate(); }}><Trash2 />Delete</Button>
         </>} />
       {action.error ? <ErrorState error={action.error} /> : remove.error ? <ErrorState error={remove.error} /> : null}
       <div className="min-h-0 flex-1 overflow-auto px-6 py-5">
         {schedule.isLoading ? <Loading /> : schedule.error ? <ErrorState error={schedule.error} /> : s ? (
-          <div className="grid gap-4 lg:grid-cols-[1fr_1.2fr]">
-            <Card><CardHeader title="Definition" /><div className="p-3"><KeyValue items={[
-              ['Display name', s.definition.displayName], ['Trigger', describeTrigger(s.definition.trigger)], ['Overlap', s.definition.overlapPolicy], ['Misfire', s.definition.misfirePolicy],
-              ['Binding', s.definition.releaseBinding.strategy === 'FIXED' ? <Mono key="b">FIXED {s.definition.releaseBinding.releaseId}</Mono> : 'FOLLOW'],
-              ['Environments', s.definition.targetConstraints.allowedEnvironments.join(', ')], ['Budget', s.definition.budget.limits.map((l) => `${l.dimension}≤${l.limit}`).join(', ')],
-              ['Task', <Badge key="t">{s.definition.invocation.task}</Badge>], ['Next fire', formatTime(s.nextFireAtMs)], ['Created', formatTime(s.createdAtMs)], ['Updated', formatTime(s.updatedAtMs)],
-              ['Digest', <Mono key="d" className="text-muted">{s.contentDigest}</Mono>]
-            ]} /><details className="mt-3"><summary className="cursor-pointer text-xs text-muted">raw definition</summary><JsonView value={s.definition} className="mt-2" /></details></div></Card>
-            <Card><CardHeader title="Trigger history" />
-              {triggers.isLoading ? <Loading /> : triggers.error ? <ErrorState error={triggers.error} /> : !triggers.data?.events.length ? <Empty title="No triggers yet" /> : (
-                <Table><thead><tr><Th>When</Th><Th>Result</Th><Th>Task</Th><Th>Detail</Th></tr></thead>
-                  <tbody>{triggers.data.events.map((e) => (
-                    <Tr key={e.occurrenceId}><Td className="text-muted">{formatTime(e.occurredAtMs)}</Td><Td><StatusBadge status={e.kind} /></Td>
-                      <Td>{e.taskId ? <Link className="text-accent" to={`/tasks/${e.taskId}`}><Mono>{e.taskId}</Mono></Link> : '—'}</Td>
-                      <Td className="max-w-64 truncate text-xs text-muted">{e.errorCode ?? e.detail ?? ''}</Td></Tr>
-                  ))}</tbody></Table>
+          <DetailLayout properties={<>
+            <PropertyGroup title="Properties">
+              <Property label="State"><StatusBadge status={s.state === 'ACTIVE' ? 'active' : s.state.toLowerCase()} /></Property>
+              <Property label="Trigger">{describeTrigger(s.definition.trigger)}</Property>
+              <Property label="Task"><Pill color="var(--violet)">{s.definition.invocation.task}</Pill></Property>
+              <Property label="Binding">{s.definition.releaseBinding.strategy === 'FIXED' ? <Mono>FIXED {s.definition.releaseBinding.releaseId}</Mono> : 'Follow latest'}</Property>
+              <Property label="Overlap">{s.definition.overlapPolicy}</Property>
+              <Property label="Misfire">{s.definition.misfirePolicy}</Property>
+            </PropertyGroup>
+            <PropertyGroup title="Constraints">
+              <Property label="Envs">{s.definition.targetConstraints.allowedEnvironments.join(', ')}</Property>
+              <Property label="Budget">{s.definition.budget.limits.map((l) => `${l.dimension} ≤ ${l.limit}`).join(', ')}</Property>
+            </PropertyGroup>
+            <PropertyGroup title="Timestamps">
+              <Property label="Next fire">{formatTime(s.nextFireAtMs)}</Property>
+              <Property label="Created">{formatTime(s.createdAtMs)}</Property>
+              <Property label="Updated">{formatTime(s.updatedAtMs)}</Property>
+              <Property label="Revision">{s.revision}</Property>
+            </PropertyGroup>
+          </>}>
+            <div className="mx-auto max-w-[760px] px-10 py-8">
+              <h2 className="text-[20px] font-semibold tracking-[-0.02em]">{s.definition.displayName ?? s.definition.scheduleId}</h2>
+              <p className="mt-1 text-[13px] text-muted"><Mono>{s.definition.scheduleId}</Mono> · {describeTrigger(s.definition.trigger)}</p>
+              <h3 className="mb-1 mt-8 border-b border-line pb-2 text-[13px] font-medium">Trigger history</h3>
+              {triggers.isLoading ? <Loading rows={3} /> : triggers.error ? <ErrorState error={triggers.error} /> : !triggers.data?.events.length ? <p className="py-6 text-[12.5px] text-muted">No triggers yet.</p> : (
+                <div className="-mx-5">{triggers.data.events.map((e) => (
+                  <ListRow key={e.occurrenceId} onClick={e.taskId ? () => navigate(`/tasks/${e.taskId}`) : undefined}>
+                    <StatusIcon status={e.kind === 'SUCCEEDED' ? 'succeeded' : e.kind.toLowerCase()} />
+                    <RowTitle sub={e.errorCode ?? e.detail}>{e.kind[0] + e.kind.slice(1).toLowerCase()}</RowTitle>
+                    <RowMeta>{e.taskId ? <Mono className="text-faint">{e.taskId}</Mono> : null}<span className="text-faint">{formatTime(e.occurredAtMs)}</span></RowMeta>
+                  </ListRow>
+                ))}</div>
               )}
-            </Card>
-          </div>
+              <details className="mt-6"><summary className="cursor-pointer text-[12px] text-faint hover:text-muted">Raw definition</summary><JsonView value={s.definition} className="mt-2" /></details>
+            </div>
+          </DetailLayout>
         ) : null}
       </div>
     </>

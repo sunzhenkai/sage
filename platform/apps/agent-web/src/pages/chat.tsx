@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Archive, ArchiveRestore, ArrowUp, MessageSquare, MessagesSquare, Plus, RotateCw, Search, Sparkles, Trash2, Wrench } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
-import { PageHeader } from '@/components/layout/app-shell';
+import { Crumb, PageHeader } from '@/components/layout/app-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/input';
@@ -11,7 +11,7 @@ import { StatusIcon } from '@/components/ui/status';
 import { api } from '@/lib/api';
 import { streamTimeline, type StreamState } from '@/lib/sse';
 import type { ChatRun, TimelineEvent } from '@/lib/types';
-import { cn, formatTime, relativeTime, shortId } from '@/lib/utils';
+import { cn, relativeTime, shortId } from '@/lib/utils';
 
 export function ChatPage() {
   const { sessionId } = useParams();
@@ -32,7 +32,7 @@ export function ChatPage() {
 
   return (
     <div className="flex min-h-0 flex-1">
-      <section className="flex w-[300px] shrink-0 flex-col border-r border-line">
+      <section className="flex w-[280px] shrink-0 flex-col border-r border-line">
         <PageHeader title="Chat" actions={<Button variant="ghost" size="icon" title="New session" onClick={() => create.mutate()} disabled={create.isPending}><Plus /></Button>} />
         <div className="flex items-center gap-1 border-b border-line px-2 py-1.5">
           <div className="relative flex-1">
@@ -58,7 +58,7 @@ export function ChatPage() {
                 <Link
                   key={s.sessionId}
                   to={`/chat/${s.sessionId}`}
-                  className={cn('group flex flex-col gap-0.5 rounded-md px-2.5 py-2 transition-colors duration-100 hover:bg-hover', active && 'bg-active hover:bg-active')}
+                  className={cn('group flex flex-col gap-0.5 rounded-md px-2.5 py-[7px] transition-colors duration-75 hover:bg-hover', active && 'bg-active hover:bg-active')}
                 >
                   <div className="flex items-center gap-2">
                     <span className={cn('truncate text-[13px] font-medium tracking-[-0.01em]', active ? 'text-fg' : 'text-fg-2')}>{s.title ?? 'Untitled session'}</span>
@@ -173,6 +173,7 @@ function SessionView({ sessionId }: { sessionId: string }) {
   return (
     <>
       <PageHeader
+        breadcrumb={<Crumb to="/chat">Chat</Crumb>}
         title={session?.title ?? 'Untitled session'}
         meta={<><StreamIndicator state={stream} />{session?.archivedAt ? <Badge>Archived</Badge> : null}</>}
         actions={<>
@@ -183,84 +184,95 @@ function SessionView({ sessionId }: { sessionId: string }) {
       />
       <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto">
         {detail.error ? <ErrorState error={detail.error} /> : null}
-        <div className="mx-auto flex max-w-[760px] flex-col gap-8 px-8 pb-10 pt-8">
+        <div className="mx-auto max-w-[720px] px-10 pb-6 pt-8">
+          <h2 className="text-[20px] font-semibold tracking-[-0.02em] text-fg">{session?.title ?? 'Untitled session'}</h2>
+          <p className="mt-1 text-[12.5px] text-muted">{groups.length} run{groups.length === 1 ? '' : 's'} · created {relativeTime(session?.createdAt)}</p>
+          <div className="mb-3 mt-7 flex items-center gap-2 border-b border-line pb-2 text-[13px] font-medium text-fg">Activity</div>
           {!loaded ? <ConversationSkeleton /> : groups.length === 0 ? (
-            <Empty icon={Sparkles} title="Start the conversation" hint="Messages are durable; each one starts a run you can follow live here." />
+            <p className="py-6 text-[12.5px] text-muted">No activity yet. Write the first message below — each one starts a run you can follow live.</p>
           ) : null}
-          {groups.map((group) => {
-            const run = runs.get(group.runId);
-            const status = group.status ?? run?.status;
-            const tools = group.events.filter((e) => e.payload.kind === 'tool' || e.payload.kind === 'task' || e.payload.kind === 'artifact');
-            const errors = group.events.flatMap((e) => (e.payload.kind === 'error' ? [{ seq: e.sequence, error: e.payload.error }] : []));
-            return (
-              <article key={group.runId} className="animate-fade-in flex flex-col gap-4">
-                {group.userText.map((text, i) => (
-                  <div key={i} className="flex justify-end">
-                    <div className="max-w-[78%] whitespace-pre-wrap rounded-[14px] rounded-br-[4px] border border-line bg-raised px-3.5 py-2 text-[13.5px] leading-[22px] text-fg shadow-card">{text}</div>
-                  </div>
-                ))}
-                <div className="flex gap-3">
-                  <div className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-accent-soft text-accent ring-1 ring-accent/25"><Sparkles className="size-3.5" strokeWidth={1.75} /></div>
-                  <div className="min-w-0 flex-1">
-                    <div className="mb-1.5 flex h-6 items-center gap-2 text-xs">
-                      <span className="font-medium text-fg">Agent</span>
-                      <span className="text-faint">{formatTime(group.at)}</span>
-                      <span className="flex items-center gap-1 text-muted"><StatusIcon status={status} className="size-3" />{status ?? 'pending'}</span>
-                      {group.attempt && group.attempt > 1 ? <span className="text-faint">· attempt {group.attempt}</span> : null}
-                      {status === 'failed' ? (
-                        <Button size="sm" variant="ghost" className="ml-auto" onClick={() => retry.mutate(group.runId)} disabled={retry.isPending}><RotateCw />Retry</Button>
-                      ) : null}
-                    </div>
-                    {tools.length ? (
-                      <div className="mb-2 flex flex-col gap-1">
-                        {tools.map((e) => (
-                          <div key={e.sequence} className="flex h-7 items-center gap-2 rounded-md border border-line bg-sunken px-2 text-xs text-muted">
-                            <Wrench className="size-3 text-faint" />
-                            {e.payload.kind === 'tool' ? <><span className="font-mono text-fg-2">{e.payload.toolName}</span><span>{e.payload.status}</span></>
-                              : e.payload.kind === 'task' ? <><span className="text-fg-2">{e.payload.title}</span><StatusIcon status={e.payload.status} className="size-3" /><span>{e.payload.status}</span>{e.payload.taskId ? <Link className="ml-auto text-accent hover:underline" to={`/tasks/${e.payload.taskId}`}>Open task</Link> : null}</>
-                              : e.payload.kind === 'artifact' ? <span className="text-fg-2">{e.payload.artifact.name}</span> : null}
-                          </div>
-                        ))}
-                      </div>
-                    ) : null}
-                    {group.assistantText ? <div className="whitespace-pre-wrap text-[13.5px] leading-[22px] text-fg">{group.assistantText}</div>
-                      : status === 'active' ? <div className="flex items-center gap-2 text-xs text-muted"><Spinner />Thinking…</div> : null}
-                    {errors.map(({ seq, error }) => (
-                      <div key={seq} className="mt-1 rounded-lg border border-red/20 bg-red/[0.06] px-3 py-2.5">
-                        <div className="flex items-center gap-2 text-xs font-medium text-red"><StatusIcon kind="failed" className="size-3" />{error.code}</div>
-                        <div className="mt-1 break-words text-[12.5px] leading-5 text-fg-2">{error.message}</div>
+          <ol className="relative">
+            {groups.length ? <span className="absolute bottom-3 left-[11px] top-3 w-px bg-line" /> : null}
+            {groups.map((group) => {
+              const run = runs.get(group.runId);
+              const status = group.status ?? run?.status;
+              const tools = group.events.filter((e) => e.payload.kind === 'tool' || e.payload.kind === 'task' || e.payload.kind === 'artifact');
+              const errors = group.events.flatMap((e) => (e.payload.kind === 'error' ? [{ seq: e.sequence, error: e.payload.error }] : []));
+              return (
+                <li key={group.runId} className="animate-fade-in">
+                  {group.userText.map((text, i) => (
+                    <FeedItem key={i} avatar={<span className="grid size-6 place-items-center rounded-full bg-[#4f5bc4] text-[10.5px] font-semibold text-white">Y</span>} who="You" at={group.at}>
+                      <div className="whitespace-pre-wrap text-[13.5px] leading-[21px] text-fg-2">{text}</div>
+                    </FeedItem>
+                  ))}
+                  <FeedItem
+                    avatar={<span className="grid size-6 place-items-center rounded-full border border-line-strong bg-panel text-muted"><Sparkles className="size-3" strokeWidth={1.75} /></span>}
+                    who="Agent"
+                    at={run?.completedAt ?? group.at}
+                    meta={<span className="inline-flex items-center gap-1"><StatusIcon status={status} className="size-3" />{status ?? 'pending'}{group.attempt && group.attempt > 1 ? ` · attempt ${group.attempt}` : ''} · <Mono className="text-faint">{shortId(group.runId)}</Mono></span>}
+                    action={status === 'failed' ? <button type="button" onClick={() => retry.mutate(group.runId)} disabled={retry.isPending} className="inline-flex h-6 items-center gap-1 rounded-md px-1.5 text-[12px] text-muted hover:bg-hover hover:text-fg"><RotateCw className="size-3" />Retry</button> : null}
+                  >
+                    {tools.map((e) => (
+                      <div key={e.sequence} className="flex items-center gap-2 py-0.5 text-[12.5px] text-muted">
+                        <Wrench className="size-3 text-faint" />
+                        {e.payload.kind === 'tool' ? <><span className="font-mono text-fg-2">{e.payload.toolName}</span>{e.payload.status}</>
+                          : e.payload.kind === 'task' ? <><span className="text-fg-2">{e.payload.title}</span><StatusIcon status={e.payload.status} className="size-3" />{e.payload.status}{e.payload.taskId ? <Link className="text-accent hover:underline" to={`/tasks/${e.payload.taskId}`}>Open</Link> : null}</>
+                          : e.payload.kind === 'artifact' ? <span className="text-fg-2">{e.payload.artifact.name}</span> : null}
                       </div>
                     ))}
-                  </div>
-                </div>
-              </article>
-            );
-          })}
+                    {group.assistantText ? <div className="whitespace-pre-wrap text-[13.5px] leading-[21px] text-fg-2">{group.assistantText}</div>
+                      : status === 'active' ? <div className="flex items-center gap-2 text-[12.5px] text-muted"><Spinner className="size-3" />Thinking…</div> : null}
+                    {errors.map(({ seq, error }) => (
+                      <div key={seq} className="text-[12.5px] leading-[19px] text-muted">
+                        <span className="font-medium text-red">{error.code}</span> <span>{error.message}</span>
+                      </div>
+                    ))}
+                  </FeedItem>
+                </li>
+              );
+            })}
+          </ol>
         </div>
       </div>
-      <div className="px-6 pb-5">
-        <div className="mx-auto max-w-[760px] rounded-xl border border-line-strong bg-raised shadow-[0_4px_16px_-6px_rgb(0_0_0/0.25)] transition-[border-color,box-shadow] focus-within:border-accent/50 focus-within:shadow-[0_0_0_3px_var(--accent-soft),0_4px_16px_-6px_rgb(0_0_0/0.25)]">
+      <div className="px-10 pb-5">
+        <div className="mx-auto max-w-[720px] rounded-lg border border-line-strong bg-sunken transition-colors focus-within:border-faint/70">
           <textarea
             ref={textarea}
             rows={1}
-            className="block max-h-[220px] min-h-[52px] w-full resize-none bg-transparent px-4 pb-1 pt-3.5 text-[13.5px] leading-[22px] text-fg placeholder:text-faint focus:outline-none"
-            placeholder="Message the agent…"
+            className="block max-h-[220px] min-h-[44px] w-full resize-none bg-transparent px-3.5 pb-1 pt-3 text-[13.5px] leading-[21px] text-fg placeholder:text-faint focus:outline-none"
+            placeholder="Leave a message…"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); submit(); } }}
           />
-          <div className="flex items-center gap-2 px-2.5 pb-2.5 pt-1">
-            <Select className="h-7 w-auto max-w-[220px] border-transparent bg-transparent text-xs text-muted hover:border-line-strong hover:bg-hover" value={connectionId} onChange={(e) => setConnectionId(e.target.value)} title="Provider connection">
+          <div className="flex items-center gap-2 px-2 pb-2">
+            <Select className="h-6 w-auto max-w-[200px] border-transparent bg-transparent px-1.5 text-[12px] text-muted hover:bg-hover" value={connectionId} onChange={(e) => setConnectionId(e.target.value)} title="Provider connection">
               <option value="">Server default</option>
               {providers.data?.providers.map((p) => <option key={p.id} value={p.id} disabled={!p.available}>{p.name}{p.available ? '' : ' (unavailable)'}</option>)}
             </Select>
-            {send.error ? <span className="truncate text-xs text-red">{send.error.message}</span> : busy ? <span className="flex items-center gap-1.5 text-xs text-muted"><Spinner className="size-3" />Run in progress</span> : null}
-            <span className="ml-auto hidden items-center gap-1 text-[11px] text-faint sm:flex"><Kbd>↵</Kbd> send <Kbd className="ml-1">⇧↵</Kbd> newline</span>
-            <Button size="icon" className="rounded-lg" onClick={submit} disabled={!draft.trim() || send.isPending} title="Send">{send.isPending ? <Spinner className="text-accent-fg" /> : <ArrowUp strokeWidth={2.25} />}</Button>
+            {send.error ? <span className="truncate text-[12px] text-red">{send.error.message}</span> : busy ? <span className="flex items-center gap-1.5 text-[12px] text-muted"><Spinner className="size-3" />Run in progress</span> : null}
+            <Button size="icon-sm" variant={draft.trim() ? 'default' : 'ghost'} className="ml-auto rounded-full" onClick={submit} disabled={!draft.trim() || send.isPending} title="Send (Enter)">{send.isPending ? <Spinner className="size-3" /> : <ArrowUp strokeWidth={2} />}</Button>
           </div>
         </div>
       </div>
     </>
+  );
+}
+
+function FeedItem({ avatar, who, at, meta, action, children }: { avatar: React.ReactNode; who: string; at?: string | undefined; meta?: React.ReactNode; action?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="relative flex gap-3 py-2.5">
+      <div className="relative z-10 shrink-0 bg-panel py-px">{avatar}</div>
+      <div className="min-w-0 flex-1">
+        <div className="flex h-6 items-center gap-1.5 text-[12.5px]">
+          <span className="font-medium text-fg">{who}</span>
+          {meta ? <span className="text-muted">{meta}</span> : null}
+          <span className="text-faint">· {relativeTime(at)}</span>
+          {action ? <span className="ml-auto">{action}</span> : null}
+        </div>
+        <div className="mt-0.5 flex flex-col gap-1">{children}</div>
+      </div>
+    </div>
   );
 }
 

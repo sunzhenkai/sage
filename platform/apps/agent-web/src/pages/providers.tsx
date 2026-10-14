@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Field, Input, Select } from '@/components/ui/input';
 import { Card, CardHeader, Empty, ErrorState, KeyValue, Loading, Mono } from '@/components/ui/misc';
-import { Table, Td, Th, Tr } from '@/components/ui/table';
+import { ListRow, Pill, RowId, RowMeta, RowTitle } from '@/components/ui/list';
+import { StatusIcon } from '@/components/ui/status';
 import { api } from '@/lib/api';
 import type { ProviderConnectionWrite } from '@/lib/types';
 import { formatTime, relativeTime } from '@/lib/utils';
@@ -33,19 +34,23 @@ export function ProvidersPage() {
           {setDefault.error ? <ErrorState error={setDefault.error} /> : remove.error ? <ErrorState error={remove.error} /> : null}
           <Card><CardHeader title="Connections" />
             {connections.isLoading ? <Loading /> : connections.error ? <ErrorState error={connections.error} /> : !connections.data?.connections.length ? <Empty title="No provider connections" /> : (
-              <Table><thead><tr><Th>Name</Th><Th>Adapter</Th><Th>Model</Th><Th>Base URL</Th><Th>Credential</Th><Th>Updated</Th><Th /></tr></thead>
-                <tbody>{connections.data.connections.map((c) => (
-                  <Tr key={c.id}>
-                    <Td><div className="flex items-center gap-2 font-medium">{c.name}{c.id === defaultId ? <Badge tone="accent">default</Badge> : null}{c.source === 'deployment-env' ? <Badge>env</Badge> : null}{!c.enabled ? <Badge tone="warning">disabled</Badge> : null}</div></Td>
-                    <Td className="text-muted">{c.adapterKind}</Td><Td><Mono>{c.modelId}</Mono></Td><Td className="max-w-56 truncate text-muted">{c.baseUrl}</Td>
-                    <Td>{c.credentialPresent ? <Badge tone="success">present</Badge> : <Badge tone="danger">missing</Badge>}</Td>
-                    <Td className="text-muted">{relativeTime(c.updatedAt)}</Td>
-                    <Td className="text-right whitespace-nowrap">
-                      <Button size="sm" variant="ghost" disabled={c.id === defaultId || setDefault.isPending} onClick={() => setDefault.mutate(c.id)}><Check />Default</Button>
-                      {c.source === 'user' ? <Button size="sm" variant="ghost" onClick={() => { if (confirm(`Delete ${c.name}?`)) remove.mutate(c.id); }}><Trash2 /></Button> : null}
-                    </Td>
-                  </Tr>
-                ))}</tbody></Table>
+              <div>{connections.data.connections.map((c) => (
+                  <ListRow key={c.id}>
+                    <RowId>{c.adapterKind === 'anthropic' ? 'ANTHROPIC' : 'OPENAI'}</RowId>
+                    <StatusIcon status={c.enabled && c.credentialPresent ? 'succeeded' : 'paused'} />
+                    <RowTitle sub={c.baseUrl}>{c.name}</RowTitle>
+                    <RowMeta>
+                      {c.id === defaultId ? <Pill color="var(--accent)">Default</Pill> : null}
+                      {c.source === 'deployment-env' ? <Pill>env</Pill> : null}
+                      <Pill color={c.credentialPresent ? 'var(--green)' : 'var(--red)'}>{c.modelId}</Pill>
+                      <span className="w-12 text-right text-faint">{relativeTime(c.updatedAt).replace(' ago', '')}</span>
+                      <span className="flex w-16 justify-end opacity-0 transition-opacity group-hover:opacity-100">
+                        {c.id !== defaultId ? <Button size="icon-sm" variant="ghost" title="Make default" disabled={setDefault.isPending} onClick={() => setDefault.mutate(c.id)}><Check /></Button> : null}
+                        {c.source === 'user' ? <Button size="icon-sm" variant="ghost" title="Delete" onClick={() => { if (confirm(`Delete ${c.name}?`)) remove.mutate(c.id); }}><Trash2 /></Button> : null}
+                      </span>
+                    </RowMeta>
+                  </ListRow>
+                ))}</div>
             )}
           </Card>
           <div className="grid gap-4 lg:grid-cols-2">

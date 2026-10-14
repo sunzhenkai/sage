@@ -4,7 +4,7 @@ import { ApiError } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 export function Card({ className, children }: { className?: string; children: React.ReactNode }) {
-  return <section className={cn('overflow-hidden rounded-lg border border-line bg-raised shadow-card', className)}>{children}</section>;
+  return <section className={cn('overflow-hidden rounded-lg border border-line', className)}>{children}</section>;
 }
 export function CardHeader({ title, description, actions }: { title: React.ReactNode; description?: React.ReactNode; actions?: React.ReactNode }) {
   return (
@@ -44,7 +44,7 @@ export function Loading({ rows = 6, label }: { rows?: number; label?: string }) 
   return (
     <div className="animate-fade-in flex flex-col" aria-label={label ?? 'Loading'}>
       {Array.from({ length: rows }, (_, i) => (
-        <div key={i} className="flex h-9 items-center gap-3 border-b border-line px-6">
+        <div key={i} className="flex h-[38px] items-center gap-3 px-5">
           <div className="skeleton size-3.5 rounded-full" />
           <div className="skeleton h-2.5" style={{ width: `${28 + ((i * 37) % 40)}%` }} />
           <div className="skeleton ml-auto h-2.5 w-14" />
@@ -55,30 +55,27 @@ export function Loading({ rows = 6, label }: { rows?: number; label?: string }) 
 }
 export function Empty({ title, hint, icon: Icon = Inbox, children }: { title: string; hint?: string; icon?: LucideIcon; children?: React.ReactNode }) {
   return (
-    <div className="animate-fade-in flex flex-1 flex-col items-center justify-center gap-3 px-6 py-16 text-center">
-      <div className="relative grid size-11 place-items-center rounded-xl border border-line-strong bg-raised shadow-card">
-        <Icon className="size-5 text-muted" strokeWidth={1.6} />
-      </div>
-      <div>
-        <div className="text-[14px] font-medium tracking-[-0.015em]">{title}</div>
-        {hint ? <div className="mx-auto mt-1 max-w-[340px] text-[12.5px] leading-5 text-muted">{hint}</div> : null}
-      </div>
-      {children ? <div className="mt-1 flex gap-2">{children}</div> : null}
+    <div className="animate-fade-in flex flex-1 flex-col items-center justify-center gap-2 px-6 py-16 text-center">
+      <Icon className="mb-2 size-9 text-faint/70" strokeWidth={1.25} />
+      <div className="text-[13.5px] font-medium tracking-[-0.01em] text-fg-2">{title}</div>
+      {hint ? <div className="max-w-[320px] text-[12.5px] leading-[18px] text-muted">{hint}</div> : null}
+      {children ? <div className="mt-3 flex gap-2">{children}</div> : null}
     </div>
   );
 }
+/** Quiet inline error — no tinted box. */
 export function ErrorState({ error }: { error: unknown }) {
   const isApi = error instanceof ApiError;
   const authHint = isApi && (error.status === 401 || error.code.includes('AUTHENTICATION'));
   const Icon = authHint ? KeyRound : AlertCircle;
   return (
-    <div className="animate-fade-in m-4 flex items-start gap-3 rounded-lg border border-line bg-raised p-3.5 shadow-card">
-      <div className={cn('grid size-7 shrink-0 place-items-center rounded-md', authHint ? 'bg-amber/12 text-amber' : 'bg-red/12 text-red')}><Icon className="size-4" /></div>
-      <div className="min-w-0 text-[12.5px]">
-        <div className="font-medium text-fg">{authHint ? 'Service token required' : 'Something went wrong'}</div>
-        <div className="mt-0.5 break-words text-muted">{error instanceof Error ? error.message : String(error)}</div>
-        {isApi ? <div className="mt-1.5 font-mono text-[11px] text-faint">{error.status} · {error.code}</div> : null}
-        {authHint ? <Link to="/settings" className="mt-2 inline-flex text-xs font-medium text-accent hover:underline">Open settings →</Link> : null}
+    <div className="animate-fade-in flex items-start gap-2.5 px-5 py-4 text-[12.5px]">
+      <Icon className={cn('mt-px size-3.5 shrink-0', authHint ? 'text-muted' : 'text-red')} strokeWidth={1.75} />
+      <div className="min-w-0">
+        <span className="font-medium text-fg-2">{authHint ? 'Service token required. ' : 'Request failed. '}</span>
+        <span className="break-words text-muted">{error instanceof Error ? error.message : String(error)}</span>
+        {isApi ? <span className="ml-2 font-mono text-[11px] text-faint">{error.status} {error.code}</span> : null}
+        {authHint ? <Link to="/settings" className="ml-2 font-medium text-accent hover:underline">Add token</Link> : null}
       </div>
     </div>
   );
