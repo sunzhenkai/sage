@@ -73,6 +73,17 @@ export function SettingsGroup({ title, description, children }: { title?: string
     </Section>
   );
 }
+/** Fixed-height pane whose content scrolls INSIDE a bordered content card (chat transcript). Fills remaining height. */
+export function CardPane({ width = 'full', scrollRef, children }: { width?: ContentWidth | undefined; scrollRef?: React.Ref<HTMLDivElement> | undefined; children: React.ReactNode }) {
+  return (
+    <div className={cn('flex min-h-0 w-full flex-1 flex-col pt-4 gutter-x', widthClass[width])}>
+      <div ref={scrollRef} className={cn(contentCard, 'min-h-0 flex-1 overflow-y-auto')}>
+        <div className="px-6 py-6">{children}</div>
+      </div>
+    </div>
+  );
+}
+
 /** Free-form row inside a content card (same inset as SettingsRow). */
 export function CardRow({ children, className }: { children: React.ReactNode; className?: string | undefined }) {
   return <div className={cn('flex items-center gap-3 px-4 py-3', className)}>{children}</div>;

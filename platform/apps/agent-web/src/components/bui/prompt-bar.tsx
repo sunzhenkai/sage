@@ -102,5 +102,5 @@ export function PromptBar({ value, onChange, onSubmit, placeholder = 'Ask anythi
 
 /** Right-aligned user message bubble (chat-composer). */
 export function UserBubble({ children }: { children: ReactNode }) {
-  return <div className="readable whitespace-pre-wrap rounded-xl bg-surface px-3 py-1.5 shadow-card text-[14px] leading-[1.45] text-ink">{children}</div>;
+  return <div className="readable whitespace-pre-wrap rounded-xl bg-field px-3 py-1.5 text-[14px] leading-[1.45] text-ink">{children}</div>;
 }

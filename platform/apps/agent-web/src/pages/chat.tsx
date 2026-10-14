@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Empty, ErrorState, Kbd } from '@/components/ui/misc';
 import { LoadingState, formatElapsed } from '@/components/bui/loading-state';
-import { PageColumn, PageContent, Quiet } from '@/components/layout/page';
+import { CardPane, PageColumn, PageContent, Quiet } from '@/components/layout/page';
 import { PromptBar, UserBubble, type PromptMenuItem, type PromptModel } from '@/components/bui/prompt-bar';
 import { ArchiveToggle, SessionHeader, SessionList } from '@/components/bui/session-list';
 import { StreamingText } from '@/components/bui/streaming-text';
@@ -49,7 +49,7 @@ export function ChatPage() {
           </div>
           <ArchiveToggle archived={archived} onChange={setArchived} />
         </div>
-        <PageContent flush className="px-2.5 pt-0.5">
+        <PageContent flush className="px-2.5 pb-2">
           {sessions.isLoading ? <SessionSkeleton /> : sessions.error ? <ErrorState error={sessions.error} /> : sessions.data?.items.length === 0 ? (
             <Empty icon={MessagesSquare} title={archived ? 'No archived sessions' : 'No sessions yet'} hint="Start a conversation with the run agent.">
               <Button size="sm" onClick={() => create.mutate()}><Plus />New session</Button>
@@ -175,7 +175,7 @@ function SessionView({ sessionId }: { sessionId: string }) {
           <Button variant="ghost" size="icon" title={`Session ${sessionId}`} onClick={() => { void navigator.clipboard?.writeText(sessionId); }}><MoreHorizontal /></Button>
         </>}
       />
-      <PageContent width="chat" scrollRef={scroller}>
+      <CardPane width="chat" scrollRef={scroller}>
         {detail.error ? <ErrorState error={detail.error} /> : null}
           {tab === 'runs' ? (
             allRuns.length ? <TaskRows variant="list" rows={[...allRuns].reverse().map((r, i) => ({
@@ -194,8 +194,8 @@ function SessionView({ sessionId }: { sessionId: string }) {
               </div>
             </>
           )}
-      </PageContent>
-      <PageColumn width="chat" className="pb-5 pt-1">
+      </CardPane>
+      <PageColumn width="chat" className="pb-5 pt-3">
         <div>
           <PromptBar value={draft} onChange={setDraft} onSubmit={submit} models={models} model={connectionId} onModel={setConnectionId} sources={sources} commands={commands} busy={send.isPending}
             placeholder={isMock() ? 'Mock mode is read-only — sending is disabled' : 'Ask the run agent — @ to reference a task, / for commands'}

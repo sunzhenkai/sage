@@ -56,11 +56,11 @@ export function SessionList({ items, activeId }: { items: SessionListItem[]; act
     g.rows.push({ s, runs: d?.runs ?? [], messages: d?.messages.length ?? 0 });
   });
   return (
-    <div className="flex flex-col pb-3">
+    <div className="flex flex-col gap-2 pb-4">
       {groups.map((g) => (
         <div key={g.label}>
-          <div className="t-meta sticky top-0 z-10 flex items-center gap-2 bg-panel px-2 pb-1.5 pt-3 font-medium">{g.label}<span className="tabular-nums font-normal">{g.rows.length}</span></div>
-          <div className="flex flex-col gap-1.5">
+          <div className="t-meta sticky top-0 z-10 flex items-center gap-2 bg-panel px-2 pb-1 pt-2.5 font-medium">{g.label}<span className="tabular-nums font-normal">{g.rows.length}</span></div>
+          <div className="flex flex-col gap-2 pt-1">
             {g.rows.map(({ s, runs, messages }) => {
               const active = s.sessionId === activeId;
               const last = runs[runs.length - 1];

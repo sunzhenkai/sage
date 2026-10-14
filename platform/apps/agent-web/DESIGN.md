@@ -49,7 +49,8 @@
 | 下拉菜单 / popover / 对话框 / 命令面板 | `bg-surface` + `shadow-overlay`（含 1px ring），背后 `--scrim` |
 | 代码块 | `CodeBlock`：白底卡片 |
 | chip / 计数徽标 | 白底 + 1px hairline |
-| 用户消息气泡 | `UserBubble`：白底 + `shadow-card` |
+| 用户消息气泡 | `UserBubble`：位于白色聊天卡片内，用 `--field` 浅灰底区分 |
+| 聊天记录 / Runs 视图 | `CardPane`：白底描边卡片填满页头与输入框之间的高度，滚动发生在卡片内部；输入框在卡片下方 |
 | 空状态（Section 内） | `Quiet`：白底描边卡片 |
 | 表格 / 列表 | 见第 5 节 |
 
@@ -77,7 +78,7 @@
 | 间距刻度 | 4 · 6 · 8 · 12 · 16 · 24 · 32 · 48（px） |
 | 详情页 | 两栏：主栏 `flex-1` + 属性侧栏 `--aside-w: 320px`（`DetailLayout`，`border-l`，同 Panel 背景） |
 | 设置页 / Providers | 720px 居中栏；`SettingsRow` 两列网格：标签列 `minmax(160px,220px)` + 控件列 `1fr`，输入框 `w-full` 填满控件列，开关/分段控件右对齐 |
-| Master-detail | 聊天页左侧会话列 300px（`SessionList`：容器 `px-2.5`、行间距 6px，避免选中卡片描边被裁切；按 Today/Yesterday/Earlier 分组；行 = 色相头像 + 最新 run 状态点 + 标题/预览 + 时间 + runs/消息计数 + 最近 5 次 run 色条；选中行为白色描边卡片；Active/Archived 分段切换） |
+| Master-detail | 聊天页左侧会话列 300px（`SessionList`：容器 `px-2.5`、组间距 8px、行间距 8px、组头与首行间 4px（sticky 组头不再盖住选中卡片的 1px 描边）；按 Today/Yesterday/Earlier 分组；行 = 色相头像 + 最新 run 状态点 + 标题/预览 + 时间 + runs/消息计数 + 最近 5 次 run 色条；选中行为白色描边卡片；Active/Archived 分段切换） |
 | 会话页头 | 单一页头 `SessionHeader`：头像 + 标题 + 状态点 + 灰色 meta，右侧操作；右侧为视图切换图标分段控件（Chat `MessageSquare` / Runs `ListChecks` + 短标签 + 计数，白底描边，选中 `--hover-2`，tooltip，←/→ 键切换，role=tablist），竖线分隔后接操作按钮；页头单行 56px；背景同页面底色，仅一条底部分隔线，不使用胶囊/卡片 tab |
 | 例外：阅读/表单类页面居中窄栏 | 设置页、Providers 页 `PageContent width="narrow"`（`--w-narrow: 720px`）；聊天消息流 + 输入框 `width="chat"`（`--w-chat: 760px`，会话列表侧栏不变）。宽度只能通过 `PageContent` / `PageColumn` 的 `width` 取得，页面里仍禁止 `max-w-*` / `mx-auto` |
 | 其余页面 | 列表、详情、Overview、Apps/Packages/Schedules **保持全宽** |
