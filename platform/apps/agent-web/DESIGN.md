@@ -47,6 +47,7 @@
 | 类型 | 实现 |
 |---|---|
 | 输入框 / 文本域 / 下拉选择 | `Input` / `Textarea` / `Select`：`bg-surface` + `border-line-strong`，focus accent ring |
+| 可搜索下拉（combobox） | `Combobox`（`components/ui/combobox.tsx`）：触发器同 Input，结果列表**内联**在输入框下方（`bg-surface` + `shadow-overlay`，不用 portal，避免被 Dialog 滚动裁切）；↑↓/Enter/Esc 键盘导航，Esc 只关列表（window 捕获阶段吞掉，避免关掉 Dialog） |
 | 搜索 / 筛选框 | 使用 `Input`（如聊天会话筛选），不用透明底输入 |
 | 聊天输入框（PromptBar） | `bg-surface` + `shadow-raised`（含 1px ring） |
 | 分段控件 / 范围选择 | `SegmentedTabs` / `ArchiveToggle` / `ViewTabs`+`ViewTab`（`PageHeader tabs` 自动包裹）：白底 + `shadow-card`，选中项 `--hover-2` |
@@ -84,7 +85,7 @@
 | 间距刻度 | 4 · 6 · 8 · 12 · 16 · 24 · 32 · 48（px） |
 | 详情页 | 两栏：主栏 `flex-1` + 属性侧栏 `--aside-w: 320px`（`DetailLayout`，`border-l`，同 Panel 背景） |
 | 设置页 / Providers | 900px 居中栏；`SettingsRow` 两列网格：标签列 `minmax(160px,220px)` + 控件列 `1fr`，输入框 `w-full` 填满控件列，开关/分段控件右对齐 |
-| Master-detail | 聊天页左侧会话列 300px（`SessionList`：容器 `px-2.5`、组间距 8px、行间距 8px、组头与首行间 4px（sticky 组头不再盖住选中卡片的 1px 描边）；按 Today/Yesterday/Earlier 分组；行 = 色相头像 + 最新 run 状态点 + 标题/预览 + 时间 + runs/消息计数 + 最近 5 次 run 色条；每行均为白色描边卡片（8px 间距）；选中行加 accent ring；Active/Archived 分段切换） |
+| Master-detail | 聊天页左侧会话列 300px（`SessionList`：容器 `px-2.5`、组间距 8px、行间距 8px、组头与首行间 4px（sticky 组头不再盖住选中卡片的 1px 描边）；按 Today/Yesterday/Earlier 分组；行 = 色相头像 + 最新 run 状态点 + 标题/预览 + 时间 + runs/消息计数 + 最近 5 次 run 色条；未选中行保留 1px 描边、无填充（面板底色，hover `--hover-2`）；仅选中行为白色填充 + accent ring；Active/Archived 分段切换） |
 | 会话页头 | 单一页头 `SessionHeader`：头像 + 标题 + 状态点 + 灰色 meta，右侧操作；右侧为视图切换图标分段控件（Chat `MessageSquare` / Runs `ListChecks` + 短标签 + 计数，白底描边，选中 `--hover-2`，tooltip，←/→ 键切换，role=tablist），竖线分隔后接操作按钮；页头单行 `--header-h`；背景同页面底色，仅一条底部分隔线，不使用胶囊/卡片 tab |
 | 例外：阅读/表单类页面居中窄栏 | 设置页、Providers 页 `PageContent width="narrow"`（`--w-narrow: 900px`）；聊天消息流 + 输入框 `width="chat"`（`--w-chat: 1000px`，会话列表侧栏不变）。宽度只能通过 `PageContent` / `PageColumn` 的 `width` 取得，页面里仍禁止 `max-w-*` / `mx-auto` |
 | 图表/列表页 | Overview、Tasks、Schedules、Apps、Packages 列表使用 `PageContent width="wide"`（`--w-wide: 1120px` + gutter），在剩余空间中**居中**；侧边栏折叠时内容不会拉伸到边缘 |

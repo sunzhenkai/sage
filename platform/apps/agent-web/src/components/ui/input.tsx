@@ -15,7 +15,7 @@ export function Select({ className, ...props }: ComponentProps<'select'>) {
 export function Label({ className, ...props }: ComponentProps<'label'>) {
   return <label className={cn('text-xs font-medium text-fg-2', className)} {...props} />;
 }
-export function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+export function Field({ label, hint, children }: { label: string; hint?: string | undefined; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1.5">
       <Label>{label}</Label>

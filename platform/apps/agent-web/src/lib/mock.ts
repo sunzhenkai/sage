@@ -2,7 +2,7 @@
  * Dev-only demo data. Enabled by `?mock=1` (persisted in localStorage, `?mock=0` to leave) or VITE_MOCK=1.
  * Mock mode is read-only: it never calls agent-api, and write operations are rejected locally.
  */
-import type { ChatRun, Message, ScheduleSnapshot, ScheduleTriggerEvent, SessionListItem, TaskStatus, TaskView, TimelineEvent } from './types';
+import type { CatalogModelItem, CatalogProviderItem, ChatRun, Message, ScheduleSnapshot, ScheduleTriggerEvent, SessionListItem, TaskStatus, TaskView, TimelineEvent } from './types';
 
 const KEY = 'sage.agent-web.mock';
 
@@ -108,8 +108,41 @@ const providers = [
   { id: 'conn-env', name: 'minimax-cn', source: 'deployment-env', adapterKind: 'openai-compatible', baseUrl: 'https://api.minimax.chat/v1', modelId: 'MiniMax-M3', enabled: true, credentialPresent: true, createdAt: iso(NOW - 40 * DAY), updatedAt: iso(NOW - 40 * DAY) }
 ];
 
+// models.dev snapshot stand-in for the Add-connection provider/model pickers.
+const catalogProviders: CatalogProviderItem[] = [
+  { providerId: 'openai', name: 'OpenAI', npm: '@ai-sdk/openai' },
+  { providerId: 'anthropic', name: 'Anthropic', npm: '@ai-sdk/anthropic' },
+  { providerId: 'openrouter', name: 'OpenRouter', api: 'https://openrouter.ai/api/v1', npm: '@openrouter/ai-sdk-provider' },
+  { providerId: 'deepseek', name: 'DeepSeek', api: 'https://api.deepseek.com', npm: '@ai-sdk/openai-compatible' },
+  { providerId: 'minimax-cn', name: 'MiniMax (minimax.cn)', api: 'https://api.minimax.cn/anthropic/v1', npm: '@ai-sdk/anthropic' },
+  { providerId: 'zhipuai', name: 'Zhipu AI', api: 'https://open.bigmodel.cn/api/paas/v4', npm: '@ai-sdk/openai-compatible' }
+];
+const catalogModels: CatalogModelItem[] = [
+  { modelId: 'gpt-5.4', providerId: 'openai', name: 'GPT-5.4', status: 'active', capabilities: ['input:text', 'output:text', 'tool_call'], releaseDate: '2026-03-05' },
+  { modelId: 'gpt-5.4-mini', providerId: 'openai', name: 'GPT-5.4 mini', status: 'active', capabilities: ['input:text', 'output:text'], releaseDate: '2026-03-05' },
+  { modelId: 'gpt-4o-mini', providerId: 'openai', name: 'GPT-4o mini', status: 'deprecated', capabilities: ['input:text', 'output:text'], releaseDate: '2024-07-18' },
+  { modelId: 'claude-opus-4-5', providerId: 'anthropic', name: 'Claude Opus 4.5 (latest)', status: 'active', capabilities: ['input:text', 'output:text', 'tool_call'], releaseDate: '2025-11-24' },
+  { modelId: 'claude-haiku-4-5', providerId: 'anthropic', name: 'Claude Haiku 4.5 (latest)', status: 'active', capabilities: ['input:text', 'output:text'], releaseDate: '2025-10-15' },
+  { modelId: 'anthropic/claude-opus-4-5', providerId: 'openrouter', name: 'Claude Opus 4.5', status: 'active', capabilities: ['input:text', 'output:text'], releaseDate: '2025-11-24', effectiveBaseUrl: 'https://openrouter.ai/api/v1' },
+  { modelId: 'deepseek/deepseek-chat', providerId: 'openrouter', name: 'DeepSeek V3', status: 'active', capabilities: ['input:text', 'output:text'], releaseDate: '2025-12-01', effectiveBaseUrl: 'https://openrouter.ai/api/v1' },
+  { modelId: 'deepseek-chat', providerId: 'deepseek', name: 'DeepSeek Chat', status: 'active', capabilities: ['input:text', 'output:text'], releaseDate: '2025-09-29' },
+  { modelId: 'deepseek-reasoner', providerId: 'deepseek', name: 'DeepSeek Reasoner', status: 'active', capabilities: ['input:text', 'output:text'], releaseDate: '2025-09-29' },
+  { modelId: 'MiniMax-M3', providerId: 'minimax-cn', name: 'MiniMax M3', status: 'active', capabilities: ['input:text', 'output:text'], releaseDate: '2026-01-10', effectiveBaseUrl: 'https://api.minimax.cn/anthropic/v1' },
+  { modelId: 'MiniMax-M2.1', providerId: 'minimax-cn', name: 'MiniMax M2.1', status: 'active', capabilities: ['input:text', 'output:text'], releaseDate: '2025-11-20', effectiveBaseUrl: 'https://api.minimax.cn/anthropic/v1' },
+  { modelId: 'glm-5', providerId: 'zhipuai', name: 'GLM-5', status: 'active', capabilities: ['input:text', 'output:text'], releaseDate: '2026-01-15' },
+  { modelId: 'glm-4.6', providerId: 'zhipuai', name: 'GLM-4.6', status: 'deprecated', capabilities: ['input:text', 'output:text'], releaseDate: '2025-10-30' }
+];
+
+type MockQuery = Record<string, string | number | boolean | undefined>;
+const catalogFilter = <T extends { name: string }>(query: MockQuery, items: readonly T[], text: (item: T) => string, limit: number) => {
+  const q = String(query.q ?? '').trim().toLowerCase();
+  const matching = items.filter((item) => !q || text(item).toLowerCase().includes(q));
+  return { matching, items: matching.slice(0, limit), truncated: matching.length > limit };
+};
+const limitOf = (query: MockQuery, fallback: number) => Math.min(Math.max(Number(query.limit ?? fallback) || fallback, 1), 100);
+
 /** Resolve a GET path to demo data. Returns undefined for unknown paths. */
-export function mockGet(path: string): unknown {
+export function mockGet(path: string, query: MockQuery = {}): unknown {
   const p = path.split('?')[0]!;
   const m = (re: RegExp) => p.match(re);
   if (p === '/livez') return { status: 'alive' };
@@ -146,7 +179,28 @@ export function mockGet(path: string): unknown {
   r = m(/^\/v1\/schedules\/([^/]+)$/); if (r) return mockSchedules.find((s) => s.definition.scheduleId === decodeURIComponent(r![1]!));
   if (p === '/v1/provider-connections') return { schemaVersion: 'ProviderConnections.v1', connections: providers };
   if (p === '/v1/run-agent/settings') return { schemaVersion: 'RunAgentSettings.v2', unset: false, providerConnectionId: 'conn-openai', updatedAt: iso(NOW - 2 * DAY), updatedBy: 'principal://demo', providers: providers.map((x) => ({ id: x.id, name: x.name, available: true })) };
-  if (p === '/v1/provider-catalog/status') return { source: 'models-dev', availability: 'available', projection: 'ready', providerCount: 229, modelCount: 8832, lastSuccessAt: iso(NOW - 6 * 3_600_000), nextSyncAt: iso(NOW + 18 * 3_600_000) };
+  if (p === '/v1/provider-catalog/status') return { source: 'models-dev', availability: 'available', projection: 'ready', providerCount: catalogProviders.length, modelCount: catalogModels.length, lastSuccessAt: iso(NOW - 6 * 3_600_000), nextSyncAt: iso(NOW + 18 * 3_600_000) };
+  if (p === '/v1/provider-catalog/providers') {
+    const { items, truncated } = catalogFilter(query, catalogProviders, (item) => `${item.name}\n${item.providerId}`, limitOf(query, 50));
+    return { schemaVersion: '1', snapshotId: 'mock-snapshot-models-dev', activeSince: iso(NOW - 8 * DAY), stale: false, items, ...(truncated ? { nextCursor: 'mock-next' } : {}) };
+  }
+  if (p === '/v1/provider-catalog/models') {
+    const providerId = String(query.providerId ?? '');
+    const status = String(query.status ?? 'active');
+    const scoped = catalogModels.filter((item) => (providerId === '' || item.providerId === providerId) && (status === 'all' || item.status === status));
+    const { items, truncated } = catalogFilter(query, scoped, (item) => `${item.name}\n${item.modelId}`, limitOf(query, 50));
+    return { schemaVersion: '1', snapshotId: 'mock-snapshot-models-dev', activeSince: iso(NOW - 8 * DAY), stale: false, items, ...(truncated ? { nextCursor: 'mock-next' } : {}) };
+  }
+  return undefined;
+}
+
+/** Resolve a non-mutating POST (connection probe) to demo data; writes stay rejected client-side. */
+export function mockPost(path: string, body?: unknown): unknown {
+  const p = path.split('?')[0]!;
+  if (p === '/v1/provider-catalog/check-connection') {
+    const apiKey = (body as { apiKey?: string } | undefined)?.apiKey;
+    return apiKey ? { status: 'connected', checkedAt: iso(NOW), message: 'Connected' } : { status: 'unauthorized', checkedAt: iso(NOW), message: 'API key was rejected' };
+  }
   return undefined;
 }
 

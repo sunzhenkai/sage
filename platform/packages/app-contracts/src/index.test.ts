@@ -148,6 +148,13 @@ describe('Provider connection check contracts', () => {
     expect(Value.Check(ProviderConnectionCheckRequestSchema, { ...request, ownerId: 'leak' })).toBe(false);
     expect(Value.Check(ProviderConnectionCheckResponseSchema, { status: 'connected', checkedAt: '2026-08-15T01:00:00.000Z', message: 'ok', apiKey: 'leak' })).toBe(false);
   });
+
+  it('accepts namespaced models.dev model ids and rejects empty/oversized ones', () => {
+    expect(Value.Check(ProviderConnectionCheckRequestSchema, { ...request, modelId: 'anthropic/claude-opus-4.5' })).toBe(true);
+    expect(Value.Check(ProviderConnectionCheckRequestSchema, { ...request, modelId: '~vendor/model:free' })).toBe(true);
+    expect(Value.Check(ProviderConnectionCheckRequestSchema, { ...request, modelId: '' })).toBe(false);
+    expect(Value.Check(ProviderConnectionCheckRequestSchema, { ...request, modelId: 'x'.repeat(257) })).toBe(false);
+  });
 });
 
 describe('Schedule plane HTTP contracts', () => {

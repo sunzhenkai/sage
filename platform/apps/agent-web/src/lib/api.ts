@@ -1,7 +1,8 @@
-import { isMock, mockGet } from './mock';
+import { isMock, mockGet, mockPost } from './mock';
 import { getSettings } from './settings';
 import type {
-  AppDetail, AppSummary, CatalogStatus, ChatRun, Message, PackageSummary, ProviderConnection, ProviderConnectionWrite, RunAgentSettings,
+  AppDetail, AppSummary, CatalogModelPage, CatalogProviderPage, CatalogStatus, ChatRun, Message, PackageSummary, ProviderConnection,
+  ProviderConnectionCheck, ProviderConnectionCheckResult, ProviderConnectionWrite, RunAgentSettings,
   RunLogPage, ScheduleDefinition, ScheduleSnapshot, ScheduleTriggerEvent, Session, SessionDetail, SessionList, TaskArtifact, TaskEvent,
   TaskStatus, TaskView, TimelineEvent
 } from './types';
@@ -31,9 +32,11 @@ type Query = Record<string, string | number | boolean | undefined>;
 async function request<T>(method: string, path: string, options: { query?: Query; body?: unknown } = {}): Promise<T> {
   if (isMock()) {
     await new Promise((resolve) => setTimeout(resolve, 120));
-    if (method !== 'GET') throw new ApiError(400, 'MOCK_READ_ONLY', 'Mock mode is read-only — nothing is sent to agent-api.');
-    const data = mockGet(path);
-    if (data === undefined) throw new ApiError(404, 'MOCK_NOT_FOUND', `No mock data for ${path}`);
+    const data = method === 'GET' ? mockGet(path, options.query) : mockPost(path, options.body);
+    if (data === undefined) {
+      if (method !== 'GET') throw new ApiError(400, 'MOCK_READ_ONLY', 'Mock mode is read-only — nothing is sent to agent-api.');
+      throw new ApiError(404, 'MOCK_NOT_FOUND', `No mock data for ${path}`);
+    }
     return data as T;
   }
   const headers: Record<string, string> = { accept: 'application/json', ...authHeaders() };
@@ -113,6 +116,9 @@ export const api = {
     remove: (id: string) => request<unknown>('DELETE', `/v1/provider-connections/${enc(id)}`),
     settings: () => request<RunAgentSettings>('GET', '/v1/run-agent/settings'),
     updateSettings: (providerConnectionId: string) => request<RunAgentSettings>('PUT', '/v1/run-agent/settings', { body: { providerConnectionId } }),
-    catalogStatus: () => request<CatalogStatus>('GET', '/v1/provider-catalog/status')
+    catalogStatus: () => request<CatalogStatus>('GET', '/v1/provider-catalog/status'),
+    catalogProviders: (query: { q?: string; limit?: number; cursor?: string } = {}) => request<CatalogProviderPage>('GET', '/v1/provider-catalog/providers', { query }),
+    catalogModels: (query: { providerId?: string; q?: string; status?: string; limit?: number; cursor?: string } = {}) => request<CatalogModelPage>('GET', '/v1/provider-catalog/models', { query }),
+    checkConnection: (body: ProviderConnectionCheck) => request<ProviderConnectionCheckResult>('POST', '/v1/provider-catalog/check-connection', { body })
   }
 };

@@ -68,7 +68,7 @@ export function SessionList({ items, activeId }: { items: SessionListItem[]; act
               const title = s.title ?? 'Untitled session';
               return (
                 <Link key={s.sessionId} to={`/chat/${s.sessionId}`}
-                  className={cn('group flex items-start gap-2.5 rounded-[10px] px-2 py-2 transition-colors duration-75', active ? 'bg-surface shadow-card ring-1 ring-accent' : 'bg-surface shadow-card hover:bg-hover')}>
+                  className={cn('group flex items-start gap-2.5 rounded-[10px] px-2 py-2 transition-colors duration-75', active ? 'bg-surface shadow-card ring-1 ring-accent' : 'shadow-card hover:bg-hover-2')}>
                   <Avatar id={s.sessionId} title={title} tone={tone} />
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-2">
@@ -78,7 +78,7 @@ export function SessionList({ items, activeId }: { items: SessionListItem[]; act
                     <span className="mt-0.5 block truncate text-[12px] text-ink-2">{s.lastMessageRole === 'assistant' ? 'Agent: ' : s.lastMessageRole === 'user' ? 'You: ' : ''}{s.preview ?? '—'}</span>
                     <span className="mt-1.5 flex items-center gap-2 text-[11px] text-ink-3">
                       <span className="inline-flex items-center gap-1" style={{ color: toneColor[tone] }}><span className={cn('size-1.5 rounded-full', tone === 'active' && 'animate-pulse')} style={{ background: toneColor[tone] }} />{toneLabel[tone]}</span>
-                      <span className="rounded-[5px] bg-surface px-1 tabular-nums shadow-[inset_0_0_0_1px_var(--line)]">{runs.length} run{runs.length === 1 ? '' : 's'}</span>
+                      <span className="rounded-[5px] px-1 tabular-nums shadow-[inset_0_0_0_1px_var(--line)]">{runs.length} run{runs.length === 1 ? '' : 's'}</span>
                       <span className="tabular-nums">{messages} msg</span>
                       <span className="ml-auto"><RunTicks runs={runs} /></span>
                     </span>

@@ -30,16 +30,17 @@ Settings live in `localStorage` (`sage.agent-web.settings`).
 | `/apps`, `/apps/:appId` | `GET /v1/apps`, `GET /v1/apps/:id`, `DELETE /v1/apps/:id` |
 | `/packages`, `/packages/:id` | `GET /v1/packages`, `GET /v1/packages/:id` |
 | `/schedules`, `/schedules/:id` | `GET/POST /v1/schedules`, `GET/DELETE /v1/schedules/:id`, `GET …/triggers`, `POST …/pause`, `POST …/resume` |
-| `/providers` | `GET/POST /v1/provider-connections`, `DELETE /v1/provider-connections/:id`, `GET/PUT /v1/run-agent/settings`, `GET /v1/provider-catalog/status` |
+| `/providers` | `GET/POST /v1/provider-connections`, `DELETE /v1/provider-connections/:id`, `GET/PUT /v1/run-agent/settings`, `GET /v1/provider-catalog/{status,providers,models}`, `POST /v1/provider-catalog/check-connection` |
 | `/settings` | `GET /livez`, `GET /readyz` |
 
 Not surfaced (yet): `POST /v1/tasks` (needs a pre-staged `task-input://` ref), `PUT /v1/provider-connections/:id`
-(client method exists, no edit UI), `/v1/provider-catalog/{providers,models,sync,check-connection}`,
+(client method exists, no edit UI), `POST /v1/provider-catalog/sync` (requires the `provider-catalog-admin` role),
 `POST /v1/chat/messages/:id/promotions`, `POST /v1/effects/resolutions`, `POST /v1/production/effects/:id/resolution`,
 `/internal/*`.
 
 ## Notes
 
+- Add provider connection opens with a **From models.dev / Manual** toggle: the catalog mode searches the `/v1/provider-catalog` snapshot (debounced server-side `q`), auto-fills adapter (from the provider `npm` package) and base URL (model endpoint → provider `api` → known default for openai/anthropic/xai/mistral/groq/deepinfra/togetherai/cerebras/cohere), and keeps the base URL editable for proxies. `Test connection` probes `{baseUrl}/models` before creating.
 - Wire types are mirrored in `src/lib/types.ts` from `@sage/app-contracts` / `@sage/task-domain` / agent-api route
   code so the browser bundle has no server-side deps; `package-ownership.json` declares `agent-web` with no `@sage/*` deps.
 - SSE uses a `fetch` stream reader (not `EventSource`) so the bearer token can be sent; reconnects with backoff.

@@ -335,7 +335,9 @@ export type ProviderConnectionStatus = Static<typeof ProviderConnectionStatusSch
 export const ProviderConnectionCheckRequestSchema = Type.Object({
   adapterKind: ProviderConnectionAdapterSchema,
   baseUrl: Type.String({ minLength: 1, maxLength: 2048, format: 'uri' }),
-  modelId: Id,
+  // models.dev ids may carry vendor namespaces/suffixes (`anthropic/claude-opus-4.5`, `~…`, `…:free`);
+  // the probe only resolves baseUrl + adapter kind, so the id stays a bounded display string.
+  modelId: Type.String({ minLength: 1, maxLength: 256 }),
   apiKey: Type.Optional(Type.String({ maxLength: 4096 }))
 }, { $id: 'ProviderConnectionCheckRequest.v1', additionalProperties: false });
 export type ProviderConnectionCheckRequest = Static<typeof ProviderConnectionCheckRequestSchema>;

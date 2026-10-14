@@ -58,6 +58,15 @@ export interface ScheduleTriggerEvent { scheduleId: string; occurrenceId: string
 
 // ---- providers ----
 export interface ProviderConnection { id: string; name: string; source: 'user' | 'deployment-env'; adapterKind: 'openai-compatible' | 'anthropic'; baseUrl: string; modelId: string; providerName?: string; modelName?: string; enabled: boolean; credentialPresent: boolean; createdAt: string; updatedAt: string; updatedBy?: string }
-export interface ProviderConnectionWrite { name: string; adapterKind: 'openai-compatible' | 'anthropic'; baseUrl: string; modelId: string; apiKey?: string }
+export interface ProviderConnectionWrite { name: string; adapterKind: 'openai-compatible' | 'anthropic'; baseUrl: string; modelId: string; providerName?: string; modelName?: string; apiKey?: string }
+export interface ProviderConnectionCheck { adapterKind: 'openai-compatible' | 'anthropic'; baseUrl: string; modelId: string; apiKey?: string }
+export type ProviderConnectionCheckStatus = 'connected' | 'unauthorized' | 'unavailable';
+export interface ProviderConnectionCheckResult { status: ProviderConnectionCheckStatus; checkedAt: string; message: string }
+
+// ---- provider catalog (models.dev snapshot, apps/agent-api/src/catalog-api.ts) ----
+export interface CatalogProviderItem { providerId: string; name: string; api?: string; npm?: string }
+export interface CatalogProviderPage { schemaVersion: '1'; snapshotId: string; activeSince: string; stale: boolean; items: CatalogProviderItem[]; nextCursor?: string }
+export interface CatalogModelItem { modelId: string; providerId: string; name: string; status: 'active' | 'deprecated' | 'legacy'; capabilities: string[]; releaseDate?: string; providerApi?: string; modelApi?: string; effectiveBaseUrl?: string }
+export interface CatalogModelPage { schemaVersion: '1'; snapshotId: string; activeSince: string; stale: boolean; items: CatalogModelItem[]; nextCursor?: string }
 export interface RunAgentSettings { schemaVersion: string; unset: boolean; providerConnectionId?: string; updatedAt?: string; updatedBy?: string; providers: { id: string; name: string; available: boolean }[] }
 export interface CatalogStatus { source: string; availability: string; snapshotId?: string; activeSince?: string; providerCount?: number; modelCount?: number; lastCheckedAt?: string; lastSuccessAt?: string; nextSyncAt?: string; projection?: string; [key: string]: unknown }
