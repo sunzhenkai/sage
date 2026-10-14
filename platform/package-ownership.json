@@ -28,6 +28,10 @@
         "tool-runtime"
       ]
     },
+    "agent-web": {
+      "owner": "Application",
+      "mayDependOn": []
+    },
     "agent-client": {
       "owner": "Agent Core",
       "mayDependOn": [
