@@ -8,10 +8,10 @@ import { exitMock, isMock } from '@/lib/mock';
 import { updateSettings, useSettings } from '@/lib/settings';
 import { cn } from '@/lib/utils';
 import { SageMark } from '@/components/brand/sage-mark';
+import { goKeyMap } from '@/lib/shortcuts';
 import { CommandPalette } from './command-palette';
 import { navGroups, navItems } from './nav';
 
-const goKeys: Record<string, string> = { o: '/overview', c: '/chat', t: '/tasks', a: '/apps', p: '/packages', s: '/schedules', m: '/providers', ',': '/settings' };
 
 function isTyping(target: EventTarget | null): boolean {
   const el = target as HTMLElement | null;
@@ -39,7 +39,7 @@ export function AppShell() {
       if (isTyping(event.target) || event.metaKey || event.ctrlKey || event.altKey) return;
       if (event.key === 'g') { pendingG.current = Date.now(); return; }
       if (Date.now() - pendingG.current < 1200) {
-        const to = goKeys[event.key]; pendingG.current = 0;
+        const to = goKeyMap()[event.key.toLowerCase()]; pendingG.current = 0;
         if (to) { event.preventDefault(); navigate(to); }
       }
     };
@@ -60,8 +60,8 @@ export function AppShell() {
         </div>
 
         <div className={cn('mx-2 mt-1 flex items-center gap-0.5', sidebarCollapsed && 'flex-col')}>
-          <button type="button" onClick={() => setPaletteOpen(true)} title="Search (⌘K)" className={cn('flex items-center gap-1.5 rounded-md border border-line-strong bg-surface text-[12.5px] text-muted shadow-btn transition-colors hover:border-faint/60 hover:text-fg', sidebarCollapsed ? 'size-8 justify-center px-0' : 'h-8 flex-1 px-2')}>
-            <Search className="size-3.5 text-faint" strokeWidth={1.75} />
+          <button type="button" onClick={() => setPaletteOpen(true)} title="Search (⌘K)" data-nav-search className={cn('flex items-center gap-2 rounded-md text-[13px] font-medium text-muted transition-colors hover:bg-hover hover:text-fg', sidebarCollapsed ? 'size-8 justify-center px-0' : 'h-[30px] flex-1 px-2')}>
+            <Search className="size-[15px] shrink-0 text-faint" strokeWidth={1.6} />
             {!sidebarCollapsed ? <><span className="flex-1 text-left">Search</span><Kbd className="gap-0"><CommandIcon className="size-2.5" />K</Kbd></> : null}
           </button>
           <button type="button" onClick={() => navigate('/chat?new=1')} className={cn('grid place-items-center rounded-md text-faint transition-colors hover:bg-hover hover:text-fg', sidebarCollapsed ? 'size-8' : 'size-7')} title="New session">

@@ -40,7 +40,9 @@
 
 凡是"内容"或可交互表面，一律 **白底（light）/ raised（dark）+ 1px 描边**；页面底、页头、侧边栏底色与导航项留在灰底上。
 
-**输入规则（无例外）**：任何接受输入或打开输入/选择器的元素都必须是白底（dark：raised）+ 1px 描边的内容表面——侧边栏搜索触发器、命令面板输入框、所有搜索/筛选框、时间范围选择（7d/14d/30d）、select/combobox 触发器、日期选择、模型选择器、分段切换、分页控件、标签输入。禁止透明底、`bg-inset`/`bg-muted` 底或"仅 hover 才有底色"的输入控件；`check:design` 禁止页面中出现 `bg-transparent`。
+**输入规则**：任何接受输入或打开输入/选择器的元素都必须是白底（dark：raised）+ 1px 描边的内容表面——命令面板输入框、所有搜索/筛选框、时间范围选择（7d/14d/30d）、select/combobox 触发器、日期选择、模型选择器、分段切换、分页控件、标签输入。禁止透明底、`bg-inset`/`bg-muted` 底或"仅 hover 才有底色"的输入控件；`check:design` 禁止页面中出现 `bg-transparent`。
+
+**唯一例外**：左侧主侧边栏的搜索触发器（`data-nav-search`）按普通导航项样式呈现——透明底、无描边、hover `--hover`，展开/折叠一致；它只是打开命令面板的入口，真正的输入框（命令面板内）仍为白底描边。`check:design` 校验该触发器不带 `bg-surface`/`border`。
 
 | 类型 | 实现 |
 |---|---|
@@ -48,7 +50,7 @@
 | 搜索 / 筛选框 | 使用 `Input`（如聊天会话筛选），不用透明底输入 |
 | 聊天输入框（PromptBar） | `bg-surface` + `shadow-raised`（含 1px ring） |
 | 分段控件 / 范围选择 | `SegmentedTabs` / `ArchiveToggle` / `ViewTabs`+`ViewTab`（`PageHeader tabs` 自动包裹）：白底 + `shadow-card`，选中项 `--hover-2` |
-| 侧边栏搜索 / 命令面板输入 | 白底 + `border-line-strong` + `shadow-btn`；命令面板输入是面板内独立描边输入框 |
+| 命令面板输入 | 面板内独立白底描边输入框（侧边栏搜索触发器为导航项样式，见上方例外） |
 | 模型选择器 | 白底胶囊 + `shadow-btn` |
 | 下拉菜单 / popover / 对话框 / 命令面板 | `bg-surface` + `shadow-overlay`（含 1px ring），背后 `--scrim` |
 | 代码块 | `CodeBlock`：白底卡片 |
@@ -238,3 +240,11 @@
 ## 14. 品牌标识
 
 - `SageMark`（`src/components/brand/sage-mark.tsx`）：圆角方块 + 抽象 S，底色 `currentColor`（侧边栏用 `text-accent`），白色 S，明暗主题通用。favicon：`public/favicon.svg`、`favicon.ico`、`apple-touch-icon.png`。禁止用文字字母代替品牌标识。
+
+## 15. 设置页模式（参考 multica）
+
+- 三栏：主侧边栏 | 设置子导航（`SettingsShell`：200px、`bg-frame`、右侧 1px 描边，顶部 "Settings" 标题，分组小标签 + 图标项，选中 = `accent-tint` 底 + 强文字）| 内容。
+- 分组：**Preferences** — Appearance、Shortcuts；**System** — Connection（`/settings/general`）、Providers（跳转 `/providers` ↗）、Status、Developer。
+- 设置页**保留**与其它页一致的顶部 `PageHeader`（齿轮图标 + "Settings"），子导航与内容位于其下；内容居中 `--w-settings: 760px`，顶部 `SettingsTitle`：22px 大标题（`h-9`，与子导航 "Settings" 标题行同高同 y）+ 一行灰色描述，下方工具行：左搜索（`SettingsSearch`，过滤当前页行），右操作（Reset to defaults）。
+- 内容：每组小标题（12px semibold muted）+ 白底描边卡片（`SettingsCard`），行（`SettingsItem`）= 左侧标题+描述、右侧控件（Switch / Select / Input / Kbd 右对齐），行间 hairline。
+- Shortcuts：键帽 `Kbd` + 每行 Reset（恢复默认）与 Clear（清除）图标按钮；覆盖存储在 `sage.agent-web.shortcuts`，`G x` 导航实时读取。

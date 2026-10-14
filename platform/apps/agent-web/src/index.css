@@ -134,7 +134,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 :root { --scrim: oklch(0 0 0 / 0.5); --table-head: oklch(0.955 0.012 255); }
 .dark { --scrim: oklch(0 0 0 / 0.65); --table-head: oklch(0.295 0.012 265); }
 @theme inline { --color-scrim: var(--scrim); --color-table-head: var(--table-head); }
-:root { --gutter: 24px; --header-h: 44px; --aside-w: 320px; --readable: 72ch; --w-narrow: 900px; --w-chat: 1000px; --w-wide: 1120px; }
+:root { --gutter: 24px; --header-h: 44px; --aside-w: 320px; --readable: 72ch; --w-narrow: 900px; --w-chat: 1000px; --w-wide: 1120px; --w-settings: 760px; }
 @utility t-title { font-size: 20px; line-height: 28px; font-weight: 600; letter-spacing: -0.02em; color: var(--ink); }
 @utility t-section { font-size: 13px; line-height: 20px; font-weight: 600; letter-spacing: -0.01em; color: var(--ink); }
 @utility t-desc { font-size: 13px; line-height: 20px; font-weight: 400; color: var(--ink-2); }

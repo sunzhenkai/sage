@@ -18,6 +18,12 @@ const rules = [
   [/\bbg-transparent\b/, 'transparent input/control — inputs & pickers are white content surfaces (Input / ViewTabs / SegmentedTabs)']
 ];
 let failures = 0;
+// Sidebar search trigger is the single exception to the input-surface rule: nav-item style only.
+{
+  const shell = readFileSync(new URL('../src/components/layout/app-shell.tsx', import.meta.url), 'utf8').split('\n').find((l) => l.includes('data-nav-search')) ?? '';
+  if (!shell) { failures++; console.log('app-shell.tsx  sidebar search trigger missing data-nav-search'); }
+  else if (/\bbg-surface\b|\bborder\b|shadow-btn/.test(shell)) { failures++; console.log('app-shell.tsx  sidebar search trigger must be nav-item style (no bg-surface/border/shadow)'); }
+}
 for (const file of readdirSync(dir).filter((f) => f.endsWith('.tsx'))) {
   readFileSync(join(dir, file), 'utf8').split('\n').forEach((line, i) => {
     if (line.includes('design-ok')) return;
