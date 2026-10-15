@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { JsonView, Kbd } from '@/components/ui/misc';
 import { Switch } from '@/components/ui/switch';
 import { api } from '@/lib/api';
+import { errorDisplay } from '@/lib/error-message';
 import { setLanguagePref, useT, type LanguagePref } from '@/lib/i18n';
 import { exitMock, isMock } from '@/lib/mock';
 import { type Theme, updateSettings, useSettings } from '@/lib/settings';
@@ -142,7 +143,7 @@ function StatusSection({ q }: { q: string }) {
   return (
     <SettingsCard title={t('settings.status.card')}>
       {showLive ? <SettingsItem title={t('settings.status.liveness')} description="GET /livez">{live.error ? <span className="text-[12.5px] text-red">{t('settings.status.unreachable')}</span> : <StatusBadge status={live.data?.status} />}</SettingsItem> : null}
-      {showReady ? <SettingsItem title={t('settings.status.readiness')} description="GET /readyz" stacked>{ready.error ? <span className="text-[12.5px] text-red">{ready.error.message}</span> : <JsonView value={ready.data ?? null} className="w-full" />}</SettingsItem> : null}
+      {showReady ? <SettingsItem title={t('settings.status.readiness')} description="GET /readyz" stacked>{ready.error ? <span className="text-[12.5px] text-red">{errorDisplay(ready.error).text}</span> : <JsonView value={ready.data ?? null} className="w-full" />}</SettingsItem> : null}
     </SettingsCard>
   );
 }

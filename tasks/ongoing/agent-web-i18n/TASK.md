@@ -22,7 +22,7 @@ handed-off: 2026-10-15
 ## 非目标
 
 - 不建 `design-system/v1` Active Instance（simple 档 adopt-only，登记显式降级）。
-- 不本地化服务端 API 错误文案（英文原样显示）、mock 伪造数据、代码注释与仓库文档（agent-web README 除外）。
+- ~~不本地化服务端 API 错误文案（英文原样显示）~~、mock 伪造数据、代码注释与仓库文档（agent-web README 除外）。（**已作废** 2026-10-15：服务端错误码改为客户端本地化，见 D-4 与 change `agent-web-error-localization`；mock 数据与服务端非文案内容仍保持原样。）
 - 不做 URL 路由式 locale（无 `/zh/` 前缀）；不加第三方语言。
 
 ## 现状
@@ -62,12 +62,14 @@ handed-off: 2026-10-15
 - 2026-10-15：explore（grill 一轮）收敛，用户「同意」：Q1 zh* 全变体 → 简体 zh-CN；Q2 术语表与文体约定整表通过（固化 `glossary.md`）；Q3 服务端错误消息原样英文显示（README 记已知边界）；Q4 zh 标签页标题「Sage 智能体控制台」。
 - 2026-10-15：approve 轻量通过（结构门通过；显式降级 2 条 confirmed），`approve/APPROVED.md` 与 `design/contract.md` 已写。
 - 2026-10-15：handoff 完成——driver `agent-web-i18n-driver` 已建；本任务进度此后只认 taskflow checkbox（`tasks/` 不再勾交付进度）。
+- 2026-10-15：本任务**非目标作废**（服务端错误文案本地化）。起因：中文界面出现「请求失败。Provider connection is referenced by run agent settings; clear the reference before deleting」中英混排；用户决策：改掉该边界，全部 `sendError` code（含透传族）做客户端 code→文案映射，动态细节保留英文 detail 作次要文字；落地 change `agent-web-error-localization`。
 
 ## 决策
 
 - D-1 采纳：simple + adopt-only + 自研 typed 词典 + Settings 语言项（Auto / English / 中文）+ 服务端默认 en 且前端传 locale — 主因：改动面广但机械、零新设计表面；见 2026-10-15 闸口「按推荐」。
 - D-2 grill 收敛（2026-10-15）：zh* 全变体 → 简体；术语与文体以 `glossary.md` 为准；服务端错误消息原样英文展示；zh 标签页标题「Sage 智能体控制台」。
 - D-3 冻结（2026-10-15）：approve 通过（轻量）；显式降级 2 条 confirmed；唯一出口 handoff 已执行。
+- D-4 边界变更（2026-10-15，supersedes D-2 中「服务端错误消息原样英文展示」）：登记在 `error-codes.ts` 清单中的服务端错误码改为客户端本地化渲染——精确 code → 最长族前缀 → 未登记 code 回退服务端英文；带运行时信息的 code 保留英文 detail 作次要文字。agent-api 的 `sendError` 文案不改（服务端仍为英文），故非破坏性接口变更。落地 change：`openspec/changes/agent-web-error-localization`（已实现，工程门全绿）。
 - 设计依据（简单档从轻）：自研词典 → 最小依赖原则（项目零依赖自研风格）→ 选型不引外部依赖、可测（键位对齐单测）；服务端 locale 复用既有查询参数，不改契约。
 - 取舍：不建 Active Instance（接受设计系统证据按 simple 档降级）；不引 react-i18next（接受自研成本，换零依赖与编译期查漏）。
 - 带进实现的未决：openspec 初始化（`openspec init --tools none`，sage 根）；axe-core 安装方式（devDep 或 `--axe-path`）。

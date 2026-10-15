@@ -2,6 +2,7 @@ import { AlertCircle, Inbox, KeyRound, type LucideIcon } from 'lucide-react';
 import { Link } from 'react-router';
 import { CodeBlock } from '@/components/bui/code-block';
 import { ApiError } from '@/lib/api';
+import { errorDisplay } from '@/lib/error-message';
 import { useT } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
@@ -72,12 +73,14 @@ export function ErrorState({ error }: { error: unknown }) {
   const isApi = error instanceof ApiError;
   const authHint = isApi && (error.status === 401 || error.code.includes('AUTHENTICATION'));
   const Icon = authHint ? KeyRound : AlertCircle;
+  const display = errorDisplay(error);
   return (
     <div className="animate-fade-in flex items-start gap-2.5 px-6 py-4 text-[12.5px]">
       <Icon className={cn('mt-px size-3.5 shrink-0', authHint ? 'text-muted' : 'text-red')} strokeWidth={1.75} />
       <div className="min-w-0">
         <span className="font-medium text-fg-2">{authHint ? t('ui.error.tokenRequired') : t('ui.error.requestFailed')}</span>
-        <span className="break-words text-muted">{error instanceof Error ? error.message : String(error)}</span>
+        <span className="break-words text-muted">{display.text}</span>
+        {display.detail ? <span className="ml-2 break-words font-mono text-[11px] text-faint">{display.detail}</span> : null}
         {isApi ? <span className="ml-2 font-mono text-[11px] text-faint">{error.status} {error.code}</span> : null}
         {authHint ? <Link to="/settings" className="ml-2 font-medium text-accent-ink hover:underline">{t('ui.error.addToken')}</Link> : null}
       </div>

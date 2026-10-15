@@ -16,6 +16,7 @@ import { TaskRows } from '@/components/bui/task-rows';
 import { ThinkingTrace, type TraceRow } from '@/components/bui/thinking';
 import { ToolChips } from '@/components/bui/tool-chips';
 import { api } from '@/lib/api';
+import { errorDisplay } from '@/lib/error-message';
 import { useLocale, useT } from '@/lib/i18n';
 import { isMock } from '@/lib/mock';
 import { streamTimeline, type StreamState } from '@/lib/sse';
@@ -188,7 +189,7 @@ function SessionView({ sessionId }: { sessionId: string }) {
               key: r.runId, status: r.status, step: allRuns.length - i,
               label: <span className="font-mono text-[12.5px]">{shortId(r.runId, 14)}</span>,
               amount: r.completedAt ? formatElapsed(new Date(r.completedAt).getTime() - new Date(r.startedAt).getTime()) : r.status === 'active' ? <LoadingState label={t('status.running')} since={r.startedAt} /> : '—',
-              details: [{ label: t('chat.runs.started'), meta: formatTime(r.startedAt) }, { label: t('chat.runs.completed'), meta: formatTime(r.completedAt) }, { label: t('chat.runs.attempt'), meta: r.attempt }, ...(r.error ? [{ label: r.error.code, meta: r.error.message }] : [])]
+              details: [{ label: t('chat.runs.started'), meta: formatTime(r.startedAt) }, { label: t('chat.runs.completed'), meta: formatTime(r.completedAt) }, { label: t('chat.runs.attempt'), meta: r.attempt }, ...(r.error ? [{ label: r.error.code, meta: errorDisplay(r.error).text }] : [])]
             }))} /></> : <Quiet>{t('chat.runs.empty')}</Quiet>
           ) : (
             <>
@@ -205,7 +206,7 @@ function SessionView({ sessionId }: { sessionId: string }) {
         <div>
           <PromptBar value={draft} onChange={setDraft} onSubmit={submit} models={models} model={connectionId} onModel={setConnectionId} sources={sources} commands={commands} busy={send.isPending}
             placeholder={isMock() ? t('chat.composer.mockPlaceholder') : t('chat.composer.placeholder')}
-            status={send.error ? <span className="w-[220px] truncate text-[12px] text-red">{send.error.message}</span> : busy ? <LoadingState label={t('status.running')} className="mr-1 scale-90" /> : null} />
+            status={send.error ? <span className="w-[220px] truncate text-[12px] text-red">{errorDisplay(send.error).text}</span> : busy ? <LoadingState label={t('status.running')} className="mr-1 scale-90" /> : null} />
         </div>
       </PageColumn>
     </>
@@ -260,13 +261,16 @@ function RunBlock({ group, run, onRetry, retrying, onFollowUp }: { group: RunGro
       ) : null}
       {group.assistantText ? <StreamingText text={group.assistantText} streaming={working} followUps={working ? [] : [t('chat.followUps.summarize'), t('chat.followUps.next')]} onFollowUp={onFollowUp} />
         : working ? <LoadingState label={t('chat.run.generating')} since={started} /> : null}
-      {errors.map(({ seq, error }) => (
-        <div key={seq} className="flex items-start gap-2.5 rounded-card bg-red-tint px-3 py-2.5 text-[13px]">
-          <span className="mt-0.5 grid size-4 shrink-0 place-items-center rounded-full bg-red text-white"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round"><path d="M12 6v8M12 18.5v.5" /></svg></span>
-          <div className="min-w-0 flex-1"><span className="font-medium text-red">{error.code}</span> <span className="text-ink-2">{error.message}</span></div>
-          {status === 'failed' ? <Button size="sm" variant="secondary" onClick={onRetry} disabled={retrying}><RotateCw />{t('common.retry')}</Button> : null}
-        </div>
-      ))}
+      {errors.map(({ seq, error }) => {
+        const display = errorDisplay(error);
+        return (
+          <div key={seq} className="flex items-start gap-2.5 rounded-card bg-red-tint px-3 py-2.5 text-[13px]">
+            <span className="mt-0.5 grid size-4 shrink-0 place-items-center rounded-full bg-red text-white"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round"><path d="M12 6v8M12 18.5v.5" /></svg></span>
+            <div className="min-w-0 flex-1"><span className="font-medium text-red">{error.code}</span> <span className="text-ink-2">{display.text}</span>{display.detail ? <span className="ml-2 break-words font-mono text-[11px] text-faint">{display.detail}</span> : null}</div>
+            {status === 'failed' ? <Button size="sm" variant="secondary" onClick={onRetry} disabled={retrying}><RotateCw />{t('common.retry')}</Button> : null}
+          </div>
+        );
+      })}
     </section>
   );
 }

@@ -680,6 +680,111 @@ export const en = {
       loading: 'Loading…'
     }
   },
+  /**
+   * Server error codes → console copy, rendered by `lib/error-message.ts` (never shown verbatim as a key).
+   * Plain keys are exact agent-api `sendError` codes; `_SUFFIX` keys back passthrough families
+   * (`SOURCE_*`, `PACKAGE_LOCK_*`, …) and win by longest prefix. The inventory lives in
+   * `lib/error-codes.ts`; an unregistered code falls back to the raw server message.
+   */
+  errors: {
+    // apps-api.ts
+    APP_AUTHENTICATION_REQUIRED: 'App API requires authentication.',
+    APP_NOT_FOUND: 'App not found.',
+    APP_OPERATION_REJECTED: 'The app operation was rejected.',
+    APP_PACKAGE_ID_MISMATCH: 'The uploaded package does not match this app.',
+    APP_UNAVAILABLE: 'App API is temporarily unavailable.',
+    APP_UPLOAD_UNTRUSTED_FIELD: 'Untrusted fields were rejected.',
+    // runs-api.ts
+    INPUT_REMOVED: 'Free-form input was removed: submit declared params (see manifest inputs) or start from Chat promotion.',
+    PACKAGE_RUN_UNTRUSTED_FIELD: 'Untrusted fields were rejected.',
+    PACKAGE_RUN_ADMISSION_NOT_AVAILABLE: 'Package run admission is not available in this deployment mode.',
+    PACKAGE_RUN_AUTHENTICATION_REQUIRED: 'Package run API requires authentication.',
+    IDEMPOTENCY_KEY_INVALID: 'Idempotency-Key must be a single string of 1-255 characters.',
+    RELEASE_NOT_FOUND: 'Release not found.',
+    PACKAGE_RUN_MANIFEST_MISSING: 'Release has no manifest summary.',
+    PROVIDER_DEPENDENCY_MISSING: 'A required provider dependency is missing.',
+    PACKAGE_RUN_ENTRY_MISSING: 'Release has no entry prompt content.',
+    PACKAGE_PARAMS_INVALID: 'Package parameters are invalid.',
+    PACKAGE_SNAPSHOT_SOURCE_UNAVAILABLE: 'The package snapshot source is unavailable.',
+    PACKAGE_RUN_ADMISSION_IDEMPOTENCY_CONFLICT: 'Package run idempotency conflict.',
+    ADMISSION_SPEC_COMMIT_FAILED: 'Spec commit failed.',
+    PACKAGE_RUN_REJECTED: 'The package run was rejected.',
+    PACKAGE_RUN_UNAVAILABLE: 'Package run is temporarily unavailable.',
+    // packages-api.ts
+    PACKAGE_AUTHENTICATION_REQUIRED: 'Package API requires authentication.',
+    PACKAGE_REGISTRATION_REJECTED: 'The package registration was rejected.',
+    PACKAGE_UNAVAILABLE: 'Package API is temporarily unavailable.',
+    PACKAGE_NOT_FOUND: 'Package not found.',
+    PACKAGE_REGISTRATION_UNTRUSTED_FIELD: 'Untrusted fields were rejected.',
+    PACKAGE_OPERATION_FORBIDDEN: 'This action needs the package-registrar role.',
+    // schedules-api.ts
+    SCHEDULE_AUTHENTICATION_REQUIRED: 'Schedule management requires a service token.',
+    SCHEDULE_RULE_INVALID: 'The schedule definition is invalid.',
+    SCHEDULE_FORBIDDEN: 'Schedule tenant mismatch.',
+    SCHEDULE_VALIDATION_FAILED: 'Schedule binding validation failed.',
+    SCHEDULE_ALREADY_EXISTS: 'Schedule already exists.',
+    SCHEDULE_NOT_FOUND: 'Schedule not found.',
+    SCHEDULE_REVISION_CONFLICT: 'Schedule revision conflict.',
+    SCHEDULE_STORE_UNAVAILABLE: 'Schedule store is unavailable.',
+    // catalog-api.ts
+    CATALOG_INVALID_REQUEST: 'The provider catalog request is invalid.',
+    CATALOG_SYNC_ATTEMPT_NOT_FOUND: 'Provider catalog sync attempt not found.',
+    CATALOG_UNAVAILABLE: 'Provider catalog is temporarily unavailable.',
+    CATALOG_AUTHENTICATION_REQUIRED: 'Provider catalog requires authentication.',
+    CATALOG_SYNC_FORBIDDEN: 'Provider catalog sync is forbidden.',
+    CATALOG_PROJECTION_UNAVAILABLE: 'Provider catalog projection is unavailable.',
+    CATALOG_CURSOR_SNAPSHOT_CHANGED: 'Provider catalog changed while paging; start again from the first page.',
+    CATALOG_SYNC_RATE_LIMITED: 'Provider catalog sync is rate limited; retry later.',
+    CATALOG_SHUTTING_DOWN: 'Provider catalog is shutting down.',
+    // provider-connections-api.ts
+    PROVIDER_CONNECTIONS_AUTHENTICATION_REQUIRED: 'Provider connections API requires authentication.',
+    PROVIDER_CONNECTIONS_UNAVAILABLE: 'Provider connection store is unavailable.',
+    PROVIDER_CONNECTION_UNTRUSTED_FIELD: 'Untrusted fields were rejected.',
+    PROVIDER_CONNECTION_INVALID_REQUEST: 'The provider connection request is invalid.',
+    SECRET_BACKEND_UNAVAILABLE: 'The secret backend is unavailable.',
+    PROVIDER_CONNECTION_NOT_FOUND: 'Provider connection not found.',
+    PROVIDER_CONNECTION_PROTECTED: 'Deployment-env connections are maintained by the trusted bootstrap and cannot be changed here.',
+    PROVIDER_CONNECTION_IN_USE: 'This provider connection is referenced by run agent settings; clear the reference before deleting.',
+    // run-agent-settings-api.ts
+    RUN_AGENT_SETTINGS_AUTHENTICATION_REQUIRED: 'Run agent settings API requires authentication.',
+    RUN_AGENT_SETTINGS_UNAVAILABLE: 'Run agent settings store is unavailable.',
+    RUN_AGENT_SETTINGS_UNTRUSTED_FIELD: 'Untrusted fields were rejected.',
+    RUN_AGENT_SETTINGS_INVALID_PROVIDER: 'Pick a provider connection that is enabled and has a stored credential.',
+    // effect-resolutions-api.ts
+    EFFECT_RESOLUTION_INVALID: 'The effect resolution request is invalid.',
+    // chat kernel (chat-compatibility.ts)
+    HARNESS_FAILURE: 'The agent run failed.',
+    CANCELLED: 'The agent run was cancelled.',
+    // passthrough families — longest prefix wins (see lib/error-codes.ts)
+    _SOURCE_ARCHIVE: 'The package source archive is invalid.',
+    _SOURCE: 'The package source failed validation.',
+    _PACKAGE_LOCK: 'The package dependency lock failed validation.',
+    _PACKAGE_OUTPUT: 'The package output failed validation.',
+    _PACKAGE: 'The agent package failed validation.',
+    _KERNEL: 'The run kernel rejected the operation.',
+    _CAPABILITY: 'The capability check failed.',
+    _CHECKPOINT: 'The checkpoint operation failed.',
+    _LEDGER: 'The effect ledger rejected the operation.',
+    _EVENT: 'The run event stream conflicted.',
+    _ENVELOPE: 'The run envelope is invalid.',
+    _SPEC: 'The run spec is unavailable or invalid.',
+    _REPLAY: 'The replay check failed.',
+    _RETRY: 'The retry budget is exhausted.',
+    _EFFECT: 'The effect outcome is unknown or conflicting.',
+    _USAGE: 'The usage ledger rejected the operation.',
+    _IDENTITY: 'The identity check failed.',
+    _MIGRATION: 'The migration failed.',
+    _ADMISSION: 'The run admission check failed.',
+    _CANDIDATE: 'The candidate is invalid.',
+    _ENGINE: 'The engine binding is invalid.',
+    _COMMAND: 'The command conflicted with the current state.',
+    _TARGET: 'The effect target is unavailable.',
+    _CHAIN: 'The effect chain is missing or conflicting.',
+    _RECEIPT: 'The receipt is unavailable.',
+    _OBSERVATION: 'The observation is unstable.',
+    _RELEASE: 'The release registry operation failed.',
+    _API: 'The release registry API call failed.'
+  },
   appShell: {
     search: 'Search (⌘K)',
     collapseSidebar: 'Collapse sidebar (⌘B)',

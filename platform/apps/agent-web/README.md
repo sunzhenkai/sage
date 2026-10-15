@@ -68,10 +68,17 @@ keeps both key sets aligned.
   `Sage 智能体控制台`). Time display (`formatTime`, `relativeTime`, chart date axes, heatmap weekdays) uses the current
   locale, and session searches send `locale=<locale>` to `GET /v1/chat/sessions` so the server matches the same
   untitled-session fallback title (`Untitled Chat` / `未命名对话`).
+- **Server errors** — `errorDisplay()` (`src/lib/error-message.ts`) resolves every rendered error through the
+  registry in `src/lib/error-codes.ts`: exact `errors.<CODE>` copy → longest `errors._<FAMILY>` prefix (passthrough
+  codes such as `SOURCE_*` / `PACKAGE_LOCK_*` / `KERNEL_*`) → the raw server message. Codes whose text carries
+  runtime detail (rejected fields, task names, schedule ids, kernel failures) also keep that raw detail as secondary
+  text. `error-codes.test.ts` keeps the registry and both dictionaries in lockstep, so a new code cannot ship
+  untranslated-by-accident.
 
-Known boundaries: agent-api error messages and other server-returned content (provider/model names, catalog values, the
-mock dataset) stay as-is; `<option>` enum values are API values and are not translated; the console is desktop-first —
-the 375px evidence viewport renders and passes axe, but layouts are tight while the sidebar is open.
+Known boundaries: server content that is not an error code stays as-is (provider/model names, catalog values, the
+mock dataset, connection-probe messages, promotion reasons); unregistered error codes keep their English message.
+`<option>` enum values are API values and are not translated; the console is desktop-first — the 375px evidence
+viewport renders and passes axe, but layouts are tight while the sidebar is open.
 
 Runtime evidence (manifest `platform/evidence/agent-web-i18n/ui-manifest.json`; axe-core is fetched into
 `.evidence/agent-web-i18n/tools/`, it is not a repo dependency):

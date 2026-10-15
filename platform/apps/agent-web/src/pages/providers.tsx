@@ -13,6 +13,7 @@ import { ErrorState, Loading, Mono } from '@/components/ui/misc';
 import { StatusIcon, statusLabelKey } from '@/components/ui/status';
 import { ChartCard, Legend, StackedBars, useChartTheme } from '@/components/charts';
 import { api } from '@/lib/api';
+import { errorDisplay } from '@/lib/error-message';
 import { useT } from '@/lib/i18n';
 import { isMock, mockSeries } from '@/lib/mock';
 import { adapterFromNpm, catalogBaseUrl, connectionName, isUsableBaseUrl, KNOWN_BASE_URLS } from '@/lib/provider-autofill';
@@ -86,7 +87,7 @@ export function ProvidersPage() {
 const MANUAL_DEFAULTS: ProviderConnectionWrite = { name: '', adapterKind: 'openai-compatible', baseUrl: 'https://api.openai.com/v1', modelId: '', apiKey: '' };
 
 const errorText = (error: unknown): string | undefined =>
-  error === null || error === undefined ? undefined : error instanceof Error ? error.message : String(error);
+  error === null || error === undefined ? undefined : errorDisplay(error).text;
 
 /** ProviderConnectionWrite with explicitly-undefined optionals; normalized() drops them before submit. */
 type ConnectionDraft = Omit<ProviderConnectionWrite, 'providerName' | 'modelName' | 'apiKey'> & {
