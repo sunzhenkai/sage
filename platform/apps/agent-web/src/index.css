@@ -10,13 +10,14 @@
 :root {
   --page: oklch(0.977 0.002 264.5); --canvas: oklch(0.955 0.003 264.5); --surface: oklch(1 0 0);
   --inset: oklch(0.982 0.002 264.5); --hover: oklch(0.972 0.002 264.5); --hover-2: oklch(0.945 0.003 264.5);
-  --ink: oklch(0.247 0.006 258.361); --ink-2: oklch(0.506 0.01 264.477); --ink-3: oklch(0.695 0.009 264.505);
+  /* ink-3 and the semantic text colors are calibrated to the WCAG AA floor (>=4.6:1 on --canvas, the darkest standard surface). */
+  --ink: oklch(0.247 0.006 258.361); --ink-2: oklch(0.506 0.01 264.477); --ink-3: oklch(0.532 0.009 264.505);
   --line: oklch(0.928 0.004 264.5); --line-strong: oklch(0.895 0.006 264.5); --line-soft: oklch(0.955 0.003 264.5);
   --field: oklch(0.961 0.001 286.375);
-  --accent: oklch(0.626 0.205 254.947); --accent-ink: oklch(0.556 0.187 255.617); --accent-tint: oklch(0.96 0.019 252.878);
-  --green: oklch(0.603 0.155 150.883); --green-tint: oklch(0.958 0.017 159.118);
-  --orange: oklch(0.689 0.179 49.902); --orange-tint: oklch(0.964 0.021 67.581);
-  --red: oklch(0.621 0.192 23.042); --red-tint: oklch(0.956 0.017 17.462);
+  --accent: oklch(0.626 0.205 254.947); --accent-ink: oklch(0.535 0.187 255.617); --accent-tint: oklch(0.96 0.019 252.878);
+  --green: oklch(0.511 0.155 150.883); --green-tint: oklch(0.958 0.017 159.118);
+  --orange: oklch(0.547 0.179 49.902); --orange-tint: oklch(0.964 0.021 67.581);
+  --red: oklch(0.555 0.192 23.042); --red-tint: oklch(0.956 0.017 17.462);
   --purple: #9a5cff;
   --tooltip-bg: oklch(0.272 0.008 264.435); --tooltip-fg: oklch(0.976 0.002 247.839); --tooltip-muted: oklch(0.731 0.008 260.731); --tooltip-border: oklch(0.356 0.007 264.474);
   --shadow-xs: 0 1px 1px oklch(0 0 0 / 0.03), 0 1px 2px oklch(0 0 0 / 0.04);
@@ -33,7 +34,7 @@
 .dark {
   --page: oklch(0.209 0.004 264.477); --canvas: oklch(0.231 0.004 264.487); --surface: oklch(0.26 0.006 271.191);
   --inset: oklch(0.243 0.004 264.492); --hover: oklch(0.289 0.006 271.22); --hover-2: oklch(0.318 0.007 274.747);
-  --ink: oklch(0.964 0.002 247.839); --ink-2: oklch(0.731 0.008 260.731); --ink-3: oklch(0.541 0.01 264.484);
+  --ink: oklch(0.964 0.002 247.839); --ink-2: oklch(0.731 0.008 260.731); --ink-3: oklch(0.64 0.01 264.484);
   --line: oklch(0.308 0.006 258.354); --line-strong: oklch(0.356 0.007 264.474); --line-soft: oklch(0.278 0.006 258.354);
   --field: oklch(0.293 0.006 271.223);
   --accent: oklch(0.68 0.173 253.301); --accent-ink: oklch(0.788 0.113 248.33); --accent-tint: oklch(0.68 0.173 253.301 / 0.16);
@@ -111,7 +112,9 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 .animate-pop-in { animation: pop-in-x 160ms var(--ease-out); }
 .skeleton { background: linear-gradient(90deg, var(--hover) 0%, var(--active) 50%, var(--hover) 100%); background-size: 800px 100%; animation: shimmer 1.4s linear infinite; border-radius: 4px; }
 
-.recharts-wrapper, .recharts-surface { outline: none; }
+/* Chart surfaces are real tab stops (recharts renders `role="application" tabindex="0"`), so only the wrapper drops the
+   outline — the surface keeps the global :focus-visible ring (keyboard users must see where they are). */
+.recharts-wrapper { outline: none; }
 .recharts-tooltip-cursor { fill: var(--hover); }
 
 /* ── Beautiful UI shared keyframes & helpers (foundation.css, MIT) ── */

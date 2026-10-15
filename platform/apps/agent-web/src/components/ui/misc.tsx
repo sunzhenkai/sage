@@ -2,6 +2,7 @@ import { AlertCircle, Inbox, KeyRound, type LucideIcon } from 'lucide-react';
 import { Link } from 'react-router';
 import { CodeBlock } from '@/components/bui/code-block';
 import { ApiError } from '@/lib/api';
+import { useT } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
 export function Card({ className, children }: { className?: string; children: React.ReactNode }) {
@@ -42,8 +43,9 @@ export function Spinner({ className }: { className?: string }) {
 }
 /** Skeleton list rows instead of a bare spinner. */
 export function Loading({ rows = 6, label }: { rows?: number; label?: string }) {
+  const t = useT();
   return (
-    <div className="animate-fade-in flex flex-col" aria-label={label ?? 'Loading'}>
+    <div className="animate-fade-in flex flex-col" aria-label={label ?? t('ui.loading')}>
       {Array.from({ length: rows }, (_, i) => (
         <div key={i} className="flex h-[38px] items-center gap-3 px-6">
           <div className="skeleton size-3.5 rounded-full" />
@@ -66,6 +68,7 @@ export function Empty({ title, hint, icon: Icon = Inbox, children }: { title: st
 }
 /** Quiet inline error — no tinted box. */
 export function ErrorState({ error }: { error: unknown }) {
+  const t = useT();
   const isApi = error instanceof ApiError;
   const authHint = isApi && (error.status === 401 || error.code.includes('AUTHENTICATION'));
   const Icon = authHint ? KeyRound : AlertCircle;
@@ -73,10 +76,10 @@ export function ErrorState({ error }: { error: unknown }) {
     <div className="animate-fade-in flex items-start gap-2.5 px-6 py-4 text-[12.5px]">
       <Icon className={cn('mt-px size-3.5 shrink-0', authHint ? 'text-muted' : 'text-red')} strokeWidth={1.75} />
       <div className="min-w-0">
-        <span className="font-medium text-fg-2">{authHint ? 'Service token required. ' : 'Request failed. '}</span>
+        <span className="font-medium text-fg-2">{authHint ? t('ui.error.tokenRequired') : t('ui.error.requestFailed')}</span>
         <span className="break-words text-muted">{error instanceof Error ? error.message : String(error)}</span>
         {isApi ? <span className="ml-2 font-mono text-[11px] text-faint">{error.status} {error.code}</span> : null}
-        {authHint ? <Link to="/settings" className="ml-2 font-medium text-accent hover:underline">Add token</Link> : null}
+        {authHint ? <Link to="/settings" className="ml-2 font-medium text-accent-ink hover:underline">{t('ui.error.addToken')}</Link> : null}
       </div>
     </div>
   );

@@ -8,28 +8,30 @@ import { RecordsTable } from '@/components/bui/records-table';
 import { Empty, ErrorState, JsonView, Loading } from '@/components/ui/misc';
 import { Sparkline, useChartTheme } from '@/components/charts';
 import { api } from '@/lib/api';
+import { useT } from '@/lib/i18n';
 import { isMock, mockSeries } from '@/lib/mock';
 import { relativeTime } from '@/lib/utils';
 
 export function PackagesPage() {
   const navigate = useNavigate();
+  const t = useT();
   const packages = useQuery({ queryKey: ['packages'], queryFn: api.packages.list });
   const items = packages.data?.packages ?? [];
   const ct = useChartTheme();
   return (
     <>
-      <PageHeader title="Packages" />
+      <PageHeader title={t('nav.packages')} />
       <PageContent width="wide">
-        {packages.isLoading ? <Loading /> : packages.error ? <ErrorState error={packages.error} /> : !items.length ? <Empty icon={Package} title="No packages" /> : (
-          <Section title="All packages" description="Published agent packages and their latest content digest." count={items.length}>
+        {packages.isLoading ? <Loading /> : packages.error ? <ErrorState error={packages.error} /> : !items.length ? <Empty icon={Package} title={t('packages.empty.title')} /> : (
+          <Section title={t('packages.all.title')} description={t('packages.all.description')} count={items.length}>
           <RecordsTable rows={items} getKey={(x) => x.packageId} onRowClick={(x) => { void navigate(`/packages/${x.packageId}`); }}
             columns={[
-              { key: 'pkg', label: 'Package', icon: <Package />, width: '30%', sort: (x, y) => x.packageId.localeCompare(y.packageId), render: (x) => <span className="flex min-w-0 items-center gap-2"><Monogram text={x.packageId} /><span className="truncate">{x.packageId}</span></span> },
-              { key: 'version', label: 'Latest version', icon: <Tags />, width: 150, render: (x) => x.latestVersion ? <Tag>{`v${x.latestVersion}`}</Tag> : <span className="text-ink-3">—</span> },
-              { key: 'usage', label: 'Installs · 14d', icon: <Hash />, width: 150, render: (x) => isMock() ? <span className="block h-5 w-full"><Sparkline values={mockSeries(x.packageId, 14, 3)} color={ct.series[3]!} height={20} /></span> : <span className="text-ink-3">—</span> },
-              { key: 'releases', label: 'Releases', icon: <Hash />, width: 110, align: 'right', sort: (x, y) => x.releaseCount - y.releaseCount, render: (x) => <span className="tabular-nums text-ink-2">{x.releaseCount}</span> },
-              { key: 'digest', label: 'Content digest', icon: <Fingerprint />, render: (x) => <span className="font-mono text-[12px] text-ink-2">{x.latestContentDigest ? `${x.latestContentDigest.slice(0, 19)}…` : '—'}</span> },
-              { key: 'updated', label: 'Last update', icon: <Clock />, width: 140, sort: (x, y) => x.updatedAt.localeCompare(y.updatedAt), render: (x) => <span className="text-ink-2">{relativeTime(x.updatedAt)}</span> }
+              { key: 'pkg', label: t('packages.columns.package'), icon: <Package />, width: '30%', sort: (x, y) => x.packageId.localeCompare(y.packageId), render: (x) => <span className="flex min-w-0 items-center gap-2"><Monogram text={x.packageId} /><span className="truncate">{x.packageId}</span></span> },
+              { key: 'version', label: t('packages.columns.latestVersion'), icon: <Tags />, width: 150, render: (x) => x.latestVersion ? <Tag>{`v${x.latestVersion}`}</Tag> : <span className="text-ink-3">—</span> },
+              { key: 'usage', label: t('packages.columns.installs'), icon: <Hash />, width: 150, render: (x) => isMock() ? <span className="block h-5 w-full"><Sparkline values={mockSeries(x.packageId, 14, 3)} color={ct.series[3]!} height={20} /></span> : <span className="text-ink-3">—</span> },
+              { key: 'releases', label: t('packages.columns.releases'), icon: <Hash />, width: 110, align: 'right', sort: (x, y) => x.releaseCount - y.releaseCount, render: (x) => <span className="tabular-nums text-ink-2">{x.releaseCount}</span> },
+              { key: 'digest', label: t('packages.columns.contentDigest'), icon: <Fingerprint />, render: (x) => <span className="font-mono text-[12px] text-ink-2">{x.latestContentDigest ? `${x.latestContentDigest.slice(0, 19)}…` : '—'}</span> },
+              { key: 'updated', label: t('packages.columns.lastUpdate'), icon: <Clock />, width: 140, sort: (x, y) => x.updatedAt.localeCompare(y.updatedAt), render: (x) => <span className="text-ink-2">{relativeTime(x.updatedAt)}</span> }
             ]} />
           </Section>
         )}
@@ -40,12 +42,13 @@ export function PackagesPage() {
 
 export function PackageDetailPage() {
   const { packageId = '' } = useParams();
+  const t = useT();
   const pkg = useQuery({ queryKey: ['package', packageId], queryFn: () => api.packages.get(packageId) });
   return (
     <>
-      <PageHeader breadcrumb={<Crumb to="/packages">Packages</Crumb>} title={packageId} />
+      <PageHeader breadcrumb={<Crumb to="/packages">{t('nav.packages')}</Crumb>} title={packageId} />
       <PageContent>
-        <PageDescription title={packageId} description="Package registry record and releases." />
+        <PageDescription title={packageId} description={t('packages.detail.description')} />
         {pkg.isLoading ? <Loading /> : pkg.error ? <ErrorState error={pkg.error} /> : <JsonView value={pkg.data} filename={`${packageId}.json`} />}
       </PageContent>
     </>

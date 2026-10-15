@@ -1,19 +1,20 @@
 import { useSyncExternalStore } from 'react';
 
-export type Shortcut = { id: string; label: string; description: string; keys: string; to?: string; fixed?: boolean };
+/** Labels/descriptions are dictionary keys (`shortcuts.*`) — the only source of truth for this copy. */
+export type Shortcut = { id: string; labelKey: string; descriptionKey: string; keys: string; to?: string; fixed?: boolean };
 
 export const defaultShortcuts: Shortcut[] = [
-  { id: 'palette', label: 'Command menu', description: 'Search pages, sessions and actions', keys: '⌘ K', fixed: true },
-  { id: 'sidebar', label: 'Toggle sidebar', description: 'Collapse or expand the main sidebar', keys: '⌘ B', fixed: true },
-  { id: 'go-overview', label: 'Go to Overview', description: 'Charts and recent activity', keys: 'G O', to: '/overview' },
-  { id: 'go-chat', label: 'Go to Chat', description: 'Conversations with the run agent', keys: 'G C', to: '/chat' },
-  { id: 'go-tasks', label: 'Go to Tasks', description: 'All tasks and their status', keys: 'G T', to: '/tasks' },
-  { id: 'go-schedules', label: 'Go to Schedules', description: 'Recurring triggers', keys: 'G S', to: '/schedules' },
-  { id: 'go-apps', label: 'Go to Apps', description: 'Registered agent apps', keys: 'G A', to: '/apps' },
-  { id: 'go-packages', label: 'Go to Packages', description: 'Published agent packages', keys: 'G P', to: '/packages' },
-  { id: 'go-providers', label: 'Go to Providers', description: 'Model provider connections', keys: 'G M', to: '/providers' },
-  { id: 'go-settings', label: 'Go to Settings', description: 'This page', keys: 'G ,', to: '/settings' },
-  { id: 'send', label: 'Send message', description: 'In the chat composer', keys: '↵', fixed: true }
+  { id: 'palette', labelKey: 'shortcuts.palette.label', descriptionKey: 'shortcuts.palette.description', keys: '⌘ K', fixed: true },
+  { id: 'sidebar', labelKey: 'shortcuts.sidebar.label', descriptionKey: 'shortcuts.sidebar.description', keys: '⌘ B', fixed: true },
+  { id: 'go-overview', labelKey: 'shortcuts.go-overview.label', descriptionKey: 'shortcuts.go-overview.description', keys: 'G O', to: '/overview' },
+  { id: 'go-chat', labelKey: 'shortcuts.go-chat.label', descriptionKey: 'shortcuts.go-chat.description', keys: 'G C', to: '/chat' },
+  { id: 'go-tasks', labelKey: 'shortcuts.go-tasks.label', descriptionKey: 'shortcuts.go-tasks.description', keys: 'G T', to: '/tasks' },
+  { id: 'go-schedules', labelKey: 'shortcuts.go-schedules.label', descriptionKey: 'shortcuts.go-schedules.description', keys: 'G S', to: '/schedules' },
+  { id: 'go-apps', labelKey: 'shortcuts.go-apps.label', descriptionKey: 'shortcuts.go-apps.description', keys: 'G A', to: '/apps' },
+  { id: 'go-packages', labelKey: 'shortcuts.go-packages.label', descriptionKey: 'shortcuts.go-packages.description', keys: 'G P', to: '/packages' },
+  { id: 'go-providers', labelKey: 'shortcuts.go-providers.label', descriptionKey: 'shortcuts.go-providers.description', keys: 'G M', to: '/providers' },
+  { id: 'go-settings', labelKey: 'shortcuts.go-settings.label', descriptionKey: 'shortcuts.go-settings.description', keys: 'G ,', to: '/settings' },
+  { id: 'send', labelKey: 'shortcuts.send.label', descriptionKey: 'shortcuts.send.description', keys: '↵', fixed: true }
 ];
 
 const KEY = 'sage.agent-web.shortcuts';

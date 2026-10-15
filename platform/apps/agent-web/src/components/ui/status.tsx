@@ -21,6 +21,20 @@ const colors: Record<StatusKind, string> = {
   canceled: 'text-faint', failed: 'text-red', paused: 'text-blue', warning: 'text-amber'
 };
 
+/**
+ * Known status words reuse the shared `status.*` vocabulary; anything else keeps the raw enum label.
+ * Consumed by StatusBadge / TaskRows so the same enum always renders the same translated word.
+ */
+const statusKeys: Record<string, string> = {
+  succeeded: 'status.succeeded', completed: 'status.completed', failed: 'status.failed', running: 'status.running',
+  paused: 'status.paused', cancelled: 'status.cancelled', skipped: 'status.skipped', missed: 'status.missed',
+  effect_unknown: 'status.effectUnknown', active: 'status.active', available: 'status.available', alive: 'status.alive',
+  ready: 'status.ready', disabled: 'status.disabled', stale: 'status.stale', unavailable: 'status.unavailable', promoted: 'status.promoted'
+};
+export function statusLabelKey(status: string | undefined): string | undefined {
+  return status === undefined ? undefined : statusKeys[status.toLowerCase()];
+}
+
 export function StatusIcon({ status, kind, className }: { status?: string | undefined; kind?: StatusKind; className?: string }) {
   const k = kind ?? statusKind(status);
   const cls = cn('size-3.5 shrink-0', colors[k], className);

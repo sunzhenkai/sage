@@ -5,6 +5,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import { Kbd } from '@/components/ui/misc';
 import { api } from '@/lib/api';
 import { exitMock, isMock } from '@/lib/mock';
+import { useT } from '@/lib/i18n';
 import { updateSettings, useSettings } from '@/lib/settings';
 import { cn } from '@/lib/utils';
 import { SageMark } from '@/components/brand/sage-mark';
@@ -19,6 +20,7 @@ function isTyping(target: EventTarget | null): boolean {
 }
 
 export function AppShell() {
+  const t = useT();
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => { try { return JSON.parse(localStorage.getItem('sage.agent-web.nav') ?? '{}') as Record<string, boolean>; } catch { return {}; } });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('sage.agent-web.sidebar') === '1');
@@ -56,35 +58,35 @@ export function AppShell() {
             <SageMark className="size-[18px] text-accent" />
             {!sidebarCollapsed ? <><span className="min-w-0 flex-1 truncate text-[13px] font-medium tracking-[-0.01em] text-fg">Sage</span><ChevronDown className="size-3.5 text-faint" strokeWidth={1.75} /></> : null}
           </button>
-          {!sidebarCollapsed ? <button type="button" onClick={toggleSidebar} title="Collapse sidebar (⌘B)" className="grid size-7 shrink-0 place-items-center rounded-md text-faint hover:bg-hover hover:text-fg"><PanelLeftClose className="size-3.5" strokeWidth={1.6} /></button> : null}
+          {!sidebarCollapsed ? <button type="button" onClick={toggleSidebar} title={t('appShell.collapseSidebar')} className="grid size-7 shrink-0 place-items-center rounded-md text-faint hover:bg-hover hover:text-fg"><PanelLeftClose className="size-3.5" strokeWidth={1.6} /></button> : null}
         </div>
 
         <div className={cn('mx-2 mt-1 flex items-center gap-0.5', sidebarCollapsed && 'flex-col')}>
-          <button type="button" onClick={() => setPaletteOpen(true)} title="Search (⌘K)" data-nav-search className={cn('flex items-center gap-2 rounded-md text-[13px] font-medium text-muted transition-colors hover:bg-hover hover:text-fg', sidebarCollapsed ? 'size-8 justify-center px-0' : 'h-[30px] flex-1 px-2')}>
+          <button type="button" onClick={() => setPaletteOpen(true)} title={t('appShell.search')} data-nav-search className={cn('flex items-center gap-2 rounded-md text-[13px] font-medium text-muted transition-colors hover:bg-hover hover:text-fg', sidebarCollapsed ? 'size-8 justify-center px-0' : 'h-[30px] flex-1 px-2')}>
             <Search className="size-[15px] shrink-0 text-faint" strokeWidth={1.6} />
-            {!sidebarCollapsed ? <><span className="flex-1 text-left">Search</span><Kbd className="gap-0"><CommandIcon className="size-2.5" />K</Kbd></> : null}
+            {!sidebarCollapsed ? <><span className="flex-1 text-left">{t('common.search')}</span><Kbd className="gap-0"><CommandIcon className="size-2.5" />K</Kbd></> : null}
           </button>
-          <button type="button" onClick={() => navigate('/chat?new=1')} className={cn('grid place-items-center rounded-md text-faint transition-colors hover:bg-hover hover:text-fg', sidebarCollapsed ? 'size-8' : 'size-7')} title="New session">
+          <button type="button" onClick={() => navigate('/chat?new=1')} className={cn('grid place-items-center rounded-md text-faint transition-colors hover:bg-hover hover:text-fg', sidebarCollapsed ? 'size-8' : 'size-7')} title={t('chat.newSession')}>
             <Plus className="size-3.5" strokeWidth={1.75} />
           </button>
-          {sidebarCollapsed ? <button type="button" onClick={toggleSidebar} title="Expand sidebar (⌘B)" className="grid size-8 place-items-center rounded-md text-faint hover:bg-hover hover:text-fg"><PanelLeftOpen className="size-3.5" strokeWidth={1.6} /></button> : null}
+          {sidebarCollapsed ? <button type="button" onClick={toggleSidebar} title={t('appShell.expandSidebar')} className="grid size-8 place-items-center rounded-md text-faint hover:bg-hover hover:text-fg"><PanelLeftOpen className="size-3.5" strokeWidth={1.6} /></button> : null}
         </div>
 
         <div className={cn('mt-3 flex flex-1 flex-col gap-4 pb-2', sidebarCollapsed ? 'mx-2 items-center overflow-hidden' : 'overflow-y-auto')}>
           {navGroups.map((group) => (
-            <div key={group} className={cn(sidebarCollapsed && 'flex flex-col items-center')}>
-              {group !== 'Workspace' && !sidebarCollapsed ? (
-                <button type="button" onClick={() => toggleGroup(group)} className="group/h mx-2 mb-0.5 flex h-6 w-[calc(100%-16px)] items-center gap-1 rounded-md px-1.5 text-[11.5px] font-medium text-faint hover:bg-hover hover:text-muted">
-                  {group}
-                  <ChevronRight className={cn('size-3 opacity-0 transition-transform group-hover/h:opacity-100', !collapsed[group] && 'rotate-90')} />
+            <div key={group.key} className={cn(sidebarCollapsed && 'flex flex-col items-center')}>
+              {group.key !== 'workspace' && !sidebarCollapsed ? (
+                <button type="button" onClick={() => toggleGroup(group.key)} className="group/h mx-2 mb-0.5 flex h-6 w-[calc(100%-16px)] items-center gap-1 rounded-md px-1.5 text-[11.5px] font-medium text-faint hover:bg-hover hover:text-muted">
+                  {t(group.labelKey)}
+                  <ChevronRight className={cn('size-3 opacity-0 transition-transform group-hover/h:opacity-100', !collapsed[group.key] && 'rotate-90')} />
                 </button>
               ) : null}
-              <nav className={cn('flex flex-col gap-px', sidebarCollapsed ? 'items-center' : 'px-2', collapsed[group] && !sidebarCollapsed && 'hidden')}>
-                {navItems.filter((i) => i.group === group).map(({ to, label, icon: Icon }) => (
+              <nav className={cn('flex flex-col gap-px', sidebarCollapsed ? 'items-center' : 'px-2', collapsed[group.key] && !sidebarCollapsed && 'hidden')}>
+                {navItems.filter((i) => i.group === group.key).map(({ to, labelKey, icon: Icon }) => (
                   <NavLink
                     key={to}
                     to={to}
-                    title={label}
+                    title={t(labelKey)}
                     className={({ isActive }) => cn(
                       'group flex items-center rounded-md text-[13px] font-medium tracking-[-0.01em] text-muted transition-colors hover:bg-hover hover:text-fg',
                       sidebarCollapsed ? 'size-8 shrink-0 justify-center gap-0 p-0' : 'relative h-[30px] gap-2 px-2',
@@ -95,7 +97,7 @@ export function AppShell() {
                     {({ isActive }) => (
                       <>
                         <Icon className={cn('size-[15px] shrink-0', isActive ? 'text-accent' : 'text-faint group-hover:text-muted')} strokeWidth={isActive ? 2 : 1.6} />
-                        <span className={cn('truncate', sidebarCollapsed && 'hidden')}>{label}</span>
+                        <span className={cn('truncate', sidebarCollapsed && 'hidden')}>{t(labelKey)}</span>
                       </>
                     )}
                   </NavLink>
@@ -106,16 +108,16 @@ export function AppShell() {
         </div>
 
         {isMock() ? (
-          <button type="button" onClick={exitMock} title="Demo data — click to exit mock mode" className={cn('mb-1 flex items-center gap-1.5 rounded-md border border-dashed border-line-strong text-[11.5px] text-muted hover:bg-hover hover:text-fg', sidebarCollapsed ? 'mx-auto size-8 justify-center px-0' : 'mx-2 h-7 px-2')}>
-            <FlaskConical className="size-3.5 shrink-0 text-amber" strokeWidth={1.75} />{!sidebarCollapsed ? <>Mock data · read-only<span className="ml-auto text-faint">Exit</span></> : null}
+          <button type="button" onClick={exitMock} title={t('appShell.mockTitle')} className={cn('mb-1 flex items-center gap-1.5 rounded-md border border-dashed border-line-strong text-[11.5px] text-muted hover:bg-hover hover:text-fg', sidebarCollapsed ? 'mx-auto size-8 justify-center px-0' : 'mx-2 h-7 px-2')}>
+            <FlaskConical className="size-3.5 shrink-0 text-amber" strokeWidth={1.75} />{!sidebarCollapsed ? <>{t('appShell.mockLabel')}<span className="ml-auto text-faint">{t('appShell.mockExit')}</span></> : null}
           </button>
         ) : null}
         <div className={cn('flex items-center gap-1 py-2', sidebarCollapsed ? 'mx-2 flex-col items-center' : 'px-2.5')}>
-          <span className={cn('flex items-center gap-1.5 text-[11.5px] text-faint', sidebarCollapsed ? 'justify-center' : 'min-w-0 flex-1 px-1')} title={settings.apiBaseUrl || 'same-origin'}>
+          <span className={cn('flex items-center gap-1.5 text-[11.5px] text-faint', sidebarCollapsed ? 'justify-center' : 'min-w-0 flex-1 px-1')} title={settings.apiBaseUrl || t('appShell.sameOrigin')}>
             <span className={cn('size-1.5 rounded-full', online ? 'bg-green' : health.isLoading ? 'bg-faint' : 'bg-red')} />
-            {!sidebarCollapsed ? <span className="truncate">{online ? 'Online' : health.isLoading ? '…' : 'Offline'}</span> : null}
+            {!sidebarCollapsed ? <span className="truncate">{online ? t('appShell.online') : health.isLoading ? '…' : t('appShell.offline')}</span> : null}
           </span>
-          <button type="button" title="Toggle theme" className={cn('grid place-items-center rounded-md text-faint hover:bg-hover hover:text-fg', sidebarCollapsed ? 'size-8' : 'size-7')} onClick={() => updateSettings({ theme: dark ? 'light' : 'dark' })}>
+          <button type="button" title={t('appShell.toggleTheme')} className={cn('grid place-items-center rounded-md text-faint hover:bg-hover hover:text-fg', sidebarCollapsed ? 'size-8' : 'size-7')} onClick={() => updateSettings({ theme: dark ? 'light' : 'dark' })}>
             {dark ? <Sun className="size-3.5" strokeWidth={1.6} /> : <Moon className="size-3.5" strokeWidth={1.6} />}
           </button>
         </div>
@@ -145,12 +147,12 @@ export function PanelBar({ left, right }: { left?: React.ReactNode; right?: Reac
 
 /** White bordered segmented group for range/filter pickers (7d/14d, All/Active/…). */
 export function ViewTabs({ children }: { children: React.ReactNode }) {
-  return <div className="flex items-center gap-0.5 rounded-control bg-surface p-0.5 shadow-card">{children}</div>;
+  return <div className="flex shrink-0 items-center gap-0.5 rounded-control bg-surface p-0.5 shadow-card">{children}</div>;
 }
 
 export function ViewTab({ active, children, onClick }: { active?: boolean; children: React.ReactNode; onClick?: () => void }) {
   return (
-    <button type="button" onClick={onClick} className={cn('h-6 rounded-[6px] px-2 text-[12.5px] font-medium tracking-[-0.01em] transition-colors', active ? 'bg-hover-2 text-fg' : 'text-muted hover:text-fg')}>
+    <button type="button" onClick={onClick} className={cn('h-6 shrink-0 whitespace-nowrap rounded-[6px] px-2 text-[12.5px] font-medium tracking-[-0.01em] transition-colors', active ? 'bg-hover-2 text-fg' : 'text-muted hover:text-fg')}>
       {children}
     </button>
   );

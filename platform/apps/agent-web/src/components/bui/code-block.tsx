@@ -1,5 +1,6 @@
 // Adapted from Beautiful UI "code-block" (MIT © 2026 Shane Levine): line-numbered listing with copy.
 import { useCallback, useState, type ReactNode } from 'react';
+import { useT } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
 const JSON_TOKEN = /("(?:\\.|[^"\\])*")(\s*:)?|\b(true|false|null)\b|(-?\b\d+(?:\.\d+)?(?:e[+-]?\d+)?\b)/gi;
@@ -19,6 +20,7 @@ function highlightJson(line: string): ReactNode[] {
 const FileIcon = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ink-3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /></svg>;
 
 export function CodeBlock({ code, filename, language = 'text', maxHeight = 420, actions, className, bare }: { code: string; filename?: ReactNode; language?: 'json' | 'text'; maxHeight?: number | 'none'; actions?: ReactNode; className?: string; bare?: boolean }) {
+  const t = useT();
   const [copied, setCopied] = useState(false);
   const copy = useCallback(() => { void navigator.clipboard?.writeText(code).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }); }, [code]);
   const lines = code.replace(/\n$/, '').split('\n');
@@ -30,10 +32,10 @@ export function CodeBlock({ code, filename, language = 'text', maxHeight = 420, 
           <span className="inline-flex min-w-0 items-center gap-[7px]"><FileIcon /><span className="truncate font-mono leading-none text-ink">{filename ?? (language === 'json' ? 'data.json' : 'output.txt')}</span></span>
           <span className="ml-auto flex items-center gap-1">
             {actions}
-            <button type="button" aria-label="Copy code" onClick={copy} className={cn('-mr-1 flex h-6 items-center gap-1 rounded-[6px] px-1.5 text-[12px] font-medium transition-colors duration-100 hover:bg-hover', copied ? 'text-green' : 'text-ink-3 hover:text-ink')}>
+            <button type="button" aria-label={t('codeBlock.copyAria')} onClick={copy} className={cn('-mr-1 flex h-6 items-center gap-1 rounded-[6px] px-1.5 text-[12px] font-medium transition-colors duration-100 hover:bg-hover', copied ? 'text-green' : 'text-ink-3 hover:text-ink')}>
               {copied ? <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
                 : <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="12" height="12" rx="2.5" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>}
-              {copied ? 'Copied' : 'Copy'}
+              {copied ? t('common.copied') : t('common.copy')}
             </button>
           </span>
         </div>

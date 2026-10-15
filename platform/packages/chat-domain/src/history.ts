@@ -51,12 +51,12 @@ export function safeHistoryPreviewFromParts(parts: readonly PreviewCandidatePart
 
 /** 未命名会话的默认显示标题，供 NULL title 的搜索回退匹配。 */
 export const untitledTitleForLocale = (locale: 'en' | 'zh-CN'): string => locale === 'zh-CN' ? '未命名对话' : 'Untitled Chat';
-/** locale 收敛：zh* → zh-CN，en* → en，其余默认 zh-CN。 */
+/** locale 收敛：zh* → zh-CN，en* → en，其余（含未提供/无法识别）默认 en。 */
 export const normalizeHistoryLocale = (locale?: string): 'en' | 'zh-CN' => {
   const value = (locale ?? '').trim().toLowerCase();
   if (value.startsWith('en')) return 'en';
   if (value.startsWith('zh')) return 'zh-CN';
-  return 'zh-CN';
+  return 'en';
 };
 
 export interface NormalizedSessionFilters { readonly status: SessionHistoryStatus; readonly q: string; readonly archived: boolean; readonly untitledFallback: string }

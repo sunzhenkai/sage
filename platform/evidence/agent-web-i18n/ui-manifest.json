@@ -1,0 +1,119 @@
+{
+  "base_url": "http://127.0.0.1:9644",
+  "viewports": [
+    { "name": "desktop", "width": 1280, "height": 800 },
+    { "name": "mobile", "width": 375, "height": 812 }
+  ],
+  "routes": [
+    {
+      "name": "overview-en",
+      "path": "/overview?mock=1",
+      "tab_steps": 70,
+      "states": { "success": { "path": "/overview?mock=1" } },
+      "not_applicable": {
+        "loading": "mock 数据经 src/lib/api.ts 固定 120ms 延迟返回；依赖固定 sleep 复现加载态不稳定/不可靠，本轮不纳入（需真实慢后端或可控请求拦截）",
+        "empty": "mock 数据集非空；空态需真实空库（0 sessions/tasks/schedules）",
+        "error": "mock 模式不触后端；错误态需故障注入，属后续运维验证"
+      }
+    },
+    {
+      "name": "overview-zh",
+      "path": "/overview?mock=1&lang=zh-CN",
+      "tab_steps": 70,
+      "states": { "success": { "path": "/overview?mock=1&lang=zh-CN" } },
+      "not_applicable": {
+        "loading": "mock 数据经 src/lib/api.ts 固定 120ms 延迟返回；依赖固定 sleep 复现加载态不稳定/不可靠，本轮不纳入（需真实慢后端或可控请求拦截）",
+        "empty": "mock 数据集非空；空态需真实空库（0 sessions/tasks/schedules）",
+        "error": "mock 模式不触后端；错误态需故障注入，属后续运维验证"
+      }
+    },
+    {
+      "name": "chat-en",
+      "path": "/chat?mock=1",
+      "tab_steps": 70,
+      "states": { "success": { "path": "/chat?mock=1" } },
+      "not_applicable": {
+        "loading": "mock 会话列表经 src/lib/api.ts 固定 120ms 延迟返回；固定 sleep 复现加载态不稳定/不可靠，本轮不纳入（需真实慢后端或可控请求拦截）",
+        "empty": "mock 模式始终返回非空会话列表；空态需真实空库",
+        "error": "mock 模式不触后端；错误态需故障注入，属后续运维验证"
+      }
+    },
+    {
+      "name": "chat-zh",
+      "path": "/chat?mock=1&lang=zh-CN",
+      "tab_steps": 70,
+      "states": { "success": { "path": "/chat?mock=1&lang=zh-CN" } },
+      "not_applicable": {
+        "loading": "mock 会话列表经 src/lib/api.ts 固定 120ms 延迟返回；固定 sleep 复现加载态不稳定/不可靠，本轮不纳入（需真实慢后端或可控请求拦截）",
+        "empty": "mock 模式始终返回非空会话列表；空态需真实空库",
+        "error": "mock 模式不触后端；错误态需故障注入，属后续运维验证"
+      }
+    },
+    {
+      "name": "tasks-en",
+      "path": "/tasks?mock=1",
+      "tab_steps": 70,
+      "states": { "success": { "path": "/tasks?mock=1" } },
+      "not_applicable": {
+        "loading": "mock 任务列表经 src/lib/api.ts 固定 120ms 延迟返回；固定 sleep 复现加载态不稳定/不可靠，本轮不纳入（需真实慢后端或可控请求拦截）",
+        "empty": "mock 模式始终返回非空任务列表；空态需真实空库",
+        "error": "mock 模式不触后端；错误态需故障注入，属后续运维验证"
+      }
+    },
+    {
+      "name": "tasks-zh",
+      "path": "/tasks?mock=1&lang=zh-CN",
+      "tab_steps": 70,
+      "states": { "success": { "path": "/tasks?mock=1&lang=zh-CN" } },
+      "not_applicable": {
+        "loading": "mock 任务列表经 src/lib/api.ts 固定 120ms 延迟返回；固定 sleep 复现加载态不稳定/不可靠，本轮不纳入（需真实慢后端或可控请求拦截）",
+        "empty": "mock 模式始终返回非空任务列表；空态需真实空库",
+        "error": "mock 模式不触后端；错误态需故障注入，属后续运维验证"
+      }
+    },
+    {
+      "name": "providers-en",
+      "path": "/providers?mock=1",
+      "tab_steps": 70,
+      "states": { "success": { "path": "/providers?mock=1" } },
+      "not_applicable": {
+        "loading": "mock 供应商列表经 src/lib/api.ts 固定 120ms 延迟返回；固定 sleep 复现加载态不稳定/不可靠，本轮不纳入（需真实慢后端或可控请求拦截）",
+        "empty": "mock 模式始终返回非空连接/目录数据；空态需真实空库",
+        "error": "mock 模式不触后端；错误态需故障注入，属后续运维验证"
+      }
+    },
+    {
+      "name": "providers-zh",
+      "path": "/providers?mock=1&lang=zh-CN",
+      "tab_steps": 70,
+      "states": { "success": { "path": "/providers?mock=1&lang=zh-CN" } },
+      "not_applicable": {
+        "loading": "mock 供应商列表经 src/lib/api.ts 固定 120ms 延迟返回；固定 sleep 复现加载态不稳定/不可靠，本轮不纳入（需真实慢后端或可控请求拦截）",
+        "empty": "mock 模式始终返回非空连接/目录数据；空态需真实空库",
+        "error": "mock 模式不触后端；错误态需故障注入，属后续运维验证"
+      }
+    },
+    {
+      "name": "settings-en",
+      "path": "/settings/appearance?mock=1",
+      "tab_steps": 70,
+      "states": { "success": { "path": "/settings/appearance?mock=1" } },
+      "not_applicable": {
+        "loading": "Appearance 分区为本地 localStorage 配置，无异步加载；shell 健康探针虽经 mock 120ms 延迟，但固定 sleep 复现加载态不稳定/不可靠，本轮不纳入",
+        "empty": "设置项静态渲染，不存在空数据集",
+        "error": "设置页无后端依赖（状态页探针除外）；错误态需故障注入，属后续运维验证"
+      }
+    },
+    {
+      "name": "settings-zh",
+      "path": "/settings/appearance?mock=1&lang=zh-CN",
+      "tab_steps": 70,
+      "states": { "success": { "path": "/settings/appearance?mock=1&lang=zh-CN" } },
+      "not_applicable": {
+        "loading": "Appearance 分区为本地 localStorage 配置，无异步加载；shell 健康探针虽经 mock 120ms 延迟，但固定 sleep 复现加载态不稳定/不可靠，本轮不纳入",
+        "empty": "设置项静态渲染，不存在空数据集",
+        "error": "设置页无后端依赖（状态页探针除外）；错误态需故障注入，属后续运维验证"
+      }
+    }
+  ]
+}

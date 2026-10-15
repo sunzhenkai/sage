@@ -1,6 +1,7 @@
 import { Fragment, useMemo, type ReactNode } from 'react';
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useSettings } from '@/lib/settings';
+import { useLocale, useT } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
 /** Reads chart tokens from CSS so series colors follow the active theme. */
@@ -132,14 +133,15 @@ export function Legend({ series }: { series: Series[] }) {
 }
 
 /** Placeholder chart for empty data: faint bars + label. */
-export function GhostChart({ height = 200, label = 'No data in this range' }: { height?: number; label?: string }) {
+export function GhostChart({ height = 200, label }: { height?: number; label?: string }) {
+  const t = useT();
   const bars = [32, 48, 26, 60, 42, 70, 38, 54, 30, 64, 46, 58, 36, 50];
   return (
     <div className="relative min-h-0 flex-1" style={{ minHeight: height }}>
       <div className="absolute inset-x-0 bottom-0 flex h-full items-end gap-[6%] px-2 pb-5 opacity-[0.5]">
         {bars.map((h, i) => <div key={i} className="flex-1 rounded-t-[2px] bg-hover" style={{ height: `${h}%` }} />)}
       </div>
-      <div className="absolute inset-0 grid place-items-center"><span className="rounded-md bg-panel/80 px-2 py-1 text-[12px] text-muted">{label}</span></div>
+      <div className="absolute inset-0 grid place-items-center"><span className="rounded-md bg-panel/80 px-2 py-1 text-[12px] text-muted">{label ?? t('charts.noData')}</span></div>
     </div>
   );
 }
@@ -206,18 +208,23 @@ export function Donut({ items, height = 180, center }: { items: { name: string; 
 export function Heatmap({ days, values, color }: { days: string[]; values: number[][]; color: string }) {
   const flat = values.flat();
   const max = Math.max(1, ...flat);
-  const weeks = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const t = useT();
+  const locale = useLocale();
+  // Weekday rows follow the interface language: 'M'/'Mon' in en, '一'/'周一' in zh-CN.
+  const weekdayNarrow = new Intl.DateTimeFormat(locale, { weekday: 'narrow' });
+  const weekdayShort = new Intl.DateTimeFormat(locale, { weekday: 'short' });
+  const weeks = Array.from({ length: 7 }, (_, i) => { const d = new Date(2024, 0, 1 + i); return { key: String(i), label: weekdayNarrow.format(d), title: weekdayShort.format(d) }; });
   return (
-    <div className="flex min-h-0 flex-1 items-center justify-center overflow-x-auto px-1">
+    <div tabIndex={0} aria-label={t('charts.heatmap')} className="flex min-h-0 flex-1 items-center justify-center overflow-x-auto px-1">
       <div className="inline-grid gap-[3px]" style={{ gridTemplateColumns: `28px repeat(${days.length}, 12px)` }}>
         <span />
         {days.map((d, i) => <span key={i} className="truncate text-center text-[9px] text-ink-3" title={d}>{i % 3 === 0 ? d.slice(-2) : ''}</span>)}
         {weeks.map((w, wi) => (
-          <Fragment key={w}>
-            <span className="pr-1 text-right text-[10px] leading-3 text-ink-3">{w[0]}</span>
+          <Fragment key={w.key}>
+            <span className="pr-1 text-right text-[10px] leading-3 text-ink-3">{w.label}</span>
             {days.map((_, di) => {
               const v = values[di]?.[wi] ?? 0;
-              return <span key={`${di}-${wi}`} title={`${days[di]} ${w}: ${v}`} className="size-3 rounded-[3px]" style={{ background: v === 0 ? 'var(--inset)' : `color-mix(in oklch, ${color} ${Math.max(18, Math.round((v / max) * 100))}%, transparent)` }} />;
+              return <span key={`${di}-${wi}`} title={`${days[di]} ${w.title}: ${v}`} className="size-3 rounded-[3px]" style={{ background: v === 0 ? 'var(--inset)' : `color-mix(in oklch, ${color} ${Math.max(18, Math.round((v / max) * 100))}%, transparent)` }} />;
             })}
           </Fragment>
         ))}

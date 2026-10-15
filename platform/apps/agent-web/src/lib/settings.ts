@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import type { LanguagePref } from './i18n';
 
 export type Theme = 'light' | 'dark' | 'system';
 export interface Settings {
@@ -7,10 +8,12 @@ export interface Settings {
   serviceToken: string;
   tenantId: string;
   theme: Theme;
+  /** UI language; 'auto' follows the browser. Settings stored before this field existed merge into the 'auto' default. */
+  language: LanguagePref;
 }
 
 const KEY = 'sage.agent-web.settings';
-const defaults: Settings = { apiBaseUrl: '', serviceToken: '', tenantId: 'tenant-local', theme: 'system' };
+const defaults: Settings = { apiBaseUrl: '', serviceToken: '', tenantId: 'tenant-local', theme: 'system', language: 'auto' };
 const listeners = new Set<() => void>();
 
 function read(): Settings {

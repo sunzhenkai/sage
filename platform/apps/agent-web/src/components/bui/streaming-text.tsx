@@ -1,5 +1,6 @@
 // Adapted from Beautiful UI "streaming-text" + "stream-text" (MIT © 2026 Shane Levine): answer body with caret, actions, follow-ups.
 import { useState, type ReactNode } from 'react';
+import { useT } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
 function renderBlocks(text: string): ReactNode[] {
@@ -14,6 +15,7 @@ function renderBlocks(text: string): ReactNode[] {
 }
 
 export function StreamingText({ text, streaming, actions, followUps, onFollowUp, className }: { text: string; streaming?: boolean; actions?: ReactNode; followUps?: string[]; onFollowUp?: (s: string) => void; className?: string }) {
+  const t = useT();
   const [copied, setCopied] = useState(false);
   return (
     <div className={cn('flex flex-col', className)}>
@@ -23,7 +25,7 @@ export function StreamingText({ text, streaming, actions, followUps, onFollowUp,
       </div>
       {!streaming ? (
         <div className="-ml-1.5 mt-2 flex items-center gap-0.5 text-ink-3">
-          <button type="button" title="Copy" onClick={() => { void navigator.clipboard?.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1400); }); }} className={cn('primitive-icon flex size-7 items-center justify-center rounded-control transition-colors hover:bg-hover hover:text-ink', copied && 'text-green')}>
+          <button type="button" title={t('common.copy')} onClick={() => { void navigator.clipboard?.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1400); }); }} className={cn('primitive-icon flex size-7 items-center justify-center rounded-control transition-colors hover:bg-hover hover:text-ink', copied && 'text-green')}>
             {copied ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
               : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="12" height="12" rx="2.5" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>}
           </button>

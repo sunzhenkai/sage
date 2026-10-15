@@ -1,6 +1,7 @@
 import { Search } from 'lucide-react';
 import { NavLink } from 'react-router';
 import { Input } from '@/components/ui/input';
+import { useT } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import { PageHeader, PanelBar } from './app-shell';
 import { contentCard, SubPane } from './page';
@@ -9,10 +10,11 @@ export type SettingsNavItem = { to: string; label: string; icon: React.Component
 
 /** Settings pattern: sub-nav column (248px, same panel bg as content, hairline divider) | centered 760px content. No top header. */
 export function SettingsShell({ groups, header, children }: { groups: { label: string; items: SettingsNavItem[] }[]; header: React.ReactNode; children: React.ReactNode }) {
+  const t = useT();
   return (
     <div className="flex min-h-0 flex-1">
       <SubPane>
-        <PageHeader title="Settings" />
+        <PageHeader title={t('nav.settings')} />
         <div className="flex-1 overflow-y-auto px-2.5 pb-4 pt-2">
           {groups.map((g) => (
             <div key={g.label} className="mt-3 first:mt-1">
@@ -72,16 +74,18 @@ export function SettingsItem({ title, description, children, stacked }: { title:
 }
 
 export function SettingsSearch({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
+  const t = useT();
   return (
     <div className="relative w-[260px]">
       <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-faint" strokeWidth={1.75} />
-      <Input aria-label="Search settings" placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} className="pl-8" />
+      <Input aria-label={t('settings.shell.searchAria')} placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} className="pl-8" />
     </div>
   );
 }
 
 export function SettingsEmpty({ q }: { q: string }) {
-  return <p className="t-desc rounded-card bg-surface px-4 py-6 text-center shadow-card">No settings match “{q}”.</p>;
+  const t = useT();
+  return <p className="t-desc rounded-card bg-surface px-4 py-6 text-center shadow-card">{t('settings.shell.empty', { query: q })}</p>;
 }
 
 export function SettingsFooter({ children }: { children: React.ReactNode }) {

@@ -1,5 +1,6 @@
 // Adapted from Beautiful UI "thinking-state" (MIT © 2026 Shane Levine): expandable agent trace.
 import { useState, type ReactNode } from 'react';
+import { useT } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
 export type TraceRow = { key: string; primary: ReactNode; secondary?: ReactNode | undefined; mono?: boolean | undefined; state?: 'done' | 'active' | 'failed' | 'pending' | undefined; icon?: ReactNode | undefined; detail?: ReactNode | undefined; onClick?: () => void | undefined };
@@ -19,9 +20,10 @@ export function RowGlyph({ state }: { state: TraceRow['state'] }) {
 }
 
 /** Collapsible trace header ("Thinking" shimmer while working → settled label) with a hairline-railed step list. */
-export function ThinkingTrace({ working, activeLabel = 'Thinking', doneLabel, rows, defaultOpen, icon, prose, className }: {
+export function ThinkingTrace({ working, activeLabel, doneLabel, rows, defaultOpen, icon, prose, className }: {
   working: boolean; activeLabel?: ReactNode; doneLabel: ReactNode; rows: TraceRow[]; defaultOpen?: boolean; icon?: ReactNode; prose?: boolean; className?: string;
 }) {
+  const t = useT();
   const [manual, setManual] = useState<boolean | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const open = manual ?? defaultOpen ?? working;
@@ -30,7 +32,7 @@ export function ThinkingTrace({ working, activeLabel = 'Thinking', doneLabel, ro
       <button type="button" aria-expanded={open} onClick={() => setManual(!open)} className="-mx-1.5 flex w-fit items-center gap-2 rounded-control px-1.5 py-1 transition-colors duration-100 hover:bg-hover-2">
         <span className="flex shrink-0" style={{ color: working ? 'var(--ink-2)' : 'var(--ink-3)' }}>{icon ?? <Sparkle color={working ? 'var(--ink-2)' : 'var(--ink-3)'} />}</span>
         <span role="status" className="contents">
-          {working ? <span className="shimmer-label whitespace-nowrap text-[13px] font-medium">{activeLabel}</span>
+          {working ? <span className="shimmer-label whitespace-nowrap text-[13px] font-medium">{activeLabel ?? t('thinking.active')}</span>
             : <span className="whitespace-nowrap text-[13px] font-medium text-ink-2" style={{ animation: 'fade-in 350ms ease-out both' }}>{doneLabel}</span>}
         </span>
         {rows.length ? <Chevron open={open} /> : null}

@@ -1,5 +1,6 @@
 // Adapted from Beautiful UI "loading-state" (MIT © 2026 Shane Levine).
 import { useEffect, useState } from 'react';
+import { useT } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
 const chevron = Array.from({ length: 9 }, (_, i) => { const r = Math.floor(i / 3), c = i % 3; return (c + Math.abs(r - 1)) * 90; });
@@ -34,14 +35,15 @@ function useNow(interval = 100) {
 }
 
 /** Pixel-grid loader + shimmering label + live elapsed timer (from `since` when given). */
-export function LoadingState({ label = 'Working', since, variant = 'drive', className }: { label?: string; since?: string | number | undefined; variant?: LoaderVariant; className?: string }) {
+export function LoadingState({ label, since, variant = 'drive', className }: { label?: string | undefined; since?: string | number | undefined; variant?: LoaderVariant; className?: string }) {
+  const t = useT();
   const [mounted] = useState(() => Date.now());
   const now = useNow();
   const start = since === undefined ? mounted : typeof since === 'number' ? since : new Date(since).getTime();
   return (
     <div role="status" className={cn('flex w-fit items-center gap-2.5', className)}>
       <LoaderGrid variant={variant} />
-      <span className="shimmer-label text-[13px] font-medium">{label}</span>
+      <span className="shimmer-label text-[13px] font-medium">{label ?? t('loadingState.working')}</span>
       <span className="font-mono text-[12px] tabular-nums text-ink-3">{formatElapsed(now - start)}</span>
     </div>
   );

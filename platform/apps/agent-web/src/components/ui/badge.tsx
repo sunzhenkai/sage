@@ -1,6 +1,7 @@
 import { cn } from '@/lib/utils';
+import { useT } from '@/lib/i18n';
 import { StatusPill, toneFor } from '@/components/bui/atoms';
-import { StatusIcon } from './status';
+import { StatusIcon, statusLabelKey } from './status';
 
 export type Tone = 'neutral' | 'accent' | 'success' | 'warning' | 'danger';
 const dots: Record<Tone, string> = { neutral: 'bg-faint', accent: 'bg-accent', success: 'bg-green', warning: 'bg-amber', danger: 'bg-red' };
@@ -32,7 +33,9 @@ export function StatusDot({ status }: { status: string | undefined }) {
 const label = (s: string) => s.replace(/_/g, ' ').toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
 
 export function StatusBadge({ status }: { status: string | undefined }) {
+  const t = useT();
+  const key = statusLabelKey(status);
   return (
-    <StatusPill tone={toneFor(status)}>{label(status ?? 'unknown')}</StatusPill>
+    <StatusPill tone={toneFor(status)}>{key === undefined ? label(status ?? 'unknown') : t(key)}</StatusPill>
   );
 }

@@ -1,0 +1,30 @@
+schema: spec-driven
+skip_specs: true
+created: 2026-10-15
+goal: |-
+  agent-web 多语言（中/英）
+
+  目标：agent-web 控制台（platform/apps/agent-web）支持中文 + 英文——按浏览器语言自动推断（默认英文），设置页可手动切换并持久化；覆盖全部界面文案与本地化格式化；配套：服务端未命名会话搜索回退默认改为英文、前端会话查询携带当前 locale。
+
+  完成判据（原文）：agent-web 全量界面文案随浏览器语言自动显示中文或英文（zh* → 中文；其余含无匹配 → 英文），设置页可手动切换并持久化；中英文两态下关键路由在 1280x800 与 375x812 渲染可用且 axe 无 serious/critical，typecheck / build（含 check:design）/ lint / test 全部通过。
+
+  已采纳方案（simple + adopt-only）：自研 typed 词典（src/lib/i18n.ts + locales/en.ts|zh-CN.ts；en 为源、zh 键位对齐单测）；Settings → Appearance 增 Language（Auto / English / 中文）；服务端 normalizeHistoryLocale 默认改 en、listSessions 携带 locale；术语与文体以 tasks/ongoing/agent-web-i18n/glossary.md 为准。
+
+  流程总览（原文）：
+  1. 语言核心 src/lib/i18n.ts（检测 / ?lang= 覆盖 / 插值 / 订阅 / html lang）+ 单测 — 验证：vitest 绿
+  2. 词典 locales/en.ts（源）+ locales/zh-CN.ts + 键位对齐测试 — 验证：对齐测试绿
+  3. 全量文案提取（pages / layout / bui / ui / utils）— 验证：抽查无残留硬编码 + 逐页走查
+  4. Settings Language 行（Auto / English / 中文）+ 即时切换与持久化 — 验证：刷新持久、document.lang 同步
+  5. 服务端默认 en + 前端会话查询带 locale — 验证：chat-domain 单测绿、zh 界面搜「未命名」命中
+  6. 工程门 typecheck / build / lint / test — 验证：全部 exit 0
+  7. 运行态证据（ui_evidence_check 双语两视口）+ README 更新 — 验证：report exit 0（否则按确认协议处理）
+
+  交付类别：Web UI。适用门包：gate-packs.md「Web UI」（simple 档调度 + adopt-only）。基准物：WCAG 2.2 AA（axe 地板）+ 交付仓 DESIGN.md / check:design + 本任务词典（en 为准）；禁止外部产品作验收基准。
+
+  Active Instance 根路径：不适用（adopt-only，simple 档）；contract digest：不适用；binding digest：不适用；projection digest：不适用。
+
+  adopt-only 显式降级原文（已 confirmed，2026-10-15 用户「按推荐冻结并交接」）：
+  1. 维度：设计系统基线 / 定级：B 类 / 默认期望：Web UI 交付应有 frozen design-system/v1 Active Instance / 实际选择：adopt-only——沿用现有组件库与样式体系（DESIGN.md + check:design），豁免 Active Instance / 原因：simple 档机制；本任务零新设计表面 / 回滚说明：后续 UI 任务补建 design-system/v1 至 freeze / 确认状态：confirmed。
+  2. 维度：重型证据门调度 / 定级：B 类 / 默认期望：medium/complex 硬门（ui_evidence_check + design 评审文件）/ 实际选择：ui_evidence_check 照计划执行；design 评审文件不设 / 原因：simple 档调度（SHOULD）/ 回滚说明：需要时补 design 评审文件并复验 / 确认状态：confirmed。
+
+  指针：tasks/ongoing/agent-web-i18n/（wizard/plan.md、glossary.md、design/contract.md、approve/APPROVED.md）。

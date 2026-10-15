@@ -68,9 +68,16 @@ describe('Think-strip previews and untitled search fallback', () => {
   it('matches untitled sessions via locale fallback title and binds it into cursor filters', () => {
     expect(normalizeHistoryLocale('zh-TW')).toBe('zh-CN');
     expect(normalizeHistoryLocale('en-GB')).toBe('en');
-    expect(normalizeHistoryLocale('fr-FR')).toBe('zh-CN');
+    expect(normalizeHistoryLocale('fr-FR')).toBe('en');
+    expect(normalizeHistoryLocale('de-DE')).toBe('en');
+    expect(normalizeHistoryLocale()).toBe('en');
+    expect(normalizeHistoryLocale(undefined)).toBe('en');
+    expect(normalizeHistoryLocale('en')).toBe('en');
+    expect(normalizeHistoryLocale('en-US')).toBe('en');
     expect(normalizeSessionFilters('all', 'untitled', false, 'zh-CN').untitledFallback).toBe('未命名对话');
     expect(normalizeSessionFilters('all', 'untitled', false, 'en').untitledFallback).toBe('Untitled Chat');
+    expect(normalizeSessionFilters('all', 'untitled', false).untitledFallback).toBe('Untitled Chat');
+    expect(normalizeSessionFilters('all', 'untitled', false, 'fr-FR').untitledFallback).toBe('Untitled Chat');
     const en = sessionFilterHash(normalizeSessionFilters('all', '', false, 'en'));
     const zh = sessionFilterHash(normalizeSessionFilters('all', '', false, 'zh-CN'));
     expect(en).not.toBe(zh);

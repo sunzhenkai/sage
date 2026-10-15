@@ -52,6 +52,40 @@ Not surfaced (yet): `POST /v1/tasks` (needs a pre-staged `task-input://` ref), `
 - `/overview` (default landing) — stat tiles with sparklines and charts (recharts, themed via `--chart-*` tokens) computed from sessions, session runs, tasks, schedules/triggers. Empty data renders ghost charts.
 - Mock mode (dev only, read-only): open any URL with `?mock=1` (persists in localStorage, `?mock=0` or the sidebar "Exit" clears it), or start with `VITE_MOCK=1 pnpm dev`. All GETs are served from a deterministic in-memory dataset; every write is rejected client-side (`MOCK_READ_ONLY`) so agent-api is never called.
 
+## Localization
+
+The console ships English (source) and Simplified Chinese copy in `src/lib/locales/{en,zh-CN}.ts`; `locales.test.ts`
+keeps both key sets aligned.
+
+- **Detection** — any `zh*` browser language (`zh`, `zh-CN`, `zh-Hans`, `zh-TW`, `zh-HK`, …) renders Simplified Chinese;
+  every other value — including no match or unreadable languages — renders **English** (the default).
+- **`?lang=<locale>`** — temporary per-visit override (normalized with the same rules and never written to settings),
+  e.g. `/overview?lang=zh-CN` on an English browser.
+- **Manual switch** — Settings → Appearance → Language (Auto / English / 中文) persists in `sage.agent-web.settings`
+  (`language: 'auto' | 'en' | 'zh-CN'`, default `auto`) and applies instantly without a reload; `Auto` re-reads the
+  browser language on every load. The Appearance "Reset to defaults" button also returns the language to `Auto`.
+- **Synced chrome** — `<html lang>` and `document.title` follow the language (`Sage Agent Console` /
+  `Sage 智能体控制台`). Time display (`formatTime`, `relativeTime`, chart date axes, heatmap weekdays) uses the current
+  locale, and session searches send `locale=<locale>` to `GET /v1/chat/sessions` so the server matches the same
+  untitled-session fallback title (`Untitled Chat` / `未命名对话`).
+
+Known boundaries: agent-api error messages and other server-returned content (provider/model names, catalog values, the
+mock dataset) stay as-is; `<option>` enum values are API values and are not translated; the console is desktop-first —
+the 375px evidence viewport renders and passes axe, but layouts are tight while the sidebar is open.
+
+Runtime evidence (manifest `platform/evidence/agent-web-i18n/ui-manifest.json`; axe-core is fetched into
+`.evidence/agent-web-i18n/tools/`, it is not a repo dependency):
+
+```bash
+cd platform
+AGENT_WEB_PORT=9644 corepack pnpm --filter @sage/agent-web dev &     # serves the manifest base_url
+cd ..
+python3 ~/.agents/skills/taskrail/scripts/ui_evidence_check.py \
+  platform/evidence/agent-web-i18n/ui-manifest.json \
+  --out platform/.evidence/agent-web-i18n/ui --run-id w7 \
+  --axe-path platform/.evidence/agent-web-i18n/tools/axe.min.js
+```
+
 ## Beautiful UI
 
 Visual system and AI-native primitives adapted from [Beautiful UI](https://www.beautifului.dev) (shadcn registry at

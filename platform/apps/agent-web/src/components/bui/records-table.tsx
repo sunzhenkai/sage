@@ -1,6 +1,7 @@
 // Adapted from Beautiful UI "records-table" (MIT © 2026 Shane Levine): CRM-style grid with row numbers,
 // hairline cell borders, sticky header/first column, sortable headers and a count footer.
 import { useMemo, useState, type ReactNode } from 'react';
+import { useT } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
 export type RecordColumn<T> = { key: string; label: ReactNode; icon?: ReactNode; width?: number | string; align?: 'left' | 'right'; sort?: (a: T, b: T) => number; render: (row: T) => ReactNode };
@@ -14,6 +15,7 @@ const SortIcon = ({ dir }: { dir: 'asc' | 'desc' | null }) => (
 export function RecordsTable<T>({ columns, rows, getKey, onRowClick, activeKey, footer, empty, className, fill }: {
   columns: RecordColumn<T>[]; rows: T[]; getKey: (row: T) => string; onRowClick?: (row: T) => void; activeKey?: string | undefined; footer?: ReactNode; empty?: ReactNode; className?: string; fill?: boolean;
 }) {
+  const t = useT();
   const [sort, setSort] = useState<{ key: string; dir: 'asc' | 'desc' } | null>(null);
   const sorted = useMemo(() => {
     const col = sort && columns.find((c) => c.key === sort.key);
@@ -69,7 +71,7 @@ export function RecordsTable<T>({ columns, rows, getKey, onRowClick, activeKey, 
         {rows.length === 0 ? empty : null}
       </div>
       <div className="flex min-h-[35px] shrink-0 items-center gap-3 border-t border-line px-3 text-[11.5px] text-ink-3">
-        <span><span className="mr-[3px] text-[13px] font-medium text-ink">{rows.length}</span>count</span>
+        <span><span className="mr-[3px] text-[13px] font-medium text-ink">{rows.length}</span>{t('recordsTable.count')}</span>
         {footer}
       </div>
     </div>

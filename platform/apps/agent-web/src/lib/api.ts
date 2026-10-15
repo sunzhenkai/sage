@@ -64,7 +64,7 @@ export const api = {
   ready: () => request<Record<string, unknown>>('GET', '/readyz'),
 
   chat: {
-    listSessions: (query: { limit?: number | undefined; q?: string | undefined; archived?: boolean | undefined; cursor?: string | undefined } = {}) => request<SessionList>('GET', '/v1/chat/sessions', { query }),
+    listSessions: (query: { limit?: number | undefined; q?: string | undefined; archived?: boolean | undefined; cursor?: string | undefined; locale?: string | undefined } = {}) => request<SessionList>('GET', '/v1/chat/sessions', { query }),
     createSession: (title?: string) => request<Session>('POST', '/v1/chat/sessions', { body: title ? { title } : {} }),
     getSession: (id: string) => request<SessionDetail>('GET', `/v1/chat/sessions/${enc(id)}`),
     archive: (id: string) => request<Session>('POST', `/v1/chat/sessions/${enc(id)}/archive`),

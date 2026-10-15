@@ -2,12 +2,14 @@
 // The original uses `liveline`; charts here reuse the app's pinned recharts.
 import { useState, type ReactNode } from 'react';
 import { Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, YAxis } from 'recharts';
+import { useT } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
 export type InsightSeries = { name: string; color: string; value: ReactNode; delta?: ReactNode | undefined; positive?: boolean | undefined; data: number[] };
 export type InsightPage = { key: string; sentence: ReactNode; series: InsightSeries[]; snapshot?: string | undefined; prompt?: string | undefined };
 
-export function InsightCards({ pages, title = 'Insights', onPrompt, className }: { pages: InsightPage[]; title?: ReactNode; onPrompt?: (p: string) => void; className?: string }) {
+export function InsightCards({ pages, title, onPrompt, className }: { pages: InsightPage[]; title?: ReactNode; onPrompt?: (p: string) => void; className?: string }) {
+  const t = useT();
   const [i, setI] = useState(0);
   const page = pages[Math.min(i, pages.length - 1)];
   if (!page) return null;
@@ -17,11 +19,11 @@ export function InsightCards({ pages, title = 'Insights', onPrompt, className }:
   return (
     <div className={cn('flex flex-col', className)}>
       <div className="flex items-center gap-1.5">
-        <span className="text-[13px] font-semibold text-ink">{title}</span>
+        <span className="text-[13px] font-semibold text-ink">{title ?? t('insightCards.title')}</span>
         <span className="text-[13px] tabular-nums text-ink-3">{pages.length}</span>
         <span className="ml-auto flex items-center gap-0.5 text-ink-2">
-          <button type="button" aria-label="Previous insight" disabled={i === 0} onClick={() => setI(i - 1)} className="flex size-6 items-center justify-center rounded-[6px] hover:bg-hover disabled:opacity-35"><Arrow d="M15 18l-6-6 6-6" /></button>
-          <button type="button" aria-label="Next insight" disabled={i >= pages.length - 1} onClick={() => setI(i + 1)} className="flex size-6 items-center justify-center rounded-[6px] hover:bg-hover disabled:opacity-35"><Arrow d="M9 18l6-6-6-6" /></button>
+          <button type="button" aria-label={t('insightCards.previous')} disabled={i === 0} onClick={() => setI(i - 1)} className="flex size-6 items-center justify-center rounded-[6px] hover:bg-hover disabled:opacity-35"><Arrow d="M15 18l-6-6 6-6" /></button>
+          <button type="button" aria-label={t('insightCards.next')} disabled={i >= pages.length - 1} onClick={() => setI(i + 1)} className="flex size-6 items-center justify-center rounded-[6px] hover:bg-hover disabled:opacity-35"><Arrow d="M9 18l6-6-6-6" /></button>
         </span>
       </div>
       <p key={page.key} className="mt-1.5 text-[13.5px] leading-[1.6] text-ink-2" style={{ animation: 'fade-in 300ms ease-out both' }}>{page.sentence}</p>
@@ -37,8 +39,8 @@ export function InsightCards({ pages, title = 'Insights', onPrompt, className }:
         </div>
         <div className="mt-3 overflow-hidden rounded-[10px] shadow-hairline">
           <div className="flex h-9 items-center justify-between border-b border-line px-3 text-[12px] text-ink-3">
-            <span>{page.snapshot ?? 'Trend snapshot'}</span>
-            <span className="rounded-full bg-field px-2 py-0.5 text-[11.5px] text-ink-2">{len} pts</span>
+            <span>{page.snapshot ?? t('insightCards.trendSnapshot')}</span>
+            <span className="rounded-full bg-field px-2 py-0.5 text-[11.5px] text-ink-2">{t('insightCards.points', { count: len })}</span>
           </div>
           <div className="h-[150px] px-1 py-2">
             <ResponsiveContainer width="100%" height="100%">
