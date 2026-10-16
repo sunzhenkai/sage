@@ -17,9 +17,12 @@
 - [x] 3.1 全仓回归与静态检查（typecheck / build / lint / test），命令与结果写入 proposal 验证记录
   - 2026-10-16：typecheck 0 错 / build Done / lint 0 问题 / test 158 files·975 tests 通过 / check:deps 4 边界 OK，见 proposal 验证记录。
 - [x] 3.2 回填 proposal 验收标准
-- [ ] 3.3 提交交付仓改动（taskrail 硬边界：须用户逐字授权后执行；未授权前保持未勾并在验证记录注明）
-- [ ] 3.4 归档前置校核：子 change 全勾且 validate 通过、findings 全有处置（见 execution-discipline「收尾校核」）
-- [ ] 3.5 归档全部子 change
+- [x] 3.3 提交交付仓改动（taskrail 硬边界：须用户逐字授权后执行；未授权前保持未勾并在验证记录注明）
+  - 2026-10-16 用户「提交 + 收尾吧」授权；提交 b726aad（工作区干净，已还原非本任务 evidence 测试副作用）。
+- [x] 3.4 归档前置校核：子 change 全勾且 validate 通过、findings 全有处置（见 execution-discipline「收尾校核」）
+  - 2026-10-16：mcp-server-implement 13 项全勾、`validate --strict` 通过；未做外部评审（无 findings）；done.md 六条核对通过；证据与当前代码一致（提交后证据 result.json 对应代码）。
+- [x] 3.5 归档全部子 change
+  - 2026-10-16：mcp-server-implement 已归档至 `openspec/changes/archive/2026-10-16-mcp-server-implement/`（sync 建立 main spec `openspec/specs/agent-mcp/`）。
 
 ## Workflow follow-up
 
