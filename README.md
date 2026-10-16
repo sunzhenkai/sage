@@ -50,6 +50,23 @@ curl http://127.0.0.1:14173/
 
 端口与启动细节见 `platform/architecture/runbooks/` 与本机 `.service-manager.md`。
 
+## MCP 接入
+
+agent-api 暴露 MCP server（Streamable HTTP，stateless），把全部 `/v1/*` 操作映射为 MCP tools，外部 MCP client（如 Claude Code）配 URL + API key 即可操作平台。
+
+```bash
+# Claude Code
+claude mcp add --transport http sage http://127.0.0.1:9610/mcp \
+  --header "Authorization: Bearer $SAGE_SERVICE_TOKEN"
+```
+
+- **URL**：`http://<host>:9610/mcp`
+- **鉴权**：`Authorization: Bearer <api-key>`。API key 集合复用 `SAGE_SERVICE_TOKEN_HASHES`（sha256 hash，逗号分隔可轮换）；fail-closed——未配置该 env 时全部 MCP 请求 401。key 明文（如 `SAGE_SERVICE_TOKEN`）与 hash 同源，一把 key 同时是 HTTP service token 与 MCP API key。
+- **生成 key**：`openssl rand -hex 32`，hash 入 `SAGE_SERVICE_TOKEN_HASHES`（见上「快速开始」）。
+- **tools**：约 50 个，`{group}_{action}` 命名（chat / task / package / app / run / provider_catalog / provider_connection / schedule / effect / run_agent_settings）。SSE 流式端点不映射，用 `chat_get_events`（`afterSequence` 游标）等拉取替代。
+- **说明**：按 MCP 规范 authorization 为可选项，本实现用静态 `Bearer <api-key>`，不支持 OAuth 2.1 发现流程；持有该 key 即持有对应 service token 权限（schedules / effect-resolutions 等强认证链路同样放行）。
+- **运行态证据**：`cd platform/apps/agent-api && node scripts/mcp-evidence.mjs http://127.0.0.1:9610 $SAGE_SERVICE_TOKEN`，跑判据闭环 + 各资源组代表 tool + 鉴权失败路径，输出落 `platform/.evidence/mcp-server/`（gitignored）。
+
 ## 架构产物
 
 - 终版架构：[`platform/architecture/generic-agent-platform-final-architecture.md`](platform/architecture/generic-agent-platform-final-architecture.md)

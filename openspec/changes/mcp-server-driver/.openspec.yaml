@@ -1,0 +1,8 @@
+schema: spec-driven
+created: 2026-10-16
+goal: 为 sage 添加 MCP 能力：所有操作都能通过 mcp 处理；mcp 使用 api key 鉴权。判据：外部 MCP client 经
+  Streamable HTTP 连上 sage MCP server：带正确 API key 可完成「建 chat
+  会话→发消息→取事件」闭环及每个资源组至少一个代表性 tool 调用；缺失或错误 key 一律 401
+  拒绝；typecheck/build/lint/test
+  全部通过。方案：tasks/ongoing/mcp-server/design/mcp-server.md；批准：tasks/ongoing/mcp-server/approve/APPROVED.md
+skip_specs: true

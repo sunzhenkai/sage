@@ -1,0 +1,6 @@
+schema: spec-driven
+created: 2026-10-16
+goal: 实现 sage MCP server：agent-api 内 src/mcp/ 模块，POST /mcp stateless Streamable
+  HTTP（@modelcontextprotocol/sdk@1.29.0），API key 鉴权复用
+  SAGE_SERVICE_TOKEN_HASHES（fail-closed），/v1/* 全量 1:1 映射为 MCP tools（app.inject
+  转发），三层测试 + 运行态证据。方案：tasks/ongoing/mcp-server/design/mcp-server.md

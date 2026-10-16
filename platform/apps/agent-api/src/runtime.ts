@@ -31,6 +31,7 @@ import { registerAppsRoutes } from './apps-api.js';
 import { registerPackageRunsRoutes, type ResolvedReleaseLockPayload } from './runs-api.js';
 import { buildSnapshotEgressConnector, SNAPSHOT_EGRESS_ALLOWLIST_ENV } from './package-snapshots.js';
 import { registerRunAgentSettingsRoutes } from './run-agent-settings-api.js';
+import { registerMcpRoutes } from './mcp/index.js';
 import { bootstrapDeploymentEnvProviderConnection, registerProviderConnectionRoutes } from './provider-connections-api.js';
 import { createRunOutputArtifactResolver } from './run-output-resolver.js';
 
@@ -340,6 +341,7 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
     registerRunAgentSettingsRoutes(app, { tenantId: config.tenantId, settingsStore: tasks, providerConnections: tasks, authenticator });
     registerProviderConnectionRoutes(app, { tenantId: config.tenantId, store: tasks, secretBackend, authenticator });
     registerProviderCatalogRoutes(app, { service: catalogService, store: catalog, manager: catalogManager, authenticator });
+    registerMcpRoutes(app, { serviceToken });
     await catalogManager.start();
     app.get('/livez', async () => ({ status: 'alive' }));
     const secretBackendMode = secretBackend.describe().mode;
