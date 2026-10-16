@@ -1,7 +1,7 @@
 ---
 slug: mcp-server
-status: handed-off
-phase: propose
+status: archived
+phase: done
 confirm_mode: human
 tier: full
 criterion: "外部 MCP client 经 Streamable HTTP 连上 sage MCP server：带正确 API key 可完成「建 chat 会话→发消息→取事件」闭环及每个资源组（chat / task / package / app / run / provider-catalog / provider-connection / schedule / effect-resolution / run-agent-settings）至少一个代表性 tool 调用；缺失或错误 key 一律 401 拒绝；typecheck / build / lint / test 全部通过。"
@@ -10,6 +10,7 @@ evidence_root: platform/.evidence/mcp-server
 created: 2026-10-16
 updated: 2026-10-16
 handed-off: 2026-10-16
+archived: 2026-10-16
 ---
 
 # 为 sage 添加 MCP 能力
