@@ -343,6 +343,14 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
     registerProviderCatalogRoutes(app, { service: catalogService, store: catalog, manager: catalogManager, authenticator });
     registerMcpRoutes(app, { serviceToken });
     await catalogManager.start();
+    // 根路径:服务状态页(浏览器打开 sage.lan 的首屏)。返回 JSON 而非 404,
+    // 并给出常用入口(API /readyz、MCP /mcp)与 service token 配置指引。
+    app.get('/', async () => ({
+      status: 'alive',
+      service: 'sage-agent-api',
+      endpoints: { readyz: '/readyz', livez: '/livez', mcp: '/mcp' },
+      mcp: { transport: 'Streamable HTTP (POST)', auth: 'Authorization: Bearer <SAGE_SERVICE_TOKEN>' },
+    }));
     app.get('/livez', async () => ({ status: 'alive' }));
     const secretBackendMode = secretBackend.describe().mode;
     app.get('/readyz', async (_request, reply) => {
