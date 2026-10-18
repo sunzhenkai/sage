@@ -7,6 +7,7 @@
 | 任务 | 标题 | 更新 | 一句话 | 路径 |
 |------|------|------|--------|------|
 | agent-web-i18n | agent-web 多语言（中/英） | 2026-10-15 | 已交接：自动推断语言、默认英文、可手动切换 → agent-web-i18n-driver | `ongoing/agent-web-i18n/` |
+| agent-web-mcp-settings | agent-web 添加 MCP 配置 | 2026-10-18 | done：MCP 设置区 + 测试连接 + dev 代理 /mcp，运行态证据齐 | `ongoing/agent-web-mcp-settings/` |
 
 ## Archived
 

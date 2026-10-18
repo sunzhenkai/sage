@@ -600,6 +600,7 @@ export const en = {
       appearance: { title: 'Appearance', description: 'How the console looks in this browser.' },
       shortcuts: { title: 'Keyboard shortcuts', description: 'Navigate the console without leaving the keyboard.' },
       general: { title: 'Connection', description: 'How the console reaches agent-api. Stored in localStorage only.' },
+      mcp: { title: 'MCP', description: 'Let external MCP clients such as Claude Code operate Sage.' },
       status: { title: 'Status', description: 'Live probes against agent-api.' },
       developer: { title: 'Developer', description: 'Tools for UI development and screenshots.' }
     },
@@ -611,6 +612,7 @@ export const en = {
       appearance: 'Appearance',
       shortcuts: 'Shortcuts',
       connection: 'Connection',
+      mcp: 'MCP',
       status: 'Status',
       developer: 'Developer'
     },
@@ -646,6 +648,29 @@ export const en = {
       tenantId: { title: 'Tenant ID', description: 'Must equal agent-api SAGE_TENANT_ID.' },
       saved: 'Saved',
       save: 'Save changes'
+    },
+    mcp: {
+      card: 'MCP server',
+      endpoint: { title: 'Endpoint', description: 'Streamable HTTP URL for MCP clients; derived from the API base URL on the Connection page.' },
+      apiKey: {
+        title: 'API key',
+        description: 'The same key as the service token (SAGE_SERVICE_TOKEN_HASHES); sent as Authorization: Bearer.',
+        empty: 'Not set',
+        emptyHint: 'Set the service token on the Connection page',
+        reveal: 'Show key',
+        hide: 'Hide key'
+      },
+      command: { title: 'Connect command', description: 'Register Sage in Claude Code or any MCP client.' },
+      test: {
+        title: 'Connection test',
+        description: 'Runs initialize + tools/list against the endpoint with the API key above.',
+        button: 'Test connection',
+        running: 'Testing…',
+        ok: 'Connected: {server} · {count} tools',
+        unreachable: 'Cannot reach {url}',
+        failed: 'Failed: {status} {code}',
+        mock: 'Mock mode is a read-only demo — real connections are not tested.'
+      }
     },
     status: {
       card: 'Probes',

@@ -64,6 +64,7 @@ claude mcp add --transport http sage http://127.0.0.1:9610/mcp \
 ```
 
 - **URL**：`http://<host>:9610/mcp`
+- **控制台**：agent-web 设置页「MCP」区可直接查看接入地址与 API key（与「连接」页服务令牌同一把 key）、复制 `claude mcp add` 命令、并对端点跑一次 initialize + tools/list 连通性测试。
 - **鉴权**：`Authorization: Bearer <api-key>`。API key 集合复用 `SAGE_SERVICE_TOKEN_HASHES`（sha256 hash，逗号分隔可轮换）；fail-closed——未配置该 env 时全部 MCP 请求 401。key 明文（如 `SAGE_SERVICE_TOKEN`）与 hash 同源，一把 key 同时是 HTTP service token 与 MCP API key。
 - **生成 key**：`openssl rand -hex 32`，hash 入 `SAGE_SERVICE_TOKEN_HASHES`（见上「快速开始」）。
 - **tools**：约 50 个，`{group}_{action}` 命名（chat / task / package / app / run / provider_catalog / provider_connection / schedule / effect / run_agent_settings）。SSE 流式端点不映射，用 `chat_get_events`（`afterSequence` 游标）等拉取替代。

@@ -1,18 +1,20 @@
 import { useQuery } from '@tanstack/react-query';
-import { Activity, Code2, Keyboard, Monitor, Moon, Palette, Plug, RotateCcw, Server, Sun, X } from 'lucide-react';
+import { Activity, Check, Code2, Copy, Eye, EyeOff, Keyboard, Monitor, Moon, Palette, Plug, RadioTower, RotateCcw, Server, Sun, X } from 'lucide-react';
 import { useState } from 'react';
-import { Navigate, useParams } from 'react-router';
+import { Link, Navigate, useParams } from 'react-router';
+import { CodeBlock } from '@/components/bui/code-block';
 import { ViewTab, ViewTabs } from '@/components/layout/app-shell';
 import { SettingsCard, SettingsEmpty, SettingsFooter, SettingsItem, SettingsSearch, SettingsShell, SettingsTitle, type SettingsNavItem } from '@/components/layout/settings-shell';
 import { StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { JsonView, Kbd } from '@/components/ui/misc';
+import { JsonView, Kbd, Spinner } from '@/components/ui/misc';
 import { Switch } from '@/components/ui/switch';
 import { api } from '@/lib/api';
 import { errorDisplay } from '@/lib/error-message';
 import { setLanguagePref, useT, type LanguagePref } from '@/lib/i18n';
 import { exitMock, isMock } from '@/lib/mock';
+import { copyText, mcpConnectCommand, mcpEndpoint, mcpProbe, type McpProbeResult } from '@/lib/mcp';
 import { type Theme, updateSettings, useSettings } from '@/lib/settings';
 import { defaultShortcuts, resetAllShortcuts, resetShortcut, setShortcut, shortcutKeys, useShortcutOverrides, type Shortcut } from '@/lib/shortcuts';
 
@@ -21,6 +23,7 @@ const pages = {
   appearance: { title: 'settings.pages.appearance.title', description: 'settings.pages.appearance.description' },
   shortcuts: { title: 'settings.pages.shortcuts.title', description: 'settings.pages.shortcuts.description' },
   general: { title: 'settings.pages.general.title', description: 'settings.pages.general.description' },
+  mcp: { title: 'settings.pages.mcp.title', description: 'settings.pages.mcp.description' },
   status: { title: 'settings.pages.status.title', description: 'settings.pages.status.description' },
   developer: { title: 'settings.pages.developer.title', description: 'settings.pages.developer.description' }
 } as const;
@@ -28,7 +31,7 @@ type PageId = keyof typeof pages;
 
 const groups: { label: string; items: SettingsNavItem[] }[] = [
   { label: 'settings.groups.preferences', items: [{ to: '/settings/appearance', label: 'settings.nav.appearance', icon: Palette }, { to: '/settings/shortcuts', label: 'settings.nav.shortcuts', icon: Keyboard }] },
-  { label: 'settings.groups.system', items: [{ to: '/settings/general', label: 'settings.nav.connection', icon: Server }, { to: '/providers', label: 'nav.providers', icon: Plug, external: true }, { to: '/settings/status', label: 'settings.nav.status', icon: Activity }, { to: '/settings/developer', label: 'settings.nav.developer', icon: Code2 }] }
+  { label: 'settings.groups.system', items: [{ to: '/settings/general', label: 'settings.nav.connection', icon: Server }, { to: '/settings/mcp', label: 'settings.nav.mcp', icon: RadioTower }, { to: '/providers', label: 'nav.providers', icon: Plug, external: true }, { to: '/settings/status', label: 'settings.nav.status', icon: Activity }, { to: '/settings/developer', label: 'settings.nav.developer', icon: Code2 }] }
 ];
 
 /** `keywords` keeps the original English search terms; `texts` are the rendered (translated) labels. */
@@ -51,7 +54,7 @@ export function SettingsPage() {
           <div className="flex-1" />
           {reset ? <Button size="sm" variant="secondary" onClick={reset}><RotateCcw />{t('settings.resetToDefaults')}</Button> : null}
         </>} />
-      {id === 'appearance' ? <AppearanceSection q={q} /> : id === 'shortcuts' ? <ShortcutsSection q={q} /> : id === 'general' ? <ConnectionSection key={section} q={q} /> : id === 'status' ? <StatusSection q={q} /> : <DeveloperSection q={q} />}
+      {id === 'appearance' ? <AppearanceSection q={q} /> : id === 'shortcuts' ? <ShortcutsSection q={q} /> : id === 'general' ? <ConnectionSection key={section} q={q} /> : id === 'mcp' ? <McpSection q={q} /> : id === 'status' ? <StatusSection q={q} /> : <DeveloperSection q={q} />}
     </SettingsShell>
   );
 }
@@ -155,6 +158,63 @@ function DeveloperSection({ q }: { q: string }) {
     <SettingsCard title={t('settings.developer.card')}>
       <SettingsItem title={t('settings.developer.mockData')} description={t('settings.developer.mockDescription')}>
         <Switch label={t('settings.developer.mockData')} checked={isMock()} onChange={(v) => { if (v) window.location.search = '?mock=1'; else exitMock(); }} />
+      </SettingsItem>
+    </SettingsCard>
+  );
+}
+
+/** MCP access for external clients (Claude Code etc.): endpoint + key (shared with the service token) + connect command + live probe. */
+function McpSection({ q }: { q: string }) {
+  const t = useT();
+  const settings = useSettings();
+  const endpoint = mcpEndpoint(settings.apiBaseUrl);
+  const command = mcpConnectCommand(settings.apiBaseUrl, settings.serviceToken);
+  const hasKey = settings.serviceToken.trim().length > 0;
+  const [reveal, setReveal] = useState(false);
+  const [copied, setCopied] = useState<'endpoint' | 'key' | null>(null);
+  const [probe, setProbe] = useState<{ state: 'idle' } | { state: 'running' } | { state: 'done'; result: McpProbeResult }>({ state: 'idle' });
+  const copy = async (value: string, kind: 'endpoint' | 'key') => {
+    if (await copyText(value)) {
+      setCopied(kind);
+      setTimeout(() => setCopied(null), 1500);
+    }
+  };
+  const runProbe = async () => {
+    setProbe({ state: 'running' });
+    setProbe({ state: 'done', result: await mcpProbe({ baseUrl: settings.apiBaseUrl, token: settings.serviceToken }) });
+  };
+  if (!match(q, t('settings.mcp.card'), t('settings.mcp.endpoint.title'), t('settings.mcp.endpoint.description'), t('settings.mcp.apiKey.title'), t('settings.mcp.apiKey.description'), t('settings.mcp.command.title'), t('settings.mcp.command.description'), t('settings.mcp.test.title'), t('settings.mcp.test.description'), 'mcp endpoint api key claude tools/list initialize bearer')) return <SettingsEmpty q={q} />;
+  const result = probe.state === 'done' ? probe.result : undefined;
+  return (
+    <SettingsCard title={t('settings.mcp.card')}>
+      <SettingsItem title={t('settings.mcp.endpoint.title')} description={t('settings.mcp.endpoint.description')}>
+        <span className="font-mono text-[12px] text-ink">{endpoint}</span>
+        <Button size="sm" variant="secondary" onClick={() => void copy(endpoint, 'endpoint')}>{copied === 'endpoint' ? <Check /> : <Copy />}{copied === 'endpoint' ? t('common.copied') : t('common.copy')}</Button>
+      </SettingsItem>
+      <SettingsItem title={t('settings.mcp.apiKey.title')} description={t('settings.mcp.apiKey.description')}>
+        {hasKey ? (
+          <>
+            <span className="font-mono text-[12px] text-ink">{reveal ? settings.serviceToken : '•'.repeat(Math.min(settings.serviceToken.length, 24))}</span>
+            <Button size="icon-sm" variant="ghost" title={reveal ? t('settings.mcp.apiKey.hide') : t('settings.mcp.apiKey.reveal')} aria-label={reveal ? t('settings.mcp.apiKey.hide') : t('settings.mcp.apiKey.reveal')} onClick={() => setReveal(!reveal)}>{reveal ? <EyeOff /> : <Eye />}</Button>
+            <Button size="sm" variant="secondary" onClick={() => void copy(settings.serviceToken, 'key')}>{copied === 'key' ? <Check /> : <Copy />}{copied === 'key' ? t('common.copied') : t('common.copy')}</Button>
+          </>
+        ) : (
+          <Link to="/settings/general" className="text-[12.5px] font-medium text-accent-ink hover:underline">{t('settings.mcp.apiKey.emptyHint')}</Link>
+        )}
+      </SettingsItem>
+      <SettingsItem title={t('settings.mcp.command.title')} description={t('settings.mcp.command.description')} stacked>
+        <CodeBlock code={command} filename="terminal" className="w-full" />
+      </SettingsItem>
+      <SettingsItem title={t('settings.mcp.test.title')} description={t('settings.mcp.test.description')} stacked>
+        <div className="flex items-center gap-3">
+          {isMock() ? <span className="t-meta">{t('settings.mcp.test.mock')}</span> : (
+            <Button size="sm" variant="secondary" disabled={!hasKey || probe.state === 'running'} onClick={() => void runProbe()}>
+              {probe.state === 'running' ? <Spinner /> : <RadioTower />}{probe.state === 'running' ? t('settings.mcp.test.running') : t('settings.mcp.test.button')}
+            </Button>
+          )}
+          {result?.ok ? <span className="t-meta text-green">{t('settings.mcp.test.ok', { server: result.serverName, count: result.toolCount })}</span> : null}
+          {result && !result.ok ? <span className="t-meta text-red">{result.status === undefined ? t('settings.mcp.test.unreachable', { url: endpoint }) : t('settings.mcp.test.failed', { status: result.status, code: result.code })}</span> : null}
+        </div>
       </SettingsItem>
     </SettingsCard>
   );

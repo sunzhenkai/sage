@@ -6,7 +6,7 @@ import { defineConfig, loadEnv } from 'vite';
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const target = env.AGENT_API_URL ?? 'http://127.0.0.1:9610';
-  const proxy = Object.fromEntries(['/v1', '/livez', '/readyz'].map((path) => [path, { target, changeOrigin: true }]));
+  const proxy = Object.fromEntries(['/v1', '/livez', '/readyz', '/mcp'].map((path) => [path, { target, changeOrigin: true }]));
   return {
     plugins: [react(), tailwindcss()],
     resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },

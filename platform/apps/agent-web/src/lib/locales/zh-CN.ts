@@ -604,6 +604,7 @@ export const zhCN = {
       appearance: { title: '外观', description: '控制台在此浏览器中的外观。' },
       shortcuts: { title: '快捷键', description: '无需离开键盘即可浏览控制台。' },
       general: { title: '连接', description: '控制台如何访问 agent-api。仅存储在 localStorage 中。' },
+      mcp: { title: 'MCP', description: '让外部 MCP 客户端（如 Claude Code）操作 Sage。' },
       status: { title: '状态', description: '对 agent-api 的实时探测。' },
       developer: { title: '开发者', description: '界面开发与截图工具。' }
     },
@@ -615,6 +616,7 @@ export const zhCN = {
       appearance: '外观',
       shortcuts: '快捷键',
       connection: '连接',
+      mcp: 'MCP',
       status: '状态',
       developer: '开发者'
     },
@@ -650,6 +652,29 @@ export const zhCN = {
       tenantId: { title: '租户 ID', description: '必须与 agent-api 的 SAGE_TENANT_ID 一致。' },
       saved: '已保存',
       save: '保存更改'
+    },
+    mcp: {
+      card: 'MCP server',
+      endpoint: { title: '接入地址', description: '供 MCP 客户端连接的 Streamable HTTP 地址，随「连接」页的 API 基础地址推导。' },
+      apiKey: {
+        title: 'API Key',
+        description: '与服务令牌同一把 key（SAGE_SERVICE_TOKEN_HASHES），以 Authorization: Bearer 发送。',
+        empty: '未设置',
+        emptyHint: '请先到「连接」页设置服务令牌',
+        reveal: '显示 key',
+        hide: '隐藏 key'
+      },
+      command: { title: '接入命令', description: '在 Claude Code 或任意 MCP 客户端中注册 Sage。' },
+      test: {
+        title: '测试连接',
+        description: '用上方 API key 对接入地址执行 initialize + tools/list。',
+        button: '测试连接',
+        running: '测试中…',
+        ok: '已连接：{server}，{count} 个工具',
+        unreachable: '无法访问 {url}',
+        failed: '连接失败：{status} {code}',
+        mock: 'Mock 模式为只读演示，不测试真实连接。'
+      }
     },
     status: {
       card: '探测',
