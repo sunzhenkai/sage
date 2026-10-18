@@ -23,3 +23,10 @@ CMD ["node", "apps/agent-api/dist/runtime.js"]
 FROM runtime AS agent-worker
 CMD ["node", "apps/agent-worker/dist/runtime.js"]
 
+FROM build AS agent-web-build
+RUN pnpm --filter @sage/agent-web build
+
+FROM caddy:2.11.4-alpine AS agent-web
+COPY --from=agent-web-build /workspace/apps/agent-web/dist /srv
+COPY apps/agent-web/Caddyfile /etc/caddy/Caddyfile
+

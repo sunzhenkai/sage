@@ -42,6 +42,9 @@ printf 'SAGE_SERVICE_TOKEN=%s\nSAGE_SERVICE_TOKEN_HASHES=%s\n' "$TOKEN" "$(print
 
 docker compose up -d --build --wait agent-api agent-worker
 
+# 控制台（静态托管，宿主端口 SAGE_WEB_HOST_PORT，默认 9620）；本地开发控制台仍用 pnpm --filter @sage/agent-web dev
+docker compose up -d --build --wait agent-web
+
 # 健康检查
 curl http://127.0.0.1:9610/readyz
 curl http://127.0.0.1:9611/readyz

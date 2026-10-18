@@ -117,6 +117,14 @@ services:
       retries: 30
 
 
+  agent-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: agent-web
+    ports: ["${SAGE_WEB_HOST_PORT:-9620}:80"]
+
+
 volumes:
   postgres-data:
   artifact-data:
