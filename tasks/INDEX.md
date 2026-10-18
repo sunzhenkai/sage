@@ -7,10 +7,10 @@
 | 任务 | 标题 | 更新 | 一句话 | 路径 |
 |------|------|------|--------|------|
 | agent-web-i18n | agent-web 多语言（中/英） | 2026-10-15 | 已交接：自动推断语言、默认英文、可手动切换 → agent-web-i18n-driver | `ongoing/agent-web-i18n/` |
-| agent-web-mcp-settings | agent-web 添加 MCP 配置 | 2026-10-18 | done：MCP 设置区 + 测试连接 + dev 代理 /mcp，运行态证据齐 | `ongoing/agent-web-mcp-settings/` |
 
 ## Archived
 
 | 任务 | 归档日 | 标题 | 一句话 | 路径 |
 |------|--------|------|--------|------|
 | mcp-server | 2026-10-16 | 为 sage 添加 MCP 能力 | MCP server（50 tools，API key 鉴权）实现完成、判据达成、交付归档 | `archive/2026-10-16/mcp-server/` |
+| agent-web-mcp-settings | 2026-10-18 | agent-web 添加 MCP 配置 | MCP 设置区 + 测试连接 + dev 代理 /mcp；已部署 sage.lan | `archive/2026-10-18/agent-web-mcp-settings/` |

@@ -1,6 +1,6 @@
 ---
 slug: agent-web-mcp-settings
-status: done
+status: archived
 phase: done
 confirm_mode: human
 tier: skip
@@ -9,7 +9,7 @@ driver: null
 evidence_root: platform/.evidence/agent-web-mcp-settings
 created: 2026-10-18
 updated: 2026-10-18
-done: 2026-10-18
+archived: 2026-10-18
 ---
 
 # agent-web 添加 MCP 配置
@@ -51,6 +51,9 @@ done: 2026-10-18
 
 done.md 核对：判据成立（上述运行态 + 工程门）；做完的样子与 intent 一致；不做未越界（无后端改动、无路由改动）；无观感目标；无正式评审项；copyText 回退路径有单测覆盖、未在真实非安全上下文手动验证（判据外项）。
 
-## 下一步
+## 归档记录
 
-- apply：按 wizard/plan.md 8 步实现；完成后过 done.md 清单。
+- 结论：完成并关闭。skip 档无 driver；判据全部验证通过（工程门 + 运行态：真实 key 连通 50 tools / 错 key 401 / 双语渲染 / 三视口无溢出）。
+- 关闭原因：用户要求归档清理（2026-10-18）；交付物已commit fa5a890 并部署至 sage.lan（mbp agent-web 重建，线上验证新 bundle 含 MCP 设置区）。
+- 未决：无。（copyText execCommand 回退仅有单测覆盖，未在真实非安全上下文手动验证——判据外项。）
+- driver 现状：无（skip 档）。
