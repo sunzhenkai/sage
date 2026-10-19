@@ -11,6 +11,7 @@ import { LoadingState, formatElapsed } from '@/components/bui/loading-state';
 import { CardPane, PageColumn, PageContent, Quiet, SubPane } from '@/components/layout/page';
 import { PromptBar, UserBubble, type PromptMenuItem, type PromptModel } from '@/components/bui/prompt-bar';
 import { ArchiveToggle, SessionHeader, SessionList } from '@/components/bui/session-list';
+import { AgentResponse } from '@/components/bui/agent-response';
 import { StreamingText } from '@/components/bui/streaming-text';
 import { TaskRows } from '@/components/bui/task-rows';
 import { ThinkingTrace, type TraceRow } from '@/components/bui/thinking';
@@ -250,27 +251,29 @@ function RunBlock({ group, run, onRetry, retrying, onFollowUp }: { group: RunGro
           <UserBubble>{text}</UserBubble>
         </div>
       ))}
-      <ThinkingTrace working={working} activeLabel={t('chat.run.thinking')} doneLabel={status === 'failed' ? t('chat.run.failedAfter', { took: took ?? '—' }) : t('chat.run.workedFor', { took: took ?? '—' })} rows={trace} defaultOpen={working} />
-      {tools.length || artifacts.length ? (
-        <ToolChips header={artifacts.length ? t('chat.run.toolCallsAndArtifacts', { tools: toolCalls, artifacts: artifactCount }) : toolCalls}
-          steps={tools.map((tool) => ({ key: tool.key, icon: toolIcon(tool.name), label: tool.done ? t('chat.run.calledChip') : t('chat.run.callingChip'), chip: tool.name, mono: true, active: !tool.done && working, ...(tool.artifact ? { detail: [{ text: `→ ${tool.artifact}` }] } : {}) }))}
-          files={artifacts.map((a) => ({ name: a.name, meta: `${Math.max(1, Math.round(a.sizeBytes / 1024))} KB` }))} />
-      ) : null}
-      {taskEvents.length ? (
-        <TaskRows rows={taskEvents.map((task) => ({ key: String(task.seq), label: task.title, status: task.status, amount: task.promotionMode, ...(task.taskId ? { onOpen: () => { window.location.assign(`/tasks/${task.taskId}`); } } : {}), details: [{ label: t('chat.run.task'), meta: task.taskId ?? '—' }, ...(task.reason ? [{ label: t('chat.run.reason'), meta: task.reason }] : [])] }))} />
-      ) : null}
-      {group.assistantText ? <StreamingText text={group.assistantText} streaming={working} followUps={working ? [] : [t('chat.followUps.summarize'), t('chat.followUps.next')]} onFollowUp={onFollowUp} />
-        : working ? <LoadingState label={t('chat.run.generating')} since={started} /> : null}
-      {errors.map(({ seq, error }) => {
-        const display = errorDisplay(error);
-        return (
-          <div key={seq} className="flex items-start gap-2.5 rounded-card bg-red-tint px-3 py-2.5 text-[13px]">
-            <span className="mt-0.5 grid size-4 shrink-0 place-items-center rounded-full bg-red text-white"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round"><path d="M12 6v8M12 18.5v.5" /></svg></span>
-            <div className="min-w-0 flex-1"><span className="font-medium text-red">{error.code}</span> <span className="text-ink-2">{display.text}</span>{display.detail ? <span className="ml-2 break-words font-mono text-[11px] text-faint">{display.detail}</span> : null}</div>
-            {status === 'failed' ? <Button size="sm" variant="secondary" onClick={onRetry} disabled={retrying}><RotateCw />{t('common.retry')}</Button> : null}
-          </div>
-        );
-      })}
+      <AgentResponse>
+        <ThinkingTrace working={working} activeLabel={t('chat.run.thinking')} doneLabel={status === 'failed' ? t('chat.run.failedAfter', { took: took ?? '—' }) : t('chat.run.workedFor', { took: took ?? '—' })} rows={trace} defaultOpen={working} />
+        {tools.length || artifacts.length ? (
+          <ToolChips header={artifacts.length ? t('chat.run.toolCallsAndArtifacts', { tools: toolCalls, artifacts: artifactCount }) : toolCalls}
+            steps={tools.map((tool) => ({ key: tool.key, icon: toolIcon(tool.name), label: tool.done ? t('chat.run.calledChip') : t('chat.run.callingChip'), chip: tool.name, mono: true, active: !tool.done && working, ...(tool.artifact ? { detail: [{ text: `→ ${tool.artifact}` }] } : {}) }))}
+            files={artifacts.map((a) => ({ name: a.name, meta: `${Math.max(1, Math.round(a.sizeBytes / 1024))} KB` }))} />
+        ) : null}
+        {taskEvents.length ? (
+          <TaskRows rows={taskEvents.map((task) => ({ key: String(task.seq), label: task.title, status: task.status, amount: task.promotionMode, ...(task.taskId ? { onOpen: () => { window.location.assign(`/tasks/${task.taskId}`); } } : {}), details: [{ label: t('chat.run.task'), meta: task.taskId ?? '—' }, ...(task.reason ? [{ label: t('chat.run.reason'), meta: task.reason }] : [])] }))} />
+        ) : null}
+        {group.assistantText ? <StreamingText text={group.assistantText} streaming={working} followUps={working ? [] : [t('chat.followUps.summarize'), t('chat.followUps.next')]} onFollowUp={onFollowUp} />
+          : working ? <LoadingState label={t('chat.run.generating')} since={started} /> : null}
+        {errors.map(({ seq, error }) => {
+          const display = errorDisplay(error);
+          return (
+            <div key={seq} className="flex items-start gap-2.5 rounded-card bg-red-tint px-3 py-2.5 text-[13px]">
+              <span className="mt-0.5 grid size-4 shrink-0 place-items-center rounded-full bg-red text-white"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round"><path d="M12 6v8M12 18.5v.5" /></svg></span>
+              <div className="min-w-0 flex-1"><span className="font-medium text-red">{error.code}</span> <span className="text-ink-2">{display.text}</span>{display.detail ? <span className="ml-2 break-words font-mono text-[11px] text-faint">{display.detail}</span> : null}</div>
+              {status === 'failed' ? <Button size="sm" variant="secondary" onClick={onRetry} disabled={retrying}><RotateCw />{t('common.retry')}</Button> : null}
+            </div>
+          );
+        })}
+      </AgentResponse>
     </section>
   );
 }
