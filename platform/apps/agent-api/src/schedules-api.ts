@@ -10,7 +10,7 @@ import type { AuthenticatedPrincipal } from '@sage/app-contracts';
 
 /**
  * /v1/schedules：创建/列表/详情/暂停/恢复/删除/触发历史。
- * 认证走 service token（stub 信任头在本链路不提权，见 production-identity 的 service token 模块）；
+ * 认证由运行时注入的身份解析器负责（当前为固定开发 principal；后续接用户登录/鉴权）；
  * 所有管理操作写不可变审计；FOLLOW 绑定在控制面记录锚点 Release；next fire 由设施 adapter 提供。
  */
 
@@ -34,6 +34,7 @@ export interface RegisterSchedulesRoutesOptions {
   readonly store: ScheduleControlStore;
   readonly adapter: SchedulePort;
   readonly releaseResolver: ScheduleApiReleaseResolver;
+  /** 运行时注入的身份解析器；当前为固定开发 principal，后续换成用户登录/鉴权。 */
   readonly authenticator: SchedulesPrincipalAuthenticator;
   readonly audit: ScheduleApiAuditPort;
   readonly now?: () => Date;
@@ -60,13 +61,12 @@ export function registerSchedulesRoutes(app: FastifyInstance, options: RegisterS
   };
 
   const principalFor = async (request: FastifyRequest): Promise<AuthenticatedPrincipal | undefined> => {
-    // service token 链路（5.1）：authenticator 只认 Bearer service token；明文信任头在本链路停止提权。
     return options.authenticator.authenticateRequest(request);
   };
 
   app.post<{ Body: unknown }>('/v1/schedules', async (request, reply) => {
     const principal = await principalFor(request);
-    if (principal === undefined) return sendError(reply, 401, 'SCHEDULE_AUTHENTICATION_REQUIRED', 'Schedule management requires a service token');
+    if (principal === undefined) return sendError(reply, 401, 'SCHEDULE_AUTHENTICATION_REQUIRED', 'Schedule API requires an authenticated principal');
     const body = request.body as Record<string, unknown> | null;
     const definition = (body ?? {})['definition'];
     const releaseId = (body ?? {})['releaseId'];
@@ -118,7 +118,7 @@ export function registerSchedulesRoutes(app: FastifyInstance, options: RegisterS
 
   app.get('/v1/schedules', async (request, reply) => {
     const principal = await principalFor(request);
-    if (principal === undefined) return sendError(reply, 401, 'SCHEDULE_AUTHENTICATION_REQUIRED', 'Schedule management requires a service token');
+    if (principal === undefined) return sendError(reply, 401, 'SCHEDULE_AUTHENTICATION_REQUIRED', 'Schedule API requires an authenticated principal');
     const records = await options.store.listRecords(options.tenantId, { limit: 200 });
     const schedules = await Promise.all(records.map(record => toApiSnapshot(record, options.adapter)));
     const response: ApiScheduleListResponse = { schemaVersion: 'ScheduleListResult.v1', schedules };
@@ -127,7 +127,7 @@ export function registerSchedulesRoutes(app: FastifyInstance, options: RegisterS
 
   app.get<{ Params: { scheduleId: string } }>('/v1/schedules/:scheduleId', async (request, reply) => {
     const principal = await principalFor(request);
-    if (principal === undefined) return sendError(reply, 401, 'SCHEDULE_AUTHENTICATION_REQUIRED', 'Schedule management requires a service token');
+    if (principal === undefined) return sendError(reply, 401, 'SCHEDULE_AUTHENTICATION_REQUIRED', 'Schedule API requires an authenticated principal');
     const record = await options.store.getRecord({ tenantId: options.tenantId, scheduleId: request.params.scheduleId });
     if (record === undefined || record.state === 'DELETED') return sendError(reply, 404, 'SCHEDULE_NOT_FOUND', `Schedule ${request.params.scheduleId} not found`);
     return reply.code(200).send(await toApiSnapshot(record, options.adapter));
@@ -135,7 +135,7 @@ export function registerSchedulesRoutes(app: FastifyInstance, options: RegisterS
 
   app.get<{ Params: { scheduleId: string }; Querystring: { limit?: string } }>('/v1/schedules/:scheduleId/triggers', async (request, reply) => {
     const principal = await principalFor(request);
-    if (principal === undefined) return sendError(reply, 401, 'SCHEDULE_AUTHENTICATION_REQUIRED', 'Schedule management requires a service token');
+    if (principal === undefined) return sendError(reply, 401, 'SCHEDULE_AUTHENTICATION_REQUIRED', 'Schedule API requires an authenticated principal');
     const limit = Math.min(Math.max(Number(request.query.limit ?? 50) || 50, 1), 200);
     const ref: ScheduleRef = { tenantId: options.tenantId, scheduleId: request.params.scheduleId };
     const events = await options.store.listTriggerEvents(ref, { limit });
@@ -144,7 +144,7 @@ export function registerSchedulesRoutes(app: FastifyInstance, options: RegisterS
 
   app.post<{ Params: { scheduleId: string; action: string } }>('/v1/schedules/:scheduleId/:action', async (request, reply) => {
     const principal = await principalFor(request);
-    if (principal === undefined) return sendError(reply, 401, 'SCHEDULE_AUTHENTICATION_REQUIRED', 'Schedule management requires a service token');
+    if (principal === undefined) return sendError(reply, 401, 'SCHEDULE_AUTHENTICATION_REQUIRED', 'Schedule API requires an authenticated principal');
     const action = request.params.action;
     if (action !== 'pause' && action !== 'resume') return sendError(reply, 404, 'SCHEDULE_NOT_FOUND', `Unknown schedule action ${action}`);
     const ref: ScheduleRef = { tenantId: options.tenantId, scheduleId: request.params.scheduleId };
@@ -166,7 +166,7 @@ export function registerSchedulesRoutes(app: FastifyInstance, options: RegisterS
 
   app.delete<{ Params: { scheduleId: string } }>('/v1/schedules/:scheduleId', async (request, reply) => {
     const principal = await principalFor(request);
-    if (principal === undefined) return sendError(reply, 401, 'SCHEDULE_AUTHENTICATION_REQUIRED', 'Schedule management requires a service token');
+    if (principal === undefined) return sendError(reply, 401, 'SCHEDULE_AUTHENTICATION_REQUIRED', 'Schedule API requires an authenticated principal');
     const ref: ScheduleRef = { tenantId: options.tenantId, scheduleId: request.params.scheduleId };
     const record = await options.store.getRecord(ref);
     if (record === undefined || record.state === 'DELETED') return sendError(reply, 404, 'SCHEDULE_NOT_FOUND', `Schedule ${ref.scheduleId} not found`);

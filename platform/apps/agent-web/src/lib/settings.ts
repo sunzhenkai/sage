@@ -5,7 +5,8 @@ export type Theme = 'light' | 'dark' | 'system';
 export interface Settings {
   /** Empty string = same origin (Vite dev/preview proxy forwards /v1 to agent-api). */
   apiBaseUrl: string;
-  serviceToken: string;
+  /** Bearer API key for the external MCP endpoint; never sent to /v1 web routes. */
+  mcpApiKey: string;
   tenantId: string;
   theme: Theme;
   /** UI language; 'auto' follows the browser. Settings stored before this field existed merge into the 'auto' default. */
@@ -13,13 +14,17 @@ export interface Settings {
 }
 
 const KEY = 'sage.agent-web.settings';
-const defaults: Settings = { apiBaseUrl: '', serviceToken: '', tenantId: 'tenant-local', theme: 'system', language: 'auto' };
+const defaults: Settings = { apiBaseUrl: '', mcpApiKey: '', tenantId: 'tenant-local', theme: 'system', language: 'auto' };
 const listeners = new Set<() => void>();
 
 function read(): Settings {
   try {
     const raw = localStorage.getItem(KEY);
-    return raw ? { ...defaults, ...(JSON.parse(raw) as Partial<Settings>) } : defaults;
+    if (!raw) return defaults;
+    const stored = JSON.parse(raw) as Partial<Settings> & { serviceToken?: string };
+    // Older builds stored the same key as `serviceToken` for every /v1 request.
+    const { serviceToken, ...rest } = stored;
+    return { ...defaults, ...rest, mcpApiKey: rest.mcpApiKey ?? serviceToken ?? '' };
   } catch {
     return defaults;
   }

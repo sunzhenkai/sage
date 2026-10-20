@@ -6,8 +6,8 @@ import type { AuthenticatedPrincipal } from '@sage/app-contracts';
  * D7：pilot 链路静态 service token 认证。
  * - `Authorization: Bearer <token>`；token 以 sha256 哈希注入（`SAGE_SERVICE_TOKEN_HASHES`，逗号分隔），
  *   常量时间比较，多 key 并存支持轮换；
- * - 配置生效时，packages/apps/runs/schedules/resolutions 五条链路仅认可 service token 主体，
- *   旧明文信任头 `x-authentication-id` 停止提权（与未认证一致）；
+ * - 只用于外部入口 `/mcp` 与 agent-worker 调用的内部 `/internal/schedule-dispatch/*`；
+ *   `/v1/*` web 链路不再校验 service token，暂由运行时固定开发 principal 占位，后续接用户登录/鉴权；
  * - 本地开发使用 dev token（见 architecture/runbooks/），经 compose env 注入。
  */
 export const SERVICE_TOKEN_HASHES_ENV = 'SAGE_SERVICE_TOKEN_HASHES';

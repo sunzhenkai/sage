@@ -22,11 +22,6 @@ export function apiUrl(path: string, query?: Record<string, string | number | bo
   return `${base}${path}${qs ? `?${qs}` : ''}`;
 }
 
-export function authHeaders(): Record<string, string> {
-  const token = getSettings().serviceToken.trim();
-  return token ? { authorization: `Bearer ${token}` } : {};
-}
-
 type Query = Record<string, string | number | boolean | undefined>;
 
 async function request<T>(method: string, path: string, options: { query?: Query; body?: unknown } = {}): Promise<T> {
@@ -39,7 +34,7 @@ async function request<T>(method: string, path: string, options: { query?: Query
     }
     return data as T;
   }
-  const headers: Record<string, string> = { accept: 'application/json', ...authHeaders() };
+  const headers: Record<string, string> = { accept: 'application/json' };
   const init: RequestInit = { method, headers };
   if (options.body !== undefined) { headers['content-type'] = 'application/json'; init.body = JSON.stringify(options.body); }
   else if (method === 'POST') { headers['content-type'] = 'application/json'; init.body = '{}'; }

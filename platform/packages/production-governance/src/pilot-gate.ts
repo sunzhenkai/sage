@@ -22,7 +22,7 @@ export interface PilotGateInput {
   readonly soakEvidence?: { readonly windowDays: number; readonly triggerCount: number; readonly successRate: number; readonly silentDuplicates: number } | undefined;
   /** 风险显式接受台账条目（含复评期限）。 */
   readonly riskLedger: readonly { readonly id: string; readonly description: string; readonly mitigation: string; readonly acceptedBy?: string; readonly reviewBy?: string }[];
-  /** 认证检查：service token 已接线（true）或 stub 仍可提权（false）。 */
+  /** 认证检查：外部入口（MCP / 内部派发）已强制凭据（true），或仍允许无凭据访问（false）。 */
   readonly serviceTokenWired: boolean;
   /** oncall roster 是否由真实主体提供（占位名视为 UNFILLED）。 */
   readonly oncallRosterReal: boolean;
@@ -67,11 +67,11 @@ export function evaluatePilotGate(input: PilotGateInput, now = new Date()): Pilo
     remediation: '为每条无人值守告警登记真实响应主体（oncall roster）与 runbook 链接，替换占位路由。'
   });
 
-  // 3) 认证：pilot 链路 service token 已接线，stub 信任头不再提权。
+  // 3) 认证：外部入口强制凭据；web→server 暂由固定开发 principal 占位，等用户登录/鉴权。
   items.push({
     id: 'service-token-auth', provided: input.serviceTokenWired,
-    detail: input.serviceTokenWired ? 'packages/apps/runs/schedules/resolutions 五条链路仅认可 service token' : 'UNFILLED — service token 未接线',
-    remediation: '以 SAGE_SERVICE_TOKEN_HASHES 注入服务 token（哈希，可轮换），五条链路停止提权 stub 信任头。'
+    detail: input.serviceTokenWired ? 'MCP 与内部 schedule-dispatch 强制凭据；/v1/* web 链路等待用户登录/鉴权' : 'UNFILLED — 外部入口凭据未接线',
+    remediation: '为 MCP 注入 SAGE_SERVICE_TOKEN_HASHES、为内部派发注入 SAGE_SERVICE_TOKEN；web 链路接入用户登录/鉴权。'
   });
 
   // 4) 风险台账：所有条目须有接受主体与复评期限（未关闭的 UNFILLED 项阻断 GO）。

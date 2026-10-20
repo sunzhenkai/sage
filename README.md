@@ -36,7 +36,7 @@ cd platform
 # 启动本地基础设施（Postgres / Temporal / MinIO）
 docker compose up -d --wait postgres temporal artifact-store
 
-# 启动应用服务（Schedule 管理 UI 需先配置 dev service token）
+# 启动应用服务（MCP 需先配置 dev API key；web 控制台暂不校验凭据）
 TOKEN=$(openssl rand -hex 32)
 printf 'SAGE_SERVICE_TOKEN=%s\nSAGE_SERVICE_TOKEN_HASHES=%s\n' "$TOKEN" "$(printf '%s' "$TOKEN" | sha256sum | cut -d' ' -f1)" >> .env
 
@@ -64,11 +64,11 @@ claude mcp add --transport http sage http://127.0.0.1:9610/mcp \
 ```
 
 - **URL**：`http://<host>:9610/mcp`
-- **控制台**：agent-web 设置页「MCP」区可直接查看接入地址与 API key（与「连接」页服务令牌同一把 key）、复制 `claude mcp add` 命令、并对端点跑一次 initialize + tools/list 连通性测试。
-- **鉴权**：`Authorization: Bearer <api-key>`。API key 集合复用 `SAGE_SERVICE_TOKEN_HASHES`（sha256 hash，逗号分隔可轮换）；fail-closed——未配置该 env 时全部 MCP 请求 401。key 明文（如 `SAGE_SERVICE_TOKEN`）与 hash 同源，一把 key 同时是 HTTP service token 与 MCP API key。
+- **控制台**：agent-web 设置页「MCP」区可直接填写 API key、复制接入地址与 `claude mcp add` 命令、并对端点跑一次 initialize + tools/list 连通性测试。浏览器访问的 `/v1/*` 接口不带凭据，等用户登录/鉴权功能接入。
+- **鉴权**：`Authorization: Bearer <api-key>`。API key 集合来自 `SAGE_SERVICE_TOKEN_HASHES`（sha256 hash，逗号分隔可轮换）；fail-closed——未配置该 env 时全部 MCP 请求 401。key 明文（如 `SAGE_SERVICE_TOKEN`）与 hash 同源，MCP API key 与 agent-worker 调内部 schedule-dispatch 的 token 共用这把 key。
 - **生成 key**：`openssl rand -hex 32`，hash 入 `SAGE_SERVICE_TOKEN_HASHES`（见上「快速开始」）。
 - **tools**：约 50 个，`{group}_{action}` 命名（chat / task / package / app / run / provider_catalog / provider_connection / schedule / effect / run_agent_settings）。SSE 流式端点不映射，用 `chat_get_events`（`afterSequence` 游标）等拉取替代。
-- **说明**：按 MCP 规范 authorization 为可选项，本实现用静态 `Bearer <api-key>`，不支持 OAuth 2.1 发现流程；持有该 key 即持有对应 service token 权限（schedules / effect-resolutions 等强认证链路同样放行）。
+- **说明**：按 MCP 规范 authorization 为可选项，本实现用静态 `Bearer <api-key>`，不支持 OAuth 2.1 发现流程；持有该 key 即可通过 MCP 调用全部 tools。
 - **运行态证据**：`cd platform/apps/agent-api && node scripts/mcp-evidence.mjs http://127.0.0.1:9610 $SAGE_SERVICE_TOKEN`，跑判据闭环 + 各资源组代表 tool + 鉴权失败路径，输出落 `platform/.evidence/mcp-server/`（gitignored）。
 
 ## 架构产物

@@ -134,9 +134,7 @@ export const en = {
       activity: 'Activity',
       activityDescription: 'Runs, sessions and task updates · last 12 weeks',
       scheduleTriggers: 'Schedule triggers',
-      scheduleTriggersNoToken: 'Requires a service token',
       scheduleTriggersCount: '{count} occurrences across {schedules} schedules',
-      scheduleTriggersEmptyNoToken: 'Add a service token in Settings',
       scheduleTriggersEmpty: 'No triggers in this range',
       providerUsage: 'Provider usage',
       providerUsageMock: 'Runs per connection',
@@ -357,11 +355,11 @@ export const en = {
   schedules: {
     new: 'New schedule',
     dialog: {
-      description: 'POST /v1/schedules — requires a service token.'
+      description: 'Run an agent app task on a cron or interval.'
     },
     empty: {
       title: 'No schedules',
-      hint: 'Run an agent app task on a cron or interval. Requires a service token.'
+      hint: 'Run an agent app task on a cron or interval.'
     },
     trigger: {
       cron: 'cron {expression} ({timezone})',
@@ -674,7 +672,6 @@ export const en = {
     },
     general: {
       apiBaseUrl: { title: 'API base URL', description: 'Empty = same origin; dev server proxies /v1 to :9610.', placeholder: 'Same origin' },
-      serviceToken: { title: 'Service token', description: 'Sent as Authorization: Bearer. Required for schedules.', placeholder: 'Not set' },
       tenantId: { title: 'Tenant ID', description: 'Must equal agent-api SAGE_TENANT_ID.' },
       saved: 'Saved',
       save: 'Save changes'
@@ -684,9 +681,8 @@ export const en = {
       endpoint: { title: 'Endpoint', description: 'Streamable HTTP URL for MCP clients; derived from the API base URL on the Connection page.' },
       apiKey: {
         title: 'API key',
-        description: 'The same key as the service token (SAGE_SERVICE_TOKEN_HASHES); sent as Authorization: Bearer.',
-        empty: 'Not set',
-        emptyHint: 'Set the service token on the Connection page',
+        description: 'Used only by external MCP clients, sent as Authorization: Bearer. Set the same key as SAGE_SERVICE_TOKEN_HASHES.',
+        placeholder: 'Not set',
         reveal: 'Show key',
         hide: 'Hide key'
       },
@@ -725,9 +721,7 @@ export const en = {
   ui: {
     loading: 'Loading',
     error: {
-      requestFailed: 'Request failed. ',
-      tokenRequired: 'Service token required. ',
-      addToken: 'Add token'
+      requestFailed: 'Request failed. '
     },
     combobox: {
       placeholder: 'Search…',
@@ -774,7 +768,6 @@ export const en = {
     PACKAGE_REGISTRATION_UNTRUSTED_FIELD: 'Untrusted fields were rejected.',
     PACKAGE_OPERATION_FORBIDDEN: 'This action needs the package-registrar role.',
     // schedules-api.ts
-    SCHEDULE_AUTHENTICATION_REQUIRED: 'Schedule management requires a service token.',
     SCHEDULE_RULE_INVALID: 'The schedule definition is invalid.',
     SCHEDULE_FORBIDDEN: 'Schedule tenant mismatch.',
     SCHEDULE_VALIDATION_FAILED: 'Schedule binding validation failed.',

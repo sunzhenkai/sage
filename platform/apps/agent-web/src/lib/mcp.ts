@@ -8,8 +8,8 @@
  * tools/list (returns the tool catalogue) — so the full SDK is not worth
  * pulling into the browser bundle.
  *
- * Auth: the same Bearer key as the service token on the Connection page
- * (SAGE_SERVICE_TOKEN_HASHES on the server); a missing or wrong key fails
+ * Auth: the Bearer key set in Settings → MCP (same key set as
+ * SAGE_SERVICE_TOKEN_HASHES on the server); a missing or wrong key fails
  * with 401 MCP_AUTHENTICATION_REQUIRED before any protocol handling.
  */
 

@@ -140,8 +140,8 @@ export function OverviewPage() {
             <Heatmap days={heatDays.map((d) => d.toISOString().slice(0, 10))} values={heat} color={ct.series[1]!} />
           </ChartCard>
 
-          <ChartCard className="lg:col-span-9" title={t('overview.charts.scheduleTriggers')} description={schedules.error ? t('overview.charts.scheduleTriggersNoToken') : t('overview.charts.scheduleTriggersCount', { count: triggers.length, schedules: schedules.data?.schedules.length ?? 0 })} actions={<Legend series={triggerSeries} />}>
-            {has(triggersByDay) ? <StackedBars data={triggersByDay} series={triggerSeries} height={200} /> : <GhostChart height={200} label={schedules.error ? t('overview.charts.scheduleTriggersEmptyNoToken') : t('overview.charts.scheduleTriggersEmpty')} />}
+          <ChartCard className="lg:col-span-9" title={t('overview.charts.scheduleTriggers')} description={schedules.error ? t('ui.error.requestFailed') : t('overview.charts.scheduleTriggersCount', { count: triggers.length, schedules: schedules.data?.schedules.length ?? 0 })} actions={<Legend series={triggerSeries} />}>
+            {has(triggersByDay) ? <StackedBars data={triggersByDay} series={triggerSeries} height={200} /> : <GhostChart height={200} label={schedules.error ? t('ui.error.requestFailed') : t('overview.charts.scheduleTriggersEmpty')} />}
           </ChartCard>
           <ChartCard className="lg:col-span-3" title={t('overview.charts.providerUsage')} description={isMock() ? t('overview.charts.providerUsageMock') : t('overview.charts.providerUsageLive')}>
             {providerUsage.length ? <BarList items={providerUsage} color={ct.series[0]!} /> : <GhostChart height={160} label={t('overview.charts.providerUsageEmpty')} />}
