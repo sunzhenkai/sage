@@ -314,6 +314,21 @@ export interface TaskPackageInputStore {
   getPackageInput(tenantId: string, taskId: string): Promise<TaskPackageInputRecord | undefined>;
 }
 
+/** 只读运行清单查询：按 release 聚合 task_package_input，用于 App 运行历史。 */
+export interface TaskPackageRunIndexFilter {
+  readonly releaseIds: readonly string[];
+  readonly limit: number;
+}
+export interface TaskPackageRunIndexEntry {
+  readonly taskId: string;
+  readonly releaseId: string;
+  readonly releaseDigest: string;
+  readonly createdAt: string;
+}
+export interface TaskPackageRunIndexStore {
+  listPackageRuns(tenantId: string, filter: TaskPackageRunIndexFilter): Promise<readonly TaskPackageRunIndexEntry[]>;
+}
+
 /** 包运行输出的物化记录：slice 提交成功后由 worker 写入，按 (tenant, task) 取回。 */
 export interface TaskRunOutputRecord {
   readonly tenantId: string;

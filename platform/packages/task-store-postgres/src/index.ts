@@ -5,7 +5,8 @@ import {
   type AgentSliceResult, type ExecuteAgentSliceInput, type ProviderConnectionAdapterKind, type ProviderConnectionRecord, type ProviderConnectionSource,
   type ProviderConnectionWrite, type ProviderCredentialSealed, type RouteDecision,
   type RunAgentSettingsRecord,
-  type SliceClaim, type TaskArtifactReference, type TaskListFilter, type TaskPackageInputRecord, type TaskProjection, type TaskProjectionEvent,
+  type SliceClaim, type TaskArtifactReference, type TaskListFilter, type TaskPackageInputRecord, type TaskPackageRunIndexEntry,
+  type TaskPackageRunIndexFilter, type TaskProjection, type TaskProjectionEvent,
   type TaskRunOutputRecord,
   type TaskProjectionView, type ProjectionRepairAudit, type ReconciliationCandidate, type TaskRoutingRecord,
   type TaskStorePort, type TaskReconciliationStore, type TaskLifecyclePath, type TaskStartClaim
@@ -48,6 +49,10 @@ interface RoutingRow extends QueryResultRow {
 interface PackageInputRow extends QueryResultRow {
   tenant_id: string; task_id: string; release_id: string; release_digest: string;
   assembled_input: string; asset_digests: unknown; run_contract: unknown; created_at: Date | string;
+}
+
+interface PackageRunIndexRow extends QueryResultRow {
+  task_id: string; release_id: string; release_digest: string; created_at: Date | string;
 }
 
 interface RunOutputRow extends QueryResultRow {
@@ -595,6 +600,27 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
       createdAt: iso(row.created_at)
     };
     return record;
+  }
+
+  async listPackageRuns(tenantId: string, filter: TaskPackageRunIndexFilter): Promise<readonly TaskPackageRunIndexEntry[]> {
+    if (typeof tenantId !== 'string' || filter === null || typeof filter !== 'object'
+      || !Array.isArray(filter.releaseIds) || filter.releaseIds.some((releaseId) => typeof releaseId !== 'string' || releaseId.length === 0)
+      || !Number.isInteger(filter.limit) || filter.limit < 1 || filter.limit > 100) {
+      throw new TaskStoreError('listPackageRuns.invalid');
+    }
+    if (filter.releaseIds.length === 0) return [];
+    const result = await this.#query<PackageRunIndexRow>('listPackageRuns', `SELECT
+      task_id, release_id, release_digest, created_at
+      FROM task_package_input
+      WHERE tenant_id=$1 AND release_id=ANY($2::text[])
+      ORDER BY created_at DESC, task_id DESC
+      LIMIT $3`, [tenantId, filter.releaseIds, filter.limit]);
+    return result.rows.map((row) => ({
+      taskId: row.task_id,
+      releaseId: row.release_id,
+      releaseDigest: row.release_digest,
+      createdAt: iso(row.created_at)
+    }));
   }
 
   async writeRunOutput(record: TaskRunOutputRecord): Promise<{ readonly status: 'stored' | 'existing' }> {

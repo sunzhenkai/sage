@@ -58,7 +58,9 @@ function sendError(reply: FastifyReply, status: number, code: string, message: s
   return reply.code(status).send({ error: { code, message, retryable } });
 }
 
-async function principalFor(request: FastifyRequest, options: RegisterAppsRoutesOptions): Promise<AuthenticatedPrincipal | undefined> {
+export type AppsAuthOptions = Pick<RegisterAppsRoutesOptions, 'tenantId' | 'serviceTokenRequired' | 'authenticator'>;
+
+export async function principalFor(request: FastifyRequest, options: AppsAuthOptions): Promise<AuthenticatedPrincipal | undefined> {
   if (options.authenticator.authenticateRequest) return options.authenticator.authenticateRequest(request);
   if (options.serviceTokenRequired === true) return undefined;
   const auth = request.headers['x-authentication-id'];
@@ -101,15 +103,19 @@ function appDetailPayload(store: AgentReleaseStore, tenantId: string, app: Agent
     createdAt: app.createdAt,
     ...(manifest === undefined ? {} : { manifest }),
     ...(assets === undefined ? {} : { assets }),
-    releases: detail.releases.map((record) => ({
-      packageVersion: record.packageVersion,
-      releaseRef: record.release.releaseRef,
-      releaseId: record.release.releaseId,
-      contentDigest: record.release.contentDigest,
-      lockDigest: record.release.lockDigest,
-      compilerBuild: record.release.provenance.compilerBuild,
-      createdAt: record.createdAt
-    }))
+    releases: detail.releases.map((record) => {
+      const releaseManifest = extractManifestSummary(record.lockPayload as Readonly<Record<string, unknown>>);
+      return {
+        packageVersion: record.packageVersion,
+        releaseRef: record.release.releaseRef,
+        releaseId: record.release.releaseId,
+        contentDigest: record.release.contentDigest,
+        lockDigest: record.release.lockDigest,
+        compilerBuild: record.release.provenance.compilerBuild,
+        createdAt: record.createdAt,
+        ...(releaseManifest === undefined ? {} : { manifest: releaseManifest })
+      };
+    })
   };
 }
 

@@ -28,6 +28,7 @@ const colors: Record<StatusKind, string> = {
 const statusKeys: Record<string, string> = {
   succeeded: 'status.succeeded', completed: 'status.completed', failed: 'status.failed', running: 'status.running',
   paused: 'status.paused', cancelled: 'status.cancelled', skipped: 'status.skipped', missed: 'status.missed',
+  pending: 'status.pending',
   effect_unknown: 'status.effectUnknown', active: 'status.active', available: 'status.available', alive: 'status.alive',
   ready: 'status.ready', disabled: 'status.disabled', stale: 'status.stale', unavailable: 'status.unavailable', promoted: 'status.promoted'
 };

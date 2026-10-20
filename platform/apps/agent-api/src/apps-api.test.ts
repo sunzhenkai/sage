@@ -112,6 +112,9 @@ describe('App management API', () => {
     expect(detail.json().releases).toHaveLength(2);
     expect(detail.json().releases[0].packageVersion).toBe('2.0.0');
     expect(detail.json().manifest).toBeDefined();
+    expect(detail.json().releases[0].manifest).toBeDefined();
+    expect(detail.json().releases[1].manifest).toBeDefined();
+    expect(detail.json().releases[0].manifest).toEqual(detail.json().manifest);
     await app.close();
   });
 

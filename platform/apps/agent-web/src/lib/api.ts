@@ -1,7 +1,8 @@
 import { isMock, mockGet, mockPost } from './mock';
 import { getSettings } from './settings';
 import type {
-  AppDetail, AppSummary, CatalogModelPage, CatalogProviderPage, CatalogStatus, ChatRun, Message, PackageSummary, ProviderConnection,
+  AppDetail, AppRunDetail, AppRunList, AppSummary, CatalogModelPage, CatalogProviderPage, CatalogStatus, ChatRun, Message, PackageDetail,
+  PackageRunResult, PackageSummary, ProviderConnection,
   ProviderConnectionCheck, ProviderConnectionCheckResult, ProviderConnectionWrite, RunAgentSettings,
   RunLogPage, ScheduleDefinition, ScheduleSnapshot, ScheduleTriggerEvent, Session, SessionDetail, SessionList, TaskArtifact, TaskEvent,
   TaskStatus, TaskView, TimelineEvent
@@ -88,13 +89,18 @@ export const api = {
   apps: {
     list: () => request<{ apps: AppSummary[] }>('GET', '/v1/apps'),
     get: (id: string) => request<AppDetail>('GET', `/v1/apps/${enc(id)}`),
+    runs: (id: string, query: { releaseId?: string | undefined; limit?: number | undefined } = {}) => request<AppRunList>('GET', `/v1/apps/${enc(id)}/runs`, { query }),
+    run: (id: string, taskId: string) => request<AppRunDetail>('GET', `/v1/apps/${enc(id)}/runs/${enc(taskId)}`),
     create: (body: { appId: string; name: string; description?: string }) => request<{ appId: string }>('POST', '/v1/apps', { body }),
     uploadRelease: (id: string, files: Record<string, string>) => request<{ releaseId: string }>('POST', `/v1/apps/${enc(id)}/releases`, { body: { files } }),
     remove: (id: string) => request<unknown>('DELETE', `/v1/apps/${enc(id)}`)
   },
+  releases: {
+    run: (releaseId: string, body: { task?: string; params?: Record<string, string | number> } = {}) => request<PackageRunResult>('POST', `/v1/releases/${enc(releaseId)}/runs`, { body })
+  },
   packages: {
     list: () => request<{ packages: PackageSummary[] }>('GET', '/v1/packages'),
-    get: (id: string) => request<Record<string, unknown>>('GET', `/v1/packages/${enc(id)}`)
+    get: (id: string) => request<PackageDetail>('GET', `/v1/packages/${enc(id)}`)
   },
 
   schedules: {
