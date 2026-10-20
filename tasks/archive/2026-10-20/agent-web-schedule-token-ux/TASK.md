@@ -11,6 +11,7 @@ evidence_root: platform/.evidence/agent-web-schedule-token-ux
 created: 2026-10-20
 updated: 2026-10-20
 archived: 2026-10-20
+merged: 2026-10-20
 ---
 
 # 优化定时任务服务令牌提示
@@ -58,3 +59,12 @@ archived: 2026-10-20
 - 用户登录/鉴权未实现，`/v1` web 链路目前使用固定开发 principal，这是用户明确接受的过渡状态；接登录时替换 runtime 注入的 `authenticator` 即可。
 - MCP API key 与 agent-worker 内部派发 token 继续共用 `SAGE_SERVICE_TOKEN_HASHES` / `SAGE_SERVICE_TOKEN`。
 - axe / 多视口证据门未跑：仓库未装 axe-core；本轮不是观感交付，已用浏览器加载与文案断言覆盖。
+- PR #4 合并跳过 driver / OpenSpec：任务在 wizard 直接定为 `full` 后手工完成，未建立 driver 与 checkbox；以本地测试、运行态冒烟和 PR 评审替代，属于流程偏离，不是未验证。
+
+## 归档记录
+
+- 结论：完成判据成立；PR #4 已合并到 `main`（merge commit `8c8ddc9`），未部署 `sage.lan`。
+- 关闭原因：合并后用户要求走收尾流程。
+- 未决：用户登录/鉴权未实现，`/v1` 固定 principal 为临时占位；MCP 与内部派发共用 `SAGE_SERVICE_TOKEN_HASHES` / `SAGE_SERVICE_TOKEN`。
+- driver 现状：未建 driver（未交接），无 checkbox。
+- 提交：`5930079`；PR：https://github.com/sunzhenkai/sage/pull/4
