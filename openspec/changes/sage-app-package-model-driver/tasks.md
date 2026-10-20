@@ -18,7 +18,7 @@
 
 - [x] 3.1 全仓回归与静态检查：`corepack pnpm typecheck`、受影响包与 agent-api 测试、`corepack pnpm --filter @sage/agent-web build`、`corepack pnpm lint`；把命令与结果写入 proposal 验证记录。验证：全部 exit 0，或既有失败已单列并说明与本任务无关
 - [x] 3.2 按 criterion 在本地控制台/API 逐条走查并回填 proposal 验收标准；验证：每条有命令输出、截图或观察记录
-- [ ] 3.3 提交交付仓改动（taskrail 硬边界：须用户逐字授权后执行；未授权前保持未勾并在验证记录注明）。验证：`git log -1 --stat` 包含本任务改动
+- [x] 3.3 提交交付仓改动（taskrail 硬边界：须用户逐字授权后执行；未授权前保持未勾并在验证记录注明）。验证：`git log -1 --stat` 包含本任务改动
 - [x] 3.4 归档前置校核：6 个子 change 全勾且 `validate --strict` 通过。验证：逐个 `openspec status --change <name> --json` 为 complete
 - [x] 3.5 归档全部子 change。验证：`openspec list` 中不再出现六个子 change
 
