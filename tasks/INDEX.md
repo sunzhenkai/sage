@@ -7,6 +7,7 @@
 | 任务 | 标题 | 更新 | 一句话 | 路径 |
 |------|------|------|--------|------|
 | agent-web-i18n | agent-web 多语言（中/英） | 2026-10-15 | 已交接：自动推断语言、默认英文、可手动切换 → agent-web-i18n-driver | `ongoing/agent-web-i18n/` |
+| import-example-apps | 应用页导入内置示例应用 | 2026-10-20 | 已交付：仓库示例导入、同名不覆盖、验证通过；待提交授权 → import-example-apps-driver | `ongoing/import-example-apps/` |
 
 ## Archived
 
