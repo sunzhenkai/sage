@@ -1,10 +1,9 @@
-import { authHeaders } from './api';
 import type { TimelineEvent } from './types';
 
 export type StreamState = 'connecting' | 'live' | 'reconnecting' | 'closed';
 
 /**
- * fetch-based SSE reader (EventSource cannot send the Authorization header).
+ * fetch-based SSE reader.
  * Reconnects with exponential backoff, resuming from the last seen `id:` (sequence).
  */
 export function streamTimeline(
@@ -21,7 +20,7 @@ export function streamTimeline(
     while (!controller.signal.aborted) {
       onState(attempt === 0 ? 'connecting' : 'reconnecting');
       try {
-        const response = await fetch(url(last), { headers: { accept: 'text/event-stream', ...authHeaders() }, signal: controller.signal });
+        const response = await fetch(url(last), { headers: { accept: 'text/event-stream' }, signal: controller.signal });
         if (!response.ok || !response.body) throw new Error(`HTTP ${response.status}`);
         onState('live');
         attempt = 0;

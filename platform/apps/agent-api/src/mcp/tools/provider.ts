@@ -133,13 +133,13 @@ export const providerConnectionTools: readonly ToolDef[] = [
 export const scheduleTools: readonly ToolDef[] = [
   {
     name: 'schedule_list',
-    description: 'List schedules (requires service token auth).',
+    description: 'List schedules.',
     schema: {},
     build: () => ({ method: 'GET', path: '/v1/schedules' }),
   },
   {
     name: 'schedule_create',
-    description: 'Create a schedule bound to a release (requires service token auth).',
+    description: 'Create a schedule bound to a release.',
     schema: {
       definition: z.unknown().describe('ApiScheduleDefinition payload'),
       releaseId: z.string().min(1),
@@ -148,13 +148,13 @@ export const scheduleTools: readonly ToolDef[] = [
   },
   {
     name: 'schedule_get',
-    description: 'Get a schedule by id (requires service token auth).',
+    description: 'Get a schedule by id.',
     schema: { scheduleId: z.string().min(1) },
     build: (a) => ({ method: 'GET', path: `/v1/schedules/${a.scheduleId}` }),
   },
   {
     name: 'schedule_get_triggers',
-    description: 'Get a schedule\'s trigger history (requires service token auth).',
+    description: 'Get a schedule\'s trigger history.',
     schema: { scheduleId: z.string().min(1), limit: z.string().optional() },
     build: (a) => ({
       method: 'GET',
@@ -164,19 +164,19 @@ export const scheduleTools: readonly ToolDef[] = [
   },
   {
     name: 'schedule_pause',
-    description: 'Pause a schedule (requires service token auth).',
+    description: 'Pause a schedule.',
     schema: { scheduleId: z.string().min(1) },
     build: (a) => ({ method: 'POST', path: `/v1/schedules/${a.scheduleId}/pause` }),
   },
   {
     name: 'schedule_resume',
-    description: 'Resume a schedule (requires service token auth).',
+    description: 'Resume a schedule.',
     schema: { scheduleId: z.string().min(1) },
     build: (a) => ({ method: 'POST', path: `/v1/schedules/${a.scheduleId}/resume` }),
   },
   {
     name: 'schedule_delete',
-    description: 'Delete a schedule (requires service token auth).',
+    description: 'Delete a schedule.',
     schema: { scheduleId: z.string().min(1) },
     build: (a) => ({ method: 'DELETE', path: `/v1/schedules/${a.scheduleId}` }),
   },
@@ -185,7 +185,7 @@ export const scheduleTools: readonly ToolDef[] = [
 export const effectTools: readonly ToolDef[] = [
   {
     name: 'effect_resolve',
-    description: 'Resolve a tool effect (idempotency-keyed, requires service token auth).',
+    description: 'Resolve a tool effect (idempotency-keyed).',
     schema: { body: z.unknown().describe('Effect resolution payload') },
     build: (a) => ({ method: 'POST', path: '/v1/effects/resolutions', body: a.body }),
   },

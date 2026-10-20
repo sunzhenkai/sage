@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Activity, Check, Code2, Copy, Eye, EyeOff, Keyboard, Monitor, Moon, Palette, Plug, RadioTower, RotateCcw, Server, Sun, X } from 'lucide-react';
 import { useState } from 'react';
-import { Link, Navigate, useParams } from 'react-router';
+import { Navigate, useParams } from 'react-router';
 import { CodeBlock } from '@/components/bui/code-block';
 import { ViewTab, ViewTabs } from '@/components/layout/app-shell';
 import { SettingsCard, SettingsEmpty, SettingsFooter, SettingsItem, SettingsSearch, SettingsShell, SettingsTitle, type SettingsNavItem } from '@/components/layout/settings-shell';
@@ -45,7 +45,7 @@ export function SettingsPage() {
   const id = section as PageId;
   const page = pages[id];
   const title = t(page.title);
-  const reset = id === 'appearance' ? () => { updateSettings({ theme: 'system' }); setLanguagePref('auto'); } : id === 'shortcuts' ? resetAllShortcuts : id === 'general' ? () => updateSettings({ apiBaseUrl: '', serviceToken: '', tenantId: 'tenant-local' }) : undefined;
+  const reset = id === 'appearance' ? () => { updateSettings({ theme: 'system' }); setLanguagePref('auto'); } : id === 'shortcuts' ? resetAllShortcuts : id === 'general' ? () => updateSettings({ apiBaseUrl: '', tenantId: 'tenant-local' }) : undefined;
   return (
     <SettingsShell groups={groups.map((g) => ({ label: t(g.label), items: g.items.map((i) => ({ ...i, label: t(i.label) })) }))} header={title}>
       <SettingsTitle title={title} description={t(page.description)}
@@ -116,12 +116,11 @@ function ShortcutsSection({ q }: { q: string }) {
 function ConnectionSection({ q }: { q: string }) {
   const t = useT();
   const settings = useSettings();
-  const [draft, setDraft] = useState({ apiBaseUrl: settings.apiBaseUrl, serviceToken: settings.serviceToken, tenantId: settings.tenantId });
+  const [draft, setDraft] = useState({ apiBaseUrl: settings.apiBaseUrl, tenantId: settings.tenantId });
   const [saved, setSaved] = useState(false);
-  const dirty = draft.apiBaseUrl !== settings.apiBaseUrl || draft.serviceToken !== settings.serviceToken || draft.tenantId !== settings.tenantId;
+  const dirty = draft.apiBaseUrl !== settings.apiBaseUrl || draft.tenantId !== settings.tenantId;
   const rows = [
     { key: 'u', keywords: 'api base url origin proxy', title: t('settings.general.apiBaseUrl.title'), description: t('settings.general.apiBaseUrl.description'), control: <Input className="w-[260px]" placeholder={t('settings.general.apiBaseUrl.placeholder')} value={draft.apiBaseUrl} onChange={(e) => setDraft({ ...draft, apiBaseUrl: e.target.value })} /> },
-    { key: 't', keywords: 'service token bearer auth', title: t('settings.general.serviceToken.title'), description: t('settings.general.serviceToken.description'), control: <Input className="w-[260px]" type="password" autoComplete="off" placeholder={t('settings.general.serviceToken.placeholder')} value={draft.serviceToken} onChange={(e) => setDraft({ ...draft, serviceToken: e.target.value })} /> },
     { key: 'n', keywords: 'tenant id', title: t('settings.general.tenantId.title'), description: t('settings.general.tenantId.description'), control: <Input className="w-[260px]" value={draft.tenantId} onChange={(e) => setDraft({ ...draft, tenantId: e.target.value })} /> }
   ].filter((r) => match(q, r.title, r.description, r.keywords));
   if (!rows.length) return <SettingsEmpty q={q} />;
@@ -163,14 +162,16 @@ function DeveloperSection({ q }: { q: string }) {
   );
 }
 
-/** MCP access for external clients (Claude Code etc.): endpoint + key (shared with the service token) + connect command + live probe. */
+/** MCP access for external clients (Claude Code etc.): endpoint + API key + connect command + live probe. */
 function McpSection({ q }: { q: string }) {
   const t = useT();
   const settings = useSettings();
   const endpoint = mcpEndpoint(settings.apiBaseUrl);
-  const command = mcpConnectCommand(settings.apiBaseUrl, settings.serviceToken);
-  const hasKey = settings.serviceToken.trim().length > 0;
+  const command = mcpConnectCommand(settings.apiBaseUrl, settings.mcpApiKey);
+  const hasKey = settings.mcpApiKey.trim().length > 0;
+  const [draftKey, setDraftKey] = useState(settings.mcpApiKey);
   const [reveal, setReveal] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [copied, setCopied] = useState<'endpoint' | 'key' | null>(null);
   const [probe, setProbe] = useState<{ state: 'idle' } | { state: 'running' } | { state: 'done'; result: McpProbeResult }>({ state: 'idle' });
   const copy = async (value: string, kind: 'endpoint' | 'key') => {
@@ -181,7 +182,13 @@ function McpSection({ q }: { q: string }) {
   };
   const runProbe = async () => {
     setProbe({ state: 'running' });
-    setProbe({ state: 'done', result: await mcpProbe({ baseUrl: settings.apiBaseUrl, token: settings.serviceToken }) });
+    setProbe({ state: 'done', result: await mcpProbe({ baseUrl: settings.apiBaseUrl, token: settings.mcpApiKey }) });
+  };
+  const saveKey = () => {
+    updateSettings({ mcpApiKey: draftKey.trim() });
+    setSaved(true);
+    setProbe({ state: 'idle' });
+    setTimeout(() => setSaved(false), 1500);
   };
   if (!match(q, t('settings.mcp.card'), t('settings.mcp.endpoint.title'), t('settings.mcp.endpoint.description'), t('settings.mcp.apiKey.title'), t('settings.mcp.apiKey.description'), t('settings.mcp.command.title'), t('settings.mcp.command.description'), t('settings.mcp.test.title'), t('settings.mcp.test.description'), 'mcp endpoint api key claude tools/list initialize bearer')) return <SettingsEmpty q={q} />;
   const result = probe.state === 'done' ? probe.result : undefined;
@@ -192,15 +199,11 @@ function McpSection({ q }: { q: string }) {
         <Button size="sm" variant="secondary" onClick={() => void copy(endpoint, 'endpoint')}>{copied === 'endpoint' ? <Check /> : <Copy />}{copied === 'endpoint' ? t('common.copied') : t('common.copy')}</Button>
       </SettingsItem>
       <SettingsItem title={t('settings.mcp.apiKey.title')} description={t('settings.mcp.apiKey.description')}>
-        {hasKey ? (
-          <>
-            <span className="font-mono text-[12px] text-ink">{reveal ? settings.serviceToken : '•'.repeat(Math.min(settings.serviceToken.length, 24))}</span>
-            <Button size="icon-sm" variant="ghost" title={reveal ? t('settings.mcp.apiKey.hide') : t('settings.mcp.apiKey.reveal')} aria-label={reveal ? t('settings.mcp.apiKey.hide') : t('settings.mcp.apiKey.reveal')} onClick={() => setReveal(!reveal)}>{reveal ? <EyeOff /> : <Eye />}</Button>
-            <Button size="sm" variant="secondary" onClick={() => void copy(settings.serviceToken, 'key')}>{copied === 'key' ? <Check /> : <Copy />}{copied === 'key' ? t('common.copied') : t('common.copy')}</Button>
-          </>
-        ) : (
-          <Link to="/settings/general" className="text-[12.5px] font-medium text-accent-ink hover:underline">{t('settings.mcp.apiKey.emptyHint')}</Link>
-        )}
+        <Input className="w-[260px]" type={reveal ? 'text' : 'password'} autoComplete="off" placeholder={t('settings.mcp.apiKey.placeholder')} value={draftKey} onChange={(e) => setDraftKey(e.target.value)} />
+        <Button size="icon-sm" variant="ghost" title={reveal ? t('settings.mcp.apiKey.hide') : t('settings.mcp.apiKey.reveal')} aria-label={reveal ? t('settings.mcp.apiKey.hide') : t('settings.mcp.apiKey.reveal')} onClick={() => setReveal(!reveal)}>{reveal ? <EyeOff /> : <Eye />}</Button>
+        <Button size="sm" variant="secondary" disabled={draftKey.trim() === settings.mcpApiKey} onClick={saveKey}>{t('settings.general.save')}</Button>
+        {hasKey ? <Button size="sm" variant="secondary" onClick={() => void copy(settings.mcpApiKey, 'key')}>{copied === 'key' ? <Check /> : <Copy />}{copied === 'key' ? t('common.copied') : t('common.copy')}</Button> : null}
+        {saved ? <span className="t-meta">{t('settings.general.saved')}</span> : null}
       </SettingsItem>
       <SettingsItem title={t('settings.mcp.command.title')} description={t('settings.mcp.command.description')} stacked>
         <CodeBlock code={command} filename="terminal" className="w-full" />

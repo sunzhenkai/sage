@@ -138,9 +138,7 @@ export const zhCN = {
       activity: '活跃度',
       activityDescription: '运行、会话与任务更新 · 最近 12 周',
       scheduleTriggers: '定时任务触发',
-      scheduleTriggersNoToken: '需要服务令牌',
       scheduleTriggersCount: '触发 {count} 次，覆盖 {schedules} 个定时任务',
-      scheduleTriggersEmptyNoToken: '在设置中添加服务令牌',
       scheduleTriggersEmpty: '该范围内没有触发',
       providerUsage: '供应商用量',
       providerUsageMock: '每个连接的运行数',
@@ -361,11 +359,11 @@ export const zhCN = {
   schedules: {
     new: '新建定时任务',
     dialog: {
-      description: 'POST /v1/schedules——需要服务令牌。'
+      description: '按 cron 或间隔运行智能体应用任务。'
     },
     empty: {
       title: '没有定时任务',
-      hint: '按 cron 或间隔运行智能体应用任务。需要服务令牌。'
+      hint: '按 cron 或间隔运行智能体应用任务。'
     },
     trigger: {
       cron: 'cron {expression}（{timezone}）',
@@ -678,7 +676,6 @@ export const zhCN = {
     },
     general: {
       apiBaseUrl: { title: 'API 基础 URL', description: '留空 = 同源；开发服务器将 /v1 代理到 :9610。', placeholder: '同源' },
-      serviceToken: { title: '服务令牌', description: '以 Authorization: Bearer 发送。定时任务需要。', placeholder: '未设置' },
       tenantId: { title: '租户 ID', description: '必须与 agent-api 的 SAGE_TENANT_ID 一致。' },
       saved: '已保存',
       save: '保存更改'
@@ -688,9 +685,8 @@ export const zhCN = {
       endpoint: { title: '接入地址', description: '供 MCP 客户端连接的 Streamable HTTP 地址，随「连接」页的 API 基础地址推导。' },
       apiKey: {
         title: 'API Key',
-        description: '与服务令牌同一把 key（SAGE_SERVICE_TOKEN_HASHES），以 Authorization: Bearer 发送。',
-        empty: '未设置',
-        emptyHint: '请先到「连接」页设置服务令牌',
+        description: '仅用于外部 MCP 客户端，以 Authorization: Bearer 发送。填与 SAGE_SERVICE_TOKEN_HASHES 对应的同一把 key。',
+        placeholder: '未设置',
         reveal: '显示 key',
         hide: '隐藏 key'
       },
@@ -729,9 +725,7 @@ export const zhCN = {
   ui: {
     loading: '加载中',
     error: {
-      requestFailed: '请求失败。',
-      tokenRequired: '需要服务令牌。',
-      addToken: '添加令牌'
+      requestFailed: '请求失败。'
     },
     combobox: {
       placeholder: '搜索…',
@@ -777,7 +771,6 @@ export const zhCN = {
     PACKAGE_REGISTRATION_UNTRUSTED_FIELD: '包含不被信任的字段，已拒绝。',
     PACKAGE_OPERATION_FORBIDDEN: '该操作需要发布包注册者角色。',
     // schedules-api.ts
-    SCHEDULE_AUTHENTICATION_REQUIRED: '定时任务管理需要服务令牌。',
     SCHEDULE_RULE_INVALID: '定时任务定义不合法。',
     SCHEDULE_FORBIDDEN: '定时任务租户不匹配。',
     SCHEDULE_VALIDATION_FAILED: '定时任务绑定校验未通过。',

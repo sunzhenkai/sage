@@ -16,9 +16,10 @@ pnpm --filter @sage/agent-web preview    # serves dist with the same proxy
 
 The dev/preview server proxies `/v1`, `/livez`, `/readyz` to `AGENT_API_URL` (default `http://127.0.0.1:9610`).
 Override the port with `AGENT_WEB_PORT`. In **Settings** you can instead point the browser straight at another
-API base URL (agent-api must then allow CORS), set a **service token** (sent as `Authorization: Bearer …`; required by
-`/v1/schedules`), the **tenant id** used in schedule definitions, and the theme (light / dark / system).
-Settings live in `localStorage` (`sage.agent-web.settings`).
+API base URL (agent-api must then allow CORS), set the **tenant id** used in schedule definitions, and the theme
+(light / dark / system). `/v1` requests carry no credentials yet — user login/auth is the next layer. The **MCP** page
+holds the API key used only by external MCP clients (same key as `SAGE_SERVICE_TOKEN_HASHES`).
+Settings live in `localStorage` (`sage.agent-web.settings`); older `serviceToken` values migrate to `mcpApiKey`.
 
 ## Pages → endpoints
 

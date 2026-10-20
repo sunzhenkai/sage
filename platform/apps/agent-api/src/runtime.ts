@@ -244,11 +244,9 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
       deploymentMode: 'local',
       snapshotConnector: buildSnapshotEgressConnector(process.env[SNAPSHOT_EGRESS_ALLOWLIST_ENV])
     });
-    // service token（配置即强认证）+ schedules 管理链路 + dispatcher 内部解析端点。
+    // service token 只用于 MCP 外部入口与 dispatcher 内部解析端点。
+    // schedules 管理链路是 web→server：当前复用固定开发 principal，后续由用户登录/鉴权接管。
     const serviceToken = ServiceTokenAuthenticator.fromEnv(process.env, config.tenantId);
-    // schedules 管理链路口径（与运行门「schedule 管理必须服务身份认证」一致）：
-    // 配置了 SAGE_SERVICE_TOKEN_HASHES 时只认 Bearer service token（stub 信任头不提权）；
-    // 未配置时对所有请求 fail closed（401）。调用方需自行持有凭据并注入 Bearer service token。
     registerSchedulesRoutes(app, {
       tenantId: config.tenantId,
       store: new InMemoryScheduleControlStore(),
@@ -273,7 +271,7 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
           }
         }
       },
-      authenticator: { authenticateRequest: (request) => serviceToken?.authenticateRequest(request) },
+      authenticator,
       audit: { append: async (input: { readonly tenantId: string; readonly occurredAt: string; readonly category: 'schedule'; readonly decision: string; readonly reasonCode: string; readonly actorRef: string; readonly correlation: Readonly<Record<string, string | number>>; readonly authorityDigest: string }) => { process.stdout.write(`[schedule-audit] ${JSON.stringify(input)}\n`); } },
     });
     const scheduleDispatchToken = serviceToken;
