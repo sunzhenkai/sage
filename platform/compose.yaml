@@ -65,6 +65,8 @@ services:
       SAGE_PACKAGE_SNAPSHOT_EGRESS_ALLOWLIST: api.github.com,api.frankfurter.dev,query1.finance.yahoo.com
       # 可选：提供三项完整值时，agent-api 启动即注册真实 deployment-env provider（冒烟垂直链路用）。
       SAGE_BOOTSTRAP_PROVIDER_API_KEY: ${SAGE_BOOTSTRAP_PROVIDER_API_KEY:-}
+      SAGE_BOOTSTRAP_PROVIDER_NAME: ${SAGE_BOOTSTRAP_PROVIDER_NAME:-}
+      SAGE_BOOTSTRAP_PROVIDER_ADAPTER: ${SAGE_BOOTSTRAP_PROVIDER_ADAPTER:-}
       # MCP API key 的 sha256（hex，逗号分隔可轮换）；同时用于 agent-worker 调内部 schedule-dispatch 校验。
       SAGE_SERVICE_TOKEN_HASHES: ${SAGE_SERVICE_TOKEN_HASHES:-}
       # Schedule 设施由 agent-api（控制面）直连 Temporal Schedules。
