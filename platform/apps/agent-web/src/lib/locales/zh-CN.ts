@@ -457,9 +457,25 @@ export const zhCN = {
     }
   },
   apps: {
+    import: {
+      action: '导入示例应用',
+      title: '导入示例应用',
+      description: '仓库内置的示例源包。同名应用不会被覆盖。',
+      choose: '示例',
+      loading: '正在读取示例…',
+      importing: '正在导入…',
+      success: '已导入 {app}，{files} 个源文件已进入应用。',
+      exists: '{app} 已存在，未做任何修改。',
+      failed: '导入失败。',
+      view: '查看应用',
+      done: '完成',
+      retry: '重试',
+      existsHidden: '服务端已有同 ID 应用但当前列表未显示（例如该应用已被删除）。示例导入只在全新创建应用时可用，请换一个示例。',
+      existsBadge: '已导入'
+    },
     empty: {
       title: '没有应用',
-      hint: '通过 agent-api 注册智能体包（pnpm --filter @sage/agent-api register-package）。'
+      hint: '可直接导入内置示例，或通过 agent-api 注册智能体包（pnpm --filter @sage/agent-api register-package）。'
     },
     all: {
       title: '全部应用',
@@ -473,6 +489,20 @@ export const zhCN = {
       releases: '发布',
       created: '创建时间',
       lastUpdate: '最后更新'
+    },
+    examples: {
+      finance: {
+        name: '财经简报',
+        description: '获取外汇汇率与全球主要股指快照，生成结构化财经简报。'
+      },
+      github: {
+        name: 'GitHub 热门项目',
+        description: '读取 GitHub trending 快照，产出排名解读、亮点与趋势摘要。'
+      },
+      lifecycle: {
+        name: '生命周期探针',
+        description: '最小示例包，无输入与参考资料，适合验证创建 → 发布 → 运行链路。'
+      }
     },
     detail: {
       deleteConfirm: '删除应用 {app}？',
@@ -716,6 +746,7 @@ export const zhCN = {
    */
   errors: {
     // apps-api.ts
+    APP_ALREADY_EXISTS: '同 ID 的应用已存在。',
     APP_AUTHENTICATION_REQUIRED: '应用 API 需要身份认证。',
     APP_NOT_FOUND: '应用不存在。',
     APP_OPERATION_REJECTED: '应用操作被拒绝。',

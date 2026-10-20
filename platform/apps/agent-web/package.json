@@ -5,10 +5,10 @@
   "type": "module",
   "scripts": {
     "clean": "rm -rf dist",
-    "dev": "vite",
+    "dev": "node scripts/prepare-examples.mjs && vite",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "build": "node scripts/check-design.mjs && tsc -p tsconfig.json --noEmit && vite build",
-    "preview": "vite preview",
+    "build": "node scripts/prepare-examples.mjs && node scripts/check-design.mjs && tsc -p tsconfig.json --noEmit && vite build",
+    "preview": "node scripts/prepare-examples.mjs && vite preview",
     "check:design": "node scripts/check-design.mjs"
   },
   "dependencies": {

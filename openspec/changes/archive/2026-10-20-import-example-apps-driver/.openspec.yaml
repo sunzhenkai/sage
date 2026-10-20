@@ -1,0 +1,5 @@
+schema: spec-driven
+skip_specs: true
+created: 2026-10-20
+goal: 应用页可从仓库内置示例中导入一个示例应用，导入成功后应用列表和详情可用；重复导入同名示例时明确提示已存在且不覆盖；typecheck、build
+  与相关测试通过。方案 design/import-example-apps.md；批准 approve/APPROVED.md

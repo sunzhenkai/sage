@@ -93,6 +93,8 @@ export const api = {
   apps: {
     list: () => request<{ apps: AppSummary[] }>('GET', '/v1/apps'),
     get: (id: string) => request<AppDetail>('GET', `/v1/apps/${enc(id)}`),
+    create: (body: { appId: string; name: string; description?: string }) => request<{ appId: string }>('POST', '/v1/apps', { body }),
+    uploadRelease: (id: string, files: Record<string, string>) => request<{ releaseId: string }>('POST', `/v1/apps/${enc(id)}/releases`, { body: { files } }),
     remove: (id: string) => request<unknown>('DELETE', `/v1/apps/${enc(id)}`)
   },
   packages: {

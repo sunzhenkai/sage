@@ -12,6 +12,7 @@
 /** Codes with a dedicated sentence in the `errors` dictionary (exact match wins over families). */
 export const API_ERROR_CODES = [
   // apps-api.ts
+  'APP_ALREADY_EXISTS',
   'APP_AUTHENTICATION_REQUIRED',
   'APP_NOT_FOUND',
   'APP_OPERATION_REJECTED',

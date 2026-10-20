@@ -453,9 +453,25 @@ export const en = {
     }
   },
   apps: {
+    import: {
+      action: 'Import example app',
+      title: 'Import example app',
+      description: 'Bundled source packages from this repository. Existing apps are never overwritten.',
+      choose: 'Example',
+      loading: 'Loading example…',
+      importing: 'Importing…',
+      success: 'Imported {app}. {files} source files are now available in the app.',
+      exists: '{app} is already registered. Nothing was changed.',
+      failed: 'Import failed.',
+      view: 'View app',
+      done: 'Done',
+      retry: 'Retry',
+      existsHidden: 'An app with this id already exists server-side but is not listed (for example, it was deleted). Example app ids are restored only when the app is newly created, so choose another example.',
+      existsBadge: 'Registered'
+    },
     empty: {
       title: 'No apps',
-      hint: 'Register an agent package via agent-api (pnpm --filter @sage/agent-api register-package).'
+      hint: 'Import a bundled example here, or register an agent package via agent-api (pnpm --filter @sage/agent-api register-package).'
     },
     all: {
       title: 'All apps',
@@ -469,6 +485,20 @@ export const en = {
       releases: 'Releases',
       created: 'Created',
       lastUpdate: 'Last update'
+    },
+    examples: {
+      finance: {
+        name: 'Finance briefing',
+        description: 'Fetches FX rates and global index snapshots, then writes a structured market brief.'
+      },
+      github: {
+        name: 'GitHub trending',
+        description: 'Reads a GitHub trending snapshot and produces a ranked digest with highlights.'
+      },
+      lifecycle: {
+        name: 'Lifecycle probe',
+        description: 'Smallest package with no inputs or references; useful for a create → release → run smoke test.'
+      }
     },
     detail: {
       deleteConfirm: 'Delete app {app}?',
@@ -713,6 +743,7 @@ export const en = {
    */
   errors: {
     // apps-api.ts
+    APP_ALREADY_EXISTS: 'An app with this id already exists.',
     APP_AUTHENTICATION_REQUIRED: 'App API requires authentication.',
     APP_NOT_FOUND: 'App not found.',
     APP_OPERATION_REJECTED: 'The app operation was rejected.',

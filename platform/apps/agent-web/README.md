@@ -27,7 +27,7 @@ Settings live in `localStorage` (`sage.agent-web.settings`).
 | `/chat`, `/chat/:sessionId` | `GET/POST /v1/chat/sessions`, `GET/DELETE /v1/chat/sessions/:id`, `POST …/archive`, `POST …/unarchive`, `POST …/messages`, `GET …/events`, `GET …/timeline` (SSE, resumed via `afterSequence`), `POST /v1/chat/runs/:runId/retry`, `GET /v1/run-agent/settings` (provider picker) |
 | `/tasks` | `GET /v1/tasks?status&limit` |
 | `/tasks/:taskId` | `GET /v1/tasks/:id`, `GET …/events`, `GET …/run-logs`, `GET …/artifacts`, `GET …/artifacts/:artifactId`, `POST …/signals` (pause/resume), `POST …/cancel`, `POST …/retry` |
-| `/apps`, `/apps/:appId` | `GET /v1/apps`, `GET /v1/apps/:id`, `DELETE /v1/apps/:id` |
+| `/apps`, `/apps/:appId` | `GET /v1/apps`, `GET /v1/apps/:id`, `POST /v1/apps`, `POST /v1/apps/:id/releases`, `DELETE /v1/apps/:id` |
 | `/packages`, `/packages/:id` | `GET /v1/packages`, `GET /v1/packages/:id` |
 | `/schedules`, `/schedules/:id` | `GET/POST /v1/schedules`, `GET/DELETE /v1/schedules/:id`, `GET …/triggers`, `POST …/pause`, `POST …/resume` |
 | `/providers` | `GET/POST /v1/provider-connections`, `DELETE /v1/provider-connections/:id`, `GET/PUT /v1/run-agent/settings`, `GET /v1/provider-catalog/{status,providers,models}`, `POST /v1/provider-catalog/check-connection` |
@@ -37,6 +37,17 @@ Not surfaced (yet): `POST /v1/tasks` (needs a pre-staged `task-input://` ref), `
 (client method exists, no edit UI), `POST /v1/provider-catalog/sync` (requires the `provider-catalog-admin` role),
 `POST /v1/chat/messages/:id/promotions`, `POST /v1/effects/resolutions`, `POST /v1/production/effects/:id/resolution`,
 `/internal/*`.
+
+## Import bundled example apps
+
+`Apps → Import example app` imports one of the source packages under `platform/examples/ai-apps`
+(`finance-briefing`, `github-trending`, `lifecycle-probe`). Dev and build run
+`scripts/prepare-examples.mjs`, which copies the packages to `/examples/ai-apps/...`; there is no
+separate import API. The browser creates the app (`POST /v1/apps`) and uploads its source files
+(`POST /v1/apps/:id/releases`). Apps whose id is already registered are never overwritten. Because
+app ids are soft-deleted server-side, an id that was previously deleted cannot be re-created; the
+dialog reports that instead of modifying it. Add a new example to the list in `src/lib/example-apps.ts`
+when adding one under `examples/ai-apps`.
 
 ## Notes
 
