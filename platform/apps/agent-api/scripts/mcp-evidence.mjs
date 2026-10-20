@@ -52,9 +52,9 @@ try {
 
   const { tools } = await client.listTools();
   const names = tools.map((t) => t.name);
-  const groups = ['chat', 'task', 'package', 'app', 'run', 'provider_catalog', 'provider_connection', 'schedule', 'effect', 'run_agent_settings'];
+  const groups = ['chat', 'task', 'app', 'run', 'provider_catalog', 'provider_connection', 'schedule', 'effect', 'run_agent_settings'];
   const missing = groups.filter((g) => !names.some((n) => n === g || n.startsWith(`${g}_`)));
-  ok('tools/list 覆盖 10 资源组', missing.length === 0, missing.length ? `缺: ${missing.join(',')}` : `${names.length} tools`);
+  ok('tools/list 覆盖 9 资源组', missing.length === 0, missing.length ? `缺: ${missing.join(',')}` : `${names.length} tools`);
 
   const created = await client.callTool({ name: 'chat_create_session', arguments: { title: 'MCP evidence' } });
   const sessionId = created.structuredContent?.sessionId;
@@ -65,7 +65,7 @@ try {
   ok('chat_get_events', Array.isArray(events.structuredContent?.events));
 
   const reps = [
-    ['task_list', {}], ['package_list', {}], ['app_list', {}],
+    ['task_list', {}], ['app_list', {}],
     ['provider_catalog_get_status', {}], ['provider_connection_list', {}],
     ['schedule_list', {}], ['run_agent_settings_get', {}],
   ];

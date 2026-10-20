@@ -88,8 +88,9 @@ export function registerAppRunsRoutes(app: FastifyInstance, options: RegisterApp
     async (request, reply) => {
       const principal = await principalFor(request, options);
       if (principal === undefined) return sendError(reply, 401, 'APP_AUTHENTICATION_REQUIRED', 'App API requires authentication');
-      const detail = options.store.getApp(options.tenantId, request.params.appId);
-      if (detail === undefined) return sendError(reply, 404, 'APP_NOT_FOUND', 'App not found');
+      const app = options.store.getApp(options.tenantId, request.params.appId);
+      if (app === undefined) return sendError(reply, 404, 'APP_NOT_FOUND', 'App not found');
+      const releases = options.store.listAppReleases(options.tenantId, request.params.appId);
       const limit = queryLimit(request.query);
       if (limit === undefined) return sendError(reply, 400, 'INVALID_APP_RUN_QUERY', `limit must be an integer between 1 and ${MAX_LIMIT}`);
       let releaseIds: readonly string[];
@@ -98,12 +99,12 @@ export function registerAppRunsRoutes(app: FastifyInstance, options: RegisterApp
         if (typeof filteredReleaseId !== 'string' || !RELEASE_ID.test(filteredReleaseId)) {
           return sendError(reply, 400, 'INVALID_APP_RUN_QUERY', 'releaseId must be sha256:<64 lowercase hex>');
         }
-        if (releaseById(detail.releases, filteredReleaseId) === undefined) {
+        if (releaseById(releases, filteredReleaseId) === undefined) {
           return sendError(reply, 404, 'APP_RELEASE_NOT_FOUND', 'Release does not belong to this app');
         }
         releaseIds = [filteredReleaseId];
       } else {
-        releaseIds = detail.releases.map((release) => release.release.releaseId);
+        releaseIds = releases.map((release) => release.release.releaseId);
       }
       try {
         const entries = await options.packageRuns.listPackageRuns(options.tenantId, { releaseIds, limit });
@@ -112,7 +113,7 @@ export function registerAppRunsRoutes(app: FastifyInstance, options: RegisterApp
         return {
           schemaVersion: 'AppRunList.v1',
           appId: request.params.appId,
-          runs: entries.map((entry, index) => runSummary(entry, releaseById(detail.releases, entry.releaseId), views[index]))
+          runs: entries.map((entry, index) => runSummary(entry, releaseById(releases, entry.releaseId), views[index]))
         };
       } catch {
         return sendError(reply, 503, 'APP_RUN_HISTORY_UNAVAILABLE', 'App run history is temporarily unavailable', true);
@@ -125,12 +126,12 @@ export function registerAppRunsRoutes(app: FastifyInstance, options: RegisterApp
     async (request, reply) => {
       const principal = await principalFor(request, options);
       if (principal === undefined) return sendError(reply, 401, 'APP_AUTHENTICATION_REQUIRED', 'App API requires authentication');
-      const detail = options.store.getApp(options.tenantId, request.params.appId);
-      if (detail === undefined) return sendError(reply, 404, 'APP_NOT_FOUND', 'App not found');
+      const app = options.store.getApp(options.tenantId, request.params.appId);
+      if (app === undefined) return sendError(reply, 404, 'APP_NOT_FOUND', 'App not found');
       try {
         const input = await options.packageInputs.getPackageInput(options.tenantId, request.params.taskId);
         if (input === undefined) return sendError(reply, 404, 'APP_RUN_NOT_FOUND', 'Run not found');
-        const release = releaseById(detail.releases, input.releaseId);
+        const release = releaseById(options.store.listAppReleases(options.tenantId, request.params.appId), input.releaseId);
         if (release === undefined) return sendError(reply, 404, 'APP_RUN_NOT_FOUND', 'Run not found');
         const view = await options.taskViews.getTaskView(options.tenantId, request.params.taskId, now(), freshnessThresholdMs);
         return {

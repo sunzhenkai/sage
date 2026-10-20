@@ -1,6 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, Boxes, Check, CircleDot, Clock, Hash, Package, PackagePlus, Play, Tags, Trash2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import {
+  ArrowRight, Boxes, Check, CircleDot, Clock, Download, FileText, Folder, GitBranch, Hash, PackagePlus,
+  Play, Plus, RefreshCw, Save, Tags, Trash2, Upload
+} from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { Crumb, PageHeader } from '@/components/layout/app-shell';
 import { Monogram, StatusPill, Tag, toneFor } from '@/components/bui/atoms';
@@ -12,15 +15,17 @@ import { StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DetailLayout, ListRow, Pill, Property, PropertyGroup, RowId, RowMeta, RowTitle } from '@/components/ui/list';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Field, Input, Textarea } from '@/components/ui/input';
 import { Empty, ErrorState, JsonView, Loading, Mono } from '@/components/ui/misc';
 import { StatusIcon, statusLabelKey } from '@/components/ui/status';
 import { Sparkline, useChartTheme } from '@/components/charts';
 import { ApiError, api } from '@/lib/api';
+import { saveBlob } from '@/lib/download';
 import { EXAMPLE_APPS, importExampleApp } from '@/lib/example-apps';
 import { errorDisplay } from '@/lib/error-message';
 import { useT } from '@/lib/i18n';
 import { isMock, mockSeries } from '@/lib/mock';
-import type { AppRelease } from '@/lib/types';
+import type { AppDraft, AppRelease, AppReleaseResult } from '@/lib/types';
 import { formatTime, relativeTime } from '@/lib/utils';
 
 export function AppsPage() {
@@ -32,27 +37,85 @@ export function AppsPage() {
   const ct = useChartTheme();
   return (
     <>
-      <PageHeader title={t('nav.apps')} actions={<ImportExampleApps />} />
+      <PageHeader title={t('nav.apps')} actions={<><CreateAppButton /><ImportExampleApps /></>} />
       <PageContent width="wide">
         {apps.isLoading ? <Loading /> : apps.error ? <ErrorState error={apps.error} /> : !items.length ? (
-          <Empty icon={Boxes} title={t('apps.empty.title')} hint={t('apps.empty.hint')} />
+          <Empty icon={Boxes} title={t('apps.empty.title')} hint={t('apps.empty.hint')}>
+            <CreateAppButton />
+            <ImportExampleApps />
+          </Empty>
         ) : (
           <Section title={t('apps.all.title')} description={t('apps.all.description')} count={items.length}>
           <RecordsTable rows={items} getKey={(a) => a.appId} onRowClick={(a) => { void navigate(`/apps/${a.appId}`); }}
             columns={[
-              { key: 'app', label: t('apps.columns.app'), icon: <Boxes />, width: '32%', sort: (x, y) => x.appId.localeCompare(y.appId), render: (a) => <span className="flex min-w-0 items-center gap-2"><Monogram text={a.appId} /><span className="truncate">{a.appId}</span></span> },
-              { key: 'status', label: t('apps.columns.status'), icon: <CircleDot />, width: 130, sort: (x, y) => x.status.localeCompare(y.status), render: (a) => { const key = statusLabelKey(a.status); return <StatusPill tone={toneFor(a.status)}>{key === undefined ? a.status[0]!.toUpperCase() + a.status.slice(1) : t(key)}</StatusPill>; } },
-              { key: 'version', label: t('apps.columns.latestVersion'), icon: <Tags />, width: 150, render: (a) => a.latestVersion ? <Tag>{`v${a.latestVersion}`}</Tag> : <span className="text-ink-3">—</span> },
-              { key: 'usage', label: t('apps.columns.runs'), icon: <Hash />, width: 150, render: (a) => isMock() ? <span className="block h-5 w-full"><Sparkline values={mockSeries(a.appId, 14)} color={a.status === 'active' ? ct.series[0]! : ct.series[5]!} height={20} /></span> : <span className="text-ink-3">—</span> },
-              { key: 'releases', label: t('apps.columns.releases'), icon: <Hash />, width: 110, align: 'right', sort: (x, y) => x.releaseCount - y.releaseCount, render: (a) => <span className="tabular-nums text-ink-2">{a.releaseCount}</span> },
-              { key: 'created', label: t('apps.columns.created'), icon: <Clock />, width: 140, sort: (x, y) => x.createdAt.localeCompare(y.createdAt), render: (a) => <span className="text-ink-2">{relativeTime(a.createdAt)}</span> },
-              { key: 'updated', label: t('apps.columns.lastUpdate'), icon: <Clock />, width: 140, sort: (x, y) => x.updatedAt.localeCompare(y.updatedAt), render: (a) => <span className="text-ink-2">{relativeTime(a.updatedAt)}</span> }
+              { key: 'app', label: t('apps.columns.app'), icon: <Boxes />, width: '28%', sort: (x, y) => x.appId.localeCompare(y.appId), render: (a) => <span className="flex min-w-0 items-center gap-2"><Monogram text={a.appId} /><span className="truncate">{a.appId}</span></span> },
+              { key: 'status', label: t('apps.columns.status'), icon: <CircleDot />, width: 120, sort: (x, y) => x.status.localeCompare(y.status), render: (a) => { const key = statusLabelKey(a.status); return <StatusPill tone={toneFor(a.status)}>{key === undefined ? a.status[0]!.toUpperCase() + a.status.slice(1) : t(key)}</StatusPill>; } },
+              { key: 'version', label: t('apps.columns.latestVersion'), icon: <Tags />, width: 140, render: (a) => a.latestVersion ? <Tag>{`v${a.latestVersion}`}</Tag> : <span className="text-ink-3">—</span> },
+              { key: 'draft', label: t('apps.columns.draft'), icon: <FileText />, width: 130, render: (a) => a.hasUnpublishedChanges ? <Pill color="var(--amber)">{t('apps.columns.unpublished')}</Pill> : <span className="text-ink-3">—</span> },
+              { key: 'usage', label: t('apps.columns.runs'), icon: <Hash />, width: 140, render: (a) => isMock() ? <span className="block h-5 w-full"><Sparkline values={mockSeries(a.appId, 14)} color={a.status === 'active' ? ct.series[0]! : ct.series[5]!} height={20} /></span> : <span className="text-ink-3">—</span> },
+              { key: 'releases', label: t('apps.columns.releases'), icon: <Hash />, width: 100, align: 'right', sort: (x, y) => x.releaseCount - y.releaseCount, render: (a) => <span className="tabular-nums text-ink-2">{a.releaseCount}</span> },
+              { key: 'created', label: t('apps.columns.created'), icon: <Clock />, width: 130, sort: (x, y) => x.createdAt.localeCompare(y.createdAt), render: (a) => <span className="text-ink-2">{relativeTime(a.createdAt)}</span> },
+              { key: 'updated', label: t('apps.columns.lastUpdate'), icon: <Clock />, width: 130, sort: (x, y) => x.updatedAt.localeCompare(y.updatedAt), render: (a) => <span className="text-ink-2">{relativeTime(a.updatedAt)}</span> }
             ]}
             footer={<span className="ml-auto">{statuses.map((st) => `${items.filter((a) => a.status === st).length} ${st}`).join(' · ')}</span>} />
           </Section>
         )}
       </PageContent>
     </>
+  );
+}
+
+function CreateAppButton() {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Button variant="secondary" onClick={() => setOpen(true)}><Plus />{t('apps.new.action')}</Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent title={t('apps.new.title')} description={t('apps.new.description')}>
+          <CreateAppForm onClose={() => setOpen(false)} />
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+function CreateAppForm({ onClose }: { onClose: () => void }) {
+  const t = useT();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [appId, setAppId] = useState('');
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const create = useMutation({
+    mutationFn: () => api.apps.create({
+      appId: appId.trim(),
+      ...(name.trim() ? { name: name.trim() } : {}),
+      ...(description.trim() ? { description: description.trim() } : {})
+    }),
+    onSuccess: async (app) => {
+      await queryClient.invalidateQueries({ queryKey: ['apps'] });
+      onClose();
+      void navigate(`/apps/${encodeURIComponent(app.appId)}`);
+    }
+  });
+  return (
+    <form className="flex flex-col gap-3" onSubmit={(event) => { event.preventDefault(); create.mutate(); }}>
+      <Field label={t('apps.new.appId')} hint={t('apps.new.appIdHint')}>
+        <Input required pattern={'^[a-z0-9][a-z0-9._\\-]{2,127}$'} value={appId} onChange={(event) => setAppId(event.target.value)} />
+      </Field>
+      <Field label={t('apps.new.name')} hint={t('apps.new.nameHint')}>
+        <Input value={name} maxLength={128} onChange={(event) => setName(event.target.value)} />
+      </Field>
+      <Field label={t('apps.new.descriptionLabel')}>
+        <Textarea rows={3} maxLength={2048} value={description} onChange={(event) => setDescription(event.target.value)} />
+      </Field>
+      {create.error ? <ErrorState error={create.error} /> : null}
+      <div className="flex justify-end gap-2">
+        <Button type="button" variant="secondary" onClick={onClose}>{t('common.cancel')}</Button>
+        <Button type="submit" disabled={create.isPending}>{create.isPending ? t('apps.new.creating') : t('apps.new.submit')}</Button>
+      </div>
+    </form>
   );
 }
 
@@ -108,7 +171,7 @@ function ImportExampleDialog({ onClose }: { onClose: () => void }) {
         return;
       }
       setState({ kind: 'success', appId: result.appId, files: result.files });
-      await Promise.all([queryClient.invalidateQueries({ queryKey: ['apps'] }), queryClient.invalidateQueries({ queryKey: ['packages'] })]);
+      await queryClient.invalidateQueries({ queryKey: ['apps'] });
     } catch (error) {
       const message = errorDisplay(error);
       const created = !existing.has(example.appId) && !(error instanceof ApiError && error.code === 'APP_ALREADY_EXISTS');
@@ -213,7 +276,7 @@ export function AppDetailPage() {
         <DetailLayout properties={<>
           <PropertyGroup title={t('apps.detail.properties')}>
             <Property label={t('apps.detail.status')}><StatusBadge status={app.data.status} /></Property>
-            <Property label={t('apps.detail.version')}><Mono>{manifest?.version ?? '—'}</Mono></Property>
+            <Property label={t('apps.detail.version')}><Mono>{manifest?.version ?? app.data.latestVersion ?? '—'}</Mono></Property>
             <Property label={t('apps.detail.entry')}><Mono>{manifest?.entry ?? '—'}</Mono></Property>
             <Property label={t('apps.detail.model')}>{manifest?.modelRoute ? <Mono>{`${manifest.modelRoute.provider} / ${manifest.modelRoute.model}`}</Mono> : null}</Property>
             <Property label={t('apps.detail.created')}>{formatTime(app.data.createdAt)}</Property>
@@ -226,7 +289,8 @@ export function AppDetailPage() {
           </PropertyGroup>
         </>}>
           <PageContent>
-            <PageDescription title={appId} description={description ?? t('apps.detail.descriptionFallback')} />
+            <PageDescription title={appId} description={app.data.description ?? description ?? t('apps.detail.descriptionFallback')} />
+            <DraftPanel appId={appId} hasUnpublishedChanges={app.data.hasUnpublishedChanges} />
             <Section card title={t('apps.detail.releases')} count={releases.length}>
             <>{releases.map((release) => (
               <ListRow key={release.releaseId}>
@@ -234,7 +298,7 @@ export function AppDetailPage() {
                 <RowTitle sub={<Mono>{shortDigest(release.releaseId)}</Mono>}>{`v${release.packageVersion}`}</RowTitle>
                 <RowMeta>
                   <span className="text-faint">{formatTime(release.createdAt)}</span>
-                  <Link className="flex items-center gap-1 text-accent-ink hover:underline" to={`/packages/${encodeURIComponent(appId)}`}><Package className="size-3.5" />{t('apps.detail.openPackage')}</Link>
+                  <Link className="flex items-center gap-1 text-accent-ink hover:underline" to={`/apps/${encodeURIComponent(appId)}/releases/${encodeURIComponent(release.releaseId)}`}><GitBranch className="size-3.5" />{t('apps.detail.openRelease')}</Link>
                   <Button size="sm" variant="secondary" disabled={isMock()} title={isMock() ? t('apps.run.mockDisabled') : undefined} onClick={() => setRunRelease(release)}><Play />{t('apps.detail.run')}</Button>
                 </RowMeta>
               </ListRow>
@@ -283,11 +347,228 @@ export function AppDetailPage() {
               </details>
             ))}</>
             </Section>
-            <Section title={t('apps.detail.rawManifest')}><JsonView value={manifest} filename="manifest.json" /></Section>
+            {manifest === undefined ? null : <Section title={t('apps.detail.rawManifest')}><JsonView value={manifest} filename="manifest.json" /></Section>}
           </PageContent>
         </DetailLayout>
       ) : null}
       <RunReleaseDialog appId={appId} release={runRelease} manifest={runRelease?.manifest ?? manifest} onClose={() => setRunRelease(undefined)} />
     </>
+  );
+}
+
+const versionFromFiles = (files: Record<string, string>): string | undefined =>
+  /^version:\s*['"]?([^'"\s]+)['"]?\s*$/m.exec(files['app.yaml'] ?? '')?.[1];
+
+const firstPath = (files: Record<string, string>): string | undefined => {
+  const paths = Object.keys(files).sort((a, b) => a.localeCompare(b));
+  return paths.find((path) => path === 'app.yaml') ?? paths.find((path) => path.startsWith('prompts/')) ?? paths[0];
+};
+
+const fingerprint = (files: Record<string, string>) =>
+  JSON.stringify(Object.entries(files).sort(([a], [b]) => a.localeCompare(b)));
+
+type DraftMessage = { tone: 'ok' | 'warn' | 'error'; text: string; release?: AppReleaseResult };
+
+function DraftPanel({ appId, hasUnpublishedChanges }: { appId: string; hasUnpublishedChanges: boolean }) {
+  const t = useT();
+  const queryClient = useQueryClient();
+  const draftQuery = useQuery({ queryKey: ['app-draft', appId], queryFn: () => api.apps.getDraft(appId) });
+  const [seed, setSeed] = useState<AppDraft>();
+  const [files, setFiles] = useState<Record<string, string>>();
+  const [revision, setRevision] = useState<number>();
+  const [selectedPath, setSelectedPath] = useState<string>();
+  const [message, setMessage] = useState<DraftMessage>();
+  const [uploading, setUploading] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const uploadRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const draft = draftQuery.data;
+    if (draft === undefined || seed !== undefined) return;
+    adoptDraft(draft);
+  }, [draftQuery.data, seed]);
+
+  function adoptDraft(draft: AppDraft): void {
+    setSeed(draft);
+    setFiles(draft.files);
+    setRevision(draft.revision);
+    setSelectedPath((current) => (current !== undefined && draft.files[current] !== undefined ? current : firstPath(draft.files)));
+  }
+
+  const dirty = seed !== undefined && files !== undefined && fingerprint(files) !== fingerprint(seed.files);
+  const version = files === undefined ? undefined : versionFromFiles(files);
+  const paths = files === undefined ? [] : Object.keys(files).sort((a, b) => a.localeCompare(b));
+  const groups = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const path of Object.keys(files ?? {}).sort((a, b) => a.localeCompare(b))) {
+      const cut = path.lastIndexOf('/');
+      const dir = cut === -1 ? '' : path.slice(0, cut);
+      const list = map.get(dir);
+      if (list === undefined) map.set(dir, [path]); else list.push(path);
+    }
+    return [...map.entries()];
+  }, [files]);
+
+  const fail = (error: unknown) => {
+    if (error instanceof ApiError && error.code === 'APP_DRAFT_CONFLICT') {
+      const current = Number(error.details?.['currentRevision']);
+      setMessage({ tone: 'warn', text: t('apps.draft.conflict', { revision: Number.isFinite(current) ? current : '?' }) });
+      void queryClient.invalidateQueries({ queryKey: ['app-draft', appId] });
+      return;
+    }
+    if (error instanceof ApiError && error.code === 'RELEASE_VERSION_CONFLICT') {
+      setMessage({ tone: 'error', text: t('apps.draft.versionConflict', { version: version ?? '?' }) });
+      return;
+    }
+    if (error instanceof ApiError && error.code === 'MOCK_IMPORT_UNSUPPORTED') {
+      setMessage({ tone: 'warn', text: t('apps.draft.uploadUnsupported') });
+      return;
+    }
+    const display = errorDisplay(error);
+    setMessage({ tone: 'error', text: [display.text, display.detail].filter(Boolean).join(' ') });
+  };
+
+  const save = useMutation({
+    mutationFn: () => api.apps.putDraft(appId, files ?? {}, revision),
+    onSuccess: async (draft) => {
+      adoptDraft(draft);
+      setMessage({ tone: 'ok', text: t('apps.draft.saved', { revision: draft.revision }) });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['app', appId] }),
+        queryClient.invalidateQueries({ queryKey: ['app-draft', appId] })
+      ]);
+    },
+    onError: fail
+  });
+
+  const publish = useMutation({
+    mutationFn: () => api.apps.publish(appId, revision ?? -1),
+    onSuccess: async (result) => {
+      setMessage({
+        tone: 'ok',
+        text: result.status === 'existing' ? t('apps.draft.existing', { version: result.packageVersion }) : t('apps.draft.published', { version: result.packageVersion }),
+        release: result
+      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['app', appId] }),
+        queryClient.invalidateQueries({ queryKey: ['app-draft', appId] }),
+        queryClient.invalidateQueries({ queryKey: ['apps'] })
+      ]);
+    },
+    onError: fail
+  });
+
+  const upload = async (file: File) => {
+    setUploading(true);
+    setMessage(undefined);
+    try {
+      const draft = await api.apps.importDraft(appId, file, file.name, revision);
+      adoptDraft(draft);
+      setMessage({ tone: 'ok', text: t('apps.draft.uploadDone', { revision: draft.revision }) });
+      await queryClient.invalidateQueries({ queryKey: ['app', appId] });
+    } catch (error) {
+      fail(error);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const download = async () => {
+    setDownloading(true);
+    setMessage(undefined);
+    try {
+      saveBlob(await api.apps.exportDraft(appId), `${appId}-draft.tar.gz`);
+    } catch (error) {
+      const display = errorDisplay(error);
+      setMessage({ tone: 'error', text: `${t('apps.draft.downloadFailed')} ${[display.text, display.detail].filter(Boolean).join(' ')}` });
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const reload = async () => {
+    setMessage(undefined);
+    const result = await draftQuery.refetch();
+    if (result.data !== undefined) adoptDraft(result.data);
+  };
+
+  const busy = save.isPending || publish.isPending || uploading;
+  const publishBlocked = dirty || revision === undefined || paths.length === 0;
+
+  return (
+    <Section card title={t('apps.draft.title')} description={t('apps.draft.description')}>
+      {draftQuery.isLoading ? <Loading rows={3} /> : draftQuery.error ? <ErrorState error={draftQuery.error} /> : files !== undefined ? (
+        <>
+          <div className="flex flex-wrap items-center gap-2 border-b border-line gutter-x py-2.5">
+            <Pill><Mono>{revision === undefined ? '—' : `r${revision}`}</Mono></Pill>
+            <Pill>{t('apps.draft.files', { count: paths.length })}</Pill>
+            <Pill>{t('apps.draft.version')} <Mono>{version ?? '—'}</Mono></Pill>
+            <Pill>{t('apps.draft.digest')} <Mono>{seed?.digest.replace(/^sha256:/, '').slice(0, 10) ?? '—'}</Mono></Pill>
+            <Pill color={dirty ? 'var(--blue)' : hasUnpublishedChanges ? 'var(--amber)' : 'var(--green)'}>
+              {dirty ? t('apps.draft.unsaved') : hasUnpublishedChanges ? t('apps.draft.unpublished') : t('apps.draft.clean')}
+            </Pill>
+            <div className="ml-auto flex flex-wrap items-center gap-1.5">
+              <Button variant="ghost" size="sm" title={t('apps.draft.reload')} aria-label={t('apps.draft.reload')} onClick={() => { void reload(); }} disabled={busy}><RefreshCw /></Button>
+              <Button variant="secondary" size="sm" onClick={() => uploadRef.current?.click()} disabled={busy}><Upload />{uploading ? t('apps.draft.uploading') : t('apps.draft.upload')}</Button>
+              <Button variant="secondary" size="sm" onClick={() => { void download(); }} disabled={busy || downloading}><Download />{downloading ? t('apps.release.downloading') : t('apps.draft.download')}</Button>
+              <Button variant="secondary" size="sm" onClick={() => save.mutate()} disabled={!dirty || revision === undefined || busy}><Save />{save.isPending ? t('apps.draft.saving') : t('apps.draft.save')}</Button>
+              <Button size="sm" onClick={() => publish.mutate()} disabled={publishBlocked || busy} title={dirty ? t('apps.draft.saveFirst') : paths.length === 0 ? t('apps.draft.empty') : undefined}><GitBranch />{publish.isPending ? t('apps.draft.publishing') : t('apps.draft.publish')}</Button>
+            </div>
+            <input ref={uploadRef} type="file" accept=".tar.gz,.tgz,application/gzip" className="hidden" onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = '';
+              if (file !== undefined) void upload(file);
+            }} />
+          </div>
+          <div className="flex min-h-[320px] flex-col md:flex-row">
+            <div className="w-full shrink-0 border-b border-line p-2 md:w-56 md:border-b-0 md:border-r">
+              {groups.length === 0 ? <p className="px-2 py-3 text-[12px] text-faint">{t('apps.draft.noFiles')}</p> : groups.map(([dir, entries]) => (
+                <div key={dir || '.'} className="mb-1.5">
+                  <div className="flex items-center gap-1.5 px-2 py-1 text-[11px] font-medium uppercase tracking-wide text-faint">
+                    <Folder className="size-3.5" />{dir === '' ? '/' : dir}
+                  </div>
+                  {entries.map((path) => {
+                    const name = dir === '' ? path : path.slice(dir.length + 1);
+                    const active = path === selectedPath;
+                    return (
+                      <button key={path} type="button" aria-pressed={active} title={path}
+                        onClick={() => setSelectedPath(path)}
+                        className={`flex w-full items-center gap-1.5 rounded-md py-1.5 ps-4 pe-2 text-left text-[12.5px] transition-colors ${active ? 'bg-hover-2 text-ink' : 'text-ink-2 hover:bg-hover'}`}>
+                        <FileText className="size-3.5 shrink-0 text-faint" /><span className="truncate">{name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+            <div className="flex min-h-[280px] min-w-0 flex-1 flex-col">
+              {selectedPath === undefined ? (
+                <p className="gutter-x py-6 text-[12.5px] text-faint">{t('apps.draft.selectFile')}</p>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2 border-b border-line gutter-x py-1.5">
+                    <Mono className="truncate text-faint">{selectedPath}</Mono>
+                    {dirty ? <span className="ml-auto shrink-0 text-[11px] text-amber">{t('apps.draft.unsaved')}</span> : null}
+                  </div>
+                  <Textarea spellCheck={false} aria-label={selectedPath} value={files[selectedPath] ?? ''}
+                    onChange={(event) => { const value = event.target.value; setFiles((current) => current === undefined ? current : { ...current, [selectedPath]: value }); }}
+                    className="min-h-[280px] flex-1 resize-none rounded-none border-0 px-3 py-3 font-mono text-[12px] leading-5 focus:shadow-none" />
+                </>
+              )}
+            </div>
+          </div>
+          {message === undefined ? null : (
+            <div role="status" className={`flex flex-wrap items-center gap-2 border-t border-line gutter-x py-2 text-[12.5px] ${message.tone === 'ok' ? 'text-green' : message.tone === 'warn' ? 'text-amber' : 'text-red'}`}>
+              <span>{message.text}</span>
+              {message.release?.status === 'stored' ? (
+                <Link className="flex items-center gap-1 text-accent-ink hover:underline" to={`/apps/${encodeURIComponent(appId)}/releases/${encodeURIComponent(message.release.releaseId)}`}>
+                  <GitBranch className="size-3.5" />{`v${message.release.packageVersion}`}
+                </Link>
+              ) : null}
+            </div>
+          )}
+        </>
+      ) : null}
+    </Section>
   );
 }

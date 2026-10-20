@@ -623,3 +623,243 @@ describe('App subject management', () => {
     expect(subject.getApp('tenant-a', 'other-app')).toBeUndefined();
   });
 });
+
+describe('App draft and release publication', () => {
+  const draftFiles = (overrides: Record<string, string> = {}) => ({
+    'app.yaml': 'id: my-app\nversion: 1.0.0\nentry: prompts/task.md\n',
+    'prompts/task.md': 'Do the task.\n',
+    ...overrides
+  });
+
+  const releaseFor = (packageId: string, overrides: { version?: string; releaseLetter?: string; contentLetter?: string } = {}): ReleasePayload => {
+    const releaseId = digest(overrides.releaseLetter ?? 'a');
+    return release({
+      releaseRef: `release://${releaseId}`,
+      releaseId,
+      packageRef: `package://owner/${packageId}`,
+      packageId,
+      packageVersion: overrides.version ?? '1.0.0',
+      contentDigest: digest(overrides.contentLetter ?? 'c')
+    });
+  };
+
+  const newApp = (subject: InMemoryAgentReleaseStore, appId = 'my-app') => {
+    subject.createApp({ tenantId: 'tenant-a', ownerNamespace: 'package-platform', appId, name: 'My App', description: 'desc' });
+    return appId;
+  };
+
+  const publishInput = (
+    subject: InMemoryAgentReleaseStore,
+    appId: string,
+    overrides: {
+      expectedRevision?: number;
+      packageVersion?: string;
+      idempotencyKey?: string;
+      release?: ReleasePayload;
+      sourceFiles?: Record<string, string>;
+      sourceFilesDigest?: string;
+    } = {}
+  ) => {
+    const revision = overrides.expectedRevision ?? subject.getApp('tenant-a', appId)?.app.draft.revision ?? 0;
+    const files = overrides.sourceFiles ?? draftFiles();
+    const digestValue = overrides.sourceFilesDigest
+      ?? subject.getApp('tenant-a', appId)?.app.draft.digest
+      ?? 'sha256:missing';
+    return {
+      tenantId: 'tenant-a',
+      ownerNamespace: 'package-platform',
+      appId,
+      expectedRevision: revision,
+      packageVersion: overrides.packageVersion ?? '1.0.0',
+      idempotencyKey: overrides.idempotencyKey ?? 'publish-1',
+      release: overrides.release ?? releaseFor(appId, { version: overrides.packageVersion ?? '1.0.0' }),
+      lockPayload: { schemaVersion: '1', packageDigest: digest('b') },
+      sourceFiles: files,
+      sourceFilesDigest: digestValue
+    };
+  };
+
+  it('creates an app with an empty revision-0 draft', () => {
+    const subject = store();
+    const app = subject.createApp({ tenantId: 'tenant-a', ownerNamespace: 'package-platform', appId: 'my-app' });
+    expect(app.draft.revision).toBe(0);
+    expect(app.draft.files).toEqual({});
+    expect(app.draft.digest).toMatch(/^sha256:[a-f0-9]{64}$/);
+    expect(app.draft.updatedAt).toBe(app.createdAt);
+    expect(subject.getApp('tenant-a', 'my-app')?.app.draft.revision).toBe(0);
+  });
+
+  it('stores a draft, increments revision and computes the source digest', () => {
+    const subject = store();
+    newApp(subject);
+    const result = subject.putAppDraft({ tenantId: 'tenant-a', appId: 'my-app', expectedRevision: 0, files: draftFiles() });
+    expect(result.status).toBe('stored');
+    if (result.status !== 'stored') throw new Error('unreachable');
+    expect(result.draft.revision).toBe(1);
+    expect(result.draft.files).toEqual(draftFiles());
+    expect(result.draft.digest).toMatch(/^sha256:[a-f0-9]{64}$/);
+    const detail = subject.getApp('tenant-a', 'my-app');
+    expect(detail?.app.draft.revision).toBe(1);
+    expect(detail?.app.draft.digest).toBe(result.draft.digest);
+  });
+
+  it('returns a conflict for a stale expectedRevision and keeps the current draft', () => {
+    const subject = store();
+    newApp(subject);
+    const first = subject.putAppDraft({ tenantId: 'tenant-a', appId: 'my-app', expectedRevision: 0, files: draftFiles() });
+    expect(first.status).toBe('stored');
+    const stale = subject.putAppDraft({
+      tenantId: 'tenant-a', appId: 'my-app', expectedRevision: 0,
+      files: draftFiles({ 'prompts/task.md': 'Changed.\n' })
+    });
+    expect(stale).toEqual({ status: 'conflict', currentRevision: 1 });
+    expect(subject.getApp('tenant-a', 'my-app')?.app.draft.files['prompts/task.md']).toBe('Do the task.\n');
+  });
+
+  it('rejects unsafe paths, executables, secrets and oversized drafts', () => {
+    const subject = store();
+    newApp(subject);
+    const put = (files: Record<string, string>) =>
+      subject.putAppDraft({ tenantId: 'tenant-a', appId: 'my-app', expectedRevision: 0, files });
+
+    expect(() => put(draftFiles({ '../escape.md': 'x' }))).toThrowError(/APP_DRAFT_INVALID/);
+    expect(() => put(draftFiles({ '/abs.md': 'x' }))).toThrowError(/APP_DRAFT_INVALID/);
+    expect(() => put(draftFiles({ 'prompts/../../x.md': 'x' }))).toThrowError(/APP_DRAFT_INVALID/);
+    expect(() => put(draftFiles({ 'prompts/a\\b.md': 'x' }))).toThrowError(/APP_DRAFT_INVALID/);
+    expect(() => put(draftFiles({ 'run.sh': 'echo hi' }))).toThrowError(/APP_DRAFT_INVALID/);
+    expect(() => put(draftFiles({ 'prompts/auth.md': 'not secret' }))).toThrowError(/APP_DRAFT_INVALID/);
+    expect(() => put(draftFiles({ 'prompts/task.md': 'sk-abcdefghijklmnopqrstuvwxyz' }))).toThrowError(/APP_DRAFT_INVALID/);
+    expect(() => put(draftFiles({ 'prompts/task.md': 'x'.repeat(512 * 1024 + 1) }))).toThrowError(/APP_DRAFT_INVALID/);
+    expect(subject.getApp('tenant-a', 'my-app')?.app.draft.revision).toBe(0);
+  });
+
+  it('rejects draft writes on soft-deleted or unknown apps', () => {
+    const subject = store();
+    newApp(subject);
+    subject.softDeleteApp('tenant-a', 'my-app');
+    expect(() => subject.putAppDraft({ tenantId: 'tenant-a', appId: 'my-app', expectedRevision: 0, files: draftFiles() }))
+      .toThrowError(/APP_DELETED/);
+    expect(() => subject.putAppDraft({ tenantId: 'tenant-a', appId: 'missing', expectedRevision: 0, files: draftFiles() }))
+      .toThrowError(/APP_NOT_FOUND/);
+  });
+
+  it('updates metadata under the shared revision and preserves omitted fields', () => {
+    const subject = store();
+    newApp(subject);
+    const updated = subject.updateAppMetadata({ tenantId: 'tenant-a', appId: 'my-app', expectedRevision: 0, name: 'Renamed' });
+    expect(updated.status).toBe('updated');
+    if (updated.status !== 'updated') throw new Error('unreachable');
+    expect(updated.app.name).toBe('Renamed');
+    expect(updated.app.description).toBe('desc');
+    expect(updated.app.draft.revision).toBe(1);
+
+    expect(subject.updateAppMetadata({ tenantId: 'tenant-a', appId: 'my-app', expectedRevision: 0, name: 'Stale' }))
+      .toEqual({ status: 'conflict', currentRevision: 1 });
+
+    subject.softDeleteApp('tenant-a', 'my-app');
+    expect(() => subject.updateAppMetadata({ tenantId: 'tenant-a', appId: 'my-app', expectedRevision: 1, name: 'Gone' }))
+      .toThrowError(/APP_DELETED/);
+  });
+
+  it('publishes the draft snapshot and lists releases newest first', () => {
+    const subject = store();
+    newApp(subject);
+    const draft = subject.putAppDraft({ tenantId: 'tenant-a', appId: 'my-app', expectedRevision: 0, files: draftFiles() });
+    if (draft.status !== 'stored') throw new Error('unreachable');
+
+    const first = subject.publishAppRelease(publishInput(subject, 'my-app', {
+      expectedRevision: 1, packageVersion: '1.0.0', release: releaseFor('my-app', { version: '1.0.0', releaseLetter: 'a' })
+    }));
+    expect(first.status).toBe('stored');
+    expect(first.record.sourceFiles).toEqual(draftFiles());
+    expect(first.record.sourceFilesDigest).toBe(draft.draft.digest);
+
+    const secondDraft = subject.putAppDraft({
+      tenantId: 'tenant-a', appId: 'my-app', expectedRevision: 1,
+      files: draftFiles({ 'prompts/task.md': 'Do the next task.\n' })
+    });
+    if (secondDraft.status !== 'stored') throw new Error('unreachable');
+    const second = subject.publishAppRelease(publishInput(subject, 'my-app', {
+      expectedRevision: 2, packageVersion: '2.0.0', idempotencyKey: 'publish-2',
+      sourceFiles: secondDraft.draft.files,
+      release: releaseFor('my-app', { version: '2.0.0', releaseLetter: 'b', contentLetter: 'd' })
+    }));
+    expect(second.status).toBe('stored');
+
+    const releases = subject.listAppReleases('tenant-a', 'my-app');
+    expect(releases.map((record) => record.packageVersion)).toEqual(['2.0.0', '1.0.0']);
+    expect(releases[1]?.sourceFilesDigest).toBe(draft.draft.digest);
+    expect(subject.listAppReleases('tenant-b', 'my-app')).toHaveLength(0);
+    expect(subject.getApp('tenant-a', 'my-app')?.releases).toHaveLength(2);
+  });
+
+  it('publishes idempotently for the same version and content', () => {
+    const subject = store();
+    newApp(subject);
+    subject.putAppDraft({ tenantId: 'tenant-a', appId: 'my-app', expectedRevision: 0, files: draftFiles() });
+    const first = subject.publishAppRelease(publishInput(subject, 'my-app', { idempotencyKey: 'publish-1' }));
+    const replay = subject.publishAppRelease(publishInput(subject, 'my-app', { idempotencyKey: 'publish-2' }));
+    expect(first.status).toBe('stored');
+    expect(replay.status).toBe('existing');
+    expect(replay.releaseRef).toBe(first.releaseRef);
+    expect(subject.listAppReleases('tenant-a', 'my-app')).toHaveLength(1);
+  });
+
+  it('rejects a different content under an already published version', () => {
+    const subject = store();
+    newApp(subject);
+    subject.putAppDraft({ tenantId: 'tenant-a', appId: 'my-app', expectedRevision: 0, files: draftFiles() });
+    subject.publishAppRelease(publishInput(subject, 'my-app'));
+    const changed = subject.putAppDraft({
+      tenantId: 'tenant-a', appId: 'my-app', expectedRevision: 1,
+      files: draftFiles({ 'prompts/task.md': 'Different.\n' })
+    });
+    if (changed.status !== 'stored') throw new Error('unreachable');
+    expect(() => subject.publishAppRelease(publishInput(subject, 'my-app', {
+      expectedRevision: 2, packageVersion: '1.0.0', idempotencyKey: 'publish-2',
+      sourceFiles: changed.draft.files,
+      release: releaseFor('my-app', { version: '1.0.0', releaseLetter: 'b', contentLetter: '9' })
+    }))).toThrowError(/RELEASE_VERSION_CONFLICT/);
+  });
+
+  it('rejects stale revisions, mismatched snapshots and deleted apps on publish', () => {
+    const subject = store();
+    newApp(subject);
+    const firstDraft = subject.putAppDraft({ tenantId: 'tenant-a', appId: 'my-app', expectedRevision: 0, files: draftFiles() });
+    if (firstDraft.status !== 'stored') throw new Error('unreachable');
+    const secondDraft = subject.putAppDraft({
+      tenantId: 'tenant-a', appId: 'my-app', expectedRevision: 1,
+      files: draftFiles({ 'prompts/task.md': 'Second.\n' })
+    });
+    if (secondDraft.status !== 'stored') throw new Error('unreachable');
+
+    expect(() => subject.publishAppRelease(publishInput(subject, 'my-app', {
+      expectedRevision: 1, sourceFiles: secondDraft.draft.files
+    }))).toThrowError(/APP_DRAFT_CONFLICT/);
+    expect(() => subject.publishAppRelease(publishInput(subject, 'my-app', {
+      expectedRevision: 2, sourceFiles: secondDraft.draft.files, sourceFilesDigest: digest('9')
+    }))).toThrowError(/APP_DRAFT_INVALID/);
+    // 快照与 digest 自洽，但不是当前 revision 的草稿：视为草稿已变化。
+    expect(() => subject.publishAppRelease(publishInput(subject, 'my-app', {
+      expectedRevision: 2, sourceFiles: firstDraft.draft.files, sourceFilesDigest: firstDraft.draft.digest
+    }))).toThrowError(/APP_DRAFT_CONFLICT/);
+
+    subject.softDeleteApp('tenant-a', 'my-app');
+    expect(() => subject.publishAppRelease(publishInput(subject, 'my-app', {
+      expectedRevision: 2, sourceFiles: secondDraft.draft.files
+    }))).toThrowError(/APP_DELETED/);
+  });
+
+  it('enforces version uniqueness on the internal submit path', () => {
+    const subject = store();
+    newApp(subject);
+    subject.submit(request({
+      packageId: 'my-app', packageVersion: '1.0.0', idempotencyKey: 'submit-1',
+      release: releaseFor('my-app', { version: '1.0.0', releaseLetter: 'a' })
+    }));
+    expect(() => subject.submit(request({
+      packageId: 'my-app', packageVersion: '1.0.0', idempotencyKey: 'submit-2',
+      release: releaseFor('my-app', { version: '1.0.0', releaseLetter: 'b', contentLetter: '9' })
+    }))).toThrowError(/RELEASE_VERSION_CONFLICT/);
+  });
+});

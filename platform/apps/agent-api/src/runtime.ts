@@ -26,10 +26,10 @@ import type { TrustedPrincipal } from '@sage/platform-ports';
 import { ChatPromotionAuthorizer, createChatApi, registerTaskRoutes } from './index.js';
 import { startChatKernelExecution, type ChatCanonicalCompatibilityOptions } from './chat-compatibility.js';
 import { registerProviderCatalogRoutes } from './catalog-api.js';
-import { registerPackagesRoutes } from './packages-api.js';
 import { registerAppsRoutes } from './apps-api.js';
 import { registerAppRunsRoutes } from './app-runs-api.js';
 import { registerPackageRunsRoutes, type ResolvedReleaseLockPayload } from './runs-api.js';
+import { resolveDispatchRelease } from './schedule-dispatch-release.js';
 import { buildSnapshotEgressConnector, SNAPSHOT_EGRESS_ALLOWLIST_ENV } from './package-snapshots.js';
 import { registerRunAgentSettingsRoutes } from './run-agent-settings-api.js';
 import { registerMcpRoutes } from './mcp/index.js';
@@ -214,10 +214,6 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
     });
     const packageStore = new InMemoryAgentReleaseStore();
     const packageSpecStore = new InMemoryAgentTaskSpecStore();
-    registerPackagesRoutes(app, {
-      tenantId: config.tenantId, store: packageStore, ownerNamespace: 'package-platform',
-      authenticator, engineIds: ['engine-local'], deploymentMode: 'local'
-    });
     registerAppsRoutes(app, {
       tenantId: config.tenantId, store: packageStore, ownerNamespace: 'package-platform',
       authenticator, engineIds: ['engine-local']
@@ -241,6 +237,7 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
           }
         }
       },
+      appStatus: packageStore,
       taskStore: tasks,
       specStore: packageSpecStore,
       settingsStore: tasks,
@@ -266,7 +263,7 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
             const assets = (lockPayload.assets ?? []).filter((asset) => typeof asset.content === 'string');
             const entry = manifest === undefined ? undefined : assets.find((asset) => asset.relativePath === manifest.entry);
             return {
-              release: { releaseRef: resolution.release.releaseRef, releaseId: resolution.release.releaseId, contentDigest: resolution.release.contentDigest },
+              release: { releaseRef: resolution.release.releaseRef, releaseId: resolution.release.releaseId, contentDigest: resolution.release.contentDigest, packageId: resolution.release.packageId },
               ...(manifest === undefined ? {} : { manifest }),
               ...(entry === undefined ? {} : { entryPrompt: entry.content }),
               references: assets.filter((asset) => asset.kind === 'reference').map((asset) => ({ relativePath: asset.relativePath, content: asset.content }))
@@ -276,25 +273,32 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
           }
         }
       },
+      appStatus: packageStore,
       authenticator,
       audit: { append: async (input: { readonly tenantId: string; readonly occurredAt: string; readonly category: 'schedule'; readonly decision: string; readonly reasonCode: string; readonly actorRef: string; readonly correlation: Readonly<Record<string, string | number>>; readonly authorityDigest: string }) => { process.stdout.write(`[schedule-audit] ${JSON.stringify(input)}\n`); } },
     });
     const scheduleDispatchToken = serviceToken;
-    app.get<{ Params: { releaseId: string } }>('/internal/schedule-dispatch/releases/:releaseId', async (request, reply) => {
+    app.get<{ Params: { releaseId: string }; Querystring: { follow?: string } }>('/internal/schedule-dispatch/releases/:releaseId', async (request, reply) => {
       if (scheduleDispatchToken === undefined) return reply.code(503).send({ error: { code: 'SCHEDULE_DISPATCH_AUTH_UNCONFIGURED', retryable: false } });
       const authorization = request.headers.authorization;
       const token = typeof authorization === 'string' && authorization.startsWith('Bearer ') ? authorization.slice(7).trim() : '';
       if (scheduleDispatchToken.verify(token) === undefined) return reply.code(401).send({ error: { code: 'SCHEDULE_AUTHENTICATION_REQUIRED', retryable: false } });
       try {
-        const resolution = packageStore.resolveImmutableRelease(config.tenantId, `release://${request.params.releaseId}`);
-        const stored = packageStore.getStoredRelease(config.tenantId, `release://${request.params.releaseId}`);
-        const lockPayload = stored === undefined ? {} : (stored.lockPayload as ResolvedReleaseLockPayload);
+        const resolved = resolveDispatchRelease({
+          store: packageStore,
+          tenantId: config.tenantId,
+          anchorReleaseId: request.params.releaseId,
+          follow: request.query.follow === '1'
+        });
+        if (resolved === undefined) return reply.code(404).send({ error: { code: 'RELEASE_NOT_FOUND', retryable: false } });
+        const { release } = resolved;
+        const lockPayload = resolved.lockPayload as ResolvedReleaseLockPayload;
         const manifest = lockPayload.manifest;
         const assets = (lockPayload.assets ?? []).filter((asset) => typeof asset.content === 'string');
         const entry = manifest === undefined ? undefined : assets.find((asset) => asset.relativePath === manifest.entry);
         const declaredSchemaAsset = manifest === undefined ? undefined : assets.find((asset) => manifest.tasks?.some((task) => task.output?.schema === asset.relativePath));
         return reply.code(200).send({
-          release: { releaseRef: resolution.release.releaseRef, releaseId: resolution.release.releaseId, releaseDigest: resolution.release.contentDigest, packageId: resolution.release.packageId, packageVersion: resolution.release.packageVersion, ownerRef: resolution.release.ownerRef, engineIds: resolution.release.compatibility.engineIds, kernelContractMajor: resolution.release.compatibility.kernelContractMajor },
+          release: { releaseRef: release.releaseRef, releaseId: release.releaseId, releaseDigest: release.contentDigest, packageId: release.packageId, packageVersion: release.packageVersion, ownerRef: release.ownerRef, engineIds: release.compatibility.engineIds, kernelContractMajor: release.compatibility.kernelContractMajor },
           ...(manifest === undefined ? {} : { manifest }),
           ...(entry === undefined ? {} : { entryPrompt: entry.content }),
           references: assets.filter((asset) => asset.kind === 'reference').map((asset) => ({ relativePath: asset.relativePath, content: asset.content })),

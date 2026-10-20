@@ -1,0 +1,8 @@
+schema: spec-driven
+skip_specs: true
+created: 2026-10-20
+goal: 把 Sage 的 App 收敛为唯一可变主体（元数据 + 草稿 + revision），Release 为发布时不可变快照（版本号 +
+  releaseId + 源文件快照），移除 Package 实体/页面/API；完成判据：在本地 Sage 控制台和 API 上，App
+  是唯一管理对象：可新建 App、上传/编辑/下载草稿、发布出带版本号且不可变的 Release、从 Release 发起运行并看到运行历史；Packages
+  独立入口与 /v1/packages 不再存在，同一 App
+  重复版本发布会返回明确冲突。方案与批准：~/code/tasks/ongoing/sage-app-package-model/design/app-release-model.md、approve/APPROVED.md

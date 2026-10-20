@@ -5,8 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { HarnessCapabilities, HarnessPort, HarnessTurnRequest, HarnessTurnResult } from '@sage/agent-contracts';
 import { LocalAgentClient } from '@sage/agent-client';
 import { createAgentTaskActivities, PackageTaskInputResolver } from '@sage/agent-worker';
-import { registerPackagesRoutes } from '@sage/agent-api';
-import { registerPackageRunsRoutes, type ResolvedReleaseLockPayload } from '@sage/agent-api';
+import { registerAppsRoutes, registerPackageRunsRoutes, type ResolvedReleaseLockPayload } from '@sage/agent-api';
 import { InMemoryAgentTaskSpecStore } from '@sage/local-fakes';
 import { InMemoryAgentReleaseStore } from '@sage/agent-release-registry';
 import type { CredentialProvider } from '@sage/platform-ports';
@@ -144,8 +143,8 @@ integration.sequential('Package run e2e acceptance', () => {
     const app = Fastify({ logger: false, ajv: { customOptions: { removeAdditional: false } } });
     const principal = { authenticationId: 'auth-pkg', principalId: 'pkg-user', tenantId, roles: ['package-registrar', 'task-operator'] };
     const authenticator = { authenticateRequest: () => principal };
-    registerPackagesRoutes(app, {
-      tenantId, store: packageStore, ownerNamespace: 'package-platform', authenticator, engineIds: ['engine-local'], deploymentMode: 'local',
+    registerAppsRoutes(app, {
+      tenantId, store: packageStore, ownerNamespace: 'package-platform', authenticator, engineIds: ['engine-local'],
     });
     registerPackageRunsRoutes(app, {
       tenantId,
@@ -173,7 +172,13 @@ integration.sequential('Package run e2e acceptance', () => {
     });
 
     try {
-      const registered = await app.inject({ method: 'POST', url: '/v1/packages/e2e-assistant/releases', payload: { files: validFiles } });
+      const created = await app.inject({ method: 'POST', url: '/v1/apps', payload: { appId: 'e2e-assistant', name: 'E2E Assistant' } });
+      expect(created.statusCode).toBe(201);
+      const drafted = await app.inject({ method: 'PUT', url: '/v1/apps/e2e-assistant/draft', payload: { files: validFiles } });
+      expect(drafted.statusCode).toBe(200);
+      const registered = await app.inject({
+        method: 'POST', url: '/v1/apps/e2e-assistant/releases', payload: { baseRevision: drafted.json().revision }
+      });
       expect(registered.statusCode).toBe(201);
       const releaseId = registered.json().releaseId as string;
 

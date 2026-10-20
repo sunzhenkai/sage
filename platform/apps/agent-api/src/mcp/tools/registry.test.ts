@@ -45,4 +45,27 @@ describe('MCP tool registry 覆盖断言', () => {
     const names = allTools.map((t) => t.name);
     expect(new Set(names).size).toBe(names.length);
   });
+
+  it('app 草稿/发布工具替代 package 工具', () => {
+    const names = allTools.map((t) => t.name);
+    expect(names).toEqual(expect.arrayContaining([
+      'app_update', 'app_get_draft', 'app_put_draft', 'app_publish_release', 'app_list_releases'
+    ]));
+    expect(names.some((name) => name.startsWith('package_'))).toBe(false);
+    expect(names).not.toContain('app_upload_release');
+  });
+
+  it('app 草稿与发布工具的请求形状正确', () => {
+    const put = allTools.find((tool) => tool.name === 'app_put_draft');
+    expect(put?.build({ appId: 'demo app', files: { 'app.yaml': 'id: demo' }, ifMatch: '"r2"' })).toEqual({
+      method: 'PUT', path: '/v1/apps/demo%20app/draft', headers: { 'if-match': '"r2"' },
+      body: { files: { 'app.yaml': 'id: demo' } }
+    });
+    const publish = allTools.find((tool) => tool.name === 'app_publish_release');
+    expect(publish?.build({ appId: 'demo', baseRevision: 3 })).toEqual({
+      method: 'POST', path: '/v1/apps/demo/releases', body: { baseRevision: 3 }
+    });
+    const list = allTools.find((tool) => tool.name === 'app_list_releases');
+    expect(list?.build({ appId: 'demo' })).toEqual({ method: 'GET', path: '/v1/apps/demo/releases' });
+  });
 });

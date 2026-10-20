@@ -35,7 +35,6 @@ export const en = {
     tasks: 'Tasks',
     schedules: 'Schedules',
     apps: 'Apps',
-    packages: 'Packages',
     providers: 'Providers',
     settings: 'Settings'
   },
@@ -391,9 +390,14 @@ export const en = {
       scheduleId: 'Schedule ID',
       scheduleIdHint: 'lowercase, [a-z0-9._-], ≥3 chars',
       displayName: 'Display name',
-      releaseId: 'Release ID (binding anchor)',
-      releaseBinding: 'Release binding',
-      contentDigest: 'Content digest',
+      app: 'App',
+      selectApp: 'Select an app',
+      release: 'Release',
+      selectRelease: 'Select a release',
+      releaseHint: 'FIXED pins this release; FOLLOW runs whatever is latest at fire time, anchored to the newest release now.',
+      binding: 'Release binding',
+      followLatest: 'Follow latest release',
+      noReleases: 'This app has no releases yet. Publish one first.',
       trigger: 'Trigger',
       cronExpression: 'Cron expression',
       timezone: 'Timezone',
@@ -452,6 +456,18 @@ export const en = {
     }
   },
   apps: {
+    new: {
+      action: 'New app',
+      title: 'New app',
+      description: 'Create the mutable app first; the source files live in its draft until you publish a release.',
+      appId: 'App ID',
+      appIdHint: 'lowercase, [a-z0-9._-], ≥3 chars',
+      name: 'Name',
+      nameHint: 'Optional; defaults to the app ID',
+      descriptionLabel: 'Description',
+      submit: 'Create app',
+      creating: 'Creating…'
+    },
     import: {
       action: 'Import example app',
       title: 'Import example app',
@@ -470,11 +486,11 @@ export const en = {
     },
     empty: {
       title: 'No apps',
-      hint: 'Import a bundled example here, or register an agent package via agent-api (pnpm --filter @sage/agent-api register-package).'
+      hint: 'Create an empty app and edit its draft, or start from a bundled example.'
     },
     all: {
       title: 'All apps',
-      description: 'Registered agent apps. Click a row for releases, tasks and assets.'
+      description: 'Mutable agent apps. Click a row to edit the draft, publish releases and inspect runs.'
     },
     columns: {
       app: 'App',
@@ -482,6 +498,8 @@ export const en = {
       latestVersion: 'Latest version',
       runs: 'Runs · 14d',
       releases: 'Releases',
+      draft: 'Draft',
+      unpublished: 'Unpublished',
       created: 'Created',
       lastUpdate: 'Last update'
     },
@@ -497,6 +515,61 @@ export const en = {
       lifecycle: {
         name: 'Lifecycle probe',
         description: 'Smallest package with no inputs or references; useful for a create → release → run smoke test.'
+      }
+    },
+    draft: {
+      title: 'Draft',
+      description: 'Edit source files, save a revision, then publish an immutable release.',
+      revision: 'r{revision}',
+      files: '{count} files',
+      version: 'Version',
+      digest: 'Digest',
+      noFiles: 'No source files yet. Upload an archive to start.',
+      unsaved: 'Unsaved changes',
+      unpublished: 'Unpublished changes',
+      clean: 'Matches latest release',
+      save: 'Save draft',
+      saving: 'Saving…',
+      saved: 'Saved as r{revision}.',
+      reload: 'Reload draft',
+      upload: 'Upload archive',
+      uploading: 'Uploading…',
+      uploadDone: 'Draft replaced from archive (r{revision}).',
+      uploadUnsupported: 'Archive import is not available in mock mode.',
+      download: 'Download draft',
+      downloadFailed: 'Draft download failed.',
+      publish: 'Publish release',
+      publishing: 'Publishing…',
+      published: 'Published v{version}.',
+      existing: 'v{version} already exists with identical content; no new release was created.',
+      empty: 'The draft is empty — add files before publishing.',
+      conflict: 'This draft was updated elsewhere (now r{revision}). Your local edits are kept; reload to discard them.',
+      versionConflict: 'v{version} already exists with different content. Bump the version in app.yaml before publishing.',
+      saveFirst: 'Save the draft before publishing.',
+      selectFile: 'Select a source file to edit.'
+    },
+    release: {
+      description: 'Immutable app snapshot with build provenance.',
+      manifest: 'Manifest',
+      assets: 'Assets',
+      assetsEmpty: 'No assets in this release.',
+      provenance: 'Provenance',
+      downloadSource: 'Download source',
+      downloadBundle: 'Download bundle',
+      downloading: 'Preparing…',
+      downloadFailed: 'Release download failed.',
+      raw: 'Raw release detail',
+      showRaw: 'Show raw JSON',
+      run: 'Run',
+      fields: {
+        version: 'Version',
+        releaseRef: 'Release ref',
+        releaseId: 'Release ID',
+        contentDigest: 'Content digest',
+        sourceFilesDigest: 'Source files digest',
+        lockDigest: 'Lock digest',
+        compilerBuild: 'Compiler build',
+        createdAt: 'Created'
       }
     },
     detail: {
@@ -519,7 +592,7 @@ export const en = {
       assets: 'Assets',
       rawManifest: 'Raw manifest',
       releases: 'Releases',
-      openPackage: 'Package',
+      openRelease: 'Release',
       run: 'Run',
       runs: 'Runs',
       runsEmpty: 'No runs yet. Start one from a release.',
@@ -566,39 +639,6 @@ export const en = {
         logs: 'Run logs',
         artifacts: 'Artifacts'
       }
-    }
-  },
-  packages: {
-    empty: {
-      title: 'No packages'
-    },
-    all: {
-      title: 'All packages',
-      description: 'Published agent packages and their latest content digest.'
-    },
-    columns: {
-      package: 'Package',
-      latestVersion: 'Latest version',
-      installs: 'Installs · 14d',
-      releases: 'Releases',
-      contentDigest: 'Content digest',
-      lastUpdate: 'Last update'
-    },
-    detail: {
-      description: 'Package registry record and releases.',
-      summary: 'Manifest',
-      version: 'Version',
-      entry: 'Entry',
-      model: 'Model',
-      tasks: 'Tasks',
-      skills: 'Skills',
-      assets: 'Assets',
-      releases: 'Releases',
-      releasesEmpty: 'No releases',
-      openApp: 'Open app',
-      run: 'Run',
-      raw: 'Raw package detail',
-      showRaw: 'Show raw JSON'
     }
   },
   providers: {
@@ -801,11 +841,17 @@ export const en = {
     // apps-api.ts
     APP_ALREADY_EXISTS: 'An app with this id already exists.',
     APP_AUTHENTICATION_REQUIRED: 'App API requires authentication.',
+    APP_DELETED: 'The app was deleted.',
+    APP_DRAFT_CONFLICT: 'The draft was updated elsewhere. Reload it or keep your local edits.',
+    APP_DRAFT_EMPTY: 'The draft is empty; add source files before publishing.',
+    APP_DRAFT_INVALID: 'The draft source failed validation.',
+    APP_INVALID: 'The app request is invalid.',
     APP_NOT_FOUND: 'App not found.',
     APP_OPERATION_REJECTED: 'The app operation was rejected.',
     APP_PACKAGE_ID_MISMATCH: 'The uploaded package does not match this app.',
     APP_UNAVAILABLE: 'App API is temporarily unavailable.',
     APP_UPLOAD_UNTRUSTED_FIELD: 'Untrusted fields were rejected.',
+    RELEASE_VERSION_CONFLICT: 'This version already exists with different content.',
     // runs-api.ts
     INPUT_REMOVED: 'Free-form input was removed: submit declared params (see manifest inputs) or start from Chat promotion.',
     PACKAGE_RUN_UNTRUSTED_FIELD: 'Untrusted fields were rejected.',
@@ -822,13 +868,6 @@ export const en = {
     ADMISSION_SPEC_COMMIT_FAILED: 'Spec commit failed.',
     PACKAGE_RUN_REJECTED: 'The package run was rejected.',
     PACKAGE_RUN_UNAVAILABLE: 'Package run is temporarily unavailable.',
-    // packages-api.ts
-    PACKAGE_AUTHENTICATION_REQUIRED: 'Package API requires authentication.',
-    PACKAGE_REGISTRATION_REJECTED: 'The package registration was rejected.',
-    PACKAGE_UNAVAILABLE: 'Package API is temporarily unavailable.',
-    PACKAGE_NOT_FOUND: 'Package not found.',
-    PACKAGE_REGISTRATION_UNTRUSTED_FIELD: 'Untrusted fields were rejected.',
-    PACKAGE_OPERATION_FORBIDDEN: 'This action needs the package-registrar role.',
     // schedules-api.ts
     SCHEDULE_RULE_INVALID: 'The schedule definition is invalid.',
     SCHEDULE_FORBIDDEN: 'Schedule tenant mismatch.',
@@ -930,8 +969,7 @@ export const en = {
     'go-chat': { label: 'Go to Chat', description: 'Conversations with the run agent' },
     'go-tasks': { label: 'Go to Tasks', description: 'All tasks and their status' },
     'go-schedules': { label: 'Go to Schedules', description: 'Recurring triggers' },
-    'go-apps': { label: 'Go to Apps', description: 'Registered agent apps' },
-    'go-packages': { label: 'Go to Packages', description: 'Published agent packages' },
+    'go-apps': { label: 'Go to Apps', description: 'Agent apps, drafts and releases' },
     'go-providers': { label: 'Go to Providers', description: 'Model provider connections' },
     'go-settings': { label: 'Go to Settings', description: 'This page' },
     send: { label: 'Send message', description: 'In the chat composer' }

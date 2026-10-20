@@ -96,18 +96,30 @@ function CreateScheduleForm({ onDone }: { onDone: (scheduleId: string) => void }
   const settings = useSettings();
   const queryClient = useQueryClient();
   const [form, setForm] = useState({
-    scheduleId: '', displayName: '', releaseId: '', triggerKind: 'cron', expression: '0 9 * * *', timezone: 'Asia/Shanghai', everyMin: '60',
-    overlap: 'SKIP', misfire: 'SKIP', binding: 'FOLLOW', contentDigest: '', env: 'local', task: '', params: '{}', runsLimit: '24'
+    scheduleId: '', displayName: '', appId: '', releaseId: '', triggerKind: 'cron', expression: '0 9 * * *', timezone: 'Asia/Shanghai', everyMin: '60',
+    overlap: 'SKIP', misfire: 'SKIP', binding: 'FOLLOW', env: 'local', task: '', params: '{}', runsLimit: '24'
   });
   const [localError, setLocalError] = useState<string>();
   const set = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => setForm((f) => ({ ...f, [key]: e.target.value }));
+  const apps = useQuery({ queryKey: ['apps'], queryFn: api.apps.list, retry: false });
+  const releases = useQuery({
+    queryKey: ['app-releases', form.appId],
+    queryFn: () => api.apps.listReleases(form.appId),
+    enabled: form.appId !== '',
+    retry: false
+  });
+  const releaseList = releases.data?.releases ?? [];
+  const selectedRelease = releaseList.find((release) => release.releaseId === form.releaseId);
+  const anchor = form.binding === 'FIXED' ? selectedRelease : releaseList[0];
   const create = useMutation({
-    mutationFn: (definition: ScheduleDefinition) => api.schedules.create(definition, form.releaseId),
+    mutationFn: (input: { definition: ScheduleDefinition; anchorReleaseId: string }) => api.schedules.create(input.definition, input.anchorReleaseId),
     onSuccess: (snapshot) => { void queryClient.invalidateQueries({ queryKey: ['schedules'] }); onDone(snapshot.definition.scheduleId); }
   });
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
     setLocalError(undefined);
+    if (form.appId === '') { setLocalError(t('schedules.form.selectApp')); return; }
+    if (anchor === undefined) { setLocalError(t('schedules.form.noReleases')); return; }
     let params: Record<string, string | number>;
     try { params = JSON.parse(form.params || '{}') as Record<string, string | number>; } catch { setLocalError(t('schedules.form.paramsError')); return; }
     const definition: ScheduleDefinition = {
@@ -115,20 +127,42 @@ function CreateScheduleForm({ onDone }: { onDone: (scheduleId: string) => void }
       ...(form.displayName ? { displayName: form.displayName } : {}),
       trigger: form.triggerKind === 'cron' ? { kind: 'cron', expression: form.expression, timezone: form.timezone } : { kind: 'interval', everyMs: Number(form.everyMin) * 60_000 },
       overlapPolicy: form.overlap as ScheduleDefinition['overlapPolicy'], misfirePolicy: form.misfire as ScheduleDefinition['misfirePolicy'],
-      releaseBinding: form.binding === 'FIXED' ? { strategy: 'FIXED', releaseId: form.releaseId, contentDigest: form.contentDigest } : { strategy: 'FOLLOW' },
+      releaseBinding: form.binding === 'FIXED' ? { strategy: 'FIXED', releaseId: anchor.releaseId, contentDigest: anchor.contentDigest } : { strategy: 'FOLLOW' },
       targetConstraints: { allowedEnvironments: [form.env as ScheduleDefinition['targetConstraints']['allowedEnvironments'][number]] },
       budget: { limits: [{ dimension: 'runs', limit: Number(form.runsLimit) }] },
       invocation: { task: form.task, ...(Object.keys(params).length ? { params } : {}) }
     };
-    create.mutate(definition);
+    create.mutate({ definition, anchorReleaseId: anchor.releaseId });
   };
   return (
     <form onSubmit={submit} className="grid grid-cols-2 gap-3">
-      <Field label={t('schedules.form.scheduleId')} hint={t('schedules.form.scheduleIdHint')}><Input required pattern="^[a-z0-9][a-z0-9._-]{2,127}$" value={form.scheduleId} onChange={set('scheduleId')} /></Field>
+      <Field label={t('schedules.form.scheduleId')} hint={t('schedules.form.scheduleIdHint')}><Input required pattern={'^[a-z0-9][a-z0-9._\\-]{2,127}$'} value={form.scheduleId} onChange={set('scheduleId')} /></Field>
       <Field label={t('schedules.form.displayName')}><Input value={form.displayName} onChange={set('displayName')} /></Field>
-      <Field label={t('schedules.form.releaseId')}><Input required value={form.releaseId} onChange={set('releaseId')} /></Field>
-      <Field label={t('schedules.form.releaseBinding')}><Select value={form.binding} onChange={set('binding')}><option>FOLLOW</option><option>FIXED</option></Select></Field>
-      {form.binding === 'FIXED' ? <div className="col-span-2"><Field label={t('schedules.form.contentDigest')}><Input required pattern="^sha256:[a-f0-9]{64}$" placeholder="sha256:…" value={form.contentDigest} onChange={set('contentDigest')} /></Field></div> : null}
+      <Field label={t('schedules.form.app')} hint={t('schedules.form.selectApp')}>
+        <Select required value={form.appId} onChange={(event) => setForm((f) => ({ ...f, appId: event.target.value, releaseId: '' }))}>
+          <option value="">{t('schedules.form.selectApp')}</option>
+          {(apps.data?.apps ?? []).map((app) => <option key={app.appId} value={app.appId}>{app.appId}</option>)}
+        </Select>
+      </Field>
+      <Field label={t('schedules.form.binding')}><Select value={form.binding} onChange={set('binding')}><option>FOLLOW</option><option>FIXED</option></Select></Field>
+      {form.binding === 'FIXED' ? (
+        <div className="col-span-2">
+          <Field label={t('schedules.form.release')} hint={t('schedules.form.releaseHint')}>
+            <Select required value={form.releaseId} onChange={set('releaseId')}>
+              <option value="">{t('schedules.form.selectRelease')}</option>
+              {releaseList.map((release) => <option key={release.releaseId} value={release.releaseId}>v{release.packageVersion} · {release.releaseId}</option>)}
+            </Select>
+          </Field>
+          {form.appId !== '' && releases.isSuccess && releaseList.length === 0 ? <p className="mt-1 text-2xs text-amber">{t('schedules.form.noReleases')}</p> : null}
+        </div>
+      ) : (
+        <div className="col-span-2">
+          <p className="text-2xs leading-4 text-faint">{t('schedules.form.releaseHint')}</p>
+          {anchor === undefined ? (form.appId !== '' && releases.isSuccess ? <p className="text-2xs text-amber">{t('schedules.form.noReleases')}</p> : null) : (
+            <p className="text-2xs text-muted">{t('schedules.form.followLatest')}: <Mono>v{anchor.packageVersion} · {anchor.releaseId}</Mono></p>
+          )}
+        </div>
+      )}
       <Field label={t('schedules.form.trigger')}><Select value={form.triggerKind} onChange={set('triggerKind')}><option value="cron">cron</option><option value="interval">interval</option></Select></Field>
       {form.triggerKind === 'cron' ? <>
         <Field label={t('schedules.form.cronExpression')}><Input required value={form.expression} onChange={set('expression')} /></Field>
@@ -138,7 +172,7 @@ function CreateScheduleForm({ onDone }: { onDone: (scheduleId: string) => void }
       <Field label={t('schedules.form.misfirePolicy')}><Select value={form.misfire} onChange={set('misfire')}><option>SKIP</option><option>CATCH_UP_ONE</option></Select></Field>
       <Field label={t('schedules.form.environment')}><Select value={form.env} onChange={set('env')}><option>local</option><option>development</option><option>staging</option><option>production</option></Select></Field>
       <Field label={t('schedules.form.budgetRunsLimit')}><Input type="number" min={1} required value={form.runsLimit} onChange={set('runsLimit')} /></Field>
-      <Field label={t('schedules.form.invocationTask')} hint={t('schedules.form.invocationTaskHint')}><Input required pattern="^[a-z][a-z0-9-]{0,63}$" value={form.task} onChange={set('task')} /></Field>
+      <Field label={t('schedules.form.invocationTask')} hint={t('schedules.form.invocationTaskHint')}><Input required pattern={'^[a-z][a-z0-9\\-]{0,63}$'} value={form.task} onChange={set('task')} /></Field>
       <div className="col-span-2"><Field label={t('schedules.form.invocationParams')}><Textarea rows={3} className="font-mono text-xs" value={form.params} onChange={set('params')} /></Field></div>
       <div className="col-span-2 text-[11px] text-muted">{t('schedules.form.tenantPrefix')} <Mono>{settings.tenantId}</Mono> {t('schedules.form.tenantSuffix')}</div>
       {localError || create.error ? <div className="col-span-2"><ErrorState error={localError ?? create.error} /></div> : null}
