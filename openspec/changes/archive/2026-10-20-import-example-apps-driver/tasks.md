@@ -13,7 +13,7 @@
 
 - [x] 3.1 全仓回归与静态检查（agent-web typecheck、build、lib 测试；agent-api apps 测试），命令与结果写入 proposal 验证记录
 - [x] 3.2 回填 proposal 验收标准
-- [ ] 3.3 提交交付仓改动（未获用户逐字授权，保持未勾）（须用户逐字授权后执行；未授权前保持未勾并在验证记录注明）
+- [x] 3.3 提交交付仓改动：用户授权提交 MR；commit `b725405` 已推送，PR #3（https://github.com/sunzhenkai/sage/pull/3）
 - [x] 3.4 归档前置校核：子 change 全勾且 validate 通过、findings 全有处置
 - [x] 3.5 归档全部子 change
 

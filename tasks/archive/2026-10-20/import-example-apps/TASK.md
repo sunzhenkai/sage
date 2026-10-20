@@ -1,8 +1,8 @@
 ---
 slug: import-example-apps
 parent: null
-status: handed-off
-phase: apply
+status: archived
+phase: done
 confirm_mode: human
 tier: full
 criterion: "应用页可从仓库内置示例中导入一个示例应用，导入成功后应用列表和详情可用；重复导入同名示例时明确提示已存在且不覆盖；typecheck、build 与相关测试通过。"
@@ -10,6 +10,7 @@ driver: null
 evidence_root: null
 created: 2026-10-20
 updated: 2026-10-20
+archived: 2026-10-20
 ---
 
 # 在应用页导入仓库内置示例应用
@@ -53,6 +54,14 @@ updated: 2026-10-20
 - D-5：应用页采用页头入口 + 对话框，不新增独立路由；空状态通过页头入口即可导入。可逆；来源实现。
 - D-6：服务端 `APP_ALREADY_EXISTS`（包括已软删除但列表不可见的 appId）只提示已存在，不自动上传发布或删除；示例 appId 因此不能在删除后复用。可逆（需服务端支持重建）；来源运行态验证。
 - D-7：用户原有 `platform/compose.yaml` 未提交改动未触碰，随任务分支带到 `feat/import-example-apps`；来源 handoff 协议。
+
+## 归档记录
+
+- 结论：完成判据成立；PR #3 已创建（OPEN / MERGEABLE），未部署 `sage.lan`。
+- 关闭原因：用户要求归档任务。
+- 未决：示例清单手写三项，新增示例需同步；服务端软删除 appId 不可复用（已在界面提示）。
+- driver 现状：`2026-10-20-import-example-apps-driver` 已归档；子 change `2026-10-20-import-example-apps-import-flow` 已归档并同步 spec `agent-web-example-app-import`。
+- 提交：`b725405`；PR：https://github.com/sunzhenkai/sage/pull/3
 
 ## 交付进展
 

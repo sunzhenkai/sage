@@ -37,4 +37,4 @@
 - 验证（当前工作树，未提交）：`pnpm --filter @sage/agent-web typecheck` exit 0；`pnpm --filter @sage/agent-web build` exit 0，`dist/examples/ai-apps/{finance-briefing,github-trending,lifecycle-probe}/app.yaml` 均存在；`pnpm vitest run apps/agent-web/src/lib` 8 files / 59 tests passed；`pnpm vitest run apps/agent-api/src/apps-api.test.ts` 12 tests passed。
 - 运行态（本地 agent-api，`http://127.0.0.1:9631/apps?lang=zh-CN`）：首次导入 `finance-briefing` 成功（5 个源文件），列表与详情可见（截图 `/tmp/sage-import-finance-briefing-success.png`、`/tmp/sage-import-finance-briefing-detail.png`）；再次导入同名示例显示“已存在，未做任何修改”（截图 `/tmp/sage-import-exists.png`）；浏览器 console 无异常。
 - 运行态发现并记录：服务端应用软删除后同 ID 不能再创建（`APP_ALREADY_EXISTS`），为验证临时删除 `lifecycle-probe` 后导入会显示“服务端已有同 ID 应用但当前列表未显示”，不覆盖、不误报成功；这是既有服务端语义，不在本任务重构范围。
-- 未勾项：3.3 提交（等待用户逐字授权）。
+- 2026-10-20：用户授权“改动提交mr吧”；commit `b725405` 已推送，PR #3 已创建（OPEN / MERGEABLE）。
