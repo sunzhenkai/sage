@@ -5,13 +5,13 @@ import { Link, useNavigate, useParams } from 'react-router';
 import { Crumb, PageHeader, ViewTab, ViewTabs } from '@/components/layout/app-shell';
 import { PageContent, PageDescription, PageToolbar, Quiet, Section, SegmentedTabs } from '@/components/layout/page';
 import { ApprovalCard } from '@/components/bui/approval-card';
+import { Artifacts } from '@/components/bui/artifacts';
 import { StatusGlyph, StatusPill, Tag, toneFor } from '@/components/bui/atoms';
-import { CodeBlock } from '@/components/bui/code-block';
 import { LoadingState, formatElapsed } from '@/components/bui/loading-state';
 import { RecordsTable } from '@/components/bui/records-table';
+import { RunLogs } from '@/components/bui/run-logs';
 import { TaskRows } from '@/components/bui/task-rows';
 import { ThinkingTrace } from '@/components/bui/thinking';
-import { FileChip, ToolChips } from '@/components/bui/tool-chips';
 import { StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DetailLayout, Pill, Property, PropertyGroup } from '@/components/ui/list';
@@ -183,55 +183,6 @@ function TaskEvents({ taskId, status }: { taskId: string; status: TaskStatus }) 
           return { key: String(e['eventId'] ?? index), primary: kind, secondary: relativeTime(at(e)), state: isLast && running ? 'active' : /fail|error/i.test(kind) ? 'failed' : 'done', detail: <JsonView value={event} filename={`${kind}.json`} /> };
         })} />
       {running ? <LoadingState label={t('tasks.events.waiting')} since={at(last)} /> : null}
-    </div>
-  );
-}
-
-function RunLogs({ taskId }: { taskId: string }) {
-  const t = useT();
-  const [selected, setSelected] = useState<{ runId: string; attemptId: string } | undefined>();
-  const logs = useQuery({ queryKey: ['task', taskId, 'run-logs', selected], queryFn: () => api.tasks.runLogs(taskId, selected ? { ...selected, limit: 500 } : { limit: 500 }) });
-  if (logs.isLoading) return <Loading rows={4} />;
-  if (logs.error) return <ErrorState error={logs.error} />;
-  const data = logs.data;
-  if (!data || data.attempts.length === 0) return <Quiet>{t('tasks.runLogs.empty')}</Quiet>;
-  return (
-    <div className="flex flex-col gap-3">
-      <ViewTabs>
-        {data.attempts.map((a) => {
-          const active = data.selected?.runId === a.runId && data.selected.attemptId === a.attemptId;
-          return <ViewTab key={`${a.runId}|${a.attemptId}`} active={active} onClick={() => setSelected({ runId: a.runId, attemptId: a.attemptId })}>{shortId(a.runId)} · {shortId(a.attemptId)}</ViewTab>;
-        })}
-      </ViewTabs>
-      <ToolChips header={t('tasks.runLogs.eventsIn', { count: data.events.length, attempt: shortId(data.selected?.attemptId ?? '') })}
-        steps={data.events.map((e) => ({ key: e.eventId, icon: /tool/.test(e.type) ? 'run' : /model/.test(e.type) ? 'think' : /artifact|write/.test(e.type) ? 'write' : 'read', label: e.type, chip: `#${e.sequence}  ${JSON.stringify(e.payload).slice(0, 80)}`, mono: true, detail: JSON.stringify(e.payload, null, 2).split('\n').map((text) => ({ text })) }))} />
-      {data.nextFromSequence ? <p className="text-[12px] text-ink-3">{t('tasks.runLogs.more')}</p> : null}
-    </div>
-  );
-}
-
-function Artifacts({ taskId }: { taskId: string }) {
-  const t = useT();
-  const artifacts = useQuery({ queryKey: ['task', taskId, 'artifacts'], queryFn: () => api.tasks.artifacts(taskId) });
-  const [open, setOpen] = useState<string>();
-  const content = useQuery({ queryKey: ['task', taskId, 'artifact', open], queryFn: () => api.tasks.artifact(taskId, open ?? ''), enabled: !!open });
-  if (artifacts.isLoading) return <Loading rows={3} />;
-  if (artifacts.error) return <ErrorState error={artifacts.error} />;
-  const list = artifacts.data?.artifacts ?? [];
-  if (!list.length) return <Quiet>{t('tasks.artifacts.empty')}</Quiet>;
-  const current = list.find((a) => a.artifactId === open);
-  return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap gap-1.5">
-        {list.map((a) => (
-          <FileChip key={a.artifactId} active={open === a.artifactId} onClick={() => setOpen(a.artifactId)} name={a.name ?? a.artifactId} meta={a.sizeBytes !== undefined ? `${Math.max(1, Math.round(a.sizeBytes / 1024))} KB` : undefined} />
-        ))}
-      </div>
-      {open ? (content.isLoading ? <Loading rows={3} /> : content.error ? <ErrorState error={content.error} /> : (
-        <CodeBlock filename={current?.name ?? open} language={/json/.test(String(current?.mediaType)) ? 'json' : 'text'}
-          code={content.data?.content !== undefined && content.data.encoding !== 'base64' ? String(content.data.content) : JSON.stringify(content.data, null, 2)}
-          actions={<a className="flex h-6 items-center rounded-[6px] px-1.5 text-[12px] font-medium text-ink-3 hover:bg-hover hover:text-ink" href={`/v1/tasks/${encodeURIComponent(taskId)}/artifacts/${encodeURIComponent(open)}?download=1`}>{t('tasks.artifacts.download')}</a>} />
-      )) : <p className="text-[12.5px] text-ink-3">{t('tasks.artifacts.select')}</p>}
     </div>
   );
 }

@@ -28,6 +28,7 @@ import { startChatKernelExecution, type ChatCanonicalCompatibilityOptions } from
 import { registerProviderCatalogRoutes } from './catalog-api.js';
 import { registerPackagesRoutes } from './packages-api.js';
 import { registerAppsRoutes } from './apps-api.js';
+import { registerAppRunsRoutes } from './app-runs-api.js';
 import { registerPackageRunsRoutes, type ResolvedReleaseLockPayload } from './runs-api.js';
 import { buildSnapshotEgressConnector, SNAPSHOT_EGRESS_ALLOWLIST_ENV } from './package-snapshots.js';
 import { registerRunAgentSettingsRoutes } from './run-agent-settings-api.js';
@@ -220,6 +221,10 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
     registerAppsRoutes(app, {
       tenantId: config.tenantId, store: packageStore, ownerNamespace: 'package-platform',
       authenticator, engineIds: ['engine-local']
+    });
+    registerAppRunsRoutes(app, {
+      tenantId: config.tenantId, store: packageStore,
+      packageRuns: tasks, packageInputs: tasks, taskViews: tasks, authenticator
     });
     registerPackageRunsRoutes(app, {
       tenantId: config.tenantId,

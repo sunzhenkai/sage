@@ -1,12 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, Boxes, Check, CircleDot, Clock, Hash, PackagePlus, Tags, Trash2 } from 'lucide-react';
+import { ArrowRight, Boxes, Check, CircleDot, Clock, Hash, Package, PackagePlus, Play, Tags, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { Crumb, PageHeader } from '@/components/layout/app-shell';
 import { Monogram, StatusPill, Tag, toneFor } from '@/components/bui/atoms';
 import { RecordsTable } from '@/components/bui/records-table';
+import { RunReleaseDialog } from '@/components/bui/run-release-dialog';
 import { CodeBlock } from '@/components/bui/code-block';
-import { PageContent, PageDescription, Section } from '@/components/layout/page';
+import { PageContent, PageDescription, Quiet, Section } from '@/components/layout/page';
 import { StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DetailLayout, ListRow, Pill, Property, PropertyGroup, RowId, RowMeta, RowTitle } from '@/components/ui/list';
@@ -19,6 +20,7 @@ import { EXAMPLE_APPS, importExampleApp } from '@/lib/example-apps';
 import { errorDisplay } from '@/lib/error-message';
 import { useT } from '@/lib/i18n';
 import { isMock, mockSeries } from '@/lib/mock';
+import type { AppRelease } from '@/lib/types';
 import { formatTime, relativeTime } from '@/lib/utils';
 
 export function AppsPage() {
@@ -172,11 +174,36 @@ export function AppDetailPage() {
   const navigate = useNavigate();
   const t = useT();
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [runRelease, setRunRelease] = useState<AppRelease>();
   const app = useQuery({ queryKey: ['app', appId], queryFn: () => api.apps.get(appId) });
+  const appRuns = useQuery({
+    queryKey: ['app-runs', appId],
+    queryFn: () => api.apps.runs(appId, { limit: 50 }),
+    enabled: app.data !== undefined,
+    refetchInterval: (query) => (query.state.data?.runs ?? []).some((run) => !['succeeded', 'failed', 'cancelled'].includes(run.status)) ? 10_000 : false
+  });
   const remove = useMutation({ mutationFn: () => api.apps.remove(appId), onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ['apps'] }); navigate('/apps'); } });
-  const manifest = app.data?.manifest as Record<string, unknown> | undefined;
-  const list = (key: string) => (Array.isArray(manifest?.[key]) ? (manifest[key] as unknown[]) : []);
-  const description = typeof manifest?.['description'] === 'string' && manifest['description'] ? String(manifest['description']) : undefined;
+  const requestedRun = searchParams.get('run');
+
+  useEffect(() => {
+    if (requestedRun === null || app.data === undefined) return;
+    const release = app.data.releases.find((entry) => entry.releaseId === requestedRun);
+    if (release !== undefined) setRunRelease(release);
+    const next = new URLSearchParams(searchParams);
+    next.delete('run');
+    setSearchParams(next, { replace: true });
+  }, [requestedRun, app.data, searchParams, setSearchParams]);
+
+  const manifest = app.data?.manifest;
+  const releases = app.data?.releases ?? [];
+  const runs = appRuns.data?.runs ?? [];
+  const tasks = manifest?.tasks ?? [];
+  const inputs = manifest?.inputs ?? [];
+  const dataSources = manifest?.dataSources ?? [];
+  const description = manifest?.description;
+  const shortDigest = (releaseId: string) => releaseId.replace(/^sha256:/, '').slice(0, 12);
+
   return (
     <>
       <PageHeader breadcrumb={<Crumb to="/apps">{t('nav.apps')}</Crumb>} title={appId}
@@ -186,29 +213,62 @@ export function AppDetailPage() {
         <DetailLayout properties={<>
           <PropertyGroup title={t('apps.detail.properties')}>
             <Property label={t('apps.detail.status')}><StatusBadge status={app.data.status} /></Property>
-            <Property label={t('apps.detail.version')}><Mono>{String(manifest?.['version'] ?? '—')}</Mono></Property>
-            <Property label={t('apps.detail.entry')}><Mono>{String(manifest?.['entry'] ?? '—')}</Mono></Property>
-            <Property label={t('apps.detail.model')}>{manifest?.['modelRoute'] ? <Mono>{Object.values(manifest['modelRoute'] as Record<string, string>).join(' / ')}</Mono> : null}</Property>
+            <Property label={t('apps.detail.version')}><Mono>{manifest?.version ?? '—'}</Mono></Property>
+            <Property label={t('apps.detail.entry')}><Mono>{manifest?.entry ?? '—'}</Mono></Property>
+            <Property label={t('apps.detail.model')}>{manifest?.modelRoute ? <Mono>{`${manifest.modelRoute.provider} / ${manifest.modelRoute.model}`}</Mono> : null}</Property>
             <Property label={t('apps.detail.created')}>{formatTime(app.data.createdAt)}</Property>
           </PropertyGroup>
           <PropertyGroup title={t('apps.detail.skills')}>
-            <div className="flex flex-wrap gap-1 px-2">{list('skillRefs').map((s) => <Pill key={String(s)} color="var(--violet)">{String(s).replace(/^skill:\/\//, '')}</Pill>)}</div>
+            <div className="flex flex-wrap gap-1 px-2">{(manifest?.skillRefs ?? []).map((s) => <Pill key={s} color="var(--violet)">{s.replace(/^skill:\/\//, '')}</Pill>)}</div>
           </PropertyGroup>
           <PropertyGroup title={t('apps.detail.capabilities')}>
-            <div className="flex flex-wrap gap-1 px-2">{list('capabilityRefs').map((s) => <Pill key={String(s)} color="var(--blue)">{String(s).replace(/^capability:\/\//, '')}</Pill>)}</div>
+            <div className="flex flex-wrap gap-1 px-2">{(manifest?.capabilityRefs ?? []).map((s) => <Pill key={s} color="var(--blue)">{s.replace(/^capability:\/\//, '')}</Pill>)}</div>
           </PropertyGroup>
         </>}>
           <PageContent>
             <PageDescription title={appId} description={description ?? t('apps.detail.descriptionFallback')} />
-            <Section card title={t('apps.detail.tasks')} count={list('tasks').length}>
-            <>{list('tasks').map((item, i) => { const task = item as { name?: string; entry?: string }; return (
-              <ListRow key={i}><StatusIcon kind="todo" /><RowTitle sub={task.entry}>{task.name ?? `task-${i}`}</RowTitle></ListRow>
-            ); })}</>
+            <Section card title={t('apps.detail.releases')} count={releases.length}>
+            <>{releases.map((release) => (
+              <ListRow key={release.releaseId}>
+                <RowId>{`v${release.packageVersion}`}</RowId>
+                <RowTitle sub={<Mono>{shortDigest(release.releaseId)}</Mono>}>{`v${release.packageVersion}`}</RowTitle>
+                <RowMeta>
+                  <span className="text-faint">{formatTime(release.createdAt)}</span>
+                  <Link className="flex items-center gap-1 text-accent-ink hover:underline" to={`/packages/${encodeURIComponent(appId)}`}><Package className="size-3.5" />{t('apps.detail.openPackage')}</Link>
+                  <Button size="sm" variant="secondary" disabled={isMock()} title={isMock() ? t('apps.run.mockDisabled') : undefined} onClick={() => setRunRelease(release)}><Play />{t('apps.detail.run')}</Button>
+                </RowMeta>
+              </ListRow>
+            ))}</>
+            </Section>
+            <Section card title={t('apps.detail.runs')} count={runs.length}>
+            <>
+              {appRuns.isLoading ? <div className="gutter-x py-3"><Loading rows={3} /></div> : appRuns.error ? <ErrorState error={appRuns.error} /> : runs.length === 0 ? (
+                <div className="gutter-x py-5"><Quiet>{t('apps.detail.runsEmpty')}</Quiet></div>
+              ) : runs.map((run) => (
+                <ListRow key={run.taskId} onClick={() => { void navigate(`/apps/${encodeURIComponent(appId)}/runs/${encodeURIComponent(run.taskId)}`); }}>
+                  <span className="w-[86px] shrink-0"><StatusBadge status={run.status} /></span>
+                  <RowTitle sub={<Mono>{run.taskId}</Mono>}>{run.releaseVersion ? `v${run.releaseVersion}` : t('apps.detail.unknownVersion')}</RowTitle>
+                  <RowMeta>
+                    <Pill>{run.source === 'schedule' ? t('apps.detail.sourceSchedule') : t('apps.detail.sourceManual')}</Pill>
+                    <span className="text-faint">{relativeTime(run.createdAt)}</span>
+                  </RowMeta>
+                </ListRow>
+              ))}
+            </>
+            </Section>
+            <Section card title={t('apps.detail.tasks')} count={tasks.length}>
+            <>{tasks.map((task) => (
+              <ListRow key={task.name}><StatusIcon kind="todo" /><RowTitle sub={task.entry}>{task.name}</RowTitle></ListRow>
+            ))}</>
             </Section>
             <Section card title={t('apps.detail.inputs')}>
             <>
-              {list('inputs').map((x, i) => { const v = x as { name?: string; type?: string; required?: boolean }; return <ListRow key={`i${i}`}><RowId>{t('apps.detail.input')}</RowId><RowTitle sub={v.type}>{v.name}</RowTitle><RowMeta>{v.required ? <Pill>{t('apps.detail.required')}</Pill> : <span className="text-faint">{t('apps.detail.optional')}</span>}</RowMeta></ListRow>; })}
-              {list('dataSources').map((x, i) => { const v = x as { name?: string; url?: string }; return <ListRow key={`d${i}`}><RowId>{t('apps.detail.source')}</RowId><RowTitle sub={v.url}>{v.name}</RowTitle></ListRow>; })}
+              {inputs.map((input) => (
+                <ListRow key={`i-${input.name}`}><RowId>{t('apps.detail.input')}</RowId><RowTitle sub={input.type}>{input.name}</RowTitle><RowMeta>{input.required ? <Pill>{t('apps.detail.required')}</Pill> : <span className="text-faint">{t('apps.detail.optional')}</span>}</RowMeta></ListRow>
+              ))}
+              {dataSources.map((source) => (
+                <ListRow key={`d-${source.name}`}><RowId>{t('apps.detail.source')}</RowId><RowTitle sub={source.url}>{source.name}</RowTitle></ListRow>
+              ))}
             </>
             </Section>
             <Section card title={t('apps.detail.assets')} count={app.data.assets?.length ?? 0}>
@@ -227,6 +287,7 @@ export function AppDetailPage() {
           </PageContent>
         </DetailLayout>
       ) : null}
+      <RunReleaseDialog appId={appId} release={runRelease} manifest={runRelease?.manifest ?? manifest} onClose={() => setRunRelease(undefined)} />
     </>
   );
 }

@@ -40,8 +40,40 @@ export interface RunLogPage { attempts: RunLogAttempt[]; selected?: { runId: str
 
 // ---- apps / packages ----
 export interface AppSummary { appId: string; status: string; releaseCount: number; latestVersion?: string; createdAt: string; updatedAt: string }
-export interface AppDetail { appId: string; status: string; createdAt: string; manifest?: Record<string, unknown>; assets?: { relativePath: string; kind: string; digest: string; bytes: number; preview?: string }[]; [key: string]: unknown }
+export interface AppManifestInput {
+  name: string; type: string; required: boolean; enum?: (string | number)[]; default?: string | number;
+}
+export interface AppManifestTask { name: string; entry: string }
+export interface AppManifest {
+  id: string; version: string; description: string; entry: string;
+  modelRoute: { provider: string; model: string };
+  skillRefs: string[]; capabilityRefs: string[];
+  inputs?: AppManifestInput[]; dataSources?: { name: string; url: string }[]; tasks?: AppManifestTask[];
+}
+export interface AppAsset { relativePath: string; kind: string; digest: string; bytes: number; preview?: string }
+export interface AppRelease {
+  packageVersion: string; releaseRef: string; releaseId: string; contentDigest: string; lockDigest: string; compilerBuild: string; createdAt: string;
+  manifest?: AppManifest;
+}
+export interface AppDetail {
+  appId: string; status: string; createdAt: string; manifest?: AppManifest; assets?: AppAsset[]; releases: AppRelease[];
+}
+export type AppRunStatus = TaskStatus | 'pending';
+export interface AppRun {
+  taskId: string; releaseId: string; releaseVersion?: string; source: 'manual' | 'schedule'; status: AppRunStatus;
+  freshness?: string; failureCode?: string; createdAt: string; updatedAt?: string;
+}
+export interface AppRunList { schemaVersion: 'AppRunList.v1'; appId: string; runs: AppRun[] }
+export interface AppRunDetail { schemaVersion: 'AppRunDetail.v1'; appId: string; run: AppRun }
+export interface PackageRunResult {
+  schemaVersion: 'PackageRunResult.v1'; status: 'admitted' | 'existing'; taskId: string; runId: string; attemptId: string;
+  releaseRef: string; releaseId: string; specRef: string; specDigest: string; inputRef: string;
+}
 export interface PackageSummary { packageId: string; latestVersion?: string; releaseCount: number; latestContentDigest?: string; updatedAt: string }
+export interface PackageDetail {
+  packageId: string; manifest?: AppManifest; assets?: AppAsset[];
+  releases: Omit<AppRelease, 'manifest'>[];
+}
 
 // ---- schedules (apps/agent-api/src/schedules-api.ts) ----
 export type ScheduleTrigger = { kind: 'cron'; expression: string; timezone: string } | { kind: 'interval'; everyMs: number };

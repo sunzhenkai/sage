@@ -57,6 +57,7 @@ export const en = {
     cancelled: 'Cancelled',
     skipped: 'Skipped',
     missed: 'Missed',
+    pending: 'Pending',
     effectUnknown: 'Effect unknown'
   },
   /** Relative-time units and suffix — composed by `lib/utils.ts` (`3m ago` / `3 分钟前`). */
@@ -516,7 +517,55 @@ export const en = {
       required: 'required',
       optional: 'optional',
       assets: 'Assets',
-      rawManifest: 'Raw manifest'
+      rawManifest: 'Raw manifest',
+      releases: 'Releases',
+      openPackage: 'Package',
+      run: 'Run',
+      runs: 'Runs',
+      runsEmpty: 'No runs yet. Start one from a release.',
+      unknownVersion: 'Unknown version',
+      sourceManual: 'Manual',
+      sourceSchedule: 'Schedule'
+    },
+    run: {
+      title: 'Run {app}',
+      description: 'Start a new run from release v{version}. Parameters come from the manifest inputs.',
+      task: 'Task',
+      required: '{name} is required',
+      number: '{name} must be a number',
+      numberHint: 'Sent as a number',
+      enumEmpty: '—',
+      dataSources: 'Data sources',
+      dataSourcesHint: 'Read-only declarations from the manifest; the runtime resolves them, this form does not send them.',
+      providerMissing: 'No enabled workspace provider with a stored credential matches this manifest. Add one and select it as the run agent default.',
+      openProviders: 'Open providers',
+      mockDisabled: 'Mock mode is read-only — start a run against agent-api to try this.',
+      submit: 'Start run',
+      starting: 'Starting…'
+    },
+    runDetail: {
+      properties: 'Properties',
+      status: 'Status',
+      version: 'Version',
+      source: 'Source',
+      task: 'Task',
+      created: 'Created',
+      updated: 'Updated',
+      release: 'Release',
+      releaseId: 'Release ID',
+      freshness: 'Freshness',
+      failureCode: 'Failure code',
+      description: 'App run detail, logs and artifacts.',
+      updatedAgo: 'updated {time}',
+      openTask: 'Open task',
+      overview: 'Overview',
+      statusHint: 'Status comes from the task projection; pending means no projection has been observed yet.',
+      pendingHint: 'The run was admitted and is waiting for the first task projection. Logs and artifacts appear once the task starts.',
+      tabs: {
+        overview: 'Overview',
+        logs: 'Run logs',
+        artifacts: 'Artifacts'
+      }
     }
   },
   packages: {
@@ -536,7 +585,20 @@ export const en = {
       lastUpdate: 'Last update'
     },
     detail: {
-      description: 'Package registry record and releases.'
+      description: 'Package registry record and releases.',
+      summary: 'Manifest',
+      version: 'Version',
+      entry: 'Entry',
+      model: 'Model',
+      tasks: 'Tasks',
+      skills: 'Skills',
+      assets: 'Assets',
+      releases: 'Releases',
+      releasesEmpty: 'No releases',
+      openApp: 'Open app',
+      run: 'Run',
+      raw: 'Raw package detail',
+      showRaw: 'Show raw JSON'
     }
   },
   providers: {

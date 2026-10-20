@@ -2,7 +2,10 @@
  * Dev-only demo data. Enabled by `?mock=1` (persisted in localStorage, `?mock=0` to leave) or VITE_MOCK=1.
  * Mock mode is read-only: it never calls agent-api, and write operations are rejected locally.
  */
-import type { CatalogModelItem, CatalogProviderItem, ChatRun, Message, ScheduleSnapshot, ScheduleTriggerEvent, SessionListItem, TaskStatus, TaskView, TimelineEvent } from './types';
+import type {
+  AppDetail, AppManifest, AppRelease, AppRun, AppSummary, CatalogModelItem, CatalogProviderItem, ChatRun, Message, PackageDetail,
+  ScheduleSnapshot, ScheduleTriggerEvent, SessionListItem, TaskStatus, TaskView, TimelineEvent
+} from './types';
 
 const KEY = 'sage.agent-web.mock';
 
@@ -102,6 +105,138 @@ export const mockTriggers: Record<string, ScheduleTriggerEvent[]> = Object.fromE
   return { scheduleId: s.definition.scheduleId, occurrenceId: `occ-${hex(8)}`, kind: r < 0.8 ? 'SUCCEEDED' : r < 0.9 ? 'FAILED' : r < 0.96 ? 'SKIPPED' : 'MISSED', occurredAtMs: NOW - i * (s.definition.trigger.kind === 'interval' ? 0.45 : 0.5) * DAY - rnd() * 3_600_000, taskId: pick(mockTasks).taskId } as ScheduleTriggerEvent;
 })]));
 
+// ---- apps / packages ----
+const stableHex = (text: string, length: number): string => {
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619);
+  let out = '';
+  let x = h >>> 0;
+  while (out.length < length) {
+    x = (Math.imul(x ^ (x >>> 13), 1274126177) >>> 0);
+    out += x.toString(16).padStart(8, '0');
+  }
+  return out.slice(0, length);
+};
+const sha = (text: string) => `sha256:${stableHex(text, 64)}`;
+
+export const mockApps: AppSummary[] = [
+  { appId: 'finance-briefing', status: 'active', releaseCount: 3, latestVersion: '2.0.0', createdAt: iso(NOW - 30 * DAY), updatedAt: iso(NOW - 3 * DAY) },
+  { appId: 'release-notes', status: 'active', releaseCount: 5, latestVersion: '1.4.2', createdAt: iso(NOW - 25 * DAY), updatedAt: iso(NOW - DAY) },
+  { appId: 'incident-summary', status: 'active', releaseCount: 2, latestVersion: '0.9.0', createdAt: iso(NOW - 9 * DAY), updatedAt: iso(NOW - 4 * DAY) },
+  { appId: 'data-sync', status: 'disabled', releaseCount: 1, latestVersion: '0.1.0', createdAt: iso(NOW - 6 * DAY), updatedAt: iso(NOW - 6 * DAY) }
+];
+
+const releaseVersions: Record<string, readonly string[]> = {
+  'finance-briefing': ['2.0.0', '1.5.0', '1.4.0'],
+  'release-notes': ['1.4.2', '1.4.1', '1.3.0', '1.2.0', '1.0.0'],
+  'incident-summary': ['0.9.0', '0.8.0'],
+  'data-sync': ['0.1.0']
+};
+
+const manifestFor = (appId: string, version: string): AppManifest => ({
+  id: appId,
+  version,
+  description: 'Daily cross-market briefing generated from FX and index data sources.',
+  entry: 'prompts/system.md',
+  modelRoute: { provider: 'minimax-cn', model: 'MiniMax-M3' },
+  skillRefs: ['skill://finance-brief/v1'],
+  capabilityRefs: ['capability://web-snapshot-reader/v1'],
+  inputs: [
+    { name: 'focus', type: 'string', required: false, default: 'global markets' },
+    { name: 'days', type: 'number', required: false, default: 7 },
+    { name: 'region', type: 'string', required: false, enum: ['us', 'eu', 'asia'] }
+  ],
+  dataSources: [{ name: 'fx-rates', url: 'https://api.frankfurter.dev/v1/latest' }],
+  tasks: [{ name: appId, entry: 'prompts/system.md' }]
+});
+
+const assetsFor = (appId: string): NonNullable<AppDetail['assets']> => [
+  { relativePath: 'prompts/system.md', kind: 'prompt', digest: sha(`prompt:${appId}`), bytes: 2306, preview: 'You are a finance analyst…' },
+  { relativePath: 'app.yaml', kind: 'manifest', digest: sha(`manifest:${appId}`), bytes: 412 }
+];
+
+const releasesFor = (appId: string, latestVersion?: string): AppRelease[] => {
+  const versions = releaseVersions[appId] ?? (latestVersion === undefined ? ['0.1.0'] : [latestVersion]);
+  return versions.map((version, i) => ({
+    packageVersion: version,
+    releaseRef: `release://${appId}-${stableHex(`${appId}@${version}`, 12)}`,
+    releaseId: sha(`${appId}@${version}`),
+    contentDigest: sha(`content:${appId}@${version}`),
+    lockDigest: sha(`lock:${appId}@${version}`),
+    compilerBuild: 'mock-compiler/1.0.0',
+    createdAt: iso(NOW - (i * 6 + 1) * DAY),
+    ...(i === 0 ? { manifest: manifestFor(appId, version) } : {})
+  }));
+};
+
+const appDetailFor = (appId: string): AppDetail => {
+  const summary = mockApps.find((app) => app.appId === appId);
+  const releases = releasesFor(appId, summary?.latestVersion);
+  const latest = releases[0]!;
+  return {
+    appId,
+    status: summary?.status ?? 'active',
+    createdAt: summary?.createdAt ?? iso(NOW - 30 * DAY),
+    manifest: latest.manifest ?? manifestFor(appId, latest.packageVersion),
+    assets: assetsFor(appId),
+    releases
+  };
+};
+
+const taskTypeForApp: Record<string, string> = {
+  'finance-briefing': 'finance-brief',
+  'release-notes': 'release-notes',
+  'incident-summary': 'incident-summary',
+  'data-sync': 'data-sync'
+};
+
+export const mockAppRuns: Record<string, AppRun[]> = Object.fromEntries(mockApps.map((app) => {
+  const releases = releasesFor(app.appId, app.latestVersion);
+  const tasks = mockTasks.filter((task) => task.taskType === taskTypeForApp[app.appId]).slice(0, 5);
+  const runs: AppRun[] = tasks.map((task, i) => {
+    const release = releases[i % releases.length]!;
+    const at = String(task.projectionUpdatedAt ?? iso(NOW - i * DAY));
+    return {
+      taskId: task.taskId,
+      releaseId: release.releaseId,
+      releaseVersion: release.packageVersion,
+      source: i % 3 === 2 ? 'schedule' : 'manual',
+      status: task.status,
+      ...(task.projectionFreshness === undefined ? {} : { freshness: String(task.projectionFreshness) }),
+      ...(task.status === 'failed' ? { failureCode: 'MODEL_PROVIDER_TIMEOUT' } : {}),
+      createdAt: at,
+      updatedAt: at
+    };
+  });
+  runs.push({
+    taskId: `pkg-${stableHex(`${app.appId}:pending`, 12)}`,
+    releaseId: releases[0]!.releaseId,
+    releaseVersion: releases[0]!.packageVersion,
+    source: 'manual',
+    status: 'pending',
+    createdAt: iso(NOW - 2 * 3_600_000)
+  });
+  return [app.appId, runs.sort((a, b) => b.createdAt.localeCompare(a.createdAt))];
+}));
+
+const packageDetailFor = (packageId: string): PackageDetail => {
+  const detail = appDetailFor(packageId);
+  return {
+    packageId,
+    ...(detail.manifest === undefined ? {} : { manifest: detail.manifest }),
+    ...(detail.assets === undefined ? {} : { assets: detail.assets }),
+    releases: detail.releases.map((release) => ({
+      packageVersion: release.packageVersion,
+      releaseRef: release.releaseRef,
+      releaseId: release.releaseId,
+      contentDigest: release.contentDigest,
+      lockDigest: release.lockDigest,
+      compilerBuild: release.compilerBuild,
+      createdAt: release.createdAt
+    }))
+  };
+};
+
 const providers = [
   { id: 'conn-openai', name: 'openai-prod', source: 'user', adapterKind: 'openai-compatible', baseUrl: 'https://api.openai.com/v1', modelId: 'gpt-4o-mini', enabled: true, credentialPresent: true, createdAt: iso(NOW - 30 * DAY), updatedAt: iso(NOW - 2 * DAY) },
   { id: 'conn-anthropic', name: 'anthropic', source: 'user', adapterKind: 'anthropic', baseUrl: 'https://api.anthropic.com', modelId: 'claude-sonnet', enabled: true, credentialPresent: true, createdAt: iso(NOW - 20 * DAY), updatedAt: iso(NOW - 6 * DAY) },
@@ -162,18 +297,37 @@ export function mockGet(path: string, query: MockQuery = {}): unknown {
   r = m(/^\/v1\/tasks\/([^/]+)\/artifacts$/); if (r) return { artifacts: [{ artifactId: 'art-1', name: 'briefing.md', mediaType: 'text/markdown', sizeBytes: 4182 }, { artifactId: 'art-2', name: 'output.json', mediaType: 'application/json', sizeBytes: 912 }] };
   r = m(/^\/v1\/tasks\/([^/]+)\/artifacts\/([^/]+)$/); if (r) return { artifactId: r[2], name: 'briefing.md', mediaType: 'text/markdown', content: '# Morning brief\n\nUSD/CNY 7.12 …', encoding: 'utf8' };
   r = m(/^\/v1\/tasks\/([^/]+)$/); if (r) return mockTasks.find((x) => x.taskId === decodeURIComponent(r![1]!));
-  if (p === '/v1/apps') return { apps: [
-    { appId: 'finance-briefing', status: 'active', releaseCount: 3, latestVersion: '2.0.0', createdAt: iso(NOW - 30 * DAY), updatedAt: iso(NOW - 3 * DAY) },
-    { appId: 'release-notes', status: 'active', releaseCount: 5, latestVersion: '1.4.2', createdAt: iso(NOW - 25 * DAY), updatedAt: iso(NOW - DAY) },
-    { appId: 'incident-summary', status: 'active', releaseCount: 2, latestVersion: '0.9.0', createdAt: iso(NOW - 9 * DAY), updatedAt: iso(NOW - 4 * DAY) },
-    { appId: 'data-sync', status: 'disabled', releaseCount: 1, latestVersion: '0.1.0', createdAt: iso(NOW - 6 * DAY), updatedAt: iso(NOW - 6 * DAY) }
-  ] };
-  r = m(/^\/v1\/apps\/([^/]+)$/); if (r) return { appId: r[1], status: 'active', createdAt: iso(NOW - 30 * DAY), manifest: { id: r[1], version: '2.0.0', description: 'Daily cross-market briefing generated from FX and index data sources.', entry: 'prompts/system.md', modelRoute: { provider: 'minimax-cn', model: 'MiniMax-M3' }, skillRefs: ['skill://finance-brief/v1'], capabilityRefs: ['capability://web-snapshot-reader/v1'], inputs: [{ name: 'focus', type: 'string', required: false }], dataSources: [{ name: 'fx-rates', url: 'https://api.frankfurter.dev/v1/latest' }], tasks: [{ name: 'finance-brief', entry: 'prompts/system.md' }] }, assets: [{ relativePath: 'prompts/system.md', kind: 'prompt', digest: `sha256:${hex(64)}`, bytes: 2306, preview: 'You are a finance analyst…' }] };
-  if (p === '/v1/packages') return { packages: [
-    { packageId: 'finance-briefing', latestVersion: '2.0.0', releaseCount: 3, latestContentDigest: `sha256:${hex(64)}`, updatedAt: iso(NOW - 3 * DAY) },
-    { packageId: 'release-notes', latestVersion: '1.4.2', releaseCount: 5, latestContentDigest: `sha256:${hex(64)}`, updatedAt: iso(NOW - DAY) }
-  ] };
-  r = m(/^\/v1\/packages\/([^/]+)$/); if (r) return { packageId: r[1], releases: [] };
+  r = m(/^\/v1\/apps\/([^/]+)\/runs$/); if (r) {
+    const appId = decodeURIComponent(r[1]!);
+    const runs = mockAppRuns[appId];
+    if (runs === undefined) return undefined;
+    const releaseId = typeof query.releaseId === 'string' ? query.releaseId : undefined;
+    const filtered = releaseId === undefined ? runs : runs.filter((run) => run.releaseId === releaseId);
+    const limit = Number(query.limit ?? 50);
+    return { schemaVersion: 'AppRunList.v1', appId, runs: Number.isFinite(limit) && limit > 0 ? filtered.slice(0, limit) : filtered };
+  }
+  r = m(/^\/v1\/apps\/([^/]+)\/runs\/([^/]+)$/); if (r) {
+    const appId = decodeURIComponent(r[1]!);
+    const taskId = decodeURIComponent(r[2]!);
+    const run = (mockAppRuns[appId] ?? []).find((entry) => entry.taskId === taskId);
+    return run === undefined ? undefined : { schemaVersion: 'AppRunDetail.v1', appId, run };
+  }
+  if (p === '/v1/apps') return { apps: mockApps };
+  r = m(/^\/v1\/apps\/([^/]+)$/); if (r) {
+    const appId = decodeURIComponent(r[1]!);
+    return mockApps.some((app) => app.appId === appId) ? appDetailFor(appId) : undefined;
+  }
+  if (p === '/v1/packages') return { packages: mockApps.map((app) => ({
+    packageId: app.appId,
+    latestVersion: app.latestVersion,
+    releaseCount: app.releaseCount,
+    latestContentDigest: sha(`content:${app.appId}@${app.latestVersion}`),
+    updatedAt: app.updatedAt
+  })) };
+  r = m(/^\/v1\/packages\/([^/]+)$/); if (r) {
+    const packageId = decodeURIComponent(r[1]!);
+    return mockApps.some((app) => app.appId === packageId) ? packageDetailFor(packageId) : undefined;
+  }
   if (p === '/v1/schedules') return { schemaVersion: 'ScheduleListResult.v1', schedules: mockSchedules };
   r = m(/^\/v1\/schedules\/([^/]+)\/triggers$/); if (r) return { schemaVersion: 'ScheduleTriggerHistory.v1', scheduleId: r[1], events: mockTriggers[decodeURIComponent(r[1]!)] ?? [] };
   r = m(/^\/v1\/schedules\/([^/]+)$/); if (r) return mockSchedules.find((s) => s.definition.scheduleId === decodeURIComponent(r![1]!));

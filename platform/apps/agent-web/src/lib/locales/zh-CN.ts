@@ -61,6 +61,7 @@ export const zhCN = {
     cancelled: '已取消',
     skipped: '已跳过',
     missed: '已错过',
+    pending: '等待中',
     effectUnknown: '效果未知'
   },
   /** Relative-time units and suffix — composed by `lib/utils.ts` (`3m ago` / `3 分钟前`). */
@@ -520,7 +521,55 @@ export const zhCN = {
       required: '必填',
       optional: '可选',
       assets: '资产',
-      rawManifest: '原始清单'
+      rawManifest: '原始清单',
+      releases: '发布版本',
+      openPackage: '发布包',
+      run: '运行',
+      runs: '运行历史',
+      runsEmpty: '还没有运行记录。可从任一发布版本发起运行。',
+      unknownVersion: '未知版本',
+      sourceManual: '手动',
+      sourceSchedule: '定时'
+    },
+    run: {
+      title: '运行 {app}',
+      description: '从发布版本 v{version} 发起一次新运行。参数来自清单 inputs。',
+      task: '任务',
+      required: '{name} 为必填',
+      number: '{name} 必须是数字',
+      numberHint: '以数字提交',
+      enumEmpty: '—',
+      dataSources: '数据源',
+      dataSourcesHint: '清单中的只读声明，由运行时解析；此表单不会提交它们。',
+      providerMissing: '没有启用且已保存凭据的供应商连接匹配该清单。请添加一个连接，并将其设为运行智能体的默认连接。',
+      openProviders: '打开供应商配置',
+      mockDisabled: 'Mock 模式为只读——请连接 agent-api 后再试运行。',
+      submit: '开始运行',
+      starting: '正在启动…'
+    },
+    runDetail: {
+      properties: '属性',
+      status: '状态',
+      version: '版本',
+      source: '来源',
+      task: '任务',
+      created: '创建时间',
+      updated: '更新时间',
+      release: '发布版本',
+      releaseId: 'Release ID',
+      freshness: '新鲜度',
+      failureCode: '失败码',
+      description: '应用运行详情、日志与产物。',
+      updatedAgo: '更新于 {time}',
+      openTask: '打开任务',
+      overview: '概览',
+      statusHint: '状态来自任务投影；等待中表示尚未观察到投影。',
+      pendingHint: '运行已准入，正在等待第一次任务投影。任务启动后即可查看日志与产物。',
+      tabs: {
+        overview: '概览',
+        logs: '运行日志',
+        artifacts: '产物'
+      }
     }
   },
   packages: {
@@ -540,7 +589,20 @@ export const zhCN = {
       lastUpdate: '最后更新'
     },
     detail: {
-      description: '发布包注册记录与发布。'
+      description: '发布包注册记录与发布。',
+      summary: '清单',
+      version: '版本',
+      entry: '入口',
+      model: '模型',
+      tasks: '任务',
+      skills: '技能',
+      assets: '资产',
+      releases: '发布版本',
+      releasesEmpty: '没有发布版本',
+      openApp: '打开应用',
+      run: '运行',
+      raw: '发布包原始详情',
+      showRaw: '展开原始 JSON'
     }
   },
   providers: {
