@@ -1,4 +1,4 @@
-import { BarChart3, Boxes, CalendarClock, ListChecks, MessageSquare, Package, Plug, Settings } from 'lucide-react';
+import { BarChart3, Boxes, CalendarClock, ListChecks, MessageSquare, Plug, Settings } from 'lucide-react';
 
 /**
  * Sidebar navigation. Labels are dictionary keys, never rendered strings — consumers resolve them
@@ -10,7 +10,6 @@ export const navItems = [
   { to: '/tasks', labelKey: 'nav.tasks', icon: ListChecks, shortcut: 'G T', group: 'workspace' },
   { to: '/schedules', labelKey: 'nav.schedules', icon: CalendarClock, shortcut: 'G S', group: 'workspace' },
   { to: '/apps', labelKey: 'nav.apps', icon: Boxes, shortcut: 'G A', group: 'agents' },
-  { to: '/packages', labelKey: 'nav.packages', icon: Package, shortcut: 'G P', group: 'agents' },
   { to: '/providers', labelKey: 'nav.providers', icon: Plug, shortcut: 'G M', group: 'configure' },
   { to: '/settings', labelKey: 'nav.settings', icon: Settings, shortcut: 'G ,', group: 'configure' }
 ] as const;

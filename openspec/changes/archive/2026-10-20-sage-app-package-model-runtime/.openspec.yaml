@@ -1,0 +1,4 @@
+schema: spec-driven
+skip_specs: true
+created: 2026-10-20
+goal: 对齐运行与调度：软删 App 的准入拒绝、FOLLOW 解析最新 Release、运行历史按 App 的 Release 汇总

@@ -1,0 +1,4 @@
+schema: spec-driven
+skip_specs: true
+created: 2026-10-20
+goal: 收敛 agent-api 的 App/Release HTTP 入口：草稿、导入导出、发布、Release 详情与下载，删除 packages 路由

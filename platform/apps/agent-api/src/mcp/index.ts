@@ -25,7 +25,7 @@ export function createInjectExecutor(app: FastifyInstance): McpExecutor {
     const query = request.query === undefined ? '' : `?${new URLSearchParams(
       Object.entries(request.query).map(([k, v]): [string, string] => [k, String(v)]),
     ).toString()}`;
-    const headers: Record<string, string> = {};
+    const headers: Record<string, string> = { ...request.headers };
     if (authorization !== undefined) headers.authorization = authorization;
     const response = await app.inject({
       method: request.method,

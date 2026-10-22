@@ -4,11 +4,13 @@ import type { AuthenticatedPrincipal } from '@sage/app-contracts';
 import { InMemoryAgentTaskSpecStore } from '@sage/local-fakes';
 import type { AgentTaskSpecStorePort } from '@sage/platform-ports';
 import type { TaskPackageInputRecord, RunAgentSettingsRecord, ProviderConnectionRecord } from '@sage/task-domain';
+import { InMemoryAgentReleaseStore } from '@sage/agent-release-registry';
 import {
   registerPackageRunsRoutes,
   type PackageReleaseResolver,
   type RegisterPackageRunsRoutesOptions,
 } from './runs-api.js';
+import type { AppStatusLookup } from './app-status.js';
 import type { TaskControllerPort } from './task-api.js';
 import type { TaskQueryResult } from '@sage/task-domain';
 
@@ -137,7 +139,7 @@ const connectionRecord = (id: string, overrides: Partial<ProviderConnectionRecor
   createdAt: '2026-08-25T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z', ...overrides
 });
 
-async function api(options: { readonly principal?: AuthenticatedPrincipal; readonly specStore?: AgentTaskSpecStorePort; readonly deploymentMode?: 'local' | 'production'; readonly controller?: FakeController; readonly taskStore?: FakeTaskStore; readonly settingsStore?: FakeSettingsStore; readonly connections?: FakeConnectionStore } = {}) {
+async function api(options: { readonly principal?: AuthenticatedPrincipal; readonly specStore?: AgentTaskSpecStorePort; readonly deploymentMode?: 'local' | 'production'; readonly controller?: FakeController; readonly taskStore?: FakeTaskStore; readonly settingsStore?: FakeSettingsStore; readonly connections?: FakeConnectionStore; readonly appStatus?: AppStatusLookup } = {}) {
   const app = Fastify({ logger: false, ajv: { customOptions: { removeAdditional: false } } });
   const controller = options.controller ?? new FakeController();
   const taskStore = options.taskStore ?? new FakeTaskStore();
@@ -152,6 +154,7 @@ async function api(options: { readonly principal?: AuthenticatedPrincipal; reado
     tenantId: 'tenant-local',
     controller,
     releaseResolver: resolver,
+    ...(options.appStatus === undefined ? {} : { appStatus: options.appStatus }),
     taskStore,
     specStore: options.specStore ?? new InMemoryAgentTaskSpecStore(),
     settingsStore,
@@ -241,6 +244,18 @@ describe('Package run API boundaries', () => {
     expect(second.json().attemptId).toBe(first.json().attemptId);
     expect(second.json().inputRef).toBe(first.json().inputRef);
     expect(controller.created).toHaveLength(1);
+    await app.close();
+  });
+
+  it('rejects runs when the release app is soft-deleted', async () => {
+    const registry = new InMemoryAgentReleaseStore();
+    registry.createApp({ tenantId: 'tenant-local', ownerNamespace: 'package-platform', appId: 'demo-assistant' });
+    registry.softDeleteApp('tenant-local', 'demo-assistant');
+    const { app, controller } = await api({ principal: operator, appStatus: registry });
+    const response = await app.inject({ method: 'POST', url: `/v1/releases/${'a'.repeat(64)}/runs`, payload: {} });
+    expect(response.statusCode).toBe(404);
+    expect(response.json().error.code).toBe('APP_DELETED');
+    expect(controller.created).toHaveLength(0);
     await app.close();
   });
 

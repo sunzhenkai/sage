@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { AuthenticatedPrincipal } from '@sage/app-contracts';
 import { InMemoryScheduleControlStore } from '@sage/local-fakes';
 import type { SchedulePort, ScheduleSnapshot } from '@sage/platform-ports';
+import type { AppStatusLookup } from './app-status.js';
 import { registerSchedulesRoutes, type ScheduleApiAuditPort } from './schedules-api.js';
 
 const definition = {
@@ -45,7 +46,7 @@ class FakeFacility implements SchedulePort {
 
 interface Harness { app: ReturnType<typeof Fastify>; audit: { records: { decision: string }[] } }
 
-const build = (options: { readonly principal?: AuthenticatedPrincipal | null } = {}): Harness => {
+const build = (options: { readonly principal?: AuthenticatedPrincipal | null; readonly appStatus?: AppStatusLookup } = {}): Harness => {
   const app = Fastify();
   const store = new InMemoryScheduleControlStore();
   const audit: { records: { decision: string }[] } = { records: [] };
@@ -56,10 +57,11 @@ const build = (options: { readonly principal?: AuthenticatedPrincipal | null } =
     adapter: new FakeFacility(),
     releaseResolver: {
       resolveRelease: async (_tenant, releaseId) => releaseId === 'release-1' ? {
-        release: { releaseRef: 'release://release-1', releaseId, contentDigest: `sha256:${'a'.repeat(64)}` },
+        release: { releaseRef: 'release://release-1', releaseId, contentDigest: `sha256:${'a'.repeat(64)}`, packageId: 'demo-app' },
         manifest: { tasks: [{ name: 'daily' }], inputs: [{ name: 'window', type: 'number', required: false, default: 7 }] }
       } : undefined
     },
+    ...(options.appStatus === undefined ? {} : { appStatus: options.appStatus }),
     authenticator: {
       authenticateRequest: (): AuthenticatedPrincipal | undefined => options.principal === undefined ? { authenticationId: 'local-dev-auth', principalId: 'local-dev-principal', tenantId: 'tenant-a', roles: ['schedule-operator'] } : options.principal ?? undefined
     },
@@ -109,6 +111,14 @@ describe('/v1/schedules API', () => {
     expect(badDigest.json().error.message).toContain('FIXED binding digest');
     const unknownRelease = await app.inject({ method: 'POST', url: '/v1/schedules', payload: { definition, releaseId: 'release-404' } });
     expect(unknownRelease.statusCode).toBe(404);
+  });
+
+  it('rejects creation when the anchor release app is soft-deleted', async () => {
+    const { app } = build({ appStatus: { getApp: () => undefined } });
+    const response = await app.inject({ method: 'POST', url: '/v1/schedules', payload: { definition, releaseId: 'release-1' } });
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe('SCHEDULE_VALIDATION_FAILED');
+    expect(response.json().error.message).toContain('deleted app');
   });
 
   it('pauses, resumes and deletes with immutable audit records', async () => {

@@ -1,6 +1,6 @@
 # 示例 ai app 包
 
-三个示例源包，用于端到端验证 agent-package 链路（源规范 → 编译 → 登记 → 从包发起运行 → 前端展示管理）。内容均为通用公开领域知识，不涉及任何公司或内部系统信息。
+三个示例源包，用于端到端验证 App / Release 链路（源规范 → 草稿 → 编译发布 → 从 Release 发起运行 → 前端管理）。内容均为通用公开领域知识，不涉及任何公司或内部系统信息。
 
 | 示例包 | 主题 | 说明 |
 |--------|------|------|
@@ -44,19 +44,31 @@ pnpm --filter @sage/agent-api register-package examples/ai-apps/finance-briefing
   --api-url http://127.0.0.1:9610 --auth local-dev-auth
 ```
 
-预期输出（`201`/`200`，幂等登记）：
+脚本会 get-or-create App、写入草稿（`If-Match` 按当前 revision），再发布为不可变 Release。默认从 `app.yaml` 的 `id` 取 App id，可用 `--app-id` 覆盖。脚本本身只打印摘要：
 
 ```json
 {
-  "schemaVersion": "PackageReleaseResult.v1",
+  "appId": "finance-briefing",
+  "version": "2.0.0",
+  "releaseId": "sha256:..."
+}
+```
+
+`POST /v1/apps/:appId/releases` 的完整响应为 `AppReleaseResult.v1`（`201` = 新发布，`200` = 同版本同内容已存在）：
+
+```json
+{
+  "schemaVersion": "AppReleaseResult.v1",
   "status": "stored",
-  "packageId": "finance-briefing",
+  "appId": "finance-briefing",
   "packageVersion": "2.0.0",
   "releaseRef": "release://sha256:...",
   "releaseId": "sha256:...",
   "contentDigest": "sha256:...",
   "lockDigest": "sha256:...",
-  "compilerBuild": "local-dev"
+  "compilerBuild": "local-dev",
+  "sourceFilesDigest": "sha256:...",
+  "createdAt": "2026-10-20T15:00:00.000Z"
 }
 ```
 
@@ -94,11 +106,13 @@ curl -sS http://127.0.0.1:9610/v1/tasks/<taskId>/events -H 'x-authentication-id:
 curl -sS http://127.0.0.1:9610/v1/tasks/<taskId>/artifacts -H 'x-authentication-id: local-dev-auth'
 ```
 
-### 5. 包列表与详情
+### 5. App 列表、草稿与 Release
 
 ```bash
-curl -sS http://127.0.0.1:9610/v1/packages -H 'x-authentication-id: local-dev-auth'
-curl -sS http://127.0.0.1:9610/v1/packages/finance-briefing -H 'x-authentication-id: local-dev-auth'
+curl -sS http://127.0.0.1:9610/v1/apps -H 'x-authentication-id: local-dev-auth'
+curl -sS http://127.0.0.1:9610/v1/apps/finance-briefing -H 'x-authentication-id: local-dev-auth'
+curl -sS http://127.0.0.1:9610/v1/apps/finance-briefing/draft -H 'x-authentication-id: local-dev-auth'
+curl -sS http://127.0.0.1:9610/v1/apps/finance-briefing/releases -H 'x-authentication-id: local-dev-auth'
 ```
 
 ## 说明

@@ -1,0 +1,4 @@
+schema: spec-driven
+skip_specs: true
+created: 2026-10-20
+goal: Web 控制台收敛到 App 唯一入口：新建、草稿编辑上传下载、发布、Release 详情与下载、运行；移除 Packages

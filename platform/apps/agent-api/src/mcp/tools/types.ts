@@ -6,9 +6,11 @@ import type { ZodRawShape } from './zod-shim.js';
  * - `schema`：tool input 的 zod raw shape（镜像既有 TypeBox body + path/query 参数）。
  */
 export interface ToolRequest {
-  readonly method: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  readonly method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   readonly path: string;
   readonly query?: Readonly<Record<string, string | number | boolean>> | undefined;
+  /** 额外请求头（如 If-Match）；authorization 由 executor 按调用方注入。 */
+  readonly headers?: Readonly<Record<string, string>> | undefined;
   readonly body?: unknown;
 }
 

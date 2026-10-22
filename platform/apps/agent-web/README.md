@@ -28,8 +28,7 @@ Settings live in `localStorage` (`sage.agent-web.settings`); older `serviceToken
 | `/chat`, `/chat/:sessionId` | `GET/POST /v1/chat/sessions`, `GET/DELETE /v1/chat/sessions/:id`, `POST …/archive`, `POST …/unarchive`, `POST …/messages`, `GET …/events`, `GET …/timeline` (SSE, resumed via `afterSequence`), `POST /v1/chat/runs/:runId/retry`, `GET /v1/run-agent/settings` (provider picker) |
 | `/tasks` | `GET /v1/tasks?status&limit` |
 | `/tasks/:taskId` | `GET /v1/tasks/:id`, `GET …/events`, `GET …/run-logs`, `GET …/artifacts`, `GET …/artifacts/:artifactId`, `POST …/signals` (pause/resume), `POST …/cancel`, `POST …/retry` |
-| `/apps`, `/apps/:appId` | `GET /v1/apps`, `GET /v1/apps/:id`, `POST /v1/apps`, `POST /v1/apps/:id/releases`, `DELETE /v1/apps/:id` |
-| `/packages`, `/packages/:id` | `GET /v1/packages`, `GET /v1/packages/:id` |
+| `/apps`, `/apps/:appId`, `/apps/:appId/releases/:releaseId` | `GET/POST /v1/apps`, `GET/PATCH/DELETE /v1/apps/:id`, `GET/PUT …/draft`, `POST …/draft/import` (multipart), `GET …/draft/export` (tar.gz), `GET/POST …/releases`, `GET …/releases/:releaseId`, `GET …/releases/:releaseId/export?format=source\|bundle`, `GET …/runs`, `POST /v1/releases/:releaseId/runs` |
 | `/schedules`, `/schedules/:id` | `GET/POST /v1/schedules`, `GET/DELETE /v1/schedules/:id`, `GET …/triggers`, `POST …/pause`, `POST …/resume` |
 | `/providers` | `GET/POST /v1/provider-connections`, `DELETE /v1/provider-connections/:id`, `GET/PUT /v1/run-agent/settings`, `GET /v1/provider-catalog/{status,providers,models}`, `POST /v1/provider-catalog/check-connection` |
 | `/settings` | `GET /livez`, `GET /readyz` |
@@ -41,14 +40,14 @@ Not surfaced (yet): `POST /v1/tasks` (needs a pre-staged `task-input://` ref), `
 
 ## Import bundled example apps
 
-`Apps → Import example app` imports one of the source packages under `platform/examples/ai-apps`
+`Apps → Import example app` imports one of the source trees under `platform/examples/ai-apps`
 (`finance-briefing`, `github-trending`, `lifecycle-probe`). Dev and build run
-`scripts/prepare-examples.mjs`, which copies the packages to `/examples/ai-apps/...`; there is no
-separate import API. The browser creates the app (`POST /v1/apps`) and uploads its source files
-(`POST /v1/apps/:id/releases`). Apps whose id is already registered are never overwritten. Because
-app ids are soft-deleted server-side, an id that was previously deleted cannot be re-created; the
-dialog reports that instead of modifying it. Add a new example to the list in `src/lib/example-apps.ts`
-when adding one under `examples/ai-apps`.
+`scripts/prepare-examples.mjs`, which copies them to `/examples/ai-apps/...`; there is no
+separate import API. The browser creates the app (`POST /v1/apps`), writes its files to the draft
+(`PUT /v1/apps/:id/draft`) and publishes that revision (`POST /v1/apps/:id/releases`). Apps whose id
+is already registered are never overwritten. Because app ids are soft-deleted server-side, an id that
+was previously deleted cannot be re-created; the dialog reports that instead of modifying it. Add a
+new example to the list in `src/lib/example-apps.ts` when adding one under `examples/ai-apps`.
 
 ## Notes
 
@@ -56,13 +55,13 @@ when adding one under `examples/ai-apps`.
 - Wire types are mirrored in `src/lib/types.ts` from `@sage/app-contracts` / `@sage/task-domain` / agent-api route
   code so the browser bundle has no server-side deps; `package-ownership.json` declares `agent-web` with no `@sage/*` deps.
 - SSE uses a `fetch` stream reader (not `EventSource`) so the bearer token can be sent; reconnects with backoff.
-- Keyboard: `⌘/Ctrl+K` palette, `G` then `C/T/A/P/S/M/,` to navigate, `Enter` to send.
+- Keyboard: `⌘/Ctrl+K` palette, `G` then `O/C/T/A/S/M/,` to navigate, `Enter` to send.
 - The app is not part of the root `tsc -b` project graph (it is a bundled DOM app with `noEmit`); use the package scripts.
 
 ## Overview & mock mode
 
 - `/overview` (default landing) — stat tiles with sparklines and charts (recharts, themed via `--chart-*` tokens) computed from sessions, session runs, tasks, schedules/triggers. Empty data renders ghost charts.
-- Mock mode (dev only, read-only): open any URL with `?mock=1` (persists in localStorage, `?mock=0` or the sidebar "Exit" clears it), or start with `VITE_MOCK=1 pnpm dev`. All GETs are served from a deterministic in-memory dataset; every write is rejected client-side (`MOCK_READ_ONLY`) so agent-api is never called.
+- Mock mode (dev only): open any URL with `?mock=1` (persists in localStorage, `?mock=0` or the sidebar "Exit" clears it), or start with `VITE_MOCK=1 pnpm dev`. GETs are served from a deterministic in-memory dataset; app create, draft save and publish mutate that dataset, so the full app/release flow works offline. Archive import is unsupported (`MOCK_IMPORT_UNSUPPORTED`); other writes are rejected client-side (`MOCK_READ_ONLY`).
 
 ## Localization
 

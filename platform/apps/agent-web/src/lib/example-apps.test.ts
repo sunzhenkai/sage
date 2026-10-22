@@ -15,7 +15,9 @@ function fetcherOf(contents: Record<string, string>): typeof fetch {
 
 const appsApi = () => ({
   create: vi.fn(async () => ({ appId: example.appId })),
-  uploadRelease: vi.fn(async () => ({ releaseId: 'release-1' }))
+  getDraft: vi.fn(async () => ({ revision: 3 })),
+  putDraft: vi.fn(async () => ({ revision: 1 })),
+  publish: vi.fn(async () => ({ releaseId: 'release-1' }))
 });
 
 describe('built-in example apps', () => {
@@ -39,34 +41,39 @@ describe('built-in example apps', () => {
     }
   });
 
-  it('creates the app then uploads all source files', async () => {
+  it('creates the app, saves every source file as the draft, then publishes it', async () => {
     const api = appsApi();
     const contents = Object.fromEntries(example.files.map((file) => [file, `content:${file}`]));
     await expect(importExampleApp({ example, existingAppIds: new Set(), appsApi: api, fetcher: fetcherOf(contents) })).resolves.toEqual({ status: 'imported', appId: example.appId, files: 5 });
     expect(api.create).toHaveBeenCalledWith({ appId: example.appId, name: example.appId });
-    expect(api.uploadRelease).toHaveBeenCalledWith(example.appId, contents);
+    expect(api.putDraft).toHaveBeenCalledWith(example.appId, contents);
+    expect(api.publish).toHaveBeenCalledWith(example.appId, 1);
   });
 
   it('does not call the API for an app that is already listed', async () => {
     const api = appsApi();
     await expect(importExampleApp({ example, existingAppIds: new Set([example.appId]), appsApi: api, fetcher: fetcherOf({}) })).resolves.toEqual({ status: 'exists', appId: example.appId });
     expect(api.create).not.toHaveBeenCalled();
-    expect(api.uploadRelease).not.toHaveBeenCalled();
+    expect(api.putDraft).not.toHaveBeenCalled();
+    expect(api.publish).not.toHaveBeenCalled();
   });
 
-  it('treats APP_ALREADY_EXISTS from a stale list as exists without uploading over it', async () => {
+  it('treats APP_ALREADY_EXISTS from a stale list as exists without overwriting its draft', async () => {
     const api = appsApi();
     api.create.mockRejectedValueOnce(new ApiError(409, 'APP_ALREADY_EXISTS', 'exists'));
     const contents = Object.fromEntries(example.files.map((file) => [file, `content:${file}`]));
     await expect(importExampleApp({ example, existingAppIds: new Set(), appsApi: api, fetcher: fetcherOf(contents) })).resolves.toEqual({ status: 'exists-hidden', appId: example.appId });
-    expect(api.uploadRelease).not.toHaveBeenCalled();
+    expect(api.putDraft).not.toHaveBeenCalled();
+    expect(api.publish).not.toHaveBeenCalled();
   });
 
-  it('retries only the release upload after a half-created app', async () => {
+  it('retries a failed publish against the saved draft without creating or re-uploading', async () => {
     const api = appsApi();
     const contents = Object.fromEntries(example.files.map((file) => [file, `content:${file}`]));
     await expect(importExampleApp({ example, existingAppIds: new Set(), appsApi: api, fetcher: fetcherOf(contents), retryAppId: example.appId })).resolves.toMatchObject({ status: 'imported' });
     expect(api.create).not.toHaveBeenCalled();
-    expect(api.uploadRelease).toHaveBeenCalledTimes(1);
+    expect(api.putDraft).not.toHaveBeenCalled();
+    expect(api.getDraft).toHaveBeenCalledWith(example.appId);
+    expect(api.publish).toHaveBeenCalledWith(example.appId, 3);
   });
 });

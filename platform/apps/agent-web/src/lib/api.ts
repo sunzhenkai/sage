@@ -1,15 +1,23 @@
-import { isMock, mockGet, mockPost } from './mock';
+import { isMock, MockHttpError, mockDownload, mockSend } from './mock';
 import { getSettings } from './settings';
 import type {
-  AppDetail, AppRunDetail, AppRunList, AppSummary, CatalogModelPage, CatalogProviderPage, CatalogStatus, ChatRun, Message, PackageDetail,
-  PackageRunResult, PackageSummary, ProviderConnection,
+  AppCreateResult, AppDetail, AppDraft, AppRelease, AppReleaseDetail, AppReleaseResult, AppRunDetail, AppRunList, AppSummary,
+  CatalogModelPage, CatalogProviderPage, CatalogStatus, ChatRun, Message,
+  PackageRunResult, ProviderConnection,
   ProviderConnectionCheck, ProviderConnectionCheckResult, ProviderConnectionWrite, RunAgentSettings,
   RunLogPage, ScheduleDefinition, ScheduleSnapshot, ScheduleTriggerEvent, Session, SessionDetail, SessionList, TaskArtifact, TaskEvent,
   TaskStatus, TaskView, TimelineEvent
 } from './types';
 
 export class ApiError extends Error {
-  constructor(readonly status: number, readonly code: string, message: string, readonly retryable = false) {
+  constructor(
+    readonly status: number,
+    readonly code: string,
+    message: string,
+    readonly retryable = false,
+    /** Server error payload beyond code/message (e.g. `currentRevision` on draft conflicts). */
+    readonly details?: Readonly<Record<string, unknown>>
+  ) {
     super(message);
     this.name = 'ApiError';
   }
@@ -25,35 +33,72 @@ export function apiUrl(path: string, query?: Record<string, string | number | bo
 
 type Query = Record<string, string | number | boolean | undefined>;
 
-async function request<T>(method: string, path: string, options: { query?: Query; body?: unknown } = {}): Promise<T> {
+function errorFrom(status: number, statusText: string, data: unknown): ApiError {
+  const body = data as { error?: { code?: string; message?: string; retryable?: boolean; [key: string]: unknown }; code?: string; message?: string } | undefined;
+  const code = body?.error?.code ?? body?.code ?? `HTTP_${status}`;
+  const message = body?.error?.message ?? body?.message ?? statusText;
+  return new ApiError(status, code, message, body?.error?.retryable ?? false, body?.error);
+}
+
+async function readJson(response: Response): Promise<unknown> {
+  const text = await response.text();
+  try { return text ? JSON.parse(text) : undefined; } catch { return text; }
+}
+
+async function request<T>(method: string, path: string, options: { query?: Query; body?: unknown; headers?: Record<string, string> } = {}): Promise<T> {
   if (isMock()) {
     await new Promise((resolve) => setTimeout(resolve, 120));
-    const data = method === 'GET' ? mockGet(path, options.query) : mockPost(path, options.body);
+    let data: unknown;
+    try { data = mockSend(method, path, options.body, options.query); } catch (error) {
+      if (error instanceof MockHttpError) throw new ApiError(error.status, error.code, error.message, false, error.details);
+      throw error;
+    }
     if (data === undefined) {
-      if (method !== 'GET') throw new ApiError(400, 'MOCK_READ_ONLY', 'Mock mode is read-only — nothing is sent to agent-api.');
+      if (method !== 'GET') throw new ApiError(400, 'MOCK_READ_ONLY', 'Mock mode is read-only for this endpoint — nothing is sent to agent-api.');
       throw new ApiError(404, 'MOCK_NOT_FOUND', `No mock data for ${path}`);
     }
     return data as T;
   }
-  const headers: Record<string, string> = { accept: 'application/json' };
+  const headers: Record<string, string> = { accept: 'application/json', ...(options.headers ?? {}) };
   const init: RequestInit = { method, headers };
   if (options.body !== undefined) { headers['content-type'] = 'application/json'; init.body = JSON.stringify(options.body); }
   else if (method === 'POST') { headers['content-type'] = 'application/json'; init.body = '{}'; }
   const response = await fetch(apiUrl(path, options.query), init);
   if (response.status === 204) return undefined as T;
-  const text = await response.text();
-  let data: unknown = undefined;
-  try { data = text ? JSON.parse(text) : undefined; } catch { data = text; }
-  if (!response.ok) {
-    const error = (data as { error?: { code?: string; message?: string; retryable?: boolean }; code?: string; message?: string } | undefined);
-    const code = error?.error?.code ?? error?.code ?? `HTTP_${response.status}`;
-    const message = error?.error?.message ?? error?.message ?? response.statusText;
-    throw new ApiError(response.status, code, message, error?.error?.retryable ?? false);
-  }
+  const data = await readJson(response);
+  if (!response.ok) throw errorFrom(response.status, response.statusText, data);
   return data as T;
 }
 
+async function download(path: string, query?: Query): Promise<Blob> {
+  if (isMock()) {
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    const blob = await mockDownload(path);
+    if (blob === undefined) throw new ApiError(404, 'MOCK_NOT_FOUND', `No mock download for ${path}`);
+    return blob;
+  }
+  const response = await fetch(apiUrl(path, query), { method: 'GET', headers: { accept: 'application/gzip' } });
+  if (!response.ok) throw errorFrom(response.status, response.statusText, await readJson(response));
+  return response.blob();
+}
+
+async function uploadArchive(path: string, file: Blob, fileName: string, ifMatch?: string): Promise<unknown> {
+  if (isMock()) {
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    throw new ApiError(400, 'MOCK_IMPORT_UNSUPPORTED', 'Mock mode cannot parse archives — upload against agent-api.');
+  }
+  const form = new FormData();
+  form.append('file', file, fileName);
+  const headers: Record<string, string> = { accept: 'application/json' };
+  if (ifMatch !== undefined) headers['if-match'] = ifMatch;
+  const response = await fetch(apiUrl(path), { method: 'POST', headers, body: form });
+  const data = await readJson(response);
+  if (!response.ok) throw errorFrom(response.status, response.statusText, data);
+  return data;
+}
+
 const enc = encodeURIComponent;
+const etag = (revision: number): string => `"r${revision}"`;
 
 export const api = {
   health: () => request<{ status: string }>('GET', '/livez'),
@@ -89,18 +134,28 @@ export const api = {
   apps: {
     list: () => request<{ apps: AppSummary[] }>('GET', '/v1/apps'),
     get: (id: string) => request<AppDetail>('GET', `/v1/apps/${enc(id)}`),
+    create: (body: { appId: string; name?: string; description?: string }) => request<AppCreateResult>('POST', '/v1/apps', { body }),
+    update: (id: string, body: { name?: string; description?: string }, revision?: number) => request<AppSummary>('PATCH', `/v1/apps/${enc(id)}`, {
+      body, ...(revision === undefined ? {} : { headers: { 'if-match': etag(revision) } })
+    }),
+    remove: (id: string) => request<unknown>('DELETE', `/v1/apps/${enc(id)}`),
+    getDraft: (id: string) => request<AppDraft>('GET', `/v1/apps/${enc(id)}/draft`),
+    putDraft: (id: string, files: Record<string, string>, revision?: number) => request<AppDraft>('PUT', `/v1/apps/${enc(id)}/draft`, {
+      body: { files }, ...(revision === undefined ? {} : { headers: { 'if-match': etag(revision) } })
+    }),
+    importDraft: async (id: string, file: Blob, fileName: string, revision?: number) =>
+      await uploadArchive(`/v1/apps/${enc(id)}/draft/import`, file, fileName, revision === undefined ? undefined : etag(revision)) as AppDraft,
+    exportDraft: (id: string) => download(`/v1/apps/${enc(id)}/draft/export`),
+    publish: (id: string, baseRevision: number) => request<AppReleaseResult>('POST', `/v1/apps/${enc(id)}/releases`, { body: { baseRevision } }),
+    listReleases: (id: string) => request<{ schemaVersion: string; appId: string; releases: AppRelease[] }>('GET', `/v1/apps/${enc(id)}/releases`),
+    getRelease: (id: string, releaseId: string) => request<AppReleaseDetail>('GET', `/v1/apps/${enc(id)}/releases/${enc(releaseId)}`),
+    exportRelease: (id: string, releaseId: string, format: 'source' | 'bundle') =>
+      download(`/v1/apps/${enc(id)}/releases/${enc(releaseId)}/export`, { format }),
     runs: (id: string, query: { releaseId?: string | undefined; limit?: number | undefined } = {}) => request<AppRunList>('GET', `/v1/apps/${enc(id)}/runs`, { query }),
     run: (id: string, taskId: string) => request<AppRunDetail>('GET', `/v1/apps/${enc(id)}/runs/${enc(taskId)}`),
-    create: (body: { appId: string; name: string; description?: string }) => request<{ appId: string }>('POST', '/v1/apps', { body }),
-    uploadRelease: (id: string, files: Record<string, string>) => request<{ releaseId: string }>('POST', `/v1/apps/${enc(id)}/releases`, { body: { files } }),
-    remove: (id: string) => request<unknown>('DELETE', `/v1/apps/${enc(id)}`)
   },
   releases: {
     run: (releaseId: string, body: { task?: string; params?: Record<string, string | number> } = {}) => request<PackageRunResult>('POST', `/v1/releases/${enc(releaseId)}/runs`, { body })
-  },
-  packages: {
-    list: () => request<{ packages: PackageSummary[] }>('GET', '/v1/packages'),
-    get: (id: string) => request<PackageDetail>('GET', `/v1/packages/${enc(id)}`)
   },
 
   schedules: {

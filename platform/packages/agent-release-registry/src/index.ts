@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 export const releaseRegistryOwner = 'agent-release-registry' as const;
 
 export type AgentReleaseRegistryBoundary = {
@@ -57,6 +59,9 @@ export interface StoredRelease {
   readonly idempotencyKey: string;
   readonly release: ReleasePayload;
   readonly lockPayload: Readonly<Record<string, unknown>>;
+  /** 发布时的草稿源文件快照；publishAppRelease 必写，内部 submit/fixture 路径可缺省。 */
+  readonly sourceFiles?: Readonly<Record<string, string>>;
+  readonly sourceFilesDigest?: string;
   readonly createdAt: string;
 }
 
@@ -68,7 +73,15 @@ export interface ReleaseSubmitResult {
 
 export type AgentAppStatus = 'active' | 'deleted';
 
-/** App 主体：包的归属主体，appId 复用 packageId 标识空间。 */
+/** App 当前可编辑的源文件集合；revision 0 表示新建后的空草稿。 */
+export interface AppDraft {
+  readonly revision: number;
+  readonly digest: string;
+  readonly files: Readonly<Record<string, string>>;
+  readonly updatedAt: string;
+}
+
+/** App 主体：唯一可变对象，拥有元数据、草稿、发布历史与软删状态；appId 复用 packageId 标识空间。 */
 export interface AgentApp {
   readonly tenantId: string;
   readonly ownerNamespace: string;
@@ -76,6 +89,7 @@ export interface AgentApp {
   readonly name?: string;
   readonly description?: string;
   readonly status: AgentAppStatus;
+  readonly draft: AppDraft;
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly deletedAt?: string;
@@ -87,6 +101,42 @@ export interface CreateAppRequest {
   readonly appId: string;
   readonly name?: string;
   readonly description?: string;
+}
+
+export interface PutAppDraftInput {
+  readonly tenantId: string;
+  readonly appId: string;
+  readonly expectedRevision: number;
+  readonly files: Readonly<Record<string, string>>;
+}
+
+export type PutAppDraftResult =
+  | { readonly status: 'stored'; readonly draft: AppDraft }
+  | { readonly status: 'conflict'; readonly currentRevision: number };
+
+export interface UpdateAppMetadataInput {
+  readonly tenantId: string;
+  readonly appId: string;
+  readonly expectedRevision: number;
+  readonly name?: string;
+  readonly description?: string;
+}
+
+export type UpdateAppMetadataResult =
+  | { readonly status: 'updated'; readonly app: AgentApp }
+  | { readonly status: 'conflict'; readonly currentRevision: number };
+
+export interface PublishAppReleaseInput {
+  readonly tenantId: string;
+  readonly ownerNamespace: string;
+  readonly appId: string;
+  readonly expectedRevision: number;
+  readonly packageVersion: string;
+  readonly idempotencyKey: string;
+  readonly release: ReleasePayload;
+  readonly lockPayload: Readonly<Record<string, unknown>>;
+  readonly sourceFiles: Readonly<Record<string, string>>;
+  readonly sourceFilesDigest: string;
 }
 
 export interface AgentAppDetail {
@@ -161,13 +211,16 @@ export type ReleaseRegistryErrorCode =
   | 'RELEASE_CHANNEL_CONFLICT'
   | 'RELEASE_ROLLBACK_PREDECESSOR_REQUIRED'
   | 'RELEASE_PUBLISH_AUDIT_FAILED'
+  | 'RELEASE_VERSION_CONFLICT'
   | 'APP_INVALID'
   | 'APP_ALREADY_EXISTS'
   | 'APP_NOT_FOUND'
-  | 'APP_DELETED';
+  | 'APP_DELETED'
+  | 'APP_DRAFT_INVALID'
+  | 'APP_DRAFT_CONFLICT';
 
 export class ReleaseRegistryError extends Error {
-  constructor(readonly code: ReleaseRegistryErrorCode, message = code) {
+  constructor(readonly code: ReleaseRegistryErrorCode, message: string = code) {
     super(message);
     this.name = 'ReleaseRegistryError';
   }
@@ -185,11 +238,17 @@ export interface AgentReleaseStore {
   resolveChannelRelease(tenantId: string, ownerNamespace: string, packageId: string, channel: string): ReleaseResolution;
   listPackages(tenantId: string, options?: { readonly limit?: number }): readonly PackageIndexSummary[];
   getPackageDetail(tenantId: string, packageId: string): PackageDetail | undefined;
-  /** App 主体管理：创建（冲突/软删重建→APP_ALREADY_EXISTS）、列出 active、详情（含 release）、幂等软删。 */
+  /** App 主体管理：创建（冲突/软删重建→APP_ALREADY_EXISTS）、列出 active、详情（含 draft 与 release）、幂等软删。 */
   createApp(request: CreateAppRequest): AgentApp;
   listApps(tenantId: string, options?: { readonly limit?: number }): readonly AgentApp[];
   getApp(tenantId: string, appId: string): AgentAppDetail | undefined;
   softDeleteApp(tenantId: string, appId: string, reason?: string): AgentApp | undefined;
+  /** 替换草稿：expectedRevision 不匹配返回 conflict；软删/缺失抛 APP_DELETED/APP_NOT_FOUND。 */
+  putAppDraft(input: PutAppDraftInput): PutAppDraftResult;
+  updateAppMetadata(input: UpdateAppMetadataInput): UpdateAppMetadataResult;
+  /** 发布当前 revision 的草稿为不可变 Release；同 App 同版本不同内容抛 RELEASE_VERSION_CONFLICT。 */
+  publishAppRelease(input: PublishAppReleaseInput): ReleaseSubmitResult;
+  listAppReleases(tenantId: string, appId: string): readonly StoredRelease[];
   auditLog(): readonly ReleaseRegistryAuditRecord[];
 }
 
@@ -317,6 +376,87 @@ function validateCreateAppRequest(request: CreateAppRequest): void {
   if (request.description !== undefined && (typeof request.description !== 'string' || request.description.length > MAX_APP_DESCRIPTION_LENGTH)) appInvalid();
 }
 
+const MAX_DRAFT_ENTRIES = 256;
+const MAX_DRAFT_FILE_BYTES = 512 * 1024;
+const MAX_DRAFT_TOTAL_BYTES = 4 * 1024 * 1024;
+const MAX_DRAFT_PATH_LENGTH = 512;
+const EXECUTABLE_EXTENSIONS = new Set([
+  '.sh', '.bash', '.zsh', '.csh', '.fish', '.ksh',
+  '.py', '.rb', '.pl', '.php', '.lua', '.js', '.mjs', '.cjs', '.ts', '.tsx', '.jsx',
+  '.exe', '.bin', '.elf', '.so', '.dylib', '.dll', '.wasm', '.jar', '.class',
+  '.app', '.command', '.bat', '.cmd', '.ps1', '.com', '.out', '.o'
+]);
+const SECRET_KEY_PATTERNS = [/\b(?:secret|password|passwd|token|api[_-]?key|credential|private[_-]?key|auth)\b/i];
+const SECRET_VALUE_PATTERNS = [
+  /(?:-----BEGIN[ A-Z]*PRIVATE KEY-----)/,
+  /\bAKIA[0-9A-Z]{16}\b/,
+  /\bghp_[0-9A-Za-z]{36}\b/,
+  /\bsk-[0-9A-Za-z]{20,}\b/
+];
+
+function draftInvalid(detail?: string): never {
+  throw new ReleaseRegistryError('APP_DRAFT_INVALID', detail === undefined ? 'APP_DRAFT_INVALID' : `APP_DRAFT_INVALID: ${detail}`);
+}
+
+function normalizeDraftPath(relativePath: unknown): string {
+  if (typeof relativePath !== 'string' || relativePath.length === 0 || relativePath.length > MAX_DRAFT_PATH_LENGTH) {
+    draftInvalid(typeof relativePath === 'string' ? `path length invalid: ${relativePath}` : 'path must be a string');
+  }
+  if (relativePath.startsWith('/') || relativePath.includes('\\') || relativePath.includes('\0')) {
+    draftInvalid(`path traversal rejected: ${relativePath}`);
+  }
+  const segments = relativePath.split('/');
+  if (segments.some((segment) => segment === '' || segment === '.' || segment === '..')) {
+    draftInvalid(`path traversal rejected: ${relativePath}`);
+  }
+  return segments.join('/');
+}
+
+function looksLikeSecret(relativePath: string, content: string): boolean {
+  const base = relativePath.slice(relativePath.lastIndexOf('/') + 1);
+  if (SECRET_KEY_PATTERNS.some((pattern) => pattern.test(base))) return true;
+  return SECRET_VALUE_PATTERNS.some((pattern) => pattern.test(content));
+}
+
+/** 规范化并校验草稿文件：路径安全、可执行扩展名、单文件/总量上限、secret 扫描。 */
+function normalizeDraftFiles(files: unknown): Readonly<Record<string, string>> {
+  if (files === null || typeof files !== 'object' || Array.isArray(files)) draftInvalid('files must be an object');
+  const entries = Object.entries(files as Record<string, unknown>);
+  if (entries.length > MAX_DRAFT_ENTRIES) draftInvalid(`entry count exceeds ${MAX_DRAFT_ENTRIES}`);
+  const normalized: Record<string, string> = {};
+  let totalBytes = 0;
+  for (const [rawPath, content] of entries) {
+    const relativePath = normalizeDraftPath(rawPath);
+    if (typeof content !== 'string') draftInvalid(`content must be a string: ${relativePath}`);
+    const extension = relativePath.slice(relativePath.lastIndexOf('.')).toLowerCase();
+    if (relativePath.includes('.') && EXECUTABLE_EXTENSIONS.has(extension)) {
+      draftInvalid(`executable file rejected: ${relativePath}`);
+    }
+    const bytes = Buffer.byteLength(content, 'utf8');
+    if (bytes > MAX_DRAFT_FILE_BYTES) draftInvalid(`file exceeds ${MAX_DRAFT_FILE_BYTES} bytes: ${relativePath}`);
+    totalBytes += bytes;
+    if (totalBytes > MAX_DRAFT_TOTAL_BYTES) draftInvalid(`draft exceeds ${MAX_DRAFT_TOTAL_BYTES} bytes`);
+    if (looksLikeSecret(relativePath, content)) draftInvalid(`secret content rejected: ${relativePath}`);
+    normalized[relativePath] = content;
+  }
+  return normalized;
+}
+
+/** 源文件 canonical sha256：按路径排序后对 [path, content] 数组取 canonical JSON 摘要。 */
+function draftDigest(files: Readonly<Record<string, string>>): string {
+  const entries = Object.keys(files).sort().map((relativePath) => [relativePath, files[relativePath] as string]);
+  return `sha256:${createHash('sha256').update(canonical(entries)).digest('hex')}`;
+}
+
+function emptyDraft(now: string): AppDraft {
+  const files: Record<string, string> = {};
+  return { revision: 0, digest: draftDigest(files), files, updatedAt: now };
+}
+
+function requireRevision(value: unknown): asserts value is number {
+  if (!Number.isInteger(value) || (value as number) < 0) draftInvalid('expectedRevision must be a non-negative integer');
+}
+
 const channelKey = (tenantId: string, ownerNamespace: string, packageId: string, channel: string): string =>
   [tenantId, ownerNamespace, packageId, channel].map(keyPart).join('|');
 
@@ -349,36 +489,45 @@ export class InMemoryAgentReleaseStore implements AgentReleaseStore {
   submit(request: ReleaseSubmitRequest): ReleaseSubmitResult {
     try {
       validateRequest(request);
+      return this.#storeValidatedRelease(request);
     } catch (cause) {
       this.#recordReject(request, cause instanceof ReleaseRegistryError ? cause.code : 'RELEASE_SUBMIT_INVALID');
       throw cause;
     }
+  }
 
+  /** 身份/内容/引用/版本唯一的 create-only 写入；submit 与 publishAppRelease 共用。 */
+  #storeValidatedRelease(
+    request: ReleaseSubmitRequest,
+    snapshot?: { readonly sourceFiles: Readonly<Record<string, string>>; readonly sourceFilesDigest: string }
+  ): ReleaseSubmitResult {
     const byIdentity = this.#byIdentity.get(identityKey(request));
     if (byIdentity !== undefined) {
-      if (!sameRecordIdentity(byIdentity, request)) {
-        this.#recordReject(request, 'RELEASE_IDENTITY_CONFLICT');
-        throw new ReleaseRegistryError('RELEASE_IDENTITY_CONFLICT');
-      }
+      if (!sameRecordIdentity(byIdentity, request)) throw new ReleaseRegistryError('RELEASE_IDENTITY_CONFLICT');
       return { status: 'existing', releaseRef: byIdentity.release.releaseRef, record: clone(byIdentity) };
     }
 
     const contentIndexKey = contentKey(request.tenantId, request.release.contentDigest);
     const byContent = this.#byContent.get(contentIndexKey);
     if (byContent !== undefined) {
-      if (!sameRecordIdentity(byContent, request)) {
-        this.#recordReject(request, 'RELEASE_CONTENT_SCOPE_CONFLICT');
-        throw new ReleaseRegistryError('RELEASE_CONTENT_SCOPE_CONFLICT');
-      }
+      if (!sameRecordIdentity(byContent, request)) throw new ReleaseRegistryError('RELEASE_CONTENT_SCOPE_CONFLICT');
       this.#byIdentity.set(identityKey(request), byContent);
       return { status: 'existing', releaseRef: byContent.release.releaseRef, record: clone(byContent) };
     }
 
     const refIndexKey = refKey(request.tenantId, request.release.releaseRef);
-    const byRef = this.#byRef.get(refIndexKey);
-    if (byRef !== undefined) {
-      this.#recordReject(request, 'RELEASE_REF_CONFLICT');
-      throw new ReleaseRegistryError('RELEASE_REF_CONFLICT');
+    if (this.#byRef.get(refIndexKey) !== undefined) throw new ReleaseRegistryError('RELEASE_REF_CONFLICT');
+
+    // 同 App 同版本唯一：同内容幂等返回既有 Release，不同内容拒绝，避免绕过 App 作用域写入冲突版本。
+    const byVersion = this.#findVersionRecord(request.tenantId, request.packageId, request.packageVersion);
+    if (byVersion !== undefined) {
+      const sameSnapshot = snapshot === undefined || byVersion.sourceFilesDigest === undefined
+        || byVersion.sourceFilesDigest === snapshot.sourceFilesDigest;
+      if (byVersion.release.contentDigest === request.release.contentDigest && sameSnapshot) {
+        this.#byIdentity.set(identityKey(request), byVersion);
+        return { status: 'existing', releaseRef: byVersion.release.releaseRef, record: clone(byVersion) };
+      }
+      throw new ReleaseRegistryError('RELEASE_VERSION_CONFLICT');
     }
 
     const record: StoredRelease = clone({
@@ -389,6 +538,10 @@ export class InMemoryAgentReleaseStore implements AgentReleaseStore {
       idempotencyKey: request.idempotencyKey,
       release: request.release,
       lockPayload: request.lockPayload,
+      ...(snapshot === undefined ? {} : {
+        sourceFiles: snapshot.sourceFiles,
+        sourceFilesDigest: snapshot.sourceFilesDigest
+      }),
       createdAt: nowIso(this.#clock)
     });
     this.#byIdentity.set(identityKey(request), record);
@@ -405,6 +558,11 @@ export class InMemoryAgentReleaseStore implements AgentReleaseStore {
       releaseDigest: request.release.contentDigest, reason: 'release submitted', occurredAt: record.createdAt
     });
     return { status: 'stored', releaseRef: record.release.releaseRef, record: clone(record) };
+  }
+
+  #findVersionRecord(tenantId: string, appId: string, packageVersion: string): StoredRelease | undefined {
+    const records = this.#byPackage.get(`${keyPart(tenantId)}|${keyPart(appId)}`);
+    return records?.find((record) => record.packageVersion === packageVersion);
   }
 
   getByRef(tenantId: string, releaseRef: string): StoredRelease | undefined {
@@ -488,6 +646,7 @@ export class InMemoryAgentReleaseStore implements AgentReleaseStore {
       ...(request.name === undefined ? {} : { name: request.name }),
       ...(request.description === undefined ? {} : { description: request.description }),
       status: 'active',
+      draft: emptyDraft(now),
       createdAt: now,
       updatedAt: now
     };
@@ -519,14 +678,103 @@ export class InMemoryAgentReleaseStore implements AgentReleaseStore {
     if (typeof tenantId !== 'string' || typeof appId !== 'string') return undefined;
     const app = this.#apps.get(appKey(tenantId, appId));
     if (app === undefined || app.status === 'deleted') return undefined;
-    const detail = this.getPackageDetail(tenantId, appId);
-    const releases = detail === undefined ? [] : detail.releases;
-    const latestContentDigest = detail === undefined ? undefined : detail.latestContentDigest;
+    const releases = this.listAppReleases(tenantId, appId);
+    const latestContentDigest = releases[0]?.release.contentDigest;
     return clone({
       app,
       releases,
       ...(latestContentDigest === undefined ? {} : { latestContentDigest })
     });
+  }
+
+  putAppDraft(input: PutAppDraftInput): PutAppDraftResult {
+    if (input === null || typeof input !== 'object' || Array.isArray(input)) draftInvalid('input must be an object');
+    if (typeof input.tenantId !== 'string' || input.tenantId.length === 0 || input.tenantId.length > MAX_ID_LENGTH) draftInvalid('tenantId invalid');
+    if (typeof input.appId !== 'string' || input.appId.length === 0 || input.appId.length > MAX_ID_LENGTH) draftInvalid('appId invalid');
+    requireRevision(input.expectedRevision);
+    const app = this.#requireActiveApp(input.tenantId, input.appId);
+    if (input.expectedRevision !== app.draft.revision) {
+      return { status: 'conflict', currentRevision: app.draft.revision };
+    }
+    const files = normalizeDraftFiles(input.files);
+    const now = nowIso(this.#clock);
+    const draft: AppDraft = {
+      revision: app.draft.revision + 1,
+      digest: draftDigest(files),
+      files,
+      updatedAt: now
+    };
+    this.#apps.set(appKey(input.tenantId, input.appId), { ...app, draft, updatedAt: now });
+    return { status: 'stored', draft: clone(draft) };
+  }
+
+  updateAppMetadata(input: UpdateAppMetadataInput): UpdateAppMetadataResult {
+    if (input === null || typeof input !== 'object' || Array.isArray(input)) appInvalid();
+    if (typeof input.tenantId !== 'string' || input.tenantId.length === 0 || input.tenantId.length > MAX_ID_LENGTH) appInvalid();
+    if (typeof input.appId !== 'string' || input.appId.length === 0 || input.appId.length > MAX_ID_LENGTH) appInvalid();
+    requireRevision(input.expectedRevision);
+    if (input.name !== undefined && (typeof input.name !== 'string' || input.name.length === 0 || input.name.length > MAX_APP_NAME_LENGTH)) appInvalid();
+    if (input.description !== undefined && (typeof input.description !== 'string' || input.description.length > MAX_APP_DESCRIPTION_LENGTH)) appInvalid();
+    const app = this.#requireActiveApp(input.tenantId, input.appId);
+    if (input.expectedRevision !== app.draft.revision) {
+      return { status: 'conflict', currentRevision: app.draft.revision };
+    }
+    const now = nowIso(this.#clock);
+    const updated: AgentApp = {
+      ...app,
+      ...(input.name === undefined ? {} : { name: input.name }),
+      ...(input.description === undefined ? {} : { description: input.description }),
+      draft: { ...app.draft, revision: app.draft.revision + 1, updatedAt: now },
+      updatedAt: now
+    };
+    this.#apps.set(appKey(input.tenantId, input.appId), updated);
+    return { status: 'updated', app: clone(updated) };
+  }
+
+  publishAppRelease(input: PublishAppReleaseInput): ReleaseSubmitResult {
+    if (input === null || typeof input !== 'object' || Array.isArray(input)) draftInvalid('input must be an object');
+    requireRevision(input.expectedRevision);
+    const app = this.#requireActiveApp(input.tenantId, input.appId);
+    if (input.ownerNamespace !== app.ownerNamespace) throw new ReleaseRegistryError('APP_INVALID');
+    if (input.expectedRevision !== app.draft.revision) throw new ReleaseRegistryError('APP_DRAFT_CONFLICT');
+    const sourceFiles = normalizeDraftFiles(input.sourceFiles);
+    const sourceFilesDigest = draftDigest(sourceFiles);
+    requireDigest(input.sourceFilesDigest);
+    if (input.sourceFilesDigest !== sourceFilesDigest) draftInvalid('sourceFilesDigest does not match sourceFiles');
+    if (sourceFilesDigest !== app.draft.digest) throw new ReleaseRegistryError('APP_DRAFT_CONFLICT');
+
+    const request: ReleaseSubmitRequest = {
+      tenantId: input.tenantId,
+      ownerNamespace: input.ownerNamespace,
+      packageId: input.appId,
+      packageVersion: input.packageVersion,
+      idempotencyKey: input.idempotencyKey,
+      release: input.release,
+      lockPayload: input.lockPayload
+    };
+    validateRequest(request);
+    const result = this.#storeValidatedRelease(request, { sourceFiles, sourceFilesDigest });
+    if (result.status === 'stored') {
+      this.#apps.set(appKey(input.tenantId, input.appId), { ...app, updatedAt: result.record.createdAt });
+    }
+    return result;
+  }
+
+  listAppReleases(tenantId: string, appId: string): readonly StoredRelease[] {
+    if (typeof tenantId !== 'string' || typeof appId !== 'string') return [];
+    const records = this.#byPackage.get(`${keyPart(tenantId)}|${keyPart(appId)}`);
+    if (records === undefined) return [];
+    return [...records]
+      .sort((left, right) =>
+        right.createdAt.localeCompare(left.createdAt) || right.release.releaseId.localeCompare(left.release.releaseId))
+      .map(clone);
+  }
+
+  #requireActiveApp(tenantId: string, appId: string): AgentApp {
+    const app = this.#apps.get(appKey(tenantId, appId));
+    if (app === undefined) throw new ReleaseRegistryError('APP_NOT_FOUND');
+    if (app.status === 'deleted') throw new ReleaseRegistryError('APP_DELETED');
+    return app;
   }
 
   softDeleteApp(tenantId: string, appId: string, reason = 'app deleted'): AgentApp | undefined {
@@ -551,7 +799,7 @@ export class InMemoryAgentReleaseStore implements AgentReleaseStore {
     if (this.#apps.has(key)) return;
     const now = nowIso(this.#clock);
     this.#apps.set(key, {
-      tenantId, ownerNamespace, appId, status: 'active', createdAt: now, updatedAt: now
+      tenantId, ownerNamespace, appId, status: 'active', draft: emptyDraft(now), createdAt: now, updatedAt: now
     });
   }
 

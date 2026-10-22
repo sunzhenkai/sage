@@ -42,6 +42,16 @@ describe('createInjectExecutor', () => {
     expect(captured.headers).toEqual({ authorization: 'Bearer abc' });
   });
 
+  it('透传 tool 提供的 If-Match 并保留 authorization', async () => {
+    let captured: Record<string, string> | undefined;
+    const executor = createInjectExecutor(fakeApp((input) => {
+      captured = input.headers;
+      return { statusCode: 200, body: '{}' };
+    }));
+    await executor({ method: 'PUT', path: '/v1/apps/demo/draft', headers: { 'if-match': '"r2"' } }, 'Bearer abc');
+    expect(captured).toEqual({ 'if-match': '"r2"', authorization: 'Bearer abc' });
+  });
+
   it('inject 抛异常：向上抛（由 tool handler 收敛为 MCP_TOOL_INVOCATION_FAILED）', async () => {
     const executor = createInjectExecutor(fakeApp(() => { throw new Error('inject boom'); }));
     await expect(executor({ method: 'GET', path: '/x' })).rejects.toThrow('inject boom');

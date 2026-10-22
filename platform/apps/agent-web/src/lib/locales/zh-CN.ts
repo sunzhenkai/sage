@@ -39,7 +39,6 @@ export const zhCN = {
     tasks: '任务',
     schedules: '定时任务',
     apps: '应用',
-    packages: '发布包',
     providers: '供应商',
     settings: '设置'
   },
@@ -272,6 +271,7 @@ export const zhCN = {
       all: '全部任务',
       active: '进行中',
       done: '已完成',
+      properties: '属性',
       activity: '活动',
       runLogs: '运行日志',
       artifacts: '产物',
@@ -395,9 +395,14 @@ export const zhCN = {
       scheduleId: '定时任务 ID',
       scheduleIdHint: '小写，[a-z0-9._-]，至少 3 个字符',
       displayName: '显示名称',
-      releaseId: '发布 ID（绑定锚点）',
-      releaseBinding: '发布绑定',
-      contentDigest: '内容摘要',
+      app: '应用',
+      selectApp: '选择应用',
+      release: 'Release',
+      selectRelease: '选择 Release',
+      releaseHint: 'FIXED 固定该 Release；FOLLOW 在触发时运行最新版本，并以当前最新 Release 作为锚点。',
+      binding: '版本绑定',
+      followLatest: '跟随最新 Release',
+      noReleases: '该应用还没有 Release，请先发布一个。',
       trigger: '触发器',
       cronExpression: 'Cron 表达式',
       timezone: '时区',
@@ -456,6 +461,18 @@ export const zhCN = {
     }
   },
   apps: {
+    new: {
+      action: '新建应用',
+      title: '新建应用',
+      description: '先创建可变的应用，源文件保存在草稿中；发布后才会产生不可变的 Release。',
+      appId: '应用 ID',
+      appIdHint: '小写，[a-z0-9._-]，至少 3 个字符',
+      name: '名称',
+      nameHint: '可选，默认与应用 ID 相同',
+      descriptionLabel: '描述',
+      submit: '创建应用',
+      creating: '正在创建…'
+    },
     import: {
       action: '导入示例应用',
       title: '导入示例应用',
@@ -474,18 +491,31 @@ export const zhCN = {
     },
     empty: {
       title: '没有应用',
-      hint: '可直接导入内置示例，或通过 agent-api 注册智能体包（pnpm --filter @sage/agent-api register-package）。'
+      hint: '新建一个空应用并编辑草稿，或从内置示例开始。'
     },
+    noSelection: {
+      title: '选择一个应用',
+      hint: '从左侧列表点开，或新建一个。'
+    },
+    filterApps: '筛选应用',
+    filterEmpty: {
+      title: '没有匹配的应用',
+      hint: '换个关键词，或清空筛选。'
+    },
+    menu: { more: '更多' },
     all: {
       title: '全部应用',
-      description: '已注册的智能体应用。点击某一行可查看发布、任务与资产。'
+      description: '可变的智能体应用。点击某一行可编辑草稿、发布 Release 并查看运行。'
     },
     columns: {
       app: '应用',
       status: '状态',
       latestVersion: '最新版本',
+      versionMeta: 'v{version} · {count}',
       runs: '运行 · 14 天',
       releases: '发布',
+      draft: '草稿',
+      unpublished: '未发布',
       created: '创建时间',
       lastUpdate: '最后更新'
     },
@@ -501,6 +531,64 @@ export const zhCN = {
       lifecycle: {
         name: '生命周期探针',
         description: '最小示例包，无输入与参考资料，适合验证创建 → 发布 → 运行链路。'
+      }
+    },
+    draft: {
+      title: '草稿',
+      description: '编辑源文件并保存修订；发布后生成不可变的 Release。',
+      revision: 'r{revision}',
+      files: '{count} 个文件',
+      version: '版本',
+      digest: '摘要',
+      noFiles: '草稿还没有源文件。上传压缩包即可开始。',
+      unsaved: '有未保存的修改',
+      unpublished: '有未发布的修改',
+      clean: '与最新 Release 一致',
+      statusLine: '{revision} · {files} · {state}',
+      stateCleanVersion: '与 v{version} 一致',
+      save: '保存草稿',
+      saving: '正在保存…',
+      saved: '已保存为 r{revision}。',
+      reload: '重新加载草稿',
+      upload: '上传压缩包',
+      uploading: '正在上传…',
+      uploadDone: '草稿已由压缩包替换（r{revision}）。',
+      uploadUnsupported: 'Mock 模式不支持压缩包上传。',
+      download: '下载草稿',
+      downloadFailed: '草稿下载失败。',
+      publish: '发布 Release',
+      publishing: '正在发布…',
+      published: '已发布 v{version}。',
+      existing: 'v{version} 已存在且内容相同，未生成新的 Release。',
+      empty: '草稿为空——请先添加文件再发布。',
+      conflict: '草稿已在别处更新（当前为 r{revision}）。本地修改已保留；重新加载将丢弃这些修改。',
+      versionConflict: 'v{version} 已存在且内容不同。请先在 app.yaml 中提升版本号再发布。',
+      saveFirst: '请先保存草稿再发布。',
+      selectFile: '选择一个源文件进行编辑。'
+    },
+    release: {
+      description: '不可变的应用快照与构建来源。',
+      manifest: '清单',
+      assets: '资产',
+      assetsEmpty: '该 Release 没有资产。',
+      provenance: '构建来源',
+      showProvenance: '显示全部来源',
+      downloadSource: '下载源码',
+      downloadBundle: '下载打包产物',
+      downloading: '正在准备…',
+      downloadFailed: 'Release 下载失败。',
+      raw: 'Release 原始详情',
+      showRaw: '显示原始 JSON',
+      run: '运行',
+      fields: {
+        version: '版本',
+        releaseRef: 'Release 引用',
+        releaseId: 'Release ID',
+        contentDigest: '内容摘要',
+        sourceFilesDigest: '源文件摘要',
+        lockDigest: '锁定摘要',
+        compilerBuild: '编译器构建',
+        createdAt: '创建时间'
       }
     },
     detail: {
@@ -523,10 +611,19 @@ export const zhCN = {
       assets: '资产',
       rawManifest: '原始清单',
       releases: '发布版本',
-      openPackage: '发布包',
+      openRelease: 'Release',
       run: '运行',
       runs: '运行历史',
       runsEmpty: '还没有运行记录。可从任一发布版本发起运行。',
+      releasesEmpty: '还没有发布版本。编辑草稿后可以发布。',
+      definitionEmpty: '这个应用没有任务、输入或数据源。',
+      showManifest: '显示原始清单',
+      tabs: {
+        properties: '属性',
+        draft: '草稿',
+        releases: '发布',
+        runs: '运行'
+      },
       unknownVersion: '未知版本',
       sourceManual: '手动',
       sourceSchedule: '定时'
@@ -565,6 +662,8 @@ export const zhCN = {
       overview: '概览',
       statusHint: '状态来自任务投影；等待中表示尚未观察到投影。',
       pendingHint: '运行已准入，正在等待第一次任务投影。任务启动后即可查看日志与产物。',
+      runningHint: '运行还在进行，日志会跟着更新。',
+      finishedHint: '这次运行已结束。日志和产物在上面的页签里。',
       tabs: {
         overview: '概览',
         logs: '运行日志',
@@ -572,45 +671,14 @@ export const zhCN = {
       }
     }
   },
-  packages: {
-    empty: {
-      title: '没有发布包'
-    },
-    all: {
-      title: '全部发布包',
-      description: '已发布的智能体包及其最新内容摘要。'
-    },
-    columns: {
-      package: '发布包',
-      latestVersion: '最新版本',
-      installs: '安装 · 14 天',
-      releases: '发布',
-      contentDigest: '内容摘要',
-      lastUpdate: '最后更新'
-    },
-    detail: {
-      description: '发布包注册记录与发布。',
-      summary: '清单',
-      version: '版本',
-      entry: '入口',
-      model: '模型',
-      tasks: '任务',
-      skills: '技能',
-      assets: '资产',
-      releases: '发布版本',
-      releasesEmpty: '没有发布版本',
-      openApp: '打开应用',
-      run: '运行',
-      raw: '发布包原始详情',
-      showRaw: '展开原始 JSON'
-    }
-  },
   providers: {
     description: '运行智能体使用的模型供应商连接。可从 models.dev 目录中选择，或输入自定义端点；API 密钥在服务端加密保存，永不返回。',
     addConnection: '添加连接',
     dialog: {
       title: '添加供应商连接',
-      description: '从 models.dev 快照自动填充——基础 URL 与模型仍可编辑。API 密钥在服务端加密保存，永不返回。'
+      description: '从 models.dev 快照自动填充——基础 URL 与模型仍可编辑。API 密钥在服务端加密保存，永不返回。',
+      editTitle: '编辑供应商连接',
+      editDescription: '可改模型、端点与名称。留空 API 密钥则保留已保存的凭据。'
     },
     connections: {
       title: '连接',
@@ -619,6 +687,7 @@ export const zhCN = {
       emptyHint: '添加一个连接，让智能体可以调用模型。',
       default: '默认',
       env: '环境变量',
+      edit: '编辑',
       makeDefault: '设为默认',
       deleteConfirm: '删除 {name}？'
     },
@@ -675,9 +744,12 @@ export const zhCN = {
       anthropicHint: 'Anthropic 调用会归一化结尾的 /v1',
       adapter: '适配器',
       modelId: '模型 ID',
+      modelIdHint: '也可直接填写模型 ID；目录选择会同步到这里。',
       name: '名称',
       namePlaceholder: '显示在连接列表中',
       apiKey: 'API 密钥',
+      apiKeyKeep: '留空则保留已保存的密钥。',
+      apiKeyPlaceholder: '••••••••（保持不变）',
       testing: '测试中…',
       test: '测试连接'
     },
@@ -804,11 +876,17 @@ export const zhCN = {
     // apps-api.ts
     APP_ALREADY_EXISTS: '同 ID 的应用已存在。',
     APP_AUTHENTICATION_REQUIRED: '应用 API 需要身份认证。',
+    APP_DELETED: '应用已被删除。',
+    APP_DRAFT_CONFLICT: '草稿已在别处更新，请重新加载或保留本地修改。',
+    APP_DRAFT_EMPTY: '草稿为空，请先添加源文件再发布。',
+    APP_DRAFT_INVALID: '草稿源文件校验失败。',
+    APP_INVALID: '应用请求无效。',
     APP_NOT_FOUND: '应用不存在。',
     APP_OPERATION_REJECTED: '应用操作被拒绝。',
     APP_PACKAGE_ID_MISMATCH: '上传的包与该应用不匹配。',
     APP_UNAVAILABLE: '应用 API 暂时不可用。',
     APP_UPLOAD_UNTRUSTED_FIELD: '包含不被信任的字段，已拒绝。',
+    RELEASE_VERSION_CONFLICT: '该版本已存在且内容不同。',
     // runs-api.ts
     INPUT_REMOVED: '自由输入已移除：请提交清单声明的参数（见 manifest inputs），或从对话中提升任务。',
     PACKAGE_RUN_UNTRUSTED_FIELD: '包含不被信任的字段，已拒绝。',
@@ -825,13 +903,6 @@ export const zhCN = {
     ADMISSION_SPEC_COMMIT_FAILED: 'Spec 提交失败。',
     PACKAGE_RUN_REJECTED: '发布包运行被拒绝。',
     PACKAGE_RUN_UNAVAILABLE: '发布包运行暂时不可用。',
-    // packages-api.ts
-    PACKAGE_AUTHENTICATION_REQUIRED: '发布包 API 需要身份认证。',
-    PACKAGE_REGISTRATION_REJECTED: '发布包注册被拒绝。',
-    PACKAGE_UNAVAILABLE: '发布包 API 暂时不可用。',
-    PACKAGE_NOT_FOUND: '发布包不存在。',
-    PACKAGE_REGISTRATION_UNTRUSTED_FIELD: '包含不被信任的字段，已拒绝。',
-    PACKAGE_OPERATION_FORBIDDEN: '该操作需要发布包注册者角色。',
     // schedules-api.ts
     SCHEDULE_RULE_INVALID: '定时任务定义不合法。',
     SCHEDULE_FORBIDDEN: '定时任务租户不匹配。',
@@ -933,8 +1004,7 @@ export const zhCN = {
     'go-chat': { label: '前往对话', description: '与运行智能体的对话' },
     'go-tasks': { label: '前往任务', description: '全部任务及其状态' },
     'go-schedules': { label: '前往定时任务', description: '周期性触发' },
-    'go-apps': { label: '前往应用', description: '已注册的智能体应用' },
-    'go-packages': { label: '前往发布包', description: '已发布的智能体包' },
+    'go-apps': { label: '前往应用', description: '智能体应用、草稿与 Release' },
     'go-providers': { label: '前往供应商', description: '模型供应商连接' },
     'go-settings': { label: '前往设置', description: '当前页面' },
     send: { label: '发送消息', description: '在对话输入框中' }

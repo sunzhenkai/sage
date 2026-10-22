@@ -1,7 +1,7 @@
 import type { ToolDef } from './types.js';
 import { chatTools } from './chat.js';
 import { taskTools } from './task.js';
-import { packageTools, appTools, runTools } from './package.js';
+import { appTools, runTools } from './app.js';
 import {
   providerCatalogTools,
   providerConnectionTools,
@@ -19,7 +19,6 @@ import {
 export const allTools: readonly ToolDef[] = [
   ...chatTools,
   ...taskTools,
-  ...packageTools,
   ...appTools,
   ...runTools,
   ...providerCatalogTools,
@@ -33,7 +32,6 @@ export const allTools: readonly ToolDef[] = [
 export const REQUIRED_GROUPS = [
   'chat',
   'task',
-  'package',
   'app',
   'run',
   'provider_catalog',

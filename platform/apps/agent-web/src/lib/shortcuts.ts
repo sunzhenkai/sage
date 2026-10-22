@@ -11,7 +11,6 @@ export const defaultShortcuts: Shortcut[] = [
   { id: 'go-tasks', labelKey: 'shortcuts.go-tasks.label', descriptionKey: 'shortcuts.go-tasks.description', keys: 'G T', to: '/tasks' },
   { id: 'go-schedules', labelKey: 'shortcuts.go-schedules.label', descriptionKey: 'shortcuts.go-schedules.description', keys: 'G S', to: '/schedules' },
   { id: 'go-apps', labelKey: 'shortcuts.go-apps.label', descriptionKey: 'shortcuts.go-apps.description', keys: 'G A', to: '/apps' },
-  { id: 'go-packages', labelKey: 'shortcuts.go-packages.label', descriptionKey: 'shortcuts.go-packages.description', keys: 'G P', to: '/packages' },
   { id: 'go-providers', labelKey: 'shortcuts.go-providers.label', descriptionKey: 'shortcuts.go-providers.description', keys: 'G M', to: '/providers' },
   { id: 'go-settings', labelKey: 'shortcuts.go-settings.label', descriptionKey: 'shortcuts.go-settings.description', keys: 'G ,', to: '/settings' },
   { id: 'send', labelKey: 'shortcuts.send.label', descriptionKey: 'shortcuts.send.description', keys: '↵', fixed: true }

@@ -26,4 +26,10 @@ describe('Provider Catalog API runtime lifecycle boundaries', () => {
     expect(source.indexOf('catalogService.listProviders')).toBeLessThan(source.indexOf('registerProviderCatalogRoutes(app'));
     expect(source.indexOf('registerProviderCatalogRoutes(app')).toBeLessThan(source.indexOf('catalogManager.start()'));
   });
+
+  it('migrates agent-state tables before wiring PostgresTaskRunLogQuery', async () => {
+    const source = await readFile(new URL('./runtime.ts', import.meta.url), 'utf8');
+    expect(source).toMatch(/await agentState\.migrate\(\)/);
+    expect(source.indexOf('await agentState.migrate()')).toBeLessThan(source.indexOf('new PostgresTaskRunLogQuery'));
+  });
 });
