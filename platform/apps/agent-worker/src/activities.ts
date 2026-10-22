@@ -211,7 +211,12 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
 
         const outputContract = packageRecord?.runContract;
         const declaredFiles = outputContract?.files ?? [];
-        if ((await listOutputFiles(outputDir)).length === 0 && outcome.output !== undefined && outcome.output.length > 0) {
+        // Declared output.files must be written by the agent into SAGE_OUTPUT_DIR.
+        // Never invent them from chat text — that turns refusals into false "succeeded" runs.
+        if (declaredFiles.length === 0
+          && (await listOutputFiles(outputDir)).length === 0
+          && outcome.output !== undefined
+          && outcome.output.length > 0) {
           await writeCompatOutput(outputDir, outcome.output, declaredFiles);
         }
         if (declaredFiles.length > 0) {

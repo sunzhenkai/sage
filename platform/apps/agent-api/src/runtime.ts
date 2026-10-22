@@ -18,7 +18,7 @@ import { registerSchedulesRoutes } from './schedules-api.js';
 import { registerEffectResolutionsRoute } from './effect-resolutions-api.js';
 import { EffectResolutionService } from './effect-resolution.js';
 import { ServiceTokenAuthenticator } from './service-token.js';
-import { PostgresToolEffectLedger, PostgresTaskRunLogQuery } from '@sage/agent-state-postgres';
+import { PostgresAgentStateAdapter, PostgresToolEffectLedger, PostgresTaskRunLogQuery } from '@sage/agent-state-postgres';
 import { TASK_NAMESPACE, TASK_QUEUE } from '@sage/task-domain';
 import { createDevRegistryBundle, publishDevRegistry } from '@sage/temporal-registry';
 import { TemporalClientFactory, TrustedMultiTargetTaskController, TrustedTemporalRouter } from '@sage/temporal-routing';
@@ -122,15 +122,19 @@ async function temporalReady(address: string): Promise<void> {
 async function migrateStores(connectionString: string, chat: ChatStore, tasks: PostgresTaskStore, catalog: ProviderCatalogStore): Promise<void> {
   const pool = new Pool({ connectionString, connectionTimeoutMillis: 2_000 });
   const client = await pool.connect();
+  const agentState = new PostgresAgentStateAdapter({ connectionString, connectionTimeoutMillis: 2_000 });
   try {
     await client.query('SELECT pg_advisory_lock(845231001)');
     await chat.migrate();
     await tasks.migrate();
     await catalog.migrate();
+    // Run-log / effect / schedule authority tables live here; PostgresTaskRunLogQuery reads canonical_agent_events.
+    await agentState.migrate();
   } finally {
     await client.query('SELECT pg_advisory_unlock(845231001)').catch(() => undefined);
     client.release();
     await pool.end();
+    await agentState.close().catch(() => undefined);
   }
 }
 
