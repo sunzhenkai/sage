@@ -2,8 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Ban, CircleDot, Clock, Hash, ListChecks, Pause, Play, RefreshCw, RotateCw, Server, Tags } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
-import { Crumb, PageHeader, ViewTab, ViewTabs } from '@/components/layout/app-shell';
-import { PageContent, PageDescription, PageToolbar, Quiet, Section, SegmentedTabs } from '@/components/layout/page';
+import { Crumb, PageHeader, ViewTab } from '@/components/layout/app-shell';
+import { PageContent, PageDescription, Quiet, Section, SegmentedTabs } from '@/components/layout/page';
 import { ApprovalCard } from '@/components/bui/approval-card';
 import { Artifacts } from '@/components/bui/artifacts';
 import { StatusGlyph, StatusPill, Tag, toneFor } from '@/components/bui/atoms';
@@ -45,14 +45,13 @@ export function TasksPage() {
   return (
     <>
       <PageHeader title={t('nav.tasks')}
+        tabs={<>
+          <ViewTab active={view === 'all'} onClick={() => setView('all')}>{t('tasks.tabs.all')}</ViewTab>
+          <ViewTab active={view === 'active'} onClick={() => setView('active')}>{t('tasks.tabs.active')}</ViewTab>
+          <ViewTab active={view === 'done'} onClick={() => setView('done')}>{t('tasks.tabs.done')}</ViewTab>
+        </>}
         actions={<Button variant="ghost" size="icon-sm" title={t('common.refresh')} onClick={() => void tasks.refetch()}><RefreshCw className={cn(tasks.isFetching && 'animate-spin')} /></Button>}
       />
-      {/* View switch lives in a tool row below the header (DESIGN §3) so it stays un-clipped and reachable on narrow viewports. */}
-      <PageToolbar left={<ViewTabs>
-        <ViewTab active={view === 'all'} onClick={() => setView('all')}>{t('tasks.tabs.all')}</ViewTab>
-        <ViewTab active={view === 'active'} onClick={() => setView('active')}>{t('tasks.tabs.active')}</ViewTab>
-        <ViewTab active={view === 'done'} onClick={() => setView('done')}>{t('tasks.tabs.done')}</ViewTab>
-      </ViewTabs>} />
       <PageContent width="wide">
         {tasks.isLoading ? <Loading /> : tasks.error ? <ErrorState error={tasks.error} /> : filtered.length === 0 ? (
           <Empty icon={ListChecks} title={t('tasks.empty.title')} hint={t('tasks.empty.hint')} />

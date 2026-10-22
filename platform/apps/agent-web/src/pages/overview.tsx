@@ -1,8 +1,8 @@
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { PageHeader, ViewTab, ViewTabs } from '@/components/layout/app-shell';
-import { PageContent, PageToolbar, Section } from '@/components/layout/page';
+import { PageHeader, ViewTab } from '@/components/layout/app-shell';
+import { PageContent, Section } from '@/components/layout/page';
 import { AreaTrend, BarList, ChartCard, Delta, GhostChart, Heatmap, Legend, LineTrend, StackedBars, StatTile, useChartTheme, type Series } from '@/components/charts';
 import { Card } from '@/components/ui/misc';
 import { StatusGlyph, ValuePill } from '@/components/bui/atoms';
@@ -106,10 +106,9 @@ export function OverviewPage() {
   return (
     <>
       <PageHeader title={t('nav.overview')}
+        tabs={<>{([7, 14, 30] as const).map((r) => <ViewTab key={r} active={range === r} onClick={() => setRange(r)}>{t('overview.range.days', { days: r })}</ViewTab>)}</>}
         actions={<span className="pr-2 text-[12px] text-faint">{t('overview.header.runsFromSessions', { runs: runs.length, sessions: details.length })}</span>}
       />
-      {/* Range switch lives in a tool row below the header (DESIGN §3) so it stays un-clipped and reachable on narrow viewports. */}
-      <PageToolbar left={<ViewTabs>{([7, 14, 30] as const).map((r) => <ViewTab key={r} active={range === r} onClick={() => setRange(r)}>{t('overview.range.days', { days: r })}</ViewTab>)}</ViewTabs>} />
       <PageContent width="wide">
         {/* One 12-col grid: every row shares the same vertical tracks (3+3+3+3 / 4+8 / 4+4+4). */}
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-12">
