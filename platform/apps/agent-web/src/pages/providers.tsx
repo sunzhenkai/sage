@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, Plus, Trash2 } from 'lucide-react';
+import { Check, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { PageHeader } from '@/components/layout/app-shell';
 import { CardRow, PageContent, PageDescription, Quiet, Section, SegmentedTabs, SettingsGroup, SettingsRow } from '@/components/layout/page';
@@ -17,13 +17,14 @@ import { errorDisplay } from '@/lib/error-message';
 import { useT } from '@/lib/i18n';
 import { isMock, mockSeries } from '@/lib/mock';
 import { adapterFromNpm, catalogBaseUrl, connectionName, isUsableBaseUrl, KNOWN_BASE_URLS } from '@/lib/provider-autofill';
-import type { CatalogModelItem, CatalogProviderItem, CatalogStatus, ProviderConnectionCheckResult, ProviderConnectionWrite } from '@/lib/types';
+import type { CatalogModelItem, CatalogProviderItem, CatalogStatus, ProviderConnection, ProviderConnectionCheckResult, ProviderConnectionWrite } from '@/lib/types';
 import { cn, formatTime, relativeTime } from '@/lib/utils';
 
 export function ProvidersPage() {
   const queryClient = useQueryClient();
   const t = useT();
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<ProviderConnection>();
   const connections = useQuery({ queryKey: ['providers', 'connections'], queryFn: api.providers.list });
   const settings = useQuery({ queryKey: ['providers', 'settings'], queryFn: api.providers.settings });
   const catalog = useQuery({ queryKey: ['providers', 'catalog'], queryFn: api.providers.catalogStatus });
@@ -32,15 +33,20 @@ export function ProvidersPage() {
   const remove = useMutation({ mutationFn: api.providers.remove, onSuccess: invalidate });
   const defaultId = settings.data?.providerConnectionId;
   const items = connections.data?.connections ?? [];
+  const closeEditor = () => { setOpen(false); setEditing(undefined); };
   return (
     <>
       <PageHeader title={t('nav.providers')} />
       <PageContent width="narrow">
         <PageDescription title={t('nav.providers')} description={t('providers.description')}
-          actions={<Dialog open={open} onOpenChange={setOpen}>
-            <Button size="sm" onClick={() => setOpen(true)}><Plus />{t('providers.addConnection')}</Button>
-            <DialogContent title={t('providers.dialog.title')} description={t('providers.dialog.description')}><CreateConnection catalog={catalog.data} onDone={() => { setOpen(false); invalidate(); }} /></DialogContent>
-          </Dialog>} />
+          actions={<Button size="sm" onClick={() => { setEditing(undefined); setOpen(true); }}><Plus />{t('providers.addConnection')}</Button>} />
+        <Dialog open={open || editing !== undefined} onOpenChange={(next) => { if (!next) closeEditor(); }}>
+          <DialogContent
+            title={editing ? t('providers.dialog.editTitle') : t('providers.dialog.title')}
+            description={editing ? t('providers.dialog.editDescription') : t('providers.dialog.description')}>
+            <ConnectionForm key={editing?.id ?? 'create'} catalog={catalog.data} existing={editing} onDone={() => { closeEditor(); invalidate(); }} />
+          </DialogContent>
+        </Dialog>
         {setDefault.error ? <ErrorState error={setDefault.error} /> : remove.error ? <ErrorState error={remove.error} /> : null}
 
         <SettingsGroup title={t('providers.connections.title')} description={t('providers.connections.configured', { count: items.length })}>
@@ -52,7 +58,8 @@ export function ProvidersPage() {
                 <div className="mt-0.5 truncate text-[12px] text-muted">{c.providerName !== undefined ? `${c.providerName} · ` : ''}<Mono>{c.modelId}</Mono> · {c.adapterKind} · {c.baseUrl}</div>
               </div>
               <span className="text-[12px] text-faint">{relativeTime(c.updatedAt)}</span>
-              <span className="flex w-14 justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+              <span className="flex w-[4.5rem] justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                {c.source === 'user' ? <Button size="icon-sm" variant="ghost" title={t('providers.connections.edit')} onClick={() => { setEditing(c); setOpen(true); }}><Pencil /></Button> : null}
                 {c.id !== defaultId ? <Button size="icon-sm" variant="ghost" title={t('providers.connections.makeDefault')} disabled={setDefault.isPending} onClick={() => setDefault.mutate(c.id)}><Check /></Button> : null}
                 {c.source === 'user' ? <Button size="icon-sm" variant="ghost" title={t('common.delete')} onClick={() => { if (confirm(t('providers.connections.deleteConfirm', { name: c.name }))) remove.mutate(c.id); }}><Trash2 /></Button> : null}
               </span>
@@ -108,17 +115,30 @@ function useDebounced<T>(value: T, delay = 250): T {
   return debounced;
 }
 
-function CreateConnection({ catalog, onDone }: { catalog: CatalogStatus | undefined; onDone: () => void }) {
+function ConnectionForm({ catalog, existing, onDone }: { catalog: CatalogStatus | undefined; existing?: ProviderConnection | undefined; onDone: () => void }) {
   const t = useT();
-  const [mode, setMode] = useState<'catalog' | 'manual'>('catalog');
-  const [form, setForm] = useState<ProviderConnectionWrite>(MANUAL_DEFAULTS);
+  const editing = existing !== undefined;
+  const [mode, setMode] = useState<'catalog' | 'manual'>(editing ? 'manual' : 'catalog');
+  const [form, setForm] = useState<ProviderConnectionWrite>(() => existing === undefined ? MANUAL_DEFAULTS : {
+    name: existing.name,
+    adapterKind: existing.adapterKind,
+    baseUrl: existing.baseUrl,
+    modelId: existing.modelId,
+    ...(existing.providerName === undefined ? {} : { providerName: existing.providerName }),
+    ...(existing.modelName === undefined ? {} : { modelName: existing.modelName })
+  });
   const [provider, setProvider] = useState<CatalogProviderItem | undefined>();
   const [model, setModel] = useState<CatalogModelItem | undefined>();
   const [providerQuery, setProviderQuery] = useState('');
   const [modelQuery, setModelQuery] = useState('');
-  const [touched, setTouched] = useState({ name: false, baseUrl: false });
+  const [touched, setTouched] = useState({ name: editing, baseUrl: editing });
   const [probe, setProbe] = useState<ProviderConnectionCheckResult | undefined>();
-  const create = useMutation({ mutationFn: api.providers.create, onSuccess: onDone });
+  const save = useMutation({
+    mutationFn: (body: ProviderConnectionWrite) => editing
+      ? api.providers.update(existing.id, body)
+      : api.providers.create(body),
+    onSuccess: onDone
+  });
   const check = useMutation({
     mutationFn: () => api.providers.checkConnection({
       adapterKind: form.adapterKind, baseUrl: form.baseUrl, modelId: form.modelId,
@@ -174,15 +194,14 @@ function CreateConnection({ catalog, onDone }: { catalog: CatalogStatus | undefi
   };
 
   const pickModel = (option: ComboboxOption) => {
-    if (provider === undefined) return;
     const next = modelItems.find((item) => item.modelId === option.value);
     resetProbe();
-    const base = catalogBaseUrl(provider, next);
+    const base = provider === undefined ? undefined : catalogBaseUrl(provider, next);
     setModel(next);
     setForm((f) => normalized({
       ...f, modelId: option.value, modelName: next?.name,
       ...(base === undefined || touched.baseUrl ? {} : { baseUrl: base.url }),
-      ...(touched.name || next === undefined ? {} : { name: connectionName(provider, next) ?? f.name })
+      ...(provider === undefined || touched.name || next === undefined ? {} : { name: connectionName(provider, next) ?? f.name })
     }));
   };
 
@@ -209,21 +228,33 @@ function CreateConnection({ catalog, onDone }: { catalog: CatalogStatus | undefi
     form.adapterKind === 'anthropic' ? t('providers.create.anthropicHint') : undefined
   ].filter((part): part is string => part !== undefined).join(' · ');
 
+  const submit = (event: React.FormEvent) => {
+    event.preventDefault();
+    const body = normalized(form);
+    if (editing && (body.apiKey === undefined || body.apiKey.trim() === '')) {
+      const { apiKey: _omit, ...rest } = body;
+      save.mutate(rest);
+      return;
+    }
+    save.mutate(body);
+  };
+  const apiKeyRequired = !editing;
+
   return (
-    <form className="flex flex-col gap-3" onSubmit={(event) => { event.preventDefault(); create.mutate(form); }}>
+    <form className="flex flex-col gap-3" onSubmit={submit}>
       <SegmentedTabs value={mode} onChange={setMode} items={[{ value: 'catalog', label: t('providers.create.fromCatalog') }, { value: 'manual', label: t('providers.create.manual') }]} />
       {!catalogReady ? <p className="text-[12px] leading-[18px] text-amber">{t('providers.create.catalogWarning', { availability: availabilityLabel, time: formatTime(catalog?.lastSuccessAt) })}</p> : null}
       {mode === 'catalog' ? (
         <>
           <Field label={t('providers.create.provider')} hint={catalog?.providerCount !== undefined ? t('providers.create.providerCount', { count: catalog.providerCount }) : undefined}>
-            <Combobox value={provider?.providerId} display={provider?.name ?? ''} query={providerQuery} onQueryChange={setProviderQuery} onSelect={pickProvider}
+            <Combobox value={provider?.providerId} display={provider?.name ?? form.providerName ?? ''} query={providerQuery} onQueryChange={setProviderQuery} onSelect={pickProvider}
               options={providerOptions} placeholder={t('providers.create.searchProviders')} loading={providerList.isLoading} error={errorText(providerList.error)} empty={t('providers.create.noProvidersMatch')}
               footer={providerList.data === undefined ? undefined : `${t('providers.create.shown', { count: providerItems.length })}${providerList.data.nextCursor !== undefined ? ` · ${t('providers.create.typeToNarrow')}` : ''}`} />
           </Field>
-          <Field label={t('providers.create.model')} hint={model === undefined ? t('providers.create.modelHint') : t('providers.create.modelSelected', { model: model.modelId })}>
-            <Combobox value={model?.modelId ?? ''} display={model?.name ?? form.modelId} query={modelQuery} onQueryChange={setModelQuery} onSelect={pickModel}
-              options={modelOptions} placeholder={provider === undefined ? t('providers.create.pickProviderFirst') : t('providers.create.searchModels')} disabled={provider === undefined}
-              loading={modelList.isLoading} error={errorText(modelList.error)} empty={modelList.data === undefined ? t('providers.create.pickProviderFirst') : t('providers.create.noModelsMatch')}
+          <Field label={t('providers.create.model')} hint={form.modelId.trim() === '' ? t('providers.create.modelHint') : t('providers.create.modelSelected', { model: form.modelId })}>
+            <Combobox value={model?.modelId ?? form.modelId} display={model?.name ?? form.modelName ?? form.modelId} query={modelQuery} onQueryChange={setModelQuery} onSelect={pickModel}
+              options={modelOptions} placeholder={provider === undefined && form.providerName === undefined ? t('providers.create.pickProviderFirst') : t('providers.create.searchModels')} disabled={provider === undefined && !editing}
+              loading={modelList.isLoading} error={errorText(modelList.error)} empty={modelList.data === undefined && provider === undefined ? t('providers.create.pickProviderFirst') : t('providers.create.noModelsMatch')}
               footer={modelList.data?.nextCursor !== undefined ? t('providers.create.showingFirst60') : undefined} />
           </Field>
         </>
@@ -238,16 +269,20 @@ function CreateConnection({ catalog, onDone }: { catalog: CatalogStatus | undefi
         </div>
       </Field>
       <Field label={t('providers.create.adapter')}><Select value={form.adapterKind} onChange={set('adapterKind')}><option value="openai-compatible">openai-compatible</option><option value="anthropic">anthropic</option></Select></Field>
-      {mode === 'manual' ? <Field label={t('providers.create.modelId')}><Input required value={form.modelId} onChange={set('modelId')} /></Field> : null}
+      <Field label={t('providers.create.modelId')} hint={mode === 'catalog' ? t('providers.create.modelIdHint') : undefined}>
+        <Input required value={form.modelId} onChange={(event) => { set('modelId')(event); setModel(undefined); }} placeholder="gpt-4o-mini" />
+      </Field>
       <Field label={t('providers.create.name')}><Input required value={form.name} onChange={set('name')} placeholder={t('providers.create.namePlaceholder')} /></Field>
-      <Field label={t('providers.create.apiKey')}><Input required type="password" autoComplete="off" value={form.apiKey ?? ''} onChange={set('apiKey')} /></Field>
+      <Field label={t('providers.create.apiKey')} hint={editing ? t('providers.create.apiKeyKeep') : undefined}>
+        <Input required={apiKeyRequired} type="password" autoComplete="off" value={form.apiKey ?? ''} onChange={set('apiKey')} placeholder={editing ? t('providers.create.apiKeyPlaceholder') : undefined} />
+      </Field>
       <div className="flex items-center gap-2">
         <Button type="button" variant="secondary" size="sm" disabled={check.isPending || !baseUrlValid || form.modelId.trim() === ''} onClick={() => check.mutate()}>{check.isPending ? t('providers.create.testing') : t('providers.create.test')}</Button>
         {probe !== undefined ? <span className={cn('text-[12.5px]', probe.status === 'connected' ? 'text-green' : probe.status === 'unauthorized' ? 'text-red' : 'text-amber')}>{probe.message}</span> : null}
         {check.error ? <span className="text-[12.5px] text-red">{errorText(check.error)}</span> : null}
       </div>
-      {create.error ? <ErrorState error={create.error} /> : null}
-      <div className="flex justify-end"><Button type="submit" disabled={create.isPending || !baseUrlValid || form.name.trim() === '' || form.modelId.trim() === ''}>{t('common.create')}</Button></div>
+      {save.error ? <ErrorState error={save.error} /> : null}
+      <div className="flex justify-end"><Button type="submit" disabled={save.isPending || !baseUrlValid || form.name.trim() === '' || form.modelId.trim() === '' || (apiKeyRequired && (form.apiKey ?? '').trim() === '')}>{editing ? t('common.save') : t('common.create')}</Button></div>
     </form>
   );
 }

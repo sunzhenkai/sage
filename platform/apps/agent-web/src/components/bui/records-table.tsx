@@ -12,8 +12,8 @@ const SortIcon = ({ dir }: { dir: 'asc' | 'desc' | null }) => (
   </svg>
 );
 
-export function RecordsTable<T>({ columns, rows, getKey, onRowClick, activeKey, footer, empty, className, fill }: {
-  columns: RecordColumn<T>[]; rows: T[]; getKey: (row: T) => string; onRowClick?: (row: T) => void; activeKey?: string | undefined; footer?: ReactNode; empty?: ReactNode; className?: string; fill?: boolean;
+export function RecordsTable<T>({ columns, rows, getKey, onRowClick, activeKey, footer, hideFooter, empty, className, fill }: {
+  columns: RecordColumn<T>[]; rows: T[]; getKey: (row: T) => string; onRowClick?: (row: T) => void; activeKey?: string | undefined; footer?: ReactNode; hideFooter?: boolean; empty?: ReactNode; className?: string; fill?: boolean;
 }) {
   const t = useT();
   const [sort, setSort] = useState<{ key: string; dir: 'asc' | 'desc' } | null>(null);
@@ -70,10 +70,12 @@ export function RecordsTable<T>({ columns, rows, getKey, onRowClick, activeKey, 
         </table>
         {rows.length === 0 ? empty : null}
       </div>
-      <div className="flex min-h-[35px] shrink-0 items-center gap-3 border-t border-line px-3 text-[11.5px] text-ink-3">
-        <span><span className="mr-[3px] text-[13px] font-medium text-ink">{rows.length}</span>{t('recordsTable.count')}</span>
-        {footer}
-      </div>
+      {hideFooter ? null : (
+        <div className="flex min-h-[35px] shrink-0 items-center gap-3 border-t border-line px-3 text-[11.5px] text-ink-3">
+          <span><span className="mr-[3px] text-[13px] font-medium text-ink">{rows.length}</span>{t('recordsTable.count')}</span>
+          {footer}
+        </div>
+      )}
     </div>
   );
 }

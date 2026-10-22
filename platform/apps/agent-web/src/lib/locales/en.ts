@@ -267,6 +267,7 @@ export const en = {
       all: 'All tasks',
       active: 'Active',
       done: 'Completed',
+      properties: 'Properties',
       activity: 'Activity',
       runLogs: 'Run logs',
       artifacts: 'Artifacts',
@@ -488,6 +489,16 @@ export const en = {
       title: 'No apps',
       hint: 'Create an empty app and edit its draft, or start from a bundled example.'
     },
+    noSelection: {
+      title: 'Select an app',
+      hint: 'Pick an app from the list, or create a new one.'
+    },
+    filterApps: 'Filter apps',
+    filterEmpty: {
+      title: 'No matching apps',
+      hint: 'Try another name, or clear the filter.'
+    },
+    menu: { more: 'More' },
     all: {
       title: 'All apps',
       description: 'Mutable agent apps. Click a row to edit the draft, publish releases and inspect runs.'
@@ -496,6 +507,7 @@ export const en = {
       app: 'App',
       status: 'Status',
       latestVersion: 'Latest version',
+      versionMeta: 'v{version} · {count}',
       runs: 'Runs · 14d',
       releases: 'Releases',
       draft: 'Draft',
@@ -528,6 +540,8 @@ export const en = {
       unsaved: 'Unsaved changes',
       unpublished: 'Unpublished changes',
       clean: 'Matches latest release',
+      statusLine: '{revision} · {files} · {state}',
+      stateCleanVersion: 'Matches v{version}',
       save: 'Save draft',
       saving: 'Saving…',
       saved: 'Saved as r{revision}.',
@@ -554,6 +568,7 @@ export const en = {
       assets: 'Assets',
       assetsEmpty: 'No assets in this release.',
       provenance: 'Provenance',
+      showProvenance: 'Show full provenance',
       downloadSource: 'Download source',
       downloadBundle: 'Download bundle',
       downloading: 'Preparing…',
@@ -596,6 +611,15 @@ export const en = {
       run: 'Run',
       runs: 'Runs',
       runsEmpty: 'No runs yet. Start one from a release.',
+      releasesEmpty: 'No releases yet. Publish the draft to create one.',
+      definitionEmpty: 'This app has no tasks, inputs, or data sources.',
+      showManifest: 'Show raw manifest',
+      tabs: {
+        properties: 'Properties',
+        draft: 'Draft',
+        releases: 'Releases',
+        runs: 'Runs'
+      },
       unknownVersion: 'Unknown version',
       sourceManual: 'Manual',
       sourceSchedule: 'Schedule'
@@ -634,6 +658,8 @@ export const en = {
       overview: 'Overview',
       statusHint: 'Status comes from the task projection; pending means no projection has been observed yet.',
       pendingHint: 'The run was admitted and is waiting for the first task projection. Logs and artifacts appear once the task starts.',
+      runningHint: 'This run is still going. Logs keep updating.',
+      finishedHint: 'This run has finished. Open logs or artifacts for the output.',
       tabs: {
         overview: 'Overview',
         logs: 'Run logs',
@@ -646,7 +672,9 @@ export const en = {
     addConnection: 'Add connection',
     dialog: {
       title: 'Add provider connection',
-      description: 'Auto-filled from the models.dev snapshot — base URL and model stay editable. The API key is sealed server-side and never returned.'
+      description: 'Auto-filled from the models.dev snapshot — base URL and model stay editable. The API key is sealed server-side and never returned.',
+      editTitle: 'Edit provider connection',
+      editDescription: 'Change the model, endpoint, or name. Leave the API key blank to keep the sealed credential.'
     },
     connections: {
       title: 'Connections',
@@ -655,6 +683,7 @@ export const en = {
       emptyHint: 'Add one to let the agent call a model.',
       default: 'Default',
       env: 'env',
+      edit: 'Edit',
       makeDefault: 'Make default',
       deleteConfirm: 'Delete {name}?'
     },
@@ -711,9 +740,12 @@ export const en = {
       anthropicHint: 'Anthropic calls normalize a trailing /v1',
       adapter: 'Adapter',
       modelId: 'Model ID',
+      modelIdHint: 'You can also type a model id directly; catalog picks sync here.',
       name: 'Name',
       namePlaceholder: 'Shown in the connection list',
       apiKey: 'API key',
+      apiKeyKeep: 'Leave blank to keep the sealed credential.',
+      apiKeyPlaceholder: '•••••••• (unchanged)',
       testing: 'Testing…',
       test: 'Test connection'
     },

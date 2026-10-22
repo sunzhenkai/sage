@@ -1,6 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
 import { AppShell } from './components/layout/app-shell';
-import { AppDetailPage, AppsPage } from './pages/apps';
+import { AppsPage } from './pages/apps';
 import { AppReleaseDetailPage } from './pages/app-release';
 import { AppRunDetailPage } from './pages/app-runs';
 import { ChatPage } from './pages/chat';
@@ -23,7 +23,7 @@ export function App() {
           <Route path="tasks" element={<TasksPage />} />
           <Route path="tasks/:taskId" element={<TaskDetailPage />} />
           <Route path="apps" element={<AppsPage />} />
-          <Route path="apps/:appId" element={<AppDetailPage />} />
+          <Route path="apps/:appId" element={<AppsPage />} />
           <Route path="apps/:appId/releases/:releaseId" element={<AppReleaseDetailPage />} />
           <Route path="apps/:appId/runs/:taskId" element={<AppRunDetailPage />} />
           <Route path="packages" element={<Navigate to="/apps" replace />} />

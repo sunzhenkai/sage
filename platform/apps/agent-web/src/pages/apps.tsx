@@ -1,76 +1,83 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  ArrowRight, Boxes, Check, CircleDot, Clock, Download, FileText, Folder, GitBranch, Hash, PackagePlus,
-  Play, Plus, RefreshCw, Save, Tags, Trash2, Upload
+  ArrowRight, Boxes, Check, FileText, Folder, GitBranch, PackagePlus,
+  Play, Plus, Save, Search
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
-import { Crumb, PageHeader } from '@/components/layout/app-shell';
-import { Monogram, StatusPill, Tag, toneFor } from '@/components/bui/atoms';
-import { RecordsTable } from '@/components/bui/records-table';
+import { PageHeader } from '@/components/layout/app-shell';
+import { AppList, AppListSkeleton } from '@/components/bui/app-list';
 import { RunReleaseDialog } from '@/components/bui/run-release-dialog';
-import { CodeBlock } from '@/components/bui/code-block';
-import { PageContent, PageDescription, Quiet, Section } from '@/components/layout/page';
+import { PageContent, Quiet, Section, SegmentedTabs, SubPane } from '@/components/layout/page';
 import { StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { DetailLayout, ListRow, Pill, Property, PropertyGroup, RowId, RowMeta, RowTitle } from '@/components/ui/list';
+import { ActionMenu } from '@/components/ui/action-menu';
+import { ListRow, Pill, Property, PropertyGroup, RowId, RowMeta, RowTitle } from '@/components/ui/list';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Field, Input, Textarea } from '@/components/ui/input';
 import { Empty, ErrorState, JsonView, Loading, Mono } from '@/components/ui/misc';
-import { StatusIcon, statusLabelKey } from '@/components/ui/status';
-import { Sparkline, useChartTheme } from '@/components/charts';
+import { StatusIcon } from '@/components/ui/status';
 import { ApiError, api } from '@/lib/api';
 import { saveBlob } from '@/lib/download';
 import { EXAMPLE_APPS, importExampleApp } from '@/lib/example-apps';
 import { errorDisplay } from '@/lib/error-message';
 import { useT } from '@/lib/i18n';
-import { isMock, mockSeries } from '@/lib/mock';
+import { isMock } from '@/lib/mock';
 import type { AppDraft, AppRelease, AppReleaseResult } from '@/lib/types';
 import { formatTime, relativeTime } from '@/lib/utils';
 
 export function AppsPage() {
-  const navigate = useNavigate();
+  const { appId } = useParams();
   const t = useT();
+  const [q, setQ] = useState('');
   const apps = useQuery({ queryKey: ['apps'], queryFn: api.apps.list });
-  const items = apps.data?.apps ?? [];
-  const statuses = [...new Set(items.map((a) => a.status))];
-  const ct = useChartTheme();
+  const items = useMemo(() => {
+    const list = apps.data?.apps ?? [];
+    const needle = q.trim().toLowerCase();
+    if (!needle) return list;
+    return list.filter((app) => app.appId.toLowerCase().includes(needle) || (app.name?.toLowerCase().includes(needle) ?? false));
+  }, [apps.data?.apps, q]);
+
   return (
-    <>
-      <PageHeader title={t('nav.apps')} actions={<><CreateAppButton /><ImportExampleApps /></>} />
-      <PageContent width="wide">
-        {apps.isLoading ? <Loading /> : apps.error ? <ErrorState error={apps.error} /> : !items.length ? (
-          <Empty icon={Boxes} title={t('apps.empty.title')} hint={t('apps.empty.hint')}>
+    <div className="flex min-h-0 flex-1">
+      <SubPane>
+        <PageHeader title={t('nav.apps')} actions={<><CreateAppButton icon /><ImportExampleApps asMenu /></>} />
+        <div className="flex items-center gap-1 border-b border-line px-2 py-1.5">
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-faint" strokeWidth={1.75} />
+            <Input placeholder={t('apps.filterApps')} value={q} onChange={(event) => setQ(event.target.value)} className="h-7 pl-7 text-[12.5px]" />
+          </div>
+        </div>
+        <PageContent flush className="px-2.5 pb-2">
+          {apps.isLoading ? <AppListSkeleton /> : apps.error ? <ErrorState error={apps.error} /> : items.length === 0 ? (
+            <Empty icon={Boxes} title={q.trim() ? t('apps.filterEmpty.title') : t('apps.empty.title')} hint={q.trim() ? t('apps.filterEmpty.hint') : t('apps.empty.hint')}>
+              {q.trim() ? null : <><CreateAppButton /><ImportExampleApps /></>}
+            </Empty>
+          ) : (
+            <AppList items={items} activeId={appId} />
+          )}
+        </PageContent>
+      </SubPane>
+      <section className="flex min-w-0 flex-1 flex-col">
+        {appId ? <AppDetailPage key={appId} /> : (
+          <Empty icon={Boxes} title={t('apps.noSelection.title')} hint={t('apps.noSelection.hint')}>
             <CreateAppButton />
             <ImportExampleApps />
           </Empty>
-        ) : (
-          <Section title={t('apps.all.title')} description={t('apps.all.description')} count={items.length}>
-          <RecordsTable rows={items} getKey={(a) => a.appId} onRowClick={(a) => { void navigate(`/apps/${a.appId}`); }}
-            columns={[
-              { key: 'app', label: t('apps.columns.app'), icon: <Boxes />, width: '28%', sort: (x, y) => x.appId.localeCompare(y.appId), render: (a) => <span className="flex min-w-0 items-center gap-2"><Monogram text={a.appId} /><span className="truncate">{a.appId}</span></span> },
-              { key: 'status', label: t('apps.columns.status'), icon: <CircleDot />, width: 120, sort: (x, y) => x.status.localeCompare(y.status), render: (a) => { const key = statusLabelKey(a.status); return <StatusPill tone={toneFor(a.status)}>{key === undefined ? a.status[0]!.toUpperCase() + a.status.slice(1) : t(key)}</StatusPill>; } },
-              { key: 'version', label: t('apps.columns.latestVersion'), icon: <Tags />, width: 140, render: (a) => a.latestVersion ? <Tag>{`v${a.latestVersion}`}</Tag> : <span className="text-ink-3">—</span> },
-              { key: 'draft', label: t('apps.columns.draft'), icon: <FileText />, width: 130, render: (a) => a.hasUnpublishedChanges ? <Pill color="var(--amber)">{t('apps.columns.unpublished')}</Pill> : <span className="text-ink-3">—</span> },
-              { key: 'usage', label: t('apps.columns.runs'), icon: <Hash />, width: 140, render: (a) => isMock() ? <span className="block h-5 w-full"><Sparkline values={mockSeries(a.appId, 14)} color={a.status === 'active' ? ct.series[0]! : ct.series[5]!} height={20} /></span> : <span className="text-ink-3">—</span> },
-              { key: 'releases', label: t('apps.columns.releases'), icon: <Hash />, width: 100, align: 'right', sort: (x, y) => x.releaseCount - y.releaseCount, render: (a) => <span className="tabular-nums text-ink-2">{a.releaseCount}</span> },
-              { key: 'created', label: t('apps.columns.created'), icon: <Clock />, width: 130, sort: (x, y) => x.createdAt.localeCompare(y.createdAt), render: (a) => <span className="text-ink-2">{relativeTime(a.createdAt)}</span> },
-              { key: 'updated', label: t('apps.columns.lastUpdate'), icon: <Clock />, width: 130, sort: (x, y) => x.updatedAt.localeCompare(y.updatedAt), render: (a) => <span className="text-ink-2">{relativeTime(a.updatedAt)}</span> }
-            ]}
-            footer={<span className="ml-auto">{statuses.map((st) => `${items.filter((a) => a.status === st).length} ${st}`).join(' · ')}</span>} />
-          </Section>
         )}
-      </PageContent>
-    </>
+      </section>
+    </div>
   );
 }
 
-function CreateAppButton() {
+function CreateAppButton({ icon = false }: { icon?: boolean }) {
   const t = useT();
   const [open, setOpen] = useState(false);
   return (
     <>
-      <Button variant="secondary" onClick={() => setOpen(true)}><Plus />{t('apps.new.action')}</Button>
+      {icon
+        ? <Button variant="ghost" size="icon" title={t('apps.new.action')} onClick={() => setOpen(true)}><Plus /></Button>
+        : <Button onClick={() => setOpen(true)}><Plus />{t('apps.new.action')}</Button>}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent title={t('apps.new.title')} description={t('apps.new.description')}>
           <CreateAppForm onClose={() => setOpen(false)} />
@@ -119,12 +126,14 @@ function CreateAppForm({ onClose }: { onClose: () => void }) {
   );
 }
 
-function ImportExampleApps() {
+function ImportExampleApps({ asMenu = false }: { asMenu?: boolean }) {
   const t = useT();
   const [open, setOpen] = useState(false);
   return (
     <>
-      <Button variant="secondary" onClick={() => setOpen(true)}><PackagePlus />{t('apps.import.action')}</Button>
+      {asMenu
+        ? <ActionMenu label={t('apps.menu.more')} items={[{ id: 'import', label: t('apps.import.action'), onSelect: () => setOpen(true) }]} />
+        : <Button variant="secondary" onClick={() => setOpen(true)}><PackagePlus />{t('apps.import.action')}</Button>}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent title={t('apps.import.title')} description={t('apps.import.description')}>
           <ImportExampleDialog onClose={() => setOpen(false)} />
@@ -232,6 +241,30 @@ function ImportExampleDialog({ onClose }: { onClose: () => void }) {
   );
 }
 
+type DetailTab = 'properties' | 'draft' | 'releases' | 'runs';
+
+type DraftChrome = {
+  statusLine: string;
+  attention: 'unsaved' | 'unpublished' | 'clean';
+  showSave: boolean;
+  saveDisabled: boolean;
+  savePending: boolean;
+  publishDisabled: boolean;
+  publishPending: boolean;
+  publishTitle?: string;
+  busy: boolean;
+};
+
+type DraftActions = {
+  save: () => void;
+  publish: () => void;
+  reload: () => void;
+  upload: () => void;
+  download: () => void;
+};
+
+const idleDraftActions: DraftActions = { save() {}, publish() {}, reload() {}, upload() {}, download() {} };
+
 export function AppDetailPage() {
   const { appId = '' } = useParams();
   const navigate = useNavigate();
@@ -239,6 +272,15 @@ export function AppDetailPage() {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [runRelease, setRunRelease] = useState<AppRelease>();
+  const [tab, setTab] = useState<DetailTab>('properties');
+  const [chrome, setChrome] = useState<DraftChrome>();
+  const [chromeAppId, setChromeAppId] = useState(appId);
+  if (chromeAppId !== appId) {
+    setChromeAppId(appId);
+    setChrome(undefined);
+  }
+  const draftActions = useRef<DraftActions>(idleDraftActions);
+  const onChrome = useCallback((next: DraftChrome) => { setChrome(next); }, []);
   const app = useQuery({ queryKey: ['app', appId], queryFn: () => api.apps.get(appId) });
   const appRuns = useQuery({
     queryKey: ['app-runs', appId],
@@ -264,92 +306,128 @@ export function AppDetailPage() {
   const tasks = manifest?.tasks ?? [];
   const inputs = manifest?.inputs ?? [];
   const dataSources = manifest?.dataSources ?? [];
-  const description = manifest?.description;
+  const skills = manifest?.skillRefs ?? [];
+  const capabilities = manifest?.capabilityRefs ?? [];
   const shortDigest = (releaseId: string) => releaseId.replace(/^sha256:/, '').slice(0, 12);
+  const draftBusy = chrome?.busy === true;
 
   return (
     <>
-      <PageHeader breadcrumb={<Crumb to="/apps">{t('nav.apps')}</Crumb>} title={appId}
-        actions={<Button variant="ghost" size="sm" className="hover:text-red" disabled={remove.isPending} onClick={() => { if (confirm(t('apps.detail.deleteConfirm', { app: appId }))) remove.mutate(); }}><Trash2 />{t('common.delete')}</Button>} />
+      <PageHeader title={appId}
+        meta={app.data ? (
+          <div className="flex items-center gap-2">
+            <StatusBadge status={app.data.status} />
+            {tab !== 'draft' && chrome && chrome.attention !== 'clean' ? <Pill color="var(--amber)">{chrome.attention === 'unsaved' ? t('apps.draft.unsaved') : t('apps.draft.unpublished')}</Pill> : null}
+          </div>
+        ) : undefined}
+        actions={app.data ? (
+          <>
+            {chrome?.showSave ? <Button variant="secondary" size="sm" disabled={chrome.saveDisabled} onClick={() => draftActions.current.save()}><Save />{chrome.savePending ? t('apps.draft.saving') : t('apps.draft.save')}</Button> : null}
+            <Button size="sm" disabled={chrome === undefined || chrome.publishDisabled} title={chrome?.publishTitle} onClick={() => draftActions.current.publish()}><GitBranch />{chrome?.publishPending ? t('apps.draft.publishing') : t('apps.draft.publish')}</Button>
+            <ActionMenu label={t('apps.menu.more')} items={[
+              { id: 'reload', label: t('apps.draft.reload'), disabled: draftBusy || chrome === undefined, onSelect: () => draftActions.current.reload() },
+              { id: 'upload', label: t('apps.draft.upload'), disabled: draftBusy || chrome === undefined, onSelect: () => draftActions.current.upload() },
+              { id: 'download', label: t('apps.draft.download'), disabled: draftBusy || chrome === undefined, onSelect: () => draftActions.current.download() },
+              { id: 'delete', label: t('common.delete'), danger: true, disabled: remove.isPending, onSelect: () => { if (confirm(t('apps.detail.deleteConfirm', { app: appId }))) remove.mutate(); } }
+            ]} />
+          </>
+        ) : undefined} />
       {remove.error ? <ErrorState error={remove.error} /> : null}
       {app.isLoading ? <Loading /> : app.error ? <ErrorState error={app.error} /> : app.data ? (
-        <DetailLayout properties={<>
-          <PropertyGroup title={t('apps.detail.properties')}>
-            <Property label={t('apps.detail.status')}><StatusBadge status={app.data.status} /></Property>
-            <Property label={t('apps.detail.version')}><Mono>{manifest?.version ?? app.data.latestVersion ?? '—'}</Mono></Property>
-            <Property label={t('apps.detail.entry')}><Mono>{manifest?.entry ?? '—'}</Mono></Property>
-            <Property label={t('apps.detail.model')}>{manifest?.modelRoute ? <Mono>{`${manifest.modelRoute.provider} / ${manifest.modelRoute.model}`}</Mono> : null}</Property>
-            <Property label={t('apps.detail.created')}>{formatTime(app.data.createdAt)}</Property>
-          </PropertyGroup>
-          <PropertyGroup title={t('apps.detail.skills')}>
-            <div className="flex flex-wrap gap-1 px-2">{(manifest?.skillRefs ?? []).map((s) => <Pill key={s} color="var(--violet)">{s.replace(/^skill:\/\//, '')}</Pill>)}</div>
-          </PropertyGroup>
-          <PropertyGroup title={t('apps.detail.capabilities')}>
-            <div className="flex flex-wrap gap-1 px-2">{(manifest?.capabilityRefs ?? []).map((s) => <Pill key={s} color="var(--blue)">{s.replace(/^capability:\/\//, '')}</Pill>)}</div>
-          </PropertyGroup>
-        </>}>
-          <PageContent>
-            <PageDescription title={appId} description={app.data.description ?? description ?? t('apps.detail.descriptionFallback')} />
-            <DraftPanel appId={appId} hasUnpublishedChanges={app.data.hasUnpublishedChanges} />
-            <Section card title={t('apps.detail.releases')} count={releases.length}>
-            <>{releases.map((release) => (
-              <ListRow key={release.releaseId}>
-                <RowId>{`v${release.packageVersion}`}</RowId>
-                <RowTitle sub={<Mono>{shortDigest(release.releaseId)}</Mono>}>{`v${release.packageVersion}`}</RowTitle>
-                <RowMeta>
-                  <span className="text-faint">{formatTime(release.createdAt)}</span>
-                  <Link className="flex items-center gap-1 text-accent-ink hover:underline" to={`/apps/${encodeURIComponent(appId)}/releases/${encodeURIComponent(release.releaseId)}`}><GitBranch className="size-3.5" />{t('apps.detail.openRelease')}</Link>
-                  <Button size="sm" variant="secondary" disabled={isMock()} title={isMock() ? t('apps.run.mockDisabled') : undefined} onClick={() => setRunRelease(release)}><Play />{t('apps.detail.run')}</Button>
-                </RowMeta>
-              </ListRow>
-            ))}</>
-            </Section>
-            <Section card title={t('apps.detail.runs')} count={runs.length}>
-            <>
-              {appRuns.isLoading ? <div className="gutter-x py-3"><Loading rows={3} /></div> : appRuns.error ? <ErrorState error={appRuns.error} /> : runs.length === 0 ? (
-                <div className="gutter-x py-5"><Quiet>{t('apps.detail.runsEmpty')}</Quiet></div>
-              ) : runs.map((run) => (
-                <ListRow key={run.taskId} onClick={() => { void navigate(`/apps/${encodeURIComponent(appId)}/runs/${encodeURIComponent(run.taskId)}`); }}>
-                  <span className="w-[86px] shrink-0"><StatusBadge status={run.status} /></span>
-                  <RowTitle sub={<Mono>{run.taskId}</Mono>}>{run.releaseVersion ? `v${run.releaseVersion}` : t('apps.detail.unknownVersion')}</RowTitle>
-                  <RowMeta>
-                    <Pill>{run.source === 'schedule' ? t('apps.detail.sourceSchedule') : t('apps.detail.sourceManual')}</Pill>
-                    <span className="text-faint">{relativeTime(run.createdAt)}</span>
-                  </RowMeta>
-                </ListRow>
-              ))}
-            </>
-            </Section>
-            <Section card title={t('apps.detail.tasks')} count={tasks.length}>
-            <>{tasks.map((task) => (
-              <ListRow key={task.name}><StatusIcon kind="todo" /><RowTitle sub={task.entry}>{task.name}</RowTitle></ListRow>
-            ))}</>
-            </Section>
-            <Section card title={t('apps.detail.inputs')}>
-            <>
-              {inputs.map((input) => (
-                <ListRow key={`i-${input.name}`}><RowId>{t('apps.detail.input')}</RowId><RowTitle sub={input.type}>{input.name}</RowTitle><RowMeta>{input.required ? <Pill>{t('apps.detail.required')}</Pill> : <span className="text-faint">{t('apps.detail.optional')}</span>}</RowMeta></ListRow>
-              ))}
-              {dataSources.map((source) => (
-                <ListRow key={`d-${source.name}`}><RowId>{t('apps.detail.source')}</RowId><RowTitle sub={source.url}>{source.name}</RowTitle></ListRow>
-              ))}
-            </>
-            </Section>
-            <Section card title={t('apps.detail.assets')} count={app.data.assets?.length ?? 0}>
-            <>{(app.data.assets ?? []).map((asset) => (
-              <details key={asset.relativePath} className="group/a">
-                <summary className="flex h-[38px] cursor-default list-none items-center gap-3 gutter-x hover:bg-hover">
-                  <RowId>{asset.kind.toUpperCase().slice(0, 10)}</RowId>
-                  <RowTitle><Mono className="text-[12.5px]">{asset.relativePath}</Mono></RowTitle>
-                  <RowMeta><span className="text-faint">{asset.bytes} B</span></RowMeta>
-                </summary>
-                {asset.preview ? <div className="gutter-x pb-2"><CodeBlock code={asset.preview} filename={asset.relativePath} maxHeight={288} /></div> : null}
-              </details>
-            ))}</>
-            </Section>
-            {manifest === undefined ? null : <Section title={t('apps.detail.rawManifest')}><JsonView value={manifest} filename="manifest.json" /></Section>}
-          </PageContent>
-        </DetailLayout>
+        <PageContent>
+          <SegmentedTabs value={tab} onChange={setTab} items={[
+            { value: 'properties', label: t('apps.detail.tabs.properties') },
+            { value: 'draft', label: t('apps.detail.tabs.draft') },
+            { value: 'releases', label: <span className="inline-flex items-center gap-1.5">{t('apps.detail.tabs.releases')}<span className="tabular-nums text-ink-3">{releases.length}</span></span> },
+            { value: 'runs', label: <span className="inline-flex items-center gap-1.5">{t('apps.detail.tabs.runs')}<span className="tabular-nums text-ink-3">{runs.length}</span></span> }
+          ]} />
+          <div className="pt-5">
+            {tab === 'properties' ? (
+              <>
+                <Section card padded>
+                  <PropertyGroup title={t('apps.detail.properties')}>
+                    <Property label={t('apps.detail.status')}><StatusBadge status={app.data.status} /></Property>
+                    <Property label={t('apps.detail.version')}><Mono>{manifest?.version ?? app.data.latestVersion ?? '—'}</Mono></Property>
+                    <Property label={t('apps.detail.entry')}><Mono>{manifest?.entry ?? '—'}</Mono></Property>
+                    <Property label={t('apps.detail.model')}>{manifest?.modelRoute ? <Mono>{`${manifest.modelRoute.provider} / ${manifest.modelRoute.model}`}</Mono> : null}</Property>
+                    <Property label={t('apps.detail.created')}>{formatTime(app.data.createdAt)}</Property>
+                  </PropertyGroup>
+                  {skills.length === 0 ? null : (
+                    <PropertyGroup title={t('apps.detail.skills')}>
+                      <div className="flex flex-wrap gap-1 px-2">{skills.map((s) => <Pill key={s} color="var(--violet)">{s.replace(/^skill:\/\//, '')}</Pill>)}</div>
+                    </PropertyGroup>
+                  )}
+                  {capabilities.length === 0 ? null : (
+                    <PropertyGroup title={t('apps.detail.capabilities')}>
+                      <div className="flex flex-wrap gap-1 px-2">{capabilities.map((s) => <Pill key={s} color="var(--blue)">{s.replace(/^capability:\/\//, '')}</Pill>)}</div>
+                    </PropertyGroup>
+                  )}
+                </Section>
+                {tasks.length === 0 ? null : (
+                  <Section card title={t('apps.detail.tasks')} count={tasks.length}>
+                    {tasks.map((task) => (
+                      <ListRow key={task.name}><StatusIcon kind="todo" /><RowTitle sub={task.entry}>{task.name}</RowTitle></ListRow>
+                    ))}
+                  </Section>
+                )}
+                {inputs.length === 0 && dataSources.length === 0 ? null : (
+                  <Section card title={t('apps.detail.inputs')}>
+                    {inputs.map((input) => (
+                      <ListRow key={`i-${input.name}`}><RowId>{t('apps.detail.input')}</RowId><RowTitle sub={input.type}>{input.name}</RowTitle><RowMeta>{input.required ? <Pill>{t('apps.detail.required')}</Pill> : <span className="text-faint">{t('apps.detail.optional')}</span>}</RowMeta></ListRow>
+                    ))}
+                    {dataSources.map((source) => (
+                      <ListRow key={`d-${source.name}`}><RowId>{t('apps.detail.source')}</RowId><RowTitle sub={source.url}>{source.name}</RowTitle></ListRow>
+                    ))}
+                  </Section>
+                )}
+                {tasks.length === 0 && inputs.length === 0 && dataSources.length === 0 && skills.length === 0 && capabilities.length === 0 && manifest === undefined
+                  ? <Quiet>{t('apps.detail.definitionEmpty')}</Quiet>
+                  : null}
+                {manifest === undefined ? null : (
+                  <details className="mt-8">
+                    <summary className="cursor-default text-[12px] text-muted hover:text-fg">{t('apps.detail.showManifest')}</summary>
+                    <div className="pt-2"><JsonView value={manifest} filename="manifest.json" /></div>
+                  </details>
+                )}
+              </>
+            ) : null}
+            <div className={tab === 'draft' ? undefined : 'hidden'}>
+              <DraftPanel key={appId} appId={appId} hasUnpublishedChanges={app.data.hasUnpublishedChanges} actionsRef={draftActions} onChrome={onChrome} />
+            </div>
+            {tab === 'releases' ? (
+              releases.length === 0 ? <Quiet>{t('apps.detail.releasesEmpty')}</Quiet> : (
+                <Section card>
+                  {releases.map((release) => (
+                    <ListRow key={release.releaseId}>
+                      <RowTitle sub={<Mono>{shortDigest(release.releaseId)}</Mono>}>{`v${release.packageVersion}`}</RowTitle>
+                      <RowMeta>
+                        <span className="text-faint">{formatTime(release.createdAt)}</span>
+                        <Link className="text-accent-ink hover:underline" to={`/apps/${encodeURIComponent(appId)}/releases/${encodeURIComponent(release.releaseId)}`}>{t('apps.detail.openRelease')}</Link>
+                        <Button size="sm" variant="secondary" disabled={isMock()} title={isMock() ? t('apps.run.mockDisabled') : undefined} onClick={() => setRunRelease(release)}><Play />{t('apps.detail.run')}</Button>
+                      </RowMeta>
+                    </ListRow>
+                  ))}
+                </Section>
+              )
+            ) : null}
+            {tab === 'runs' ? (
+              appRuns.isLoading ? <Loading rows={3} /> : appRuns.error ? <ErrorState error={appRuns.error} /> : runs.length === 0 ? <Quiet>{t('apps.detail.runsEmpty')}</Quiet> : (
+                <Section card>
+                  {runs.map((run) => (
+                    <ListRow key={run.taskId} onClick={() => { void navigate(`/apps/${encodeURIComponent(appId)}/runs/${encodeURIComponent(run.taskId)}`); }}>
+                      <span className="w-[86px] shrink-0"><StatusBadge status={run.status} /></span>
+                      <RowTitle sub={<Mono>{run.taskId}</Mono>}>{run.releaseVersion ? `v${run.releaseVersion}` : t('apps.detail.unknownVersion')}</RowTitle>
+                      <RowMeta>
+                        <Pill>{run.source === 'schedule' ? t('apps.detail.sourceSchedule') : t('apps.detail.sourceManual')}</Pill>
+                        <span className="text-faint">{relativeTime(run.createdAt)}</span>
+                      </RowMeta>
+                    </ListRow>
+                  ))}
+                </Section>
+              )
+            ) : null}
+          </div>
+        </PageContent>
       ) : null}
       <RunReleaseDialog appId={appId} release={runRelease} manifest={runRelease?.manifest ?? manifest} onClose={() => setRunRelease(undefined)} />
     </>
@@ -369,7 +447,12 @@ const fingerprint = (files: Record<string, string>) =>
 
 type DraftMessage = { tone: 'ok' | 'warn' | 'error'; text: string; release?: AppReleaseResult };
 
-function DraftPanel({ appId, hasUnpublishedChanges }: { appId: string; hasUnpublishedChanges: boolean }) {
+function DraftPanel({ appId, hasUnpublishedChanges, actionsRef, onChrome }: {
+  appId: string;
+  hasUnpublishedChanges: boolean;
+  actionsRef: MutableRefObject<DraftActions>;
+  onChrome: (chrome: DraftChrome) => void;
+}) {
   const t = useT();
   const queryClient = useQueryClient();
   const draftQuery = useQuery({ queryKey: ['app-draft', appId], queryFn: () => api.apps.getDraft(appId) });
@@ -492,35 +575,58 @@ function DraftPanel({ appId, hasUnpublishedChanges }: { appId: string; hasUnpubl
     if (result.data !== undefined) adoptDraft(result.data);
   };
 
-  const busy = save.isPending || publish.isPending || uploading;
+  const busy = save.isPending || publish.isPending || uploading || downloading;
   const publishBlocked = dirty || revision === undefined || paths.length === 0;
+  const attention = dirty ? 'unsaved' : hasUnpublishedChanges ? 'unpublished' : 'clean';
+  const stateLabel = dirty
+    ? t('apps.draft.unsaved')
+    : hasUnpublishedChanges
+      ? t('apps.draft.unpublished')
+      : version
+        ? t('apps.draft.stateCleanVersion', { version })
+        : t('apps.draft.clean');
+  const statusLine = t('apps.draft.statusLine', {
+    revision: revision === undefined ? '—' : `r${revision}`,
+    files: t('apps.draft.files', { count: paths.length }),
+    state: stateLabel
+  });
+
+  actionsRef.current = {
+    save: () => { save.mutate(); },
+    publish: () => { publish.mutate(); },
+    reload: () => { void reload(); },
+    upload: () => { uploadRef.current?.click(); },
+    download: () => { void download(); }
+  };
+
+  useEffect(() => {
+    if (files === undefined) return;
+    onChrome({
+      statusLine,
+      attention,
+      showSave: dirty,
+      saveDisabled: !dirty || revision === undefined || busy,
+      savePending: save.isPending,
+      publishDisabled: publishBlocked || busy,
+      publishPending: publish.isPending,
+      ...(dirty ? { publishTitle: t('apps.draft.saveFirst') } : paths.length === 0 ? { publishTitle: t('apps.draft.empty') } : {}),
+      busy
+    });
+  }, [files, statusLine, attention, dirty, revision, busy, publishBlocked, save.isPending, publish.isPending, paths.length, onChrome, t]);
 
   return (
-    <Section card title={t('apps.draft.title')} description={t('apps.draft.description')}>
+    <Section card>
       {draftQuery.isLoading ? <Loading rows={3} /> : draftQuery.error ? <ErrorState error={draftQuery.error} /> : files !== undefined ? (
         <>
-          <div className="flex flex-wrap items-center gap-2 border-b border-line gutter-x py-2.5">
-            <Pill><Mono>{revision === undefined ? '—' : `r${revision}`}</Mono></Pill>
-            <Pill>{t('apps.draft.files', { count: paths.length })}</Pill>
-            <Pill>{t('apps.draft.version')} <Mono>{version ?? '—'}</Mono></Pill>
-            <Pill>{t('apps.draft.digest')} <Mono>{seed?.digest.replace(/^sha256:/, '').slice(0, 10) ?? '—'}</Mono></Pill>
-            <Pill color={dirty ? 'var(--blue)' : hasUnpublishedChanges ? 'var(--amber)' : 'var(--green)'}>
-              {dirty ? t('apps.draft.unsaved') : hasUnpublishedChanges ? t('apps.draft.unpublished') : t('apps.draft.clean')}
-            </Pill>
-            <div className="ml-auto flex flex-wrap items-center gap-1.5">
-              <Button variant="ghost" size="sm" title={t('apps.draft.reload')} aria-label={t('apps.draft.reload')} onClick={() => { void reload(); }} disabled={busy}><RefreshCw /></Button>
-              <Button variant="secondary" size="sm" onClick={() => uploadRef.current?.click()} disabled={busy}><Upload />{uploading ? t('apps.draft.uploading') : t('apps.draft.upload')}</Button>
-              <Button variant="secondary" size="sm" onClick={() => { void download(); }} disabled={busy || downloading}><Download />{downloading ? t('apps.release.downloading') : t('apps.draft.download')}</Button>
-              <Button variant="secondary" size="sm" onClick={() => save.mutate()} disabled={!dirty || revision === undefined || busy}><Save />{save.isPending ? t('apps.draft.saving') : t('apps.draft.save')}</Button>
-              <Button size="sm" onClick={() => publish.mutate()} disabled={publishBlocked || busy} title={dirty ? t('apps.draft.saveFirst') : paths.length === 0 ? t('apps.draft.empty') : undefined}><GitBranch />{publish.isPending ? t('apps.draft.publishing') : t('apps.draft.publish')}</Button>
-            </div>
+          <div className="flex items-center gap-2 border-b border-line gutter-x py-2.5">
+            <p className="min-w-0 truncate text-[13px] text-ink-2">{statusLine}</p>
             <input ref={uploadRef} type="file" accept=".tar.gz,.tgz,application/gzip" className="hidden" onChange={(event) => {
               const file = event.target.files?.[0];
               event.target.value = '';
               if (file !== undefined) void upload(file);
             }} />
           </div>
-          <div className="flex min-h-[320px] flex-col md:flex-row">
+          <div className="flex min-h-[420px] flex-col md:flex-row">
             <div className="w-full shrink-0 border-b border-line p-2 md:w-56 md:border-b-0 md:border-r">
               {groups.length === 0 ? <p className="px-2 py-3 text-[12px] text-faint">{t('apps.draft.noFiles')}</p> : groups.map(([dir, entries]) => (
                 <div key={dir || '.'} className="mb-1.5">
@@ -548,7 +654,6 @@ function DraftPanel({ appId, hasUnpublishedChanges }: { appId: string; hasUnpubl
                 <>
                   <div className="flex items-center gap-2 border-b border-line gutter-x py-1.5">
                     <Mono className="truncate text-faint">{selectedPath}</Mono>
-                    {dirty ? <span className="ml-auto shrink-0 text-[11px] text-amber">{t('apps.draft.unsaved')}</span> : null}
                   </div>
                   <Textarea spellCheck={false} aria-label={selectedPath} value={files[selectedPath] ?? ''}
                     onChange={(event) => { const value = event.target.value; setFiles((current) => current === undefined ? current : { ...current, [selectedPath]: value }); }}

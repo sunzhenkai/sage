@@ -1,11 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
-import { Download, GitBranch, Play, Tags } from 'lucide-react';
+import { Copy, Play } from 'lucide-react';
 import { useState } from 'react';
 import { useParams } from 'react-router';
 import { Crumb, PageHeader } from '@/components/layout/app-shell';
 import { CodeBlock } from '@/components/bui/code-block';
 import { RunReleaseDialog } from '@/components/bui/run-release-dialog';
-import { DetailLayout, PageContent, PageDescription, Quiet, Section } from '@/components/layout/page';
+import { DetailLayout, PageContent, Quiet, Section } from '@/components/layout/page';
+import { ActionMenu } from '@/components/ui/action-menu';
 import { Button } from '@/components/ui/button';
 import { ListRow, Pill, Property, PropertyGroup, RowId, RowMeta, RowTitle } from '@/components/ui/list';
 import { ErrorState, JsonView, Loading, Mono } from '@/components/ui/misc';
@@ -25,7 +26,6 @@ export function AppReleaseDetailPage() {
   const [downloadError, setDownloadError] = useState<string>();
   const detail = release.data;
   const manifest = detail?.manifest;
-  const shortDigest = (digest: string | undefined) => digest?.replace(/^sha256:/, '').slice(0, 12) ?? '—';
 
   const download = async (format: 'source' | 'bundle') => {
     if (detail === undefined) return;
@@ -46,46 +46,59 @@ export function AppReleaseDetailPage() {
       <PageHeader
         breadcrumb={<><Crumb to="/apps">{t('nav.apps')}</Crumb><span className="hidden items-center gap-1.5 sm:flex"><Crumb to={`/apps/${encodeURIComponent(appId)}`}>{appId}</Crumb></span></>}
         title={detail === undefined ? releaseId : `v${detail.packageVersion}`}
-        meta={detail === undefined ? null : <div className="hidden items-center gap-2 lg:flex"><Pill color="var(--violet)"><GitBranch className="size-3" />{detail.releaseRef}</Pill><span>{formatTime(detail.createdAt)}</span></div>}
+        meta={detail === undefined ? null : <span>{formatTime(detail.createdAt)}</span>}
         actions={detail === undefined ? null : (
           <>
-            <Button variant="secondary" size="sm" aria-label={t('apps.release.downloadSource')} title={t('apps.release.downloadSource')} disabled={downloading !== undefined} onClick={() => { void download('source'); }}><Download /><span className="hidden sm:inline">{downloading === 'source' ? t('apps.release.downloading') : t('apps.release.downloadSource')}</span></Button>
-            <Button variant="secondary" size="sm" aria-label={t('apps.release.downloadBundle')} title={t('apps.release.downloadBundle')} disabled={downloading !== undefined} onClick={() => { void download('bundle'); }}><Download /><span className="hidden sm:inline">{downloading === 'bundle' ? t('apps.release.downloading') : t('apps.release.downloadBundle')}</span></Button>
-            <Button size="sm" aria-label={t('apps.release.run')} title={isMock() ? t('apps.run.mockDisabled') : t('apps.release.run')} disabled={isMock()} onClick={() => setRunOpen(true)}><Play /><span className="hidden sm:inline">{t('apps.release.run')}</span></Button>
+            <Button size="sm" aria-label={t('apps.release.run')} title={isMock() ? t('apps.run.mockDisabled') : t('apps.release.run')} disabled={isMock()} onClick={() => setRunOpen(true)}><Play />{t('apps.release.run')}</Button>
+            <ActionMenu label={t('apps.menu.more')} items={[
+              { id: 'source', label: downloading === 'source' ? t('apps.release.downloading') : t('apps.release.downloadSource'), disabled: downloading !== undefined, onSelect: () => { void download('source'); } },
+              { id: 'bundle', label: downloading === 'bundle' ? t('apps.release.downloading') : t('apps.release.downloadBundle'), disabled: downloading !== undefined, onSelect: () => { void download('bundle'); } }
+            ]} />
           </>
         )} />
       {downloadError !== undefined ? <p className="gutter-x py-3 text-[12.5px] text-red" role="alert">{t('apps.release.downloadFailed')} {downloadError}</p> : null}
       {release.isLoading ? <Loading /> : release.error ? <ErrorState error={release.error} /> : detail ? (
-        <DetailLayout properties={
-          <PropertyGroup title={t('apps.release.provenance')}>
+        <DetailLayout properties={<>
+          <PropertyGroup title={t('apps.detail.properties')}>
             <Property label={t('apps.release.fields.version')}><Mono>{detail.packageVersion}</Mono></Property>
-            <Property label={t('apps.release.fields.createdAt')}>{formatTime(detail.createdAt)}</Property>
-            <Property label={t('apps.release.fields.contentDigest')}><Mono>{shortDigest(detail.contentDigest)}</Mono></Property>
-            <Property label={t('apps.release.fields.lockDigest')}><Mono>{shortDigest(detail.lockDigest)}</Mono></Property>
-            <Property label={t('apps.release.fields.compilerBuild')}><Mono>{detail.compilerBuild}</Mono></Property>
+            <Property label={t('apps.detail.entry')}><Mono>{manifest?.entry ?? '—'}</Mono></Property>
+            <Property label={t('apps.detail.model')}>{manifest?.modelRoute === undefined ? null : <Mono>{`${manifest.modelRoute.provider} / ${manifest.modelRoute.model}`}</Mono>}</Property>
           </PropertyGroup>
-        }>
+          {(manifest?.tasks ?? []).length === 0 ? null : (
+            <PropertyGroup title={t('apps.detail.tasks')}>
+              <div className="flex flex-wrap gap-1 px-2">{(manifest?.tasks ?? []).map((task) => <Pill key={task.name}>{task.name}</Pill>)}</div>
+            </PropertyGroup>
+          )}
+          {(manifest?.skillRefs ?? []).length === 0 ? null : (
+            <PropertyGroup title={t('apps.detail.skills')}>
+              <div className="flex flex-wrap gap-1 px-2">{(manifest?.skillRefs ?? []).map((skill) => <Pill key={skill} color="var(--violet)">{skill.replace(/^skill:\/\//, '')}</Pill>)}</div>
+            </PropertyGroup>
+          )}
+          {(manifest?.capabilityRefs ?? []).length === 0 ? null : (
+            <PropertyGroup title={t('apps.detail.capabilities')}>
+              <div className="flex flex-wrap gap-1 px-2">{(manifest?.capabilityRefs ?? []).map((capability) => <Pill key={capability} color="var(--blue)">{capability.replace(/^capability:\/\//, '')}</Pill>)}</div>
+            </PropertyGroup>
+          )}
+        </>}>
           <PageContent>
-            <PageDescription title={`v${detail.packageVersion}`} description={manifest?.description ?? t('apps.release.description')} />
-            <Section card title={t('apps.release.manifest')}>
-              <>
-                <ListRow><RowId>{t('apps.release.fields.version')}</RowId><RowTitle><Mono>{manifest?.version ?? detail.packageVersion}</Mono></RowTitle><RowMeta><Tags className="size-3.5" /></RowMeta></ListRow>
-                <ListRow><RowId>{t('apps.detail.entry')}</RowId><RowTitle><Mono>{manifest?.entry ?? '—'}</Mono></RowTitle></ListRow>
-                <ListRow><RowId>{t('apps.detail.model')}</RowId><RowTitle><Mono>{manifest?.modelRoute === undefined ? '—' : `${manifest.modelRoute.provider} / ${manifest.modelRoute.model}`}</Mono></RowTitle></ListRow>
-                <ListRow><RowId>{t('apps.detail.tasks')}</RowId><RowMeta>{(manifest?.tasks ?? []).map((task) => <Pill key={task.name}>{task.name}</Pill>)}</RowMeta></ListRow>
-                <ListRow><RowId>{t('apps.detail.skills')}</RowId><RowMeta>{(manifest?.skillRefs ?? []).map((skill) => <Pill key={skill} color="var(--violet)">{skill.replace(/^skill:\/\//, '')}</Pill>)}</RowMeta></ListRow>
-                <ListRow><RowId>{t('apps.detail.capabilities')}</RowId><RowMeta>{(manifest?.capabilityRefs ?? []).map((capability) => <Pill key={capability} color="var(--blue)">{capability.replace(/^capability:\/\//, '')}</Pill>)}</RowMeta></ListRow>
-              </>
-            </Section>
             <Section card title={t('apps.release.provenance')}>
-              <>
+              {([
+                [t('apps.release.fields.releaseId'), detail.releaseId],
+                [t('apps.release.fields.contentDigest'), detail.contentDigest],
+                [t('apps.release.fields.compilerBuild'), detail.provenance.compilerBuild]
+              ] as const).map(([label, value]) => (
+                <ListRow key={label}>
+                  <RowId>{label}</RowId>
+                  <RowTitle><Mono className="truncate">{value}</Mono></RowTitle>
+                  <RowMeta><Button variant="ghost" size="icon-sm" aria-label={t('common.copy')} title={t('common.copy')} onClick={() => { void navigator.clipboard?.writeText(value); }}><Copy /></Button></RowMeta>
+                </ListRow>
+              ))}
+              <details>
+                <summary className="cursor-default gutter-x py-2 text-[12px] text-muted hover:text-fg">{t('apps.release.showProvenance')}</summary>
                 {([
-                  [t('apps.release.fields.releaseId'), detail.releaseId],
                   [t('apps.release.fields.releaseRef'), detail.releaseRef],
-                  [t('apps.release.fields.contentDigest'), detail.contentDigest],
                   [t('apps.release.fields.sourceFilesDigest'), detail.sourceFilesDigest ?? detail.provenance.sourceDigest],
                   [t('apps.release.fields.lockDigest'), detail.provenance.lockDigest],
-                  [t('apps.release.fields.compilerBuild'), detail.provenance.compilerBuild],
                   ['compilerRef', detail.provenance.compilerRef],
                   ['compilerDigest', detail.provenance.compilerDigest],
                   ['sbomDigest', detail.provenance.sbomDigest],
@@ -93,9 +106,13 @@ export function AppReleaseDetailPage() {
                   ['policyDigest', detail.provenance.policyDigest],
                   ['signatureDigest', detail.provenance.signatureDigest]
                 ] as const).map(([label, value]) => (
-                  <ListRow key={label}><RowId>{label}</RowId><RowTitle sub={<Mono className="truncate">{value}</Mono>}><Mono>{shortDigest(value)}</Mono></RowTitle></ListRow>
+                  <ListRow key={label}>
+                    <RowId>{label}</RowId>
+                    <RowTitle><Mono className="truncate">{value}</Mono></RowTitle>
+                    <RowMeta><Button variant="ghost" size="icon-sm" aria-label={t('common.copy')} title={t('common.copy')} onClick={() => { void navigator.clipboard?.writeText(value); }}><Copy /></Button></RowMeta>
+                  </ListRow>
                 ))}
-              </>
+              </details>
             </Section>
             <Section card title={t('apps.release.assets')} count={detail.assets?.length ?? 0}>
               {detail.assets === undefined || detail.assets.length === 0 ? <div className="gutter-x py-5"><Quiet>{t('apps.release.assetsEmpty')}</Quiet></div> : (detail.assets ?? []).map((asset) => (

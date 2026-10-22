@@ -271,6 +271,7 @@ export const zhCN = {
       all: '全部任务',
       active: '进行中',
       done: '已完成',
+      properties: '属性',
       activity: '活动',
       runLogs: '运行日志',
       artifacts: '产物',
@@ -492,6 +493,16 @@ export const zhCN = {
       title: '没有应用',
       hint: '新建一个空应用并编辑草稿，或从内置示例开始。'
     },
+    noSelection: {
+      title: '选择一个应用',
+      hint: '从左侧列表点开，或新建一个。'
+    },
+    filterApps: '筛选应用',
+    filterEmpty: {
+      title: '没有匹配的应用',
+      hint: '换个关键词，或清空筛选。'
+    },
+    menu: { more: '更多' },
     all: {
       title: '全部应用',
       description: '可变的智能体应用。点击某一行可编辑草稿、发布 Release 并查看运行。'
@@ -500,6 +511,7 @@ export const zhCN = {
       app: '应用',
       status: '状态',
       latestVersion: '最新版本',
+      versionMeta: 'v{version} · {count}',
       runs: '运行 · 14 天',
       releases: '发布',
       draft: '草稿',
@@ -532,6 +544,8 @@ export const zhCN = {
       unsaved: '有未保存的修改',
       unpublished: '有未发布的修改',
       clean: '与最新 Release 一致',
+      statusLine: '{revision} · {files} · {state}',
+      stateCleanVersion: '与 v{version} 一致',
       save: '保存草稿',
       saving: '正在保存…',
       saved: '已保存为 r{revision}。',
@@ -558,6 +572,7 @@ export const zhCN = {
       assets: '资产',
       assetsEmpty: '该 Release 没有资产。',
       provenance: '构建来源',
+      showProvenance: '显示全部来源',
       downloadSource: '下载源码',
       downloadBundle: '下载打包产物',
       downloading: '正在准备…',
@@ -600,6 +615,15 @@ export const zhCN = {
       run: '运行',
       runs: '运行历史',
       runsEmpty: '还没有运行记录。可从任一发布版本发起运行。',
+      releasesEmpty: '还没有发布版本。编辑草稿后可以发布。',
+      definitionEmpty: '这个应用没有任务、输入或数据源。',
+      showManifest: '显示原始清单',
+      tabs: {
+        properties: '属性',
+        draft: '草稿',
+        releases: '发布',
+        runs: '运行'
+      },
       unknownVersion: '未知版本',
       sourceManual: '手动',
       sourceSchedule: '定时'
@@ -638,6 +662,8 @@ export const zhCN = {
       overview: '概览',
       statusHint: '状态来自任务投影；等待中表示尚未观察到投影。',
       pendingHint: '运行已准入，正在等待第一次任务投影。任务启动后即可查看日志与产物。',
+      runningHint: '运行还在进行，日志会跟着更新。',
+      finishedHint: '这次运行已结束。日志和产物在上面的页签里。',
       tabs: {
         overview: '概览',
         logs: '运行日志',
@@ -650,7 +676,9 @@ export const zhCN = {
     addConnection: '添加连接',
     dialog: {
       title: '添加供应商连接',
-      description: '从 models.dev 快照自动填充——基础 URL 与模型仍可编辑。API 密钥在服务端加密保存，永不返回。'
+      description: '从 models.dev 快照自动填充——基础 URL 与模型仍可编辑。API 密钥在服务端加密保存，永不返回。',
+      editTitle: '编辑供应商连接',
+      editDescription: '可改模型、端点与名称。留空 API 密钥则保留已保存的凭据。'
     },
     connections: {
       title: '连接',
@@ -659,6 +687,7 @@ export const zhCN = {
       emptyHint: '添加一个连接，让智能体可以调用模型。',
       default: '默认',
       env: '环境变量',
+      edit: '编辑',
       makeDefault: '设为默认',
       deleteConfirm: '删除 {name}？'
     },
@@ -715,9 +744,12 @@ export const zhCN = {
       anthropicHint: 'Anthropic 调用会归一化结尾的 /v1',
       adapter: '适配器',
       modelId: '模型 ID',
+      modelIdHint: '也可直接填写模型 ID；目录选择会同步到这里。',
       name: '名称',
       namePlaceholder: '显示在连接列表中',
       apiKey: 'API 密钥',
+      apiKeyKeep: '留空则保留已保存的密钥。',
+      apiKeyPlaceholder: '••••••••（保持不变）',
       testing: '测试中…',
       test: '测试连接'
     },
