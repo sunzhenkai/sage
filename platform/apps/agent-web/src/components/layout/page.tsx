@@ -118,7 +118,7 @@ export function DetailLayout({ children, properties }: { children: React.ReactNo
   return (
     <div className="flex min-h-0 flex-1">
       <div className="flex min-w-0 flex-1 flex-col">{children}</div>
-      <aside className="w-[var(--aside-w)] shrink-0 overflow-y-auto border-l border-line px-4 py-6">{properties}</aside>
+      <aside className="hidden w-[var(--aside-w)] shrink-0 overflow-y-auto border-l border-line px-4 py-6 lg:block">{properties}</aside>
     </div>
   );
 }

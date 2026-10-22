@@ -1,0 +1,4 @@
+schema: spec-driven
+skip_specs: true
+created: 2026-10-20
+goal: 收敛 MCP 与 CLI：删除 package_*，新增 app_* 草稿/发布工具，register-package 改走草稿发布

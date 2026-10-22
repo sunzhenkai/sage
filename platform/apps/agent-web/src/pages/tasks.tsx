@@ -14,7 +14,7 @@ import { TaskRows } from '@/components/bui/task-rows';
 import { ThinkingTrace } from '@/components/bui/thinking';
 import { StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { DetailLayout, Pill, Property, PropertyGroup } from '@/components/ui/list';
+import { Pill, Property, PropertyGroup } from '@/components/ui/list';
 import { Empty, ErrorState, JsonView, Loading, Mono } from '@/components/ui/misc';
 import { api } from '@/lib/api';
 import { useT } from '@/lib/i18n';
@@ -53,7 +53,7 @@ export function TasksPage() {
         actions={<Button variant="ghost" size="icon-sm" title={t('common.refresh')} onClick={() => void tasks.refetch()}><RefreshCw className={cn(tasks.isFetching && 'animate-spin')} /></Button>}
       />
       <PageContent width="wide">
-        {tasks.isLoading ? <Loading /> : tasks.error ? <ErrorState error={tasks.error} /> : filtered.length === 0 ? (
+        {tasks.isLoading ? <Loading /> : tasks.error ? <ErrorState error={tasks.error} /> : filtered.length === 0 && all.length === 0 ? (
           <Empty icon={ListChecks} title={t('tasks.empty.title')} hint={t('tasks.empty.hint')} />
         ) : (
           <>
@@ -76,6 +76,7 @@ export function TasksPage() {
               </Section>
             ) : null}
             <Section title={t('tasks.all.title')} description={t('tasks.all.description')} count={filtered.length}>
+            {filtered.length === 0 ? <Quiet>{t('tasks.empty.hint')}</Quiet> : (
             <RecordsTable rows={filtered} getKey={(x) => x.taskId} onRowClick={(x) => { void navigate(`/tasks/${x.taskId}`); }}
               columns={[
                 { key: 'task', label: t('tasks.columns.task'), icon: <ListChecks />, width: '34%', sort: (x, y) => x.taskId.localeCompare(y.taskId), render: (x) => <span className="flex min-w-0 items-center gap-2"><StatusGlyph status={x.status} size={16} /><span className="truncate">{x.taskId}</span></span> },
@@ -86,6 +87,7 @@ export function TasksPage() {
                 { key: 'updated', label: t('tasks.columns.lastUpdate'), icon: <Clock />, width: 130, sort: (x, y) => String(x.projectionUpdatedAt).localeCompare(String(y.projectionUpdatedAt)), render: (x) => <span className="text-ink-2">{relativeTime(x.projectionUpdatedAt)}</span> }
               ]}
               footer={<span className="ml-auto">{t('tasks.footer', { inflight: active.length, failed: filtered.filter((x) => x.status === 'failed').length })}</span>} />
+            )}
             </Section>
           </>
         )}
@@ -94,8 +96,8 @@ export function TasksPage() {
   );
 }
 
-type Tab = 'activity' | 'run-logs' | 'artifacts' | 'raw';
-const tabKeys: Record<Tab, string> = { activity: 'tasks.tabs.activity', 'run-logs': 'tasks.tabs.runLogs', artifacts: 'tasks.tabs.artifacts', raw: 'tasks.tabs.raw' };
+type Tab = 'properties' | 'activity' | 'run-logs' | 'artifacts' | 'raw';
+const tabKeys: Record<Tab, string> = { properties: 'tasks.tabs.properties', activity: 'tasks.tabs.activity', 'run-logs': 'tasks.tabs.runLogs', artifacts: 'tasks.tabs.artifacts', raw: 'tasks.tabs.raw' };
 
 export function TaskDetailPage() {
   const { taskId = '' } = useParams();
@@ -119,43 +121,43 @@ export function TaskDetailPage() {
         </>} />
       {control.error ? <ErrorState error={control.error} /> : null}
       {taskQuery.isLoading ? <Loading /> : taskQuery.error ? <ErrorState error={taskQuery.error} /> : detail ? (
-        <DetailLayout properties={<>
-          <PropertyGroup title={t('tasks.detail.properties')}>
-            <Property label={t('tasks.detail.status')}><StatusBadge status={detail.status} /></Property>
-            <Property label={t('tasks.detail.type')}>{detail.taskType ? <Pill color="var(--accent)">{detail.taskType}</Pill> : null}</Property>
-            <Property label={t('tasks.detail.attempt')}>{detail.attempt}</Property>
-            <Property label={t('tasks.detail.revision')}>{detail.revision}</Property>
-            <Property label={t('tasks.detail.lifecycle')}>{detail.lifecyclePath}</Property>
-          </PropertyGroup>
-          <PropertyGroup title={t('tasks.detail.execution')}>
-            <Property label={t('tasks.detail.workflow')}><Mono>{detail.workflowId}</Mono></Property>
-            <Property label={t('tasks.detail.target')}><Mono>{detail.targetId}</Mono></Property>
-            <Property label={t('tasks.detail.freshness')}>{detail.projectionFreshness}</Property>
-            <Property label={t('tasks.detail.session')}>{detail.sessionId ? <Link className="text-accent-ink hover:underline" to={`/chat/${detail.sessionId}`}>{shortId(detail.sessionId)}</Link> : null}</Property>
-          </PropertyGroup>
-          <PropertyGroup title={t('tasks.detail.timestamps')}>
-            <Property label={t('tasks.detail.updated')}>{formatTime(detail.projectionUpdatedAt)}</Property>
-            <Property label={t('tasks.detail.observed')}>{formatTime(detail.historyObservedAt)}</Property>
-          </PropertyGroup>
-        </>}>
-          <PageContent>
-            <PageDescription leading={<StatusGlyph status={detail.status} size={26} step={detail.attempt} />} title={detail.taskId} description={<>{detail.taskType ?? t('tasks.detail.taskFallback')} · {t(statusKeys[detail.status])}{detail.freshnessReason ? ` · ${detail.freshnessReason}` : ''}</>} />
-            {detail.status === 'effect_unknown' || detail.status === 'paused' ? (
-              <ApprovalCard className="mb-8"
-                eyebrow={<><span className="size-1.5 rounded-full bg-orange" />{detail.status === 'paused' ? t('tasks.approval.pausedEyebrow') : t('tasks.approval.effectUnknownEyebrow')}</>}
-                question={detail.status === 'paused' ? t('tasks.approval.pausedQuestion') : t('tasks.approval.effectUnknownQuestion')}
-                options={detail.status === 'paused'
-                  ? [{ key: 'resume', label: t('common.resume'), description: t('tasks.approval.resumeDescription') }, { key: 'cancel', label: t('tasks.approval.cancelLabel'), description: t('tasks.approval.cancelDescription'), danger: true }]
-                  : [{ key: 'retry', label: t('tasks.approval.retryLabel'), description: t('tasks.approval.retryDescription') }, { key: 'cancel', label: t('tasks.approval.cancelLabel'), description: t('tasks.approval.cancelAndInvestigate'), danger: true }]}
-                busy={control.isPending}
-                onConfirm={(k) => { if (k !== 'cancel' || confirm(t('tasks.detail.cancelConfirm'))) control.mutate(k as 'resume' | 'retry' | 'cancel'); }} />
-            ) : null}
-            <SegmentedTabs value={tab} onChange={setTab} items={(['activity', 'run-logs', 'artifacts', 'raw'] as Tab[]).map((name) => ({ value: name, label: t(tabKeys[name]) }))} />
-            <div className="pt-5">
-              {tab === 'activity' ? <Section card padded><TaskEvents taskId={taskId} status={detail.status} /></Section> : tab === 'run-logs' ? <Section card padded><RunLogs taskId={taskId} /></Section> : tab === 'artifacts' ? <Artifacts taskId={taskId} /> : <JsonView value={detail} filename={`${detail.taskId}.json`} />}
-            </div>
-          </PageContent>
-        </DetailLayout>
+        <PageContent>
+          <PageDescription leading={<StatusGlyph status={detail.status} size={26} step={detail.attempt} />} title={detail.taskId} description={<>{detail.taskType ?? t('tasks.detail.taskFallback')} · {t(statusKeys[detail.status])}{detail.freshnessReason ? ` · ${detail.freshnessReason}` : ''}</>} />
+          {detail.status === 'effect_unknown' || detail.status === 'paused' ? (
+            <ApprovalCard className="mb-8"
+              eyebrow={<><span className="size-1.5 rounded-full bg-orange" />{detail.status === 'paused' ? t('tasks.approval.pausedEyebrow') : t('tasks.approval.effectUnknownEyebrow')}</>}
+              question={detail.status === 'paused' ? t('tasks.approval.pausedQuestion') : t('tasks.approval.effectUnknownQuestion')}
+              options={detail.status === 'paused'
+                ? [{ key: 'resume', label: t('common.resume'), description: t('tasks.approval.resumeDescription') }, { key: 'cancel', label: t('tasks.approval.cancelLabel'), description: t('tasks.approval.cancelDescription'), danger: true }]
+                : [{ key: 'retry', label: t('tasks.approval.retryLabel'), description: t('tasks.approval.retryDescription') }, { key: 'cancel', label: t('tasks.approval.cancelLabel'), description: t('tasks.approval.cancelAndInvestigate'), danger: true }]}
+              busy={control.isPending}
+              onConfirm={(k) => { if (k !== 'cancel' || confirm(t('tasks.detail.cancelConfirm'))) control.mutate(k as 'resume' | 'retry' | 'cancel'); }} />
+          ) : null}
+          <SegmentedTabs value={tab} onChange={setTab} items={(['properties', 'activity', 'run-logs', 'artifacts', 'raw'] as Tab[]).map((name) => ({ value: name, label: t(tabKeys[name]) }))} />
+          <div className="pt-5">
+            {tab === 'properties' ? (
+              <Section card padded>
+                <PropertyGroup title={t('tasks.detail.properties')}>
+                  <Property label={t('tasks.detail.status')}><StatusBadge status={detail.status} /></Property>
+                  <Property label={t('tasks.detail.type')}>{detail.taskType ? <Pill color="var(--accent)">{detail.taskType}</Pill> : null}</Property>
+                  <Property label={t('tasks.detail.attempt')}>{detail.attempt}</Property>
+                  <Property label={t('tasks.detail.revision')}>{detail.revision}</Property>
+                  <Property label={t('tasks.detail.lifecycle')}>{detail.lifecyclePath}</Property>
+                </PropertyGroup>
+                <PropertyGroup title={t('tasks.detail.execution')}>
+                  <Property label={t('tasks.detail.workflow')}><Mono>{detail.workflowId}</Mono></Property>
+                  <Property label={t('tasks.detail.target')}><Mono>{detail.targetId}</Mono></Property>
+                  <Property label={t('tasks.detail.freshness')}>{detail.projectionFreshness}</Property>
+                  <Property label={t('tasks.detail.session')}>{detail.sessionId ? <Link className="text-accent-ink hover:underline" to={`/chat/${detail.sessionId}`}>{shortId(detail.sessionId)}</Link> : null}</Property>
+                </PropertyGroup>
+                <PropertyGroup title={t('tasks.detail.timestamps')}>
+                  <Property label={t('tasks.detail.updated')}>{formatTime(detail.projectionUpdatedAt)}</Property>
+                  <Property label={t('tasks.detail.observed')}>{formatTime(detail.historyObservedAt)}</Property>
+                </PropertyGroup>
+              </Section>
+            ) : tab === 'activity' ? <Section card padded><TaskEvents taskId={taskId} status={detail.status} /></Section> : tab === 'run-logs' ? <Section card padded><RunLogs taskId={taskId} /></Section> : tab === 'artifacts' ? <Artifacts taskId={taskId} /> : <JsonView value={detail} filename={`${detail.taskId}.json`} />}
+          </div>
+        </PageContent>
       ) : null}
     </>
   );

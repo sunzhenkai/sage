@@ -20,6 +20,7 @@ import type { ProviderConnectionStore, RunAgentSettingsStore, TaskPackageInputSt
 import type { ControlledEgressConnectorPort } from '@sage/tool-runtime';
 import { fetchPackageSnapshots, PackageSnapshotError } from './package-snapshots.js';
 import type { TaskControllerPort } from './task-api.js';
+import type { AppStatusLookup } from './app-status.js';
 
 export interface RunsPrincipalAuthenticator {
   authenticateRequest?(request: FastifyRequest): Promise<AuthenticatedPrincipal | undefined> | AuthenticatedPrincipal | undefined;
@@ -41,6 +42,8 @@ export interface RegisterPackageRunsRoutesOptions {
   readonly tenantId: string;
   readonly controller: TaskControllerPort;
   readonly releaseResolver: PackageReleaseResolver;
+  /** App 准入：Release 所属 App 软删/缺失时拒绝新运行。 */
+  readonly appStatus?: AppStatusLookup;
   readonly taskStore: TaskPackageInputStore;
   readonly specStore: AgentTaskSpecStorePort;
   /** pilot 强认证（5.1）：true 时 stub 信任头停止提权，仅 service token 主体被认可。 */
@@ -160,6 +163,9 @@ export function registerPackageRunsRoutes(app: FastifyInstance, options: Registe
         const resolved = await options.releaseResolver.resolveRelease(options.tenantId, request.params.releaseId);
         if (resolved === undefined) return sendError(reply, 404, 'RELEASE_NOT_FOUND', 'Release not found');
         const release = resolved.release;
+        if (options.appStatus !== undefined && options.appStatus.getApp(options.tenantId, release.packageId) === undefined) {
+          return sendError(reply, 404, 'APP_DELETED', `App '${release.packageId}' is deleted or missing`);
+        }
         const manifest = resolved.lockPayload.manifest;
         if (manifest === undefined) return sendError(reply, 409, 'PACKAGE_RUN_MANIFEST_MISSING', 'Release has no manifest summary');
 

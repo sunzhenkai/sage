@@ -63,8 +63,8 @@ export function AppRunDetailPage() {
           <PageContent>
             <PageDescription
               leading={<StatusGlyph status={run.status} />}
-              title={run.releaseVersion === undefined ? taskId : `v${run.releaseVersion} · ${taskId}`}
-              description={<>{t('apps.runDetail.description')}{run.updatedAt === undefined ? '' : ` · ${t('apps.runDetail.updatedAgo', { time: relativeTime(run.updatedAt) })}`}</>} />
+              title={run.releaseVersion === undefined ? taskId : `v${run.releaseVersion}`}
+              description={run.updatedAt === undefined ? undefined : t('apps.runDetail.updatedAgo', { time: relativeTime(run.updatedAt) })} />
             <SegmentedTabs value={tab} onChange={setTab} items={[
               { value: 'overview', label: t('apps.runDetail.tabs.overview') },
               { value: 'logs', label: t('apps.runDetail.tabs.logs') },
@@ -74,14 +74,11 @@ export function AppRunDetailPage() {
               {pending ? (
                 <Section card padded><Quiet>{t('apps.runDetail.pendingHint')}</Quiet></Section>
               ) : tab === 'overview' ? (
-                <Section card title={t('apps.runDetail.overview')}>
-                  <>
-                    <ListRow><RowId>{t('apps.runDetail.status')}</RowId><RowTitle>{t('apps.runDetail.statusHint')}</RowTitle><StatusBadge status={run.status} /></ListRow>
-                    <ListRow><RowId>{t('apps.runDetail.created')}</RowId><RowTitle><Mono>{run.createdAt}</Mono></RowTitle></ListRow>
-                    <ListRow><RowId>{t('apps.runDetail.updated')}</RowId><RowTitle><Mono>{run.updatedAt ?? '—'}</Mono></RowTitle></ListRow>
-                    {run.failureCode === undefined ? null : <ListRow><RowId>{t('apps.runDetail.failureCode')}</RowId><RowTitle><span className="text-red">{run.failureCode}</span></RowTitle></ListRow>}
-                  </>
-                </Section>
+                run.failureCode === undefined ? <Quiet>{t(live ? 'apps.runDetail.runningHint' : 'apps.runDetail.finishedHint')}</Quiet> : (
+                  <Section card>
+                    <ListRow><RowId>{t('apps.runDetail.failureCode')}</RowId><RowTitle><span className="text-red">{run.failureCode}</span></RowTitle></ListRow>
+                  </Section>
+                )
               ) : tab === 'logs' ? (
                 <Section card padded><RunLogs taskId={taskId} live={live} /></Section>
               ) : (

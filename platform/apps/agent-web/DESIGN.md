@@ -88,7 +88,7 @@
 | Master-detail | 聊天页左侧会话列 300px（`SessionList`：容器 `px-2.5`、组间距 8px、行间距 8px、组头与首行间 4px（sticky 组头不再盖住选中卡片的 1px 描边）；按 Today/Yesterday/Earlier 分组；行 = 色相头像 + 最新 run 状态点 + 标题/预览 + 时间 + runs/消息计数 + 最近 5 次 run 色条；未选中行保留 1px 描边、无填充（面板底色，hover `--hover-2`）；仅选中行为白色填充 + accent ring；Active/Archived 分段切换） |
 | 会话页头 | 单一页头 `SessionHeader`：头像 + 标题 + 状态点 + 灰色 meta，右侧操作；右侧为视图切换图标分段控件（Chat `MessageSquare` / Runs `ListChecks` + 短标签 + 计数，白底描边，选中 `--hover-2`，tooltip，←/→ 键切换，role=tablist），竖线分隔后接操作按钮；页头单行 `--header-h`；背景同页面底色，仅一条底部分隔线，不使用胶囊/卡片 tab |
 | 例外：阅读/表单类页面居中窄栏 | 设置页、Providers 页 `PageContent width="narrow"`（`--w-narrow: 900px`）；聊天消息流 + 输入框 `width="chat"`（`--w-chat: 1000px`，会话列表侧栏不变）。宽度只能通过 `PageContent` / `PageColumn` 的 `width` 取得，页面里仍禁止 `max-w-*` / `mx-auto` |
-| 图表/列表页 | Overview、Tasks、Schedules、Apps、Packages 列表使用 `PageContent width="wide"`（`--w-wide: 1120px` + gutter），在剩余空间中**居中**；侧边栏折叠时内容不会拉伸到边缘 |
+| 图表/列表页 | Overview、Tasks、Schedules、Apps 列表使用 `PageContent width="wide"`（`--w-wide: 1120px` + gutter），在剩余空间中**居中**；侧边栏折叠时内容不会拉伸到边缘 |
 | 其余页面 | 详情页（两栏 + 属性侧栏）保持全宽 |
 | `readable` | `--readable: 72ch`，仅限全宽块内的长正文 |
 
@@ -184,7 +184,7 @@
 
 | 类型 | 组件 | 用于 |
 |---|---|---|
-| KPI + sparkline | `StatTile` / `Sparkline` | Overview 指标块；Apps/Packages 列表 14 天用量列 |
+| KPI + sparkline | `StatTile` / `Sparkline` | Overview 指标块；Apps 列表草稿/发布状态 |
 | 面积趋势 | `AreaTrend` | 会话数、token 用量 |
 | 折线 | `LineTrend` | 成功率、延迟 p50/p95 |
 | 状态堆叠柱 | `StackedBars` | 按天运行/任务/触发结果；Providers 请求/错误；Chat Runs 单次耗时 |

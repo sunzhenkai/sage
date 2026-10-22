@@ -1,9 +1,11 @@
 /**
  * Dev-only demo data. Enabled by `?mock=1` (persisted in localStorage, `?mock=0` to leave) or VITE_MOCK=1.
- * Mock mode is read-only: it never calls agent-api, and write operations are rejected locally.
+ * Mock mode never calls agent-api; app draft/publish endpoints keep an in-memory state so the
+ * create → draft → publish flow is demonstrable. Archive import is unsupported in mock mode.
  */
 import type {
-  AppDetail, AppManifest, AppRelease, AppRun, AppSummary, CatalogModelItem, CatalogProviderItem, ChatRun, Message, PackageDetail,
+  AppAsset, AppDetail, AppDraft, AppManifest, AppRelease, AppReleaseDetail, AppReleaseResult, AppRun, AppSummary,
+  CatalogModelItem, CatalogProviderItem, ChatRun, Message,
   ScheduleSnapshot, ScheduleTriggerEvent, SessionListItem, TaskStatus, TaskView, TimelineEvent
 } from './types';
 
@@ -105,7 +107,7 @@ export const mockTriggers: Record<string, ScheduleTriggerEvent[]> = Object.fromE
   return { scheduleId: s.definition.scheduleId, occurrenceId: `occ-${hex(8)}`, kind: r < 0.8 ? 'SUCCEEDED' : r < 0.9 ? 'FAILED' : r < 0.96 ? 'SKIPPED' : 'MISSED', occurredAtMs: NOW - i * (s.definition.trigger.kind === 'interval' ? 0.45 : 0.5) * DAY - rnd() * 3_600_000, taskId: pick(mockTasks).taskId } as ScheduleTriggerEvent;
 })]));
 
-// ---- apps / packages ----
+// ---- apps ----
 const stableHex = (text: string, length: number): string => {
   let h = 2166136261;
   for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619);
@@ -118,13 +120,6 @@ const stableHex = (text: string, length: number): string => {
   return out.slice(0, length);
 };
 const sha = (text: string) => `sha256:${stableHex(text, 64)}`;
-
-export const mockApps: AppSummary[] = [
-  { appId: 'finance-briefing', status: 'active', releaseCount: 3, latestVersion: '2.0.0', createdAt: iso(NOW - 30 * DAY), updatedAt: iso(NOW - 3 * DAY) },
-  { appId: 'release-notes', status: 'active', releaseCount: 5, latestVersion: '1.4.2', createdAt: iso(NOW - 25 * DAY), updatedAt: iso(NOW - DAY) },
-  { appId: 'incident-summary', status: 'active', releaseCount: 2, latestVersion: '0.9.0', createdAt: iso(NOW - 9 * DAY), updatedAt: iso(NOW - 4 * DAY) },
-  { appId: 'data-sync', status: 'disabled', releaseCount: 1, latestVersion: '0.1.0', createdAt: iso(NOW - 6 * DAY), updatedAt: iso(NOW - 6 * DAY) }
-];
 
 const releaseVersions: Record<string, readonly string[]> = {
   'finance-briefing': ['2.0.0', '1.5.0', '1.4.0'],
@@ -150,7 +145,24 @@ const manifestFor = (appId: string, version: string): AppManifest => ({
   tasks: [{ name: appId, entry: 'prompts/system.md' }]
 });
 
-const assetsFor = (appId: string): NonNullable<AppDetail['assets']> => [
+const sourceFilesFor = (appId: string, version: string): Record<string, string> => ({
+  'app.yaml': [
+    `id: ${appId}`,
+    `version: ${version}`,
+    'description: Daily cross-market briefing generated from FX and index data sources.',
+    'entry: prompts/system.md',
+    'model:',
+    '  provider: minimax-cn',
+    '  model: MiniMax-M3',
+    'tasks:',
+    `  - name: ${appId}`,
+    '    entry: prompts/system.md'
+  ].join('\n') + '\n',
+  'prompts/system.md': `You are the ${appId} agent. Produce a concise, sourced briefing.\n`,
+  'references/brief-writing-guide.md': '# Brief writing guide\n\nLead with the conclusion, then evidence.\n'
+});
+
+const assetsFor = (appId: string): AppAsset[] => [
   { relativePath: 'prompts/system.md', kind: 'prompt', digest: sha(`prompt:${appId}`), bytes: 2306, preview: 'You are a finance analyst…' },
   { relativePath: 'app.yaml', kind: 'manifest', digest: sha(`manifest:${appId}`), bytes: 412 }
 ];
@@ -165,22 +177,89 @@ const releasesFor = (appId: string, latestVersion?: string): AppRelease[] => {
     lockDigest: sha(`lock:${appId}@${version}`),
     compilerBuild: 'mock-compiler/1.0.0',
     createdAt: iso(NOW - (i * 6 + 1) * DAY),
+    sourceFilesDigest: sha(`source:${appId}@${version}`),
     ...(i === 0 ? { manifest: manifestFor(appId, version) } : {})
   }));
 };
 
-const appDetailFor = (appId: string): AppDetail => {
-  const summary = mockApps.find((app) => app.appId === appId);
-  const releases = releasesFor(appId, summary?.latestVersion);
-  const latest = releases[0]!;
+export const mockApps: AppSummary[] = [
+  { appId: 'finance-briefing', status: 'active', draftRevision: 0, draftDigest: '', releaseCount: 3, latestVersion: '2.0.0', hasUnpublishedChanges: false, createdAt: iso(NOW - 30 * DAY), updatedAt: iso(NOW - 3 * DAY) },
+  { appId: 'release-notes', status: 'active', draftRevision: 0, draftDigest: '', releaseCount: 5, latestVersion: '1.4.2', hasUnpublishedChanges: false, createdAt: iso(NOW - 25 * DAY), updatedAt: iso(NOW - DAY) },
+  { appId: 'incident-summary', status: 'active', draftRevision: 0, draftDigest: '', releaseCount: 2, latestVersion: '0.9.0', hasUnpublishedChanges: false, createdAt: iso(NOW - 9 * DAY), updatedAt: iso(NOW - 4 * DAY) },
+  { appId: 'data-sync', status: 'disabled', draftRevision: 0, draftDigest: '', releaseCount: 1, latestVersion: '0.1.0', hasUnpublishedChanges: false, createdAt: iso(NOW - 6 * DAY), updatedAt: iso(NOW - 6 * DAY) }
+];
+
+const mockReleases = new Map<string, AppRelease[]>(mockApps.map((app) => [app.appId, releasesFor(app.appId, app.latestVersion)]));
+const mockDrafts = new Map<string, AppDraft>();
+
+for (const [index, app] of mockApps.entries()) {
+  const latest = mockReleases.get(app.appId)?.[0];
+  const files = sourceFilesFor(app.appId, latest?.packageVersion ?? '0.1.0');
+  const draft: AppDraft = {
+    schemaVersion: 'AppDraft.v1', appId: app.appId, revision: index + 1,
+    digest: latest?.sourceFilesDigest ?? sha(`source:${app.appId}@0.1.0`), files, updatedAt: app.updatedAt
+  };
+  mockDrafts.set(app.appId, draft);
+  app.draftRevision = draft.revision;
+  app.draftDigest = draft.digest;
+}
+
+const appSummaryOf = (appId: string): AppSummary | undefined => mockApps.find((app) => app.appId === appId);
+const draftOf = (appId: string): AppDraft | undefined => mockDrafts.get(appId);
+const releasesOf = (appId: string): AppRelease[] => mockReleases.get(appId) ?? [];
+
+function refreshSummary(appId: string): void {
+  const app = appSummaryOf(appId);
+  const draft = draftOf(appId);
+  if (app === undefined || draft === undefined) return;
+  const releases = releasesOf(appId);
+  const latest = releases[0];
+  app.draftRevision = draft.revision;
+  app.draftDigest = draft.digest;
+  app.releaseCount = releases.length;
+  if (latest === undefined) delete app.latestVersion; else app.latestVersion = latest.packageVersion;
+  app.hasUnpublishedChanges = Object.keys(draft.files).length > 0 && latest?.sourceFilesDigest !== draft.digest;
+  app.updatedAt = draft.updatedAt;
+}
+
+const appDetailFor = (appId: string): AppDetail | undefined => {
+  const summary = appSummaryOf(appId);
+  if (summary === undefined) return undefined;
+  const releases = releasesOf(appId);
+  const latest = releases[0];
   return {
-    appId,
-    status: summary?.status ?? 'active',
-    createdAt: summary?.createdAt ?? iso(NOW - 30 * DAY),
-    manifest: latest.manifest ?? manifestFor(appId, latest.packageVersion),
-    assets: assetsFor(appId),
+    ...summary,
+    ...(latest?.manifest === undefined ? {} : { manifest: latest.manifest }),
+    ...(releases.length === 0 ? {} : { assets: assetsFor(appId) }),
     releases
   };
+};
+
+const provenanceFor = (appId: string, release: AppRelease) => ({
+  compilerRef: 'build://compiler/mock',
+  compilerDigest: sha('compiler:mock'),
+  compilerBuild: release.compilerBuild,
+  sourceDigest: release.sourceFilesDigest ?? sha(`source:${appId}@${release.packageVersion}`),
+  lockDigest: release.lockDigest,
+  sbomDigest: sha(`sbom:${release.releaseId}`),
+  provenanceDigest: sha(`provenance:${release.releaseId}`),
+  policyDigest: sha(`policy:${release.releaseId}`),
+  signatureDigest: sha(`signature:${release.releaseId}`)
+});
+
+const releaseDetailFor = (appId: string, releaseId: string): AppReleaseDetail | undefined => {
+  const release = releasesOf(appId).find((entry) => entry.releaseId === releaseId);
+  if (release === undefined) return undefined;
+  return {
+    schemaVersion: 'AppReleaseDetail.v1', appId, ...release,
+    provenance: provenanceFor(appId, release),
+    assets: assetsFor(appId)
+  };
+};
+
+const versionOf = (files: Record<string, string>): string => {
+  const match = /^version:\s*['"]?([^'"\s]+)['"]?\s*$/m.exec(files['app.yaml'] ?? '');
+  return match?.[1] ?? '0.1.0';
 };
 
 const taskTypeForApp: Record<string, string> = {
@@ -218,24 +297,6 @@ export const mockAppRuns: Record<string, AppRun[]> = Object.fromEntries(mockApps
   });
   return [app.appId, runs.sort((a, b) => b.createdAt.localeCompare(a.createdAt))];
 }));
-
-const packageDetailFor = (packageId: string): PackageDetail => {
-  const detail = appDetailFor(packageId);
-  return {
-    packageId,
-    ...(detail.manifest === undefined ? {} : { manifest: detail.manifest }),
-    ...(detail.assets === undefined ? {} : { assets: detail.assets }),
-    releases: detail.releases.map((release) => ({
-      packageVersion: release.packageVersion,
-      releaseRef: release.releaseRef,
-      releaseId: release.releaseId,
-      contentDigest: release.contentDigest,
-      lockDigest: release.lockDigest,
-      compilerBuild: release.compilerBuild,
-      createdAt: release.createdAt
-    }))
-  };
-};
 
 const providers = [
   { id: 'conn-openai', name: 'openai-prod', source: 'user', adapterKind: 'openai-compatible', baseUrl: 'https://api.openai.com/v1', modelId: 'gpt-4o-mini', enabled: true, credentialPresent: true, createdAt: iso(NOW - 30 * DAY), updatedAt: iso(NOW - 2 * DAY) },
@@ -276,8 +337,17 @@ const catalogFilter = <T extends { name: string }>(query: MockQuery, items: read
 };
 const limitOf = (query: MockQuery, fallback: number) => Math.min(Math.max(Number(query.limit ?? fallback) || fallback, 1), 100);
 
-/** Resolve a GET path to demo data. Returns undefined for unknown paths. */
-export function mockGet(path: string, query: MockQuery = {}): unknown {
+/** Local HTTP-shaped failure so `api.ts` can surface the same ApiError shape as agent-api. */
+export class MockHttpError {
+  constructor(
+    readonly status: number,
+    readonly code: string,
+    readonly message: string,
+    readonly details?: Readonly<Record<string, unknown>>
+  ) {}
+}
+
+function mockRead(path: string, query: MockQuery): unknown {
   const p = path.split('?')[0]!;
   const m = (re: RegExp) => p.match(re);
   if (p === '/livez') return { status: 'alive' };
@@ -299,8 +369,8 @@ export function mockGet(path: string, query: MockQuery = {}): unknown {
   r = m(/^\/v1\/tasks\/([^/]+)$/); if (r) return mockTasks.find((x) => x.taskId === decodeURIComponent(r![1]!));
   r = m(/^\/v1\/apps\/([^/]+)\/runs$/); if (r) {
     const appId = decodeURIComponent(r[1]!);
-    const runs = mockAppRuns[appId];
-    if (runs === undefined) return undefined;
+    if (appSummaryOf(appId) === undefined) return undefined;
+    const runs = mockAppRuns[appId] ?? [];
     const releaseId = typeof query.releaseId === 'string' ? query.releaseId : undefined;
     const filtered = releaseId === undefined ? runs : runs.filter((run) => run.releaseId === releaseId);
     const limit = Number(query.limit ?? 50);
@@ -312,22 +382,20 @@ export function mockGet(path: string, query: MockQuery = {}): unknown {
     const run = (mockAppRuns[appId] ?? []).find((entry) => entry.taskId === taskId);
     return run === undefined ? undefined : { schemaVersion: 'AppRunDetail.v1', appId, run };
   }
-  if (p === '/v1/apps') return { apps: mockApps };
-  r = m(/^\/v1\/apps\/([^/]+)$/); if (r) {
+  r = m(/^\/v1\/apps\/([^/]+)\/draft$/); if (r) {
     const appId = decodeURIComponent(r[1]!);
-    return mockApps.some((app) => app.appId === appId) ? appDetailFor(appId) : undefined;
+    return appSummaryOf(appId) === undefined ? undefined : draftOf(appId);
   }
-  if (p === '/v1/packages') return { packages: mockApps.map((app) => ({
-    packageId: app.appId,
-    latestVersion: app.latestVersion,
-    releaseCount: app.releaseCount,
-    latestContentDigest: sha(`content:${app.appId}@${app.latestVersion}`),
-    updatedAt: app.updatedAt
-  })) };
-  r = m(/^\/v1\/packages\/([^/]+)$/); if (r) {
-    const packageId = decodeURIComponent(r[1]!);
-    return mockApps.some((app) => app.appId === packageId) ? packageDetailFor(packageId) : undefined;
+  r = m(/^\/v1\/apps\/([^/]+)\/releases$/); if (r) {
+    const appId = decodeURIComponent(r[1]!);
+    if (appSummaryOf(appId) === undefined) return undefined;
+    return { schemaVersion: 'AppReleaseList.v1', appId, releases: releasesOf(appId) };
   }
+  r = m(/^\/v1\/apps\/([^/]+)\/releases\/([^/]+)$/); if (r) {
+    return releaseDetailFor(decodeURIComponent(r[1]!), decodeURIComponent(r[2]!));
+  }
+  if (p === '/v1/apps') return { schemaVersion: 'AppList.v1', apps: mockApps };
+  r = m(/^\/v1\/apps\/([^/]+)$/); if (r) return appDetailFor(decodeURIComponent(r[1]!));
   if (p === '/v1/schedules') return { schemaVersion: 'ScheduleListResult.v1', schedules: mockSchedules };
   r = m(/^\/v1\/schedules\/([^/]+)\/triggers$/); if (r) return { schemaVersion: 'ScheduleTriggerHistory.v1', scheduleId: r[1], events: mockTriggers[decodeURIComponent(r[1]!)] ?? [] };
   r = m(/^\/v1\/schedules\/([^/]+)$/); if (r) return mockSchedules.find((s) => s.definition.scheduleId === decodeURIComponent(r![1]!));
@@ -348,12 +416,159 @@ export function mockGet(path: string, query: MockQuery = {}): unknown {
   return undefined;
 }
 
-/** Resolve a non-mutating POST (connection probe) to demo data; writes stay rejected client-side. */
-export function mockPost(path: string, body?: unknown): unknown {
+function createMockApp(body: unknown): AppSummary {
+  const input = body as { appId?: string; name?: string; description?: string } | undefined;
+  if (input?.appId === undefined || input.appId === '') throw new MockHttpError(400, 'APP_INVALID', 'appId is required');
+  if (appSummaryOf(input.appId) !== undefined) throw new MockHttpError(409, 'APP_ALREADY_EXISTS', 'An app with this id already exists');
+  const now = iso(NOW + mockApps.length * 1_000);
+  const app: AppSummary = {
+    appId: input.appId,
+    ...(input.name === undefined ? {} : { name: input.name }),
+    ...(input.description === undefined ? {} : { description: input.description }),
+    status: 'active', draftRevision: 0, draftDigest: sha('files:'), releaseCount: 0, hasUnpublishedChanges: false,
+    createdAt: now, updatedAt: now
+  };
+  mockApps.push(app);
+  mockDrafts.set(app.appId, { schemaVersion: 'AppDraft.v1', appId: app.appId, revision: 0, digest: sha('files:'), files: {}, updatedAt: now });
+  return app;
+}
+
+function putMockDraft(appId: string, body: unknown): AppDraft {
+  const draft = draftOf(appId);
+  if (draft === undefined) throw new MockHttpError(404, 'APP_NOT_FOUND', 'App not found');
+  const files = (body as { files?: Record<string, string> } | undefined)?.files;
+  if (files === undefined) throw new MockHttpError(400, 'APP_INVALID', 'files is required');
+  const next: AppDraft = {
+    schemaVersion: 'AppDraft.v1', appId, revision: draft.revision + 1,
+    digest: sha(JSON.stringify(files)), files, updatedAt: iso(NOW + (draft.revision + 1) * 1_000)
+  };
+  mockDrafts.set(appId, next);
+  refreshSummary(appId);
+  return next;
+}
+
+function publishMockRelease(appId: string, body: unknown): AppReleaseResult {
+  const app = appSummaryOf(appId);
+  const draft = draftOf(appId);
+  if (app === undefined || draft === undefined) throw new MockHttpError(404, 'APP_NOT_FOUND', 'App not found');
+  const baseRevision = (body as { baseRevision?: number } | undefined)?.baseRevision;
+  if (baseRevision !== draft.revision) throw new MockHttpError(409, 'APP_DRAFT_CONFLICT', 'App draft revision changed', { currentRevision: draft.revision });
+  if (Object.keys(draft.files).length === 0) throw new MockHttpError(400, 'APP_DRAFT_EMPTY', 'App draft is empty; upload files before publishing');
+  const version = versionOf(draft.files);
+  const releases = releasesOf(appId);
+  const existing = releases.find((release) => release.packageVersion === version);
+  if (existing !== undefined && existing.sourceFilesDigest !== draft.digest) {
+    throw new MockHttpError(409, 'RELEASE_VERSION_CONFLICT', `Version ${version} already exists with different content`);
+  }
+  const createdAt = iso(NOW + (releases.length + 1) * 1_000);
+  const release: AppRelease = existing ?? {
+    packageVersion: version,
+    releaseRef: `release://${appId}-${stableHex(`${appId}@${version}:${draft.digest}`, 12)}`,
+    releaseId: sha(`release:${appId}@${version}:${draft.digest}`),
+    contentDigest: sha(`content:${appId}@${version}:${draft.digest}`),
+    lockDigest: sha(`lock:${appId}@${version}:${draft.digest}`),
+    compilerBuild: 'mock-compiler/1.0.0',
+    createdAt,
+    sourceFilesDigest: draft.digest,
+    manifest: manifestFor(appId, version)
+  };
+  if (existing === undefined) mockReleases.set(appId, [release, ...releases]);
+  refreshSummary(appId);
+  return {
+    schemaVersion: 'AppReleaseResult.v1', status: existing === undefined ? 'stored' : 'existing',
+    appId, packageVersion: release.packageVersion, releaseRef: release.releaseRef, releaseId: release.releaseId,
+    contentDigest: release.contentDigest, lockDigest: release.lockDigest, compilerBuild: release.compilerBuild,
+    sourceFilesDigest: release.sourceFilesDigest ?? draft.digest, createdAt: release.createdAt
+  };
+}
+
+/** Resolve any mock request. Writes keep in-memory app state; unknown writes fall back to read-only errors in `api.ts`. */
+export function mockSend(method: string, path: string, body?: unknown, query: MockQuery = {}): unknown {
   const p = path.split('?')[0]!;
-  if (p === '/v1/provider-catalog/check-connection') {
+  if (method === 'GET') return mockRead(path, query);
+  if (method === 'POST' && p === '/v1/apps') return createMockApp(body);
+  let r = p.match(/^\/v1\/apps\/([^/]+)\/draft$/);
+  if (method === 'PUT' && r) return putMockDraft(decodeURIComponent(r[1]!), body);
+  r = p.match(/^\/v1\/apps\/([^/]+)\/releases$/);
+  if (method === 'POST' && r) return publishMockRelease(decodeURIComponent(r[1]!), body);
+  r = p.match(/^\/v1\/apps\/([^/]+)$/);
+  if (method === 'PATCH' && r) {
+    const app = appSummaryOf(decodeURIComponent(r[1]!));
+    if (app === undefined) throw new MockHttpError(404, 'APP_NOT_FOUND', 'App not found');
+    const input = body as { name?: string; description?: string } | undefined;
+    if (input?.name !== undefined) app.name = input.name;
+    if (input?.description !== undefined) app.description = input.description;
+    app.updatedAt = iso(NOW);
+    return app;
+  }
+  if (method === 'DELETE' && r) {
+    const appId = decodeURIComponent(r[1]!);
+    const index = mockApps.findIndex((app) => app.appId === appId);
+    if (index >= 0) mockApps.splice(index, 1);
+    mockDrafts.delete(appId);
+    mockReleases.delete(appId);
+    return { schemaVersion: 'AppDelete.v1', appId, status: 'deleted' };
+  }
+  if (method === 'POST' && p === '/v1/provider-catalog/check-connection') {
     const apiKey = (body as { apiKey?: string } | undefined)?.apiKey;
     return apiKey ? { status: 'connected', checkedAt: iso(NOW), message: 'Connected' } : { status: 'unauthorized', checkedAt: iso(NOW), message: 'API key was rejected' };
+  }
+  return undefined;
+}
+
+const encoder = new TextEncoder();
+
+/** Minimal ustar writer so mock downloads are real tar.gz archives. */
+function tarHeader(name: string, size: number): Uint8Array<ArrayBuffer> {
+  const header = new Uint8Array(512);
+  const write = (offset: number, value: string) => header.set(encoder.encode(value), offset);
+  write(0, name.slice(0, 100));
+  write(100, '0000644\0');
+  write(108, '0000000\0');
+  write(116, '0000000\0');
+  write(124, `${size.toString(8).padStart(11, '0')}\0`);
+  write(136, `${Math.floor(NOW / 1000).toString(8).padStart(11, '0')}\0`);
+  write(148, '        ');
+  header[156] = '0'.charCodeAt(0);
+  write(257, 'ustar\0');
+  write(263, '00');
+  let checksum = 0;
+  for (const byte of header) checksum += byte;
+  write(148, `${checksum.toString(8).padStart(6, '0')}\0 `);
+  return header;
+}
+
+async function archive(files: Record<string, string>): Promise<Blob> {
+  const chunks: BlobPart[] = [];
+  for (const [name, content] of Object.entries(files)) {
+    const bytes = new Uint8Array(encoder.encode(content));
+    const padding = (512 - (bytes.length % 512)) % 512;
+    chunks.push(tarHeader(name, bytes.length), bytes);
+    if (padding > 0) chunks.push(new Uint8Array(padding));
+  }
+  chunks.push(new Uint8Array(1024));
+  const raw = new Blob(chunks, { type: 'application/gzip' });
+  if (typeof CompressionStream === 'undefined') return raw;
+  return await new Response(raw.stream().pipeThrough(new CompressionStream('gzip'))).blob();
+}
+
+/** Mock archive downloads (draft export + release source/bundle export). */
+export async function mockDownload(path: string): Promise<Blob | undefined> {
+  const p = path.split('?')[0]!;
+  let r = p.match(/^\/v1\/apps\/([^/]+)\/draft\/export$/);
+  if (r) {
+    const draft = draftOf(decodeURIComponent(r[1]!));
+    return draft === undefined ? undefined : await archive(draft.files);
+  }
+  r = p.match(/^\/v1\/apps\/([^/]+)\/releases\/([^/]+)\/export$/);
+  if (r) {
+    const appId = decodeURIComponent(r[1]!);
+    const release = releasesOf(appId).find((entry) => entry.releaseId === decodeURIComponent(r![2]!));
+    if (release === undefined) return undefined;
+    const files = sourceFilesFor(appId, release.packageVersion);
+    const query = new URLSearchParams(path.split('?')[1] ?? '');
+    if (query.get('format') === 'bundle') files['release.json'] = `${JSON.stringify(release, null, 2)}\n`;
+    return await archive(files);
   }
   return undefined;
 }

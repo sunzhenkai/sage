@@ -7,6 +7,7 @@ import { ChatStore } from '@sage/chat-domain';
 import { CHAT_SLICE_SYSTEM_PROMPT, createLivePackageAgentClient, createLocalKernelComposition, PACKAGE_RUN_SYSTEM_PROMPT, type LiveProviderRoute } from '@sage/local-runtime';
 import { createLocalSecretBackendFromEnv } from '@sage/secret-vault';
 import { LegacyAgentRunSpecV1Adapter, parseAgentExecutionFeatureConfig, selectAgentExecutionMode, type AgentExecutionMode, type AgentLifecycleOwner, type LegacyAdapterResult } from '@sage/agent-client';
+import { PostgresAgentStateAdapter } from '@sage/agent-state-postgres';
 import { PostgresTaskStore } from '@sage/task-store-postgres';
 import { TASK_NAMESPACE, TASK_QUEUE, type TaskInputRef } from '@sage/task-domain';
 import { createAgentTaskActivities, type TaskSliceInputResolver } from './activities.js';
@@ -47,14 +48,17 @@ export function readWorkerRuntimeConfig(): WorkerRuntimeConfig {
 async function migrateStores(connectionString: string, chat: ChatStore, tasks: PostgresTaskStore): Promise<void> {
   const pool = new Pool({ connectionString, connectionTimeoutMillis: 2_000 });
   const client = await pool.connect();
+  const agentState = new PostgresAgentStateAdapter({ connectionString, connectionTimeoutMillis: 2_000 });
   try {
     await client.query('SELECT pg_advisory_lock(845231001)');
     await chat.migrate();
     await tasks.migrate();
+    await agentState.migrate();
   } finally {
     await client.query('SELECT pg_advisory_unlock(845231001)').catch(() => undefined);
     client.release();
     await pool.end();
+    await agentState.close().catch(() => undefined);
   }
 }
 

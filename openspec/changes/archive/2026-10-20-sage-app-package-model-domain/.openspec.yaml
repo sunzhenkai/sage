@@ -1,0 +1,4 @@
+schema: spec-driven
+skip_specs: true
+created: 2026-10-20
+goal: 在 agent-release-registry 落地 App 草稿/revision、发布与版本唯一契约

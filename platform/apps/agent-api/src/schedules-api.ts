@@ -7,6 +7,7 @@ import {
 } from '@sage/app-contracts';
 import { assertScheduleDefinition, scheduleDefinitionDigest, type ScheduleControlStore, type SchedulePort, type ScheduleRef, type ScheduleSnapshot } from '@sage/platform-ports';
 import type { AuthenticatedPrincipal } from '@sage/app-contracts';
+import type { AppStatusLookup } from './app-status.js';
 
 /**
  * /v1/schedules：创建/列表/详情/暂停/恢复/删除/触发历史。
@@ -20,7 +21,7 @@ export interface ScheduleApiAuditPort {
 
 export interface ScheduleApiReleaseResolver {
   resolveRelease(tenantId: string, releaseId: string): Promise<{
-    readonly release: { readonly releaseRef: string; readonly releaseId: string; readonly contentDigest: string };
+    readonly release: { readonly releaseRef: string; readonly releaseId: string; readonly contentDigest: string; readonly packageId: string };
     readonly manifest?: { readonly tasks?: readonly { readonly name: string }[]; readonly inputs?: readonly { readonly name: string; readonly type: 'string' | 'enum' | 'number'; readonly enum?: readonly (string | number)[]; readonly default?: string | number; readonly required: boolean }[] };
   } | undefined>;
 }
@@ -34,6 +35,8 @@ export interface RegisterSchedulesRoutesOptions {
   readonly store: ScheduleControlStore;
   readonly adapter: SchedulePort;
   readonly releaseResolver: ScheduleApiReleaseResolver;
+  /** App 准入：锚点 Release 所属 App 软删/缺失时拒绝创建调度。 */
+  readonly appStatus?: AppStatusLookup;
   /** 运行时注入的身份解析器；当前为固定开发 principal，后续换成用户登录/鉴权。 */
   readonly authenticator: SchedulesPrincipalAuthenticator;
   readonly audit: ScheduleApiAuditPort;
@@ -81,6 +84,9 @@ export function registerSchedulesRoutes(app: FastifyInstance, options: RegisterS
     // 创建时绑定校验：按当时 Release 校验 task 存在与 params 合法（spec: ai-app-schedule-plane）。
     const resolved = await options.releaseResolver.resolveRelease(options.tenantId, releaseId);
     if (resolved === undefined) return sendError(reply, 404, 'SCHEDULE_VALIDATION_FAILED', `Anchor release ${releaseId} not found`);
+    if (options.appStatus !== undefined && options.appStatus.getApp(options.tenantId, resolved.release.packageId) === undefined) {
+      return sendError(reply, 400, 'SCHEDULE_VALIDATION_FAILED', `Anchor release ${releaseId} belongs to a deleted app`);
+    }
     const violations: string[] = [];
     const declaredTasks = resolved.manifest?.tasks ?? [];
     if (declaredTasks.length > 0 && !declaredTasks.some(task => task.name === definition.invocation.task)) {

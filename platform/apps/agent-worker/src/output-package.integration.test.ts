@@ -137,4 +137,12 @@ describe('package output materialization', () => {
     await expect(activities.executeAgentSlice(input('task-missing'))).rejects.toMatchObject({ type: 'PACKAGE_OUTPUT_MISSING_FILE' });
     expect(store.failed[0]).toMatchObject({ outcome: 'failed', failureCode: 'PACKAGE_OUTPUT_MISSING_FILE' });
   });
+
+  it('does not invent declared files from chat text when the output directory is empty', async () => {
+    const store = fakeStore();
+    const activities = activitiesOf(store, { writeFiles: () => undefined });
+    await expect(activities.executeAgentSlice(input('task-refusal'))).rejects.toMatchObject({ type: 'PACKAGE_OUTPUT_MISSING_FILE' });
+    expect(store.failed[0]).toMatchObject({ outcome: 'failed', failureCode: 'PACKAGE_OUTPUT_MISSING_FILE' });
+    expect(store.committed).toHaveLength(0);
+  });
 });

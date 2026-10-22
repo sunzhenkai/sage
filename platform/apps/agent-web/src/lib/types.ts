@@ -38,8 +38,13 @@ export interface RunLogAttempt { runId: string; attemptId: string; [key: string]
 export interface RunLogEvent { eventId: string; runId: string; attemptId: string; sequence: number; type: string; payload: Record<string, unknown>; [key: string]: unknown }
 export interface RunLogPage { attempts: RunLogAttempt[]; selected?: { runId: string; attemptId: string }; events: RunLogEvent[]; nextFromSequence?: number }
 
-// ---- apps / packages ----
-export interface AppSummary { appId: string; status: string; releaseCount: number; latestVersion?: string; createdAt: string; updatedAt: string }
+// ---- apps ----
+export interface AppSummary {
+  appId: string; name?: string; description?: string; status: string;
+  draftRevision: number; draftDigest: string;
+  releaseCount: number; latestVersion?: string; hasUnpublishedChanges: boolean;
+  createdAt: string; updatedAt: string;
+}
 export interface AppManifestInput {
   name: string; type: string; required: boolean; enum?: (string | number)[]; default?: string | number;
 }
@@ -53,10 +58,32 @@ export interface AppManifest {
 export interface AppAsset { relativePath: string; kind: string; digest: string; bytes: number; preview?: string }
 export interface AppRelease {
   packageVersion: string; releaseRef: string; releaseId: string; contentDigest: string; lockDigest: string; compilerBuild: string; createdAt: string;
+  sourceFilesDigest?: string;
   manifest?: AppManifest;
 }
-export interface AppDetail {
-  appId: string; status: string; createdAt: string; manifest?: AppManifest; assets?: AppAsset[]; releases: AppRelease[];
+export interface AppCreateResult {
+  schemaVersion?: 'App.v1'; appId: string; name?: string; description?: string; status: string;
+  draftRevision: number; draftDigest: string; createdAt: string;
+}
+
+export interface AppDetail extends AppSummary {
+  manifest?: AppManifest; assets?: AppAsset[]; releases: AppRelease[];
+}
+export interface AppDraft {
+  schemaVersion: 'AppDraft.v1'; appId: string; revision: number; digest: string;
+  files: Record<string, string>; updatedAt: string;
+}
+export interface AppReleaseProvenance {
+  compilerRef: string; compilerDigest: string; compilerBuild: string; sourceDigest: string; lockDigest: string;
+  sbomDigest: string; provenanceDigest: string; policyDigest: string; signatureDigest: string;
+}
+export interface AppReleaseDetail extends AppRelease {
+  schemaVersion: 'AppReleaseDetail.v1'; appId: string; provenance: AppReleaseProvenance; assets?: AppAsset[];
+}
+export interface AppReleaseResult {
+  schemaVersion: 'AppReleaseResult.v1'; status: 'stored' | 'existing'; appId: string; packageVersion: string;
+  releaseRef: string; releaseId: string; contentDigest: string; lockDigest: string; compilerBuild: string;
+  sourceFilesDigest: string; createdAt: string;
 }
 export type AppRunStatus = TaskStatus | 'pending';
 export interface AppRun {
@@ -68,11 +95,6 @@ export interface AppRunDetail { schemaVersion: 'AppRunDetail.v1'; appId: string;
 export interface PackageRunResult {
   schemaVersion: 'PackageRunResult.v1'; status: 'admitted' | 'existing'; taskId: string; runId: string; attemptId: string;
   releaseRef: string; releaseId: string; specRef: string; specDigest: string; inputRef: string;
-}
-export interface PackageSummary { packageId: string; latestVersion?: string; releaseCount: number; latestContentDigest?: string; updatedAt: string }
-export interface PackageDetail {
-  packageId: string; manifest?: AppManifest; assets?: AppAsset[];
-  releases: Omit<AppRelease, 'manifest'>[];
 }
 
 // ---- schedules (apps/agent-api/src/schedules-api.ts) ----

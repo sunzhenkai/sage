@@ -83,10 +83,16 @@ async function api(options: { readonly authenticated?: boolean; readonly harness
   return { app, store, harness };
 }
 
+async function publishVersion(app: Awaited<ReturnType<typeof api>>['app'], appId: string, version: string) {
+  const draft = await app.inject({ method: 'PUT', url: `/v1/apps/${appId}/draft`, payload: { files: filesFor(appId, version) } });
+  const baseRevision = (draft.json() as { revision: number }).revision;
+  return app.inject({ method: 'POST', url: `/v1/apps/${appId}/releases`, payload: { baseRevision } });
+}
+
 async function seedApp(app: Awaited<ReturnType<typeof api>>['app']) {
   await app.inject({ method: 'POST', url: '/v1/apps', payload: { appId: 'demo-app', name: 'Demo' } });
-  const v1 = await app.inject({ method: 'POST', url: '/v1/apps/demo-app/releases', payload: { files: filesFor('demo-app', '1.0.0') } });
-  const v2 = await app.inject({ method: 'POST', url: '/v1/apps/demo-app/releases', payload: { files: filesFor('demo-app', '2.0.0') } });
+  const v1 = await publishVersion(app, 'demo-app', '1.0.0');
+  const v2 = await publishVersion(app, 'demo-app', '2.0.0');
   return {
     v1: v1.json() as { releaseId: string },
     v2: v2.json() as { releaseId: string }
@@ -169,7 +175,7 @@ describe('App run history API', () => {
     const { app } = await api({ harness });
     const releases = await seedApp(app);
     await app.inject({ method: 'POST', url: '/v1/apps', payload: { appId: 'other-app', name: 'Other' } });
-    const other = await app.inject({ method: 'POST', url: '/v1/apps/other-app/releases', payload: { files: filesFor('other-app', '1.0.0') } });
+    const other = await publishVersion(app, 'other-app', '1.0.0');
     const otherReleaseId = (other.json() as { releaseId: string }).releaseId;
 
     harness.inputs.set('tenant-local:task-detail', {
