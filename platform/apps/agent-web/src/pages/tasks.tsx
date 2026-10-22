@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Ban, CircleDot, Clock, Hash, ListChecks, Pause, Play, RefreshCw, RotateCw, Server, Tags } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
-import { Crumb, PageHeader, ViewTab, ViewTabs } from '@/components/layout/app-shell';
+import { Crumb, PageHeader, ViewTab } from '@/components/layout/app-shell';
 import { PageContent, PageDescription, Quiet, Section, SegmentedTabs } from '@/components/layout/page';
 import { ApprovalCard } from '@/components/bui/approval-card';
 import { Artifacts } from '@/components/bui/artifacts';
@@ -42,16 +42,14 @@ export function TasksPage() {
   const trend = Array.from({ length: 14 }, (_, i) => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - 13 + i); const key = d.toISOString().slice(0, 10);
     const inDay = all.filter((x) => String(x.projectionUpdatedAt ?? '').slice(0, 10) === key);
     return { label: shortDate(d), ...Object.fromEntries(trendSeries.map((s) => [s.key, inDay.filter((x) => x.status === s.key).length])) }; });
-  const statusFilter = (
-    <ViewTabs>
-      <ViewTab active={view === 'all'} onClick={() => setView('all')}>{t('tasks.tabs.all')}</ViewTab>
-      <ViewTab active={view === 'active'} onClick={() => setView('active')}>{t('tasks.tabs.active')}</ViewTab>
-      <ViewTab active={view === 'done'} onClick={() => setView('done')}>{t('tasks.tabs.done')}</ViewTab>
-    </ViewTabs>
-  );
   return (
     <>
       <PageHeader title={t('nav.tasks')}
+        tabs={<>
+          <ViewTab active={view === 'all'} onClick={() => setView('all')}>{t('tasks.tabs.all')}</ViewTab>
+          <ViewTab active={view === 'active'} onClick={() => setView('active')}>{t('tasks.tabs.active')}</ViewTab>
+          <ViewTab active={view === 'done'} onClick={() => setView('done')}>{t('tasks.tabs.done')}</ViewTab>
+        </>}
         actions={<Button variant="ghost" size="icon-sm" title={t('common.refresh')} onClick={() => void tasks.refetch()}><RefreshCw className={cn(tasks.isFetching && 'animate-spin')} /></Button>}
       />
       <PageContent width="wide">
@@ -77,7 +75,7 @@ export function TasksPage() {
                 }))} />
               </Section>
             ) : null}
-            <Section title={t('tasks.all.title')} description={t('tasks.all.description')} count={filtered.length} actions={statusFilter}>
+            <Section title={t('tasks.all.title')} description={t('tasks.all.description')} count={filtered.length}>
             {filtered.length === 0 ? <Quiet>{t('tasks.empty.hint')}</Quiet> : (
             <RecordsTable rows={filtered} getKey={(x) => x.taskId} onRowClick={(x) => { void navigate(`/tasks/${x.taskId}`); }}
               columns={[
