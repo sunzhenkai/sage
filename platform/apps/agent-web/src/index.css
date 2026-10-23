@@ -100,7 +100,7 @@ body {
 input:focus-visible, textarea:focus-visible, select:focus-visible { outline: none; }
 .tabular { font-variant-numeric: tabular-nums; }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 10px; border: 3px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-thumb { background-color: transparent; border-radius: 10px; border: 3px solid transparent; background-clip: content-box; transition: background-color 200ms linear; }
 ::-webkit-scrollbar-track { background: transparent; }
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 /* Centered dialogs get their x offset from Tailwind's `-translate-x-1/2` (`translate` property, v4).
@@ -147,11 +147,15 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 @utility gutter-x { padding-left: var(--gutter); padding-right: var(--gutter); }
 @utility readable { max-width: var(--readable); }
 
-/* ── Scrollbars: thin, themed, auto-hide without reflow ──────────────────
-   Width is constant (scrollbar-width: thin); only the thumb COLOR changes on hover/focus,
-   so showing/hiding never changes content width. Track is always transparent. */
+/* ── Scrollbars: thin, themed, hide after scroll idle without reflow ─────
+   Width is constant (scrollbar-width: thin). `installAutoHideScrollbars` adds
+   `.scrollbar-active` while a container is scrolling and removes it 1s after
+   the last scroll event. Only the thumb color changes, so show/hide never
+   changes content width. Track stays transparent. */
 :root { --scroll-thumb: oklch(0 0 0 / 0.22); --scroll-thumb-hover: oklch(0 0 0 / 0.36); }
 .dark { --scroll-thumb: oklch(1 0 0 / 0.2); --scroll-thumb-hover: oklch(1 0 0 / 0.34); }
 * { scrollbar-width: thin; scrollbar-color: transparent transparent; }
-*:hover, *:focus-within { scrollbar-color: var(--scroll-thumb) transparent; }
-html, body { scrollbar-color: var(--scroll-thumb) transparent; }
+.scrollbar-active { scrollbar-color: var(--scroll-thumb) transparent; }
+.scrollbar-active::-webkit-scrollbar-thumb { background-color: var(--scroll-thumb); }
+.scrollbar-active::-webkit-scrollbar-thumb:hover { background-color: var(--scroll-thumb-hover); }
+@media (prefers-reduced-motion: reduce) { ::-webkit-scrollbar-thumb { transition: none; } }

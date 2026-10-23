@@ -3,8 +3,11 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import { applyLocaleFromEnvironment } from './lib/i18n';
+import { installAutoHideScrollbars } from './lib/scrollbar-idle';
 import { applyTheme, getSettings } from './lib/settings';
 import './index.css';
+
+installAutoHideScrollbars();
 
 // Apply the interface language before the first render (persisted pref + ?lang= + browser languages).
 applyLocaleFromEnvironment();

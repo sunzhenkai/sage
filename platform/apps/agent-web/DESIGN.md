@@ -217,7 +217,7 @@
 | 尺寸 | `scrollbar-width: thin`，宽度恒定 |
 | 轨道 | 永远透明 |
 | 滑块 | `--scroll-thumb`（light `oklch(0 0 0 / .22)` / dark `oklch(1 0 0 / .2)`） |
-| 自动隐藏 | 默认滑块透明；容器 hover / focus-within 时变为 `--scroll-thumb`。只改变颜色，不改变宽度或 overflow → **显示/隐藏不引起重排** |
+| 自动隐藏 | 默认滑块透明。容器滚动时加上 `scrollbar-active`，滑块变为 `--scroll-thumb`；停止滚动 1s 后去掉该类，滑块回到透明。只改变颜色，不改变宽度或 overflow → **显示/隐藏不引起重排** |
 | 禁止 | 页面内自定义 `::-webkit-scrollbar` 宽度、hover 时切换 `overflow` |
 
 
