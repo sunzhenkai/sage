@@ -299,9 +299,9 @@ export const mockAppRuns: Record<string, AppRun[]> = Object.fromEntries(mockApps
 }));
 
 const providers = [
-  { id: 'conn-openai', name: 'openai-prod', source: 'user', adapterKind: 'openai-compatible', baseUrl: 'https://api.openai.com/v1', modelId: 'gpt-4o-mini', enabled: true, credentialPresent: true, createdAt: iso(NOW - 30 * DAY), updatedAt: iso(NOW - 2 * DAY) },
-  { id: 'conn-anthropic', name: 'anthropic', source: 'user', adapterKind: 'anthropic', baseUrl: 'https://api.anthropic.com', modelId: 'claude-sonnet', enabled: true, credentialPresent: true, createdAt: iso(NOW - 20 * DAY), updatedAt: iso(NOW - 6 * DAY) },
-  { id: 'conn-env', name: 'minimax-cn', source: 'deployment-env', adapterKind: 'openai-compatible', baseUrl: 'https://api.minimax.chat/v1', modelId: 'MiniMax-M3', enabled: true, credentialPresent: true, createdAt: iso(NOW - 40 * DAY), updatedAt: iso(NOW - 40 * DAY) }
+  { id: 'conn-openai', name: 'openai-prod', providerName: 'OpenAI', source: 'user', adapterKind: 'openai-compatible', baseUrl: 'https://api.openai.com/v1', modelId: 'gpt-4o-mini', models: ['gpt-4o-mini', 'gpt-5.4', 'gpt-5.4-mini'], enabled: true, credentialPresent: true, createdAt: iso(NOW - 30 * DAY), updatedAt: iso(NOW - 2 * DAY) },
+  { id: 'conn-anthropic', name: 'anthropic', providerName: 'Anthropic', source: 'user', adapterKind: 'anthropic', baseUrl: 'https://api.anthropic.com', modelId: 'claude-sonnet', models: ['claude-sonnet', 'claude-haiku-4-5'], enabled: true, credentialPresent: true, createdAt: iso(NOW - 20 * DAY), updatedAt: iso(NOW - 6 * DAY) },
+  { id: 'conn-env', name: 'minimax-cn', source: 'deployment-env', adapterKind: 'openai-compatible', baseUrl: 'https://api.minimax.chat/v1', modelId: 'MiniMax-M3', models: ['MiniMax-M3'], enabled: true, credentialPresent: true, createdAt: iso(NOW - 40 * DAY), updatedAt: iso(NOW - 40 * DAY) }
 ];
 
 // models.dev snapshot stand-in for the Add-connection provider/model pickers.
@@ -400,7 +400,7 @@ function mockRead(path: string, query: MockQuery): unknown {
   r = m(/^\/v1\/schedules\/([^/]+)\/triggers$/); if (r) return { schemaVersion: 'ScheduleTriggerHistory.v1', scheduleId: r[1], events: mockTriggers[decodeURIComponent(r[1]!)] ?? [] };
   r = m(/^\/v1\/schedules\/([^/]+)$/); if (r) return mockSchedules.find((s) => s.definition.scheduleId === decodeURIComponent(r![1]!));
   if (p === '/v1/provider-connections') return { schemaVersion: 'ProviderConnections.v1', connections: providers };
-  if (p === '/v1/run-agent/settings') return { schemaVersion: 'RunAgentSettings.v2', unset: false, providerConnectionId: 'conn-openai', updatedAt: iso(NOW - 2 * DAY), updatedBy: 'principal://demo', providers: providers.map((x) => ({ id: x.id, name: x.name, available: true })) };
+  if (p === '/v1/run-agent/settings') return { schemaVersion: 'RunAgentSettings.v2', unset: false, providerConnectionId: 'conn-openai', updatedAt: iso(NOW - 2 * DAY), updatedBy: 'principal://demo', providers: providers.map((x) => ({ id: x.id, name: x.name, modelId: x.modelId, models: x.models, available: true })) };
   if (p === '/v1/provider-catalog/status') return { source: 'models-dev', availability: 'available', projection: 'ready', providerCount: catalogProviders.length, modelCount: catalogModels.length, lastSuccessAt: iso(NOW - 6 * 3_600_000), nextSyncAt: iso(NOW + 18 * 3_600_000) };
   if (p === '/v1/provider-catalog/providers') {
     const { items, truncated } = catalogFilter(query, catalogProviders, (item) => `${item.name}\n${item.providerId}`, limitOf(query, 50));

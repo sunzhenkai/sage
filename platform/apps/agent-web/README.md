@@ -25,16 +25,15 @@ Settings live in `localStorage` (`sage.agent-web.settings`); older `serviceToken
 
 | Route | Endpoints |
 | --- | --- |
-| `/chat`, `/chat/:sessionId` | `GET/POST /v1/chat/sessions`, `GET/DELETE /v1/chat/sessions/:id`, `POST …/archive`, `POST …/unarchive`, `POST …/messages`, `GET …/events`, `GET …/timeline` (SSE, resumed via `afterSequence`), `POST /v1/chat/runs/:runId/retry`, `GET /v1/run-agent/settings` (provider picker) |
+| `/chat`, `/chat/:sessionId` | `GET/POST /v1/chat/sessions`, `GET/DELETE /v1/chat/sessions/:id`, `POST …/archive`, `POST …/unarchive`, `POST …/messages`, `GET …/events`, `GET …/timeline` (SSE, resumed via `afterSequence`), `POST /v1/chat/runs/:runId/retry`, `GET /v1/run-agent/settings` (model picker: `connection / model`, sends `provider: { connectionId, modelId }`) |
 | `/tasks` | `GET /v1/tasks?status&limit` |
 | `/tasks/:taskId` | `GET /v1/tasks/:id`, `GET …/events`, `GET …/run-logs`, `GET …/artifacts`, `GET …/artifacts/:artifactId`, `POST …/signals` (pause/resume), `POST …/cancel`, `POST …/retry` |
 | `/apps`, `/apps/:appId`, `/apps/:appId/releases/:releaseId` | `GET/POST /v1/apps`, `GET/PATCH/DELETE /v1/apps/:id`, `GET/PUT …/draft`, `POST …/draft/import` (multipart), `GET …/draft/export` (tar.gz), `GET/POST …/releases`, `GET …/releases/:releaseId`, `GET …/releases/:releaseId/export?format=source\|bundle`, `GET …/runs`, `POST /v1/releases/:releaseId/runs` |
 | `/schedules`, `/schedules/:id` | `GET/POST /v1/schedules`, `GET/DELETE /v1/schedules/:id`, `GET …/triggers`, `POST …/pause`, `POST …/resume` |
-| `/providers` | `GET/POST /v1/provider-connections`, `DELETE /v1/provider-connections/:id`, `GET/PUT /v1/run-agent/settings`, `GET /v1/provider-catalog/{status,providers,models}`, `POST /v1/provider-catalog/check-connection` |
+| `/providers` | `GET/POST /v1/provider-connections`, `PUT/DELETE /v1/provider-connections/:id`, `GET/PUT /v1/run-agent/settings`, `GET /v1/provider-catalog/{status,providers,models}`, `POST /v1/provider-catalog/check-connection` |
 | `/settings` | `GET /livez`, `GET /readyz` |
 
-Not surfaced (yet): `POST /v1/tasks` (needs a pre-staged `task-input://` ref), `PUT /v1/provider-connections/:id`
-(client method exists, no edit UI), `POST /v1/provider-catalog/sync` (requires the `provider-catalog-admin` role),
+Not surfaced (yet): `POST /v1/tasks` (needs a pre-staged `task-input://` ref), `POST /v1/provider-catalog/sync` (requires the `provider-catalog-admin` role),
 `POST /v1/chat/messages/:id/promotions`, `POST /v1/effects/resolutions`, `POST /v1/production/effects/:id/resolution`,
 `/internal/*`.
 
@@ -52,6 +51,7 @@ new example to the list in `src/lib/example-apps.ts` when adding one under `exam
 ## Notes
 
 - Add provider connection opens with a **From models.dev / Manual** toggle: the catalog mode searches the `/v1/provider-catalog` snapshot (debounced server-side `q`), auto-fills adapter (from the provider `npm` package) and base URL (model endpoint → provider `api` → known default for openai/anthropic/xai/mistral/groq/deepinfra/togetherai/cerebras/cohere), and keeps the base URL editable for proxies. `Test connection` probes `{baseUrl}/models` before creating.
+- A connection carries a default model (`modelId`) plus an allowed `models` list (default always included; at most 64). The connection dialog edits the list — add from the models.dev suggestions for that provider or any free-text id, promote another model to default, remove extras. The chat model picker groups options per connection and labels them `connection / model`; submit and retry send `{ connectionId, modelId }`, and the server rejects models outside the connection's list. Helpers live in `src/lib/connection-models.ts`.
 - Wire types are mirrored in `src/lib/types.ts` from `@sage/app-contracts` / `@sage/task-domain` / agent-api route
   code so the browser bundle has no server-side deps; `package-ownership.json` declares `agent-web` with no `@sage/*` deps.
 - SSE uses a `fetch` stream reader (not `EventSource`) so the bearer token can be sent; reconnects with backoff.

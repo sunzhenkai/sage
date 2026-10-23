@@ -140,6 +140,8 @@ describe('provider-routed Chat execution (reference-only, required)', () => {
     const inline = [
       { adapterKind: 'openai-compatible', baseUrl: 'https://provider.example', modelId: 'm', apiKey: 'k' },
       { connectionId: 'conn-live', apiKey: 'must-be-exclusive' },
+      { connectionId: 'conn-live', modelId: 'MiniMax-M3', baseUrl: 'https://provider.example' },
+      { connectionId: 'conn-live', modelId: '' },
       { connectionId: '' }
     ];
     for (const provider of inline) {
@@ -148,6 +150,47 @@ describe('provider-routed Chat execution (reference-only, required)', () => {
       expect(response.json().error.code).toBe('CHAT_INVALID_REQUEST');
     }
     expect(state.runs.size).toBe(0);
+    await app.close();
+  });
+
+  it('routes the selected model of a multi-model connection and defaults to the connection model', async () => {
+    const { store, state } = fakeChatStore();
+    const routes: LiveProviderRoute[] = [];
+    const app = await createChatApi({
+      store,
+      providerConnections: registryWith([{ id: 'conn-multi', modelId: 'MiniMax-M3', models: ['MiniMax-M3', 'MiniMax-M2.1'] }], { 'conn-multi': sealedFor('multi-key') }),
+      secretBackend: backend,
+      liveClientFactory: ({ route }) => { routes.push(route); return fakeClient('ok'); }
+    });
+    const picked = await app.inject({ method: 'POST', url: '/v1/chat/sessions/session-1/messages', payload: { parts: [{ kind: 'text', text: 'hi' }], provider: { connectionId: 'conn-multi', modelId: 'MiniMax-M2.1' } } });
+    expect(picked.statusCode).toBe(202);
+    await settle(() => state.completed.length > 0);
+    const fallback = await app.inject({ method: 'POST', url: '/v1/chat/sessions/session-1/messages', payload: { parts: [{ kind: 'text', text: 'hi' }], provider: { connectionId: 'conn-multi' } } });
+    expect(fallback.statusCode).toBe(202);
+    await settle(() => state.completed.length > 1);
+    expect(routes.map((route) => route.modelId)).toEqual(['MiniMax-M2.1', 'MiniMax-M3']);
+    expect(routes[0]).toMatchObject({ apiKey: 'multi-key', baseUrl: 'https://api.minimaxi.com/anthropic' });
+    await app.close();
+  });
+
+  it('rejects a model outside the connection allow-list before any Run starts', async () => {
+    const { store, state } = fakeChatStore();
+    const app = await createChatApi({
+      store,
+      // 存量条目（无 models 字段）按 [modelId] 解释。
+      providerConnections: registryWith([{ id: 'conn-multi', models: ['MiniMax-M3', 'MiniMax-M2.1'] }, { id: 'conn-legacy' }], { 'conn-multi': sealedFor('k'), 'conn-legacy': sealedFor('k') }),
+      secretBackend: backend,
+      liveClientFactory: () => { throw new Error('must not run'); }
+    });
+    for (const provider of [{ connectionId: 'conn-multi', modelId: 'gpt-4o' }, { connectionId: 'conn-legacy', modelId: 'MiniMax-M2.1' }]) {
+      const response = await app.inject({ method: 'POST', url: '/v1/chat/sessions/session-1/messages', payload: { parts: [{ kind: 'text', text: 'hi' }], provider } });
+      expect(response.statusCode).toBe(400);
+      expect(response.json().error.code).toBe('CHAT_INVALID_REQUEST');
+      expect(response.json().error.message).toContain(`model ${provider.modelId} is not enabled`);
+    }
+    const legacyDefault = await app.inject({ method: 'POST', url: '/v1/chat/sessions/session-1/messages', payload: { parts: [{ kind: 'text', text: 'hi' }], provider: { connectionId: 'conn-legacy', modelId: 'MiniMax-M3' } } });
+    expect(legacyDefault.statusCode).toBe(202);
+    expect(state.runs.size).toBe(1);
     await app.close();
   });
 
@@ -197,6 +240,31 @@ describe('provider-routed Chat execution (reference-only, required)', () => {
     await settle(() => state.completed.length > 0);
     expect(liveRoutes).toHaveLength(1);
     expect(liveRoutes[0]).toMatchObject({ apiKey: 'retry-key' });
+    await app.close();
+  });
+
+  it('applies the model selection on retry and rejects models outside the allow-list or extra fields', async () => {
+    const { store, state } = fakeChatStore();
+    await store.acceptUserMessage({ sessionId: 'session-1', messageId: 'message-1', runId: 'run-1', parts: [{ kind: 'text', text: '你好' }], now: new Date().toISOString() } as never);
+    const failedRun = state.runs.get('run-1');
+    if (failedRun) state.runs.set('run-1', { ...failedRun, status: 'failed' });
+    const liveRoutes: LiveProviderRoute[] = [];
+    const app = await createChatApi({
+      store,
+      providerConnections: registryWith([{ id: 'conn-multi', models: ['MiniMax-M3', 'MiniMax-M2.1'] }], { 'conn-multi': sealedFor('retry-key') }),
+      secretBackend: backend,
+      liveClientFactory: ({ route }) => { liveRoutes.push(route); return fakeClient('retry reply'); }
+    });
+    for (const provider of [{ connectionId: 'conn-multi', modelId: 'other-model' }, { connectionId: 'conn-multi', modelId: 'MiniMax-M2.1', apiKey: 'x' }, { connectionId: 'conn-multi', modelId: 7 }]) {
+      const rejected = await app.inject({ method: 'POST', url: '/v1/chat/runs/run-1/retry', payload: { provider } });
+      expect(rejected.statusCode).toBe(400);
+      expect(rejected.json().error.code).toBe('CHAT_INVALID_REQUEST');
+    }
+    expect(state.runs.size).toBe(1);
+    const response = await app.inject({ method: 'POST', url: '/v1/chat/runs/run-1/retry', payload: { provider: { connectionId: 'conn-multi', modelId: 'MiniMax-M2.1' } } });
+    expect(response.statusCode).toBe(202);
+    await settle(() => state.completed.length > 0);
+    expect(liveRoutes.map((route) => route.modelId)).toEqual(['MiniMax-M2.1']);
     await app.close();
   });
 

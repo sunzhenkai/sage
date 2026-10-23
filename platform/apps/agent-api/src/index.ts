@@ -17,7 +17,7 @@ import {
 } from '@sage/app-contracts';
 import { AgentObservability } from '@sage/observability';
 import { ChatStoreError, outputAsReferenceOnly, type ChatStore } from '@sage/chat-domain';
-import type { ProviderConnectionStore } from '@sage/task-domain';
+import { resolveConnectionModel, type ProviderConnectionStore } from '@sage/task-domain';
 import type { SecretBackend } from '@sage/secret-vault';
 import { registerChatPromotionRoute, type RegisterPromotionOptions } from './promotion.js';
 import { runChatAgentPath, type ChatCanonicalCompatibilityOptions } from './chat-compatibility.js';
@@ -63,9 +63,10 @@ const errorOf = (code: ChatError['code'], message: string, retryable: boolean): 
 const textOf = (parts: readonly MessagePart[]): string => parts.map((part) => part.kind === 'text' ? part.text : `[Artifact ${part.artifact.artifactRef}]`).join('\n');
 
 /**
- * Provider route（必需，仅引用形态）：`{ connectionId }` 从受信 provider 注册表解析
+ * Provider route（必需，仅引用形态）：`{ connectionId, modelId? }` 从受信 provider 注册表解析
  * （enabled + 凭据在场 → 服务端解密）。明文 key 只进入本次 Run 的内存路由，不落任何持久化。
- * - route 缺失 / 非引用形态：CHAT_INVALID_REQUEST（含修复指引）；
+ * modelId 缺省 = 条目默认模型；显式给出时必须属于条目允许的 models。
+ * - route 缺失 / 非引用形态 / 未知字段 / modelId 不在允许列表：CHAT_INVALID_REQUEST（含修复指引）；
  * - 引用解析失败（条目缺失、停用、无凭据、后端不可用）：CHAT_PROVIDER_DEPENDENCY_MISSING。
  */
 const resolveProviderSelection = async (
@@ -79,19 +80,25 @@ const resolveProviderSelection = async (
   if (value === null || typeof value !== 'object' || Array.isArray(value)) throw invalid('provider route must be an object with connectionId');
   const record = value as Record<string, unknown>;
   if (typeof record.connectionId !== 'string') throw invalid('inline provider routes are no longer accepted; use a workspace provider reference ({ connectionId })');
-  if (Object.keys(record).some((key) => key !== 'connectionId')) throw invalid('connectionId cannot be combined with other route fields');
+  if (Object.keys(record).some((key) => key !== 'connectionId' && key !== 'modelId')) throw invalid('connectionId can only be combined with modelId');
   const connectionId = record.connectionId;
   if (connectionId.length === 0 || connectionId.length > 128) throw invalid('connectionId must be 1-128 characters');
+  const requestedModel = record.modelId;
+  if (requestedModel !== undefined && (typeof requestedModel !== 'string' || requestedModel.length === 0 || requestedModel.length > 256)) {
+    throw invalid('modelId must be 1-256 characters when provided');
+  }
   const unavailable = (): ChatStoreError => new ChatStoreError('CHAT_PROVIDER_DEPENDENCY_MISSING', `provider connection ${connectionId} is missing, disabled, or has no stored credential`, false);
   if (providerConnections === undefined || secretBackend === undefined) throw unavailable();
   const connection = await providerConnections.getProviderConnection(tenantId, connectionId);
   if (connection === undefined || !connection.enabled) throw unavailable();
+  const modelId = resolveConnectionModel(connection, requestedModel);
+  if (modelId === undefined) throw invalid(`model ${requestedModel} is not enabled for provider connection ${connectionId}; pick one of the connection's models`);
   const sealed = await providerConnections.getProviderCredential(tenantId, connectionId);
   if (sealed === undefined) throw unavailable();
   let apiKey: string;
   try { apiKey = secretBackend.open({ ciphertext: sealed.ciphertext, keyVersion: sealed.keyVersion }); }
   catch { throw unavailable(); }
-  return { adapterKind: connection.adapterKind, baseUrl: connection.baseUrl, modelId: connection.modelId, apiKey };
+  return { adapterKind: connection.adapterKind, baseUrl: connection.baseUrl, modelId, apiKey };
 };
 
 const liveClient = (route: LiveProviderRoute, transcript: readonly LiveProviderTurnMessage[], liveClientFactory: CreateChatApiOptions['liveClientFactory']): Pick<LocalAgentClient, 'run'> =>

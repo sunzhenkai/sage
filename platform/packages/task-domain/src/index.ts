@@ -378,7 +378,10 @@ export interface ProviderConnectionRecord {
   readonly source: ProviderConnectionSource;
   readonly adapterKind: ProviderConnectionAdapterKind;
   readonly baseUrl: string;
+  /** 默认模型：未显式选择模型时使用；恒属于 models。 */
   readonly modelId: string;
+  /** 允许的模型 id 列表（含 modelId）；缺省（存量记录）按 [modelId] 解释，读取请用 connectionModels()。 */
+  readonly models?: readonly string[];
   readonly providerName?: string;
   readonly modelName?: string;
   readonly enabled: boolean;
@@ -402,11 +405,48 @@ export interface ProviderConnectionWrite {
   readonly adapterKind: ProviderConnectionAdapterKind;
   readonly baseUrl: string;
   readonly modelId: string;
+  /** 允许的模型 id 列表；缺省 = [modelId]。存储前经 normalizeConnectionModels 归一（去重、含默认模型）。 */
+  readonly models?: readonly string[];
   readonly providerName?: string;
   readonly modelName?: string;
   readonly enabled: boolean;
   readonly updatedBy?: string;
   readonly credential?: ProviderCredentialSealed;
+}
+
+/** 单条目允许的模型数上限与模型 id 长度上限（API 与存储层共用）。 */
+export const PROVIDER_CONNECTION_MAX_MODELS = 64;
+export const PROVIDER_CONNECTION_MODEL_ID_MAX_LENGTH = 256;
+
+const isModelId = (value: unknown): value is string =>
+  typeof value === 'string' && value.trim().length > 0 && value.length <= PROVIDER_CONNECTION_MODEL_ID_MAX_LENGTH;
+
+/**
+ * 归一条目模型列表：默认模型恒在首位，其余按输入顺序去重（trim 后比较）。
+ * 输入非法（非字符串、空串、超长、超出上限）返回 undefined，由调用方拒绝。
+ */
+export function normalizeConnectionModels(modelId: string, models: readonly unknown[] | undefined): readonly string[] | undefined {
+  if (!isModelId(modelId)) return undefined;
+  const result: string[] = [modelId];
+  for (const item of models ?? []) {
+    if (!isModelId(item)) return undefined;
+    const trimmed = item.trim();
+    if (!result.includes(trimmed)) result.push(trimmed);
+  }
+  return result.length > PROVIDER_CONNECTION_MAX_MODELS ? undefined : result;
+}
+
+/** 条目的有效模型列表：存量记录（无 models）按 [modelId] 解释，且默认模型恒包含在内。 */
+export function connectionModels(record: Pick<ProviderConnectionRecord, 'modelId' | 'models'>): readonly string[] {
+  const result: string[] = [record.modelId];
+  for (const item of record.models ?? []) if (typeof item === 'string' && item.length > 0 && !result.includes(item)) result.push(item);
+  return result;
+}
+
+/** 解析一次运行使用的模型：未指定 → 默认模型；指定但不在允许列表 → undefined（调用方拒绝）。 */
+export function resolveConnectionModel(record: Pick<ProviderConnectionRecord, 'modelId' | 'models'>, requested: string | undefined): string | undefined {
+  if (requested === undefined) return record.modelId;
+  return connectionModels(record).includes(requested) ? requested : undefined;
 }
 
 export interface ProviderConnectionStore {

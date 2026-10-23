@@ -23,6 +23,7 @@ class FakeRegistryStore implements ProviderConnectionStore, RunAgentSettingsStor
     if (this.connections.has(`${tenantId}/${id}`)) throw new Error('conflict');
     const record: ProviderConnectionRecord = {
       tenantId, id, name: write.name, source: write.source, adapterKind: write.adapterKind, baseUrl: write.baseUrl, modelId: write.modelId,
+      models: write.models ?? [write.modelId],
       ...(write.providerName === undefined ? {} : { providerName: write.providerName }),
       ...(write.modelName === undefined ? {} : { modelName: write.modelName }),
       enabled: write.enabled, credentialPresent: write.credential !== undefined,
@@ -37,6 +38,8 @@ class FakeRegistryStore implements ProviderConnectionStore, RunAgentSettingsStor
     if (existing === undefined) return undefined;
     const record: ProviderConnectionRecord = {
       ...existing, name: write.name, source: write.source, adapterKind: write.adapterKind, baseUrl: write.baseUrl, modelId: write.modelId,
+      // 与 Postgres 存储一致：models 缺省时保留既有列表。
+      models: write.models ?? existing.models ?? [existing.modelId],
       enabled: write.enabled, updatedAt,
       credentialPresent: write.credential !== undefined || this.credentials.has(`${tenantId}/${id}`),
       ...(write.updatedBy === undefined ? {} : { updatedBy: write.updatedBy })
@@ -134,6 +137,38 @@ describe('Provider connections API', () => {
     await app.close();
   });
 
+  it('stores an allowed model list with the default model first and de-duplicated', async () => {
+    const { app } = await api();
+    const created = await app.inject({ method: 'POST', url: '/v1/provider-connections', payload: createPayload({ models: ['MiniMax-M2.1', ' MiniMax-M2.1 ', 'MiniMax-M3'] }) });
+    expect(created.statusCode).toBe(201);
+    expect(created.json().connection).toMatchObject({ modelId: 'MiniMax-M3', models: ['MiniMax-M3', 'MiniMax-M2.1'] });
+    const legacy = await app.inject({ method: 'POST', url: '/v1/provider-connections', payload: createPayload({ name: 'legacy client' }) });
+    expect(legacy.json().connection.models).toEqual(['MiniMax-M3']);
+    await app.close();
+  });
+
+  it('rejects malformed model lists', async () => {
+    const { app } = await api();
+    for (const models of ['MiniMax-M3', [''], ['   '], [42], ['x'.repeat(257)], Array.from({ length: 65 }, (_, i) => `m-${i}`), Array.from({ length: 64 }, (_, i) => `m-${i}`)]) {
+      const response = await app.inject({ method: 'POST', url: '/v1/provider-connections', payload: createPayload({ models }) });
+      expect(response.statusCode, JSON.stringify(models).slice(0, 40)).toBe(400);
+      expect(response.json().error.code).toBe('PROVIDER_CONNECTION_INVALID_REQUEST');
+    }
+    await app.close();
+  });
+
+  it('replaces the model list on update and keeps it when an older client omits models', async () => {
+    const { app } = await api();
+    const created = await app.inject({ method: 'POST', url: '/v1/provider-connections', payload: createPayload({ models: ['MiniMax-M2.1'] }) });
+    const id = created.json().connection.id;
+    const switched = await app.inject({ method: 'PUT', url: `/v1/provider-connections/${id}`, payload: createPayload({ modelId: 'MiniMax-M2.1', models: ['MiniMax-M3', 'MiniMax-M4'], apiKey: undefined }) });
+    expect(switched.statusCode).toBe(200);
+    expect(switched.json().connection).toMatchObject({ modelId: 'MiniMax-M2.1', models: ['MiniMax-M2.1', 'MiniMax-M3', 'MiniMax-M4'] });
+    const metadataOnly = await app.inject({ method: 'PUT', url: `/v1/provider-connections/${id}`, payload: createPayload({ name: '改名', modelId: 'MiniMax-M2.1', apiKey: undefined }) });
+    expect(metadataOnly.json().connection.models).toEqual(['MiniMax-M2.1', 'MiniMax-M3', 'MiniMax-M4']);
+    await app.close();
+  });
+
   it('fails closed on credential writes when the secret backend is unavailable', async () => {
     const { app, store } = await api({ backend: false });
     const response = await app.inject({ method: 'POST', url: '/v1/provider-connections', payload: createPayload() });
@@ -216,6 +251,16 @@ describe('deployment-env bootstrap', () => {
     const fresh = new FakeRegistryStore();
     expect(await bootstrapDeploymentEnvProviderConnection(fresh, backend, {}, 'tenant-local')).toBe('skipped');
     expect(await fresh.listProviderConnections('tenant-local')).toHaveLength(0);
+  });
+
+  it('registers extra allowed models from SAGE_BOOTSTRAP_PROVIDER_MODELS', async () => {
+    const store = new FakeRegistryStore();
+    const backend = backendWithKey();
+    expect(await bootstrapDeploymentEnvProviderConnection(store, backend, { ...bootEnv, SAGE_BOOTSTRAP_PROVIDER_MODELS: 'model-v2, model-v1,,model-v3' }, 'tenant-local')).toBe('registered');
+    const [entry] = await store.listProviderConnections('tenant-local');
+    expect(entry).toMatchObject({ modelId: 'model-v1', models: ['model-v1', 'model-v2', 'model-v3'] });
+    expect(await bootstrapDeploymentEnvProviderConnection(store, backend, bootEnv, 'tenant-local')).toBe('registered');
+    expect((await store.listProviderConnections('tenant-local'))[0]?.models).toEqual(['model-v1']);
   });
 
   it('skips when baseUrl or model is missing — no vendor defaults apply', async () => {

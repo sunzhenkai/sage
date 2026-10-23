@@ -49,11 +49,11 @@ export const chatTools: readonly ToolDef[] = [
   },
   {
     name: 'chat_send_message',
-    description: 'Submit a user message to a chat session (async, returns 202 with run). Provider selection is by connectionId reference.',
+    description: 'Submit a user message to a chat session (async, returns 202 with run). Provider selection is by connectionId reference, with an optional modelId from that connection\'s models.',
     schema: {
       sessionId: z.string().min(1),
       parts: z.array(z.unknown()).min(1).max(32),
-      provider: z.object({ connectionId: z.string().min(1).max(128) }).optional(),
+      provider: z.object({ connectionId: z.string().min(1).max(128), modelId: z.string().min(1).max(256).optional() }).optional(),
     },
     build: (a) => ({
       method: 'POST',
@@ -66,7 +66,7 @@ export const chatTools: readonly ToolDef[] = [
     description: 'Retry a chat run (async, returns 202 with new run). Provider selection is required.',
     schema: {
       runId: z.string().min(1),
-      provider: z.object({ connectionId: z.string().min(1).max(128) }),
+      provider: z.object({ connectionId: z.string().min(1).max(128), modelId: z.string().min(1).max(256).optional() }),
     },
     build: (a) => ({ method: 'POST', path: `/v1/chat/runs/${a.runId}/retry`, body: { provider: a.provider } }),
   },

@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { Type, type Static } from 'typebox';
-import type { ProviderConnectionStore, RunAgentSettingsStore } from '@sage/task-domain';
+import { connectionModels, type ProviderConnectionStore, type RunAgentSettingsStore } from '@sage/task-domain';
 
 export interface RunAgentSettingsPrincipalAuthenticator {
   authenticateRequest?(request: FastifyRequest): { readonly principalId: string; readonly tenantId: string } | undefined;
@@ -24,6 +24,9 @@ export type UpdateRunAgentSettingsRequest = Static<typeof UpdateRunAgentSettings
 export interface RunAgentProviderStatus {
   readonly id: string;
   readonly name?: string;
+  /** 条目默认模型与允许的模型列表：供 Chat 模型选择器按条目分组展示。 */
+  readonly modelId?: string;
+  readonly models?: readonly string[];
   readonly available: boolean;
   readonly reason?: string;
 }
@@ -53,6 +56,8 @@ export const providerStatuses = async (
       statuses.push({
         id: entry.id,
         name: entry.name,
+        modelId: entry.modelId,
+        models: connectionModels(entry),
         available: entry.enabled && entry.credentialPresent,
         ...(entry.enabled && entry.credentialPresent ? {} : { reason: entry.credentialPresent ? 'Connection is disabled' : 'Connection has no stored credential' })
       });

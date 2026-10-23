@@ -116,16 +116,16 @@ describe('Run agent settings API', () => {
 
   it('GET derives availability from the registry only', async () => {
     const connections = new FakeConnectionStore();
-    connections.entries.set('tenant-local/conn-1', connectionRecord());
+    connections.entries.set('tenant-local/conn-1', connectionRecord({ models: ['MiniMax-M3', 'MiniMax-M2.1'] }));
     connections.entries.set('tenant-local/conn-2', connectionRecord({ id: 'conn-2', name: '停用条目', enabled: false }));
     connections.entries.set('tenant-local/conn-3', connectionRecord({ id: 'conn-3', name: '缺凭据条目', credentialPresent: false }));
     const { app } = await api({ connections });
     const response = await app.inject({ method: 'GET', url: '/v1/run-agent/settings' });
     const providers = response.json().providers;
     expect(providers).toEqual([
-      { id: 'conn-1', name: 'MiniMax 个人', available: true },
-      { id: 'conn-2', name: '停用条目', available: false, reason: 'Connection is disabled' },
-      { id: 'conn-3', name: '缺凭据条目', available: false, reason: 'Connection has no stored credential' }
+      { id: 'conn-1', name: 'MiniMax 个人', modelId: 'MiniMax-M3', models: ['MiniMax-M3', 'MiniMax-M2.1'], available: true },
+      { id: 'conn-2', name: '停用条目', modelId: 'MiniMax-M3', models: ['MiniMax-M3'], available: false, reason: 'Connection is disabled' },
+      { id: 'conn-3', name: '缺凭据条目', modelId: 'MiniMax-M3', models: ['MiniMax-M3'], available: false, reason: 'Connection has no stored credential' }
     ]);
     await app.close();
   });

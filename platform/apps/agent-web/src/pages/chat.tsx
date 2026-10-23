@@ -10,6 +10,7 @@ import { Empty, ErrorState, Kbd } from '@/components/ui/misc';
 import { LoadingState, formatElapsed } from '@/components/bui/loading-state';
 import { CardPane, PageColumn, PageContent, Quiet, SubPane } from '@/components/layout/page';
 import { PromptBar, UserBubble, type PromptMenuItem, type PromptModel } from '@/components/bui/prompt-bar';
+import { defaultSelectionKey, parseSelectionKey, pickerOptions } from '@/lib/connection-models';
 import { ArchiveToggle, SessionHeader, SessionList } from '@/components/bui/session-list';
 import { AgentResponse } from '@/components/bui/agent-response';
 import { StreamingText } from '@/components/bui/streaming-text';
@@ -112,7 +113,8 @@ function SessionView({ sessionId }: { sessionId: string }) {
   const t = useT();
   const detail = useQuery({ queryKey: ['chat', 'session', sessionId], queryFn: () => api.chat.getSession(sessionId) });
   const providers = useQuery({ queryKey: ['providers', 'settings'], queryFn: api.providers.settings, retry: false });
-  const [connectionId, setConnectionId] = useState<string>('');
+  /** Picker key for the chosen (connection, model) pair; '' = server default. */
+  const [selection, setSelection] = useState<string>('');
   const [events, setEvents] = useState<TimelineEvent[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [stream, setStream] = useState<StreamState>('connecting');
@@ -122,7 +124,13 @@ function SessionView({ sessionId }: { sessionId: string }) {
   const [tab, setTab] = useState<'chat' | 'runs'>('chat');
   const tasks = useQuery({ queryKey: ['tasks'], queryFn: () => api.tasks.list({ limit: 200 }), retry: false });
 
-  useEffect(() => { if (!connectionId && providers.data?.providerConnectionId) setConnectionId(providers.data.providerConnectionId); }, [providers.data, connectionId]);
+  // Start on the default connection's default model; fall back to it again when the chosen model disappears.
+  useEffect(() => {
+    const data = providers.data;
+    if (!data || (selection && pickerOptions(data.providers).some((option) => option.key === selection))) return;
+    const next = defaultSelectionKey(data.providers, data.providerConnectionId);
+    if (next !== selection) setSelection(next);
+  }, [providers.data, selection]);
 
   useEffect(() => {
     let stop: (() => void) | undefined;
@@ -144,10 +152,10 @@ function SessionView({ sessionId }: { sessionId: string }) {
   useEffect(() => { scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: 'smooth' }); }, [events.length]);
 
   const send = useMutation({
-    mutationFn: (text: string) => api.chat.submit(sessionId, text, connectionId || undefined),
+    mutationFn: (text: string) => api.chat.submit(sessionId, text, parseSelectionKey(selection)),
     onSuccess: () => { setDraft(''); void queryClient.invalidateQueries({ queryKey: ['chat', 'sessions'] }); }
   });
-  const retry = useMutation({ mutationFn: (runId: string) => api.chat.retryRun(runId, connectionId || undefined) });
+  const retry = useMutation({ mutationFn: (runId: string) => api.chat.retryRun(runId, parseSelectionKey(selection)) });
   const archive = useMutation({
     mutationFn: () => (detail.data?.session.archivedAt ? api.chat.unarchive(sessionId) : api.chat.archive(sessionId)),
     onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ['chat'] }); }
@@ -162,7 +170,10 @@ function SessionView({ sessionId }: { sessionId: string }) {
   const busy = groups.some((g) => (g.status ?? runs.get(g.runId)?.status) === 'active');
   const session = detail.data?.session;
   const submit = () => { const text = draft.trim(); if (text && !send.isPending) send.mutate(text); };
-  const models: PromptModel[] = (providers.data?.providers ?? []).map((p) => ({ id: p.id, label: p.name, disabled: !p.available }));
+  const models: PromptModel[] = pickerOptions(providers.data?.providers ?? []).map((option) => ({
+    id: option.key, label: option.label, group: option.connectionName, menuLabel: option.modelId ?? option.connectionName,
+    hint: option.isDefault && option.modelId !== undefined ? t('promptBar.defaultModel') : undefined, disabled: option.disabled
+  }));
   const sources: PromptMenuItem[] = (tasks.data?.tasks ?? []).slice(0, 8).map((task) => ({ key: task.taskId, icon: <ListChecks strokeWidth={1.75} />, label: task.taskId, hint: `${task.taskType ?? t('chat.sources.taskTypeFallback')} · ${task.status}`, insert: `@${task.taskId}` }));
   const commands: PromptMenuItem[] = [
     { key: 'new', icon: <Plus strokeWidth={1.75} />, label: '/new', hint: t('chat.commands.new'), run: () => { void navigate('/chat?new=1'); } },
@@ -205,7 +216,7 @@ function SessionView({ sessionId }: { sessionId: string }) {
       </CardPane>
       <PageColumn width="chat" className="pb-5 pt-3">
         <div>
-          <PromptBar value={draft} onChange={setDraft} onSubmit={submit} models={models} model={connectionId} onModel={setConnectionId} sources={sources} commands={commands} busy={send.isPending}
+          <PromptBar value={draft} onChange={setDraft} onSubmit={submit} models={models} model={selection} onModel={setSelection} sources={sources} commands={commands} busy={send.isPending}
             placeholder={isMock() ? t('chat.composer.mockPlaceholder') : t('chat.composer.placeholder')}
             status={send.error ? <span className="w-[220px] truncate text-[12px] text-red">{errorDisplay(send.error).text}</span> : busy ? <LoadingState label={t('status.running')} className="mr-1 scale-90" /> : null} />
         </div>

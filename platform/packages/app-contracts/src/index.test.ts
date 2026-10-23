@@ -136,6 +136,14 @@ describe('workspace payload boundaries and promotion eligibility', () => {
     expect(Value.Check(SubmitMessageRequestSchema, { parts: [{ kind: 'text', text: 'hi' }], provider: { adapterKind: 'anthropic', baseUrl: 'https://api.example.com', modelId: 'm', apiKey: 'k', connectionId: 'conn-1' } })).toBe(false);
     expect(Value.Check(RetryRunRequestSchema, { provider: { connectionId: 'conn-1' } })).toBe(true);
   });
+
+  it('accepts an optional modelId alongside the connection reference', () => {
+    expect(Value.Check(SubmitMessageRequestSchema, { parts: [{ kind: 'text', text: 'hi' }], provider: { connectionId: 'conn-1', modelId: 'gpt-4o' } })).toBe(true);
+    expect(Value.Check(RetryRunRequestSchema, { provider: { connectionId: 'conn-1', modelId: 'gpt-4o' } })).toBe(true);
+    expect(Value.Check(SubmitMessageRequestSchema, { parts: [{ kind: 'text', text: 'hi' }], provider: { connectionId: 'conn-1', modelId: '' } })).toBe(false);
+    expect(Value.Check(SubmitMessageRequestSchema, { parts: [{ kind: 'text', text: 'hi' }], provider: { modelId: 'gpt-4o' } })).toBe(false);
+    expect(Value.Check(RetryRunRequestSchema, { provider: { connectionId: 'conn-1', modelId: 'm'.repeat(257) } })).toBe(false);
+  });
 });
 
 

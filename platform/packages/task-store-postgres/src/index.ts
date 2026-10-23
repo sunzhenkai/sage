@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { Pool, type PoolClient, type PoolConfig, type QueryResultRow } from 'pg';
 import {
-  isAgentSliceResult, isRouteDecision, isTaskProjection, isTaskRoutingRecord,
+  connectionModels, isAgentSliceResult, normalizeConnectionModels, isRouteDecision, isTaskProjection, isTaskRoutingRecord,
   type AgentSliceResult, type ExecuteAgentSliceInput, type ProviderConnectionAdapterKind, type ProviderConnectionRecord, type ProviderConnectionSource,
   type ProviderConnectionWrite, type ProviderCredentialSealed, type RouteDecision,
   type RunAgentSettingsRecord,
@@ -70,6 +70,8 @@ interface RunAgentSettingsRow extends QueryResultRow {
 interface ProviderConnectionRow extends QueryResultRow {
   tenant_id: string; id: string; name: string; source: ProviderConnectionSource;
   adapter_kind: ProviderConnectionAdapterKind; base_url: string; model_id: string;
+  /** 009 迁移新增；空数组 = 旧二进制写入的行，读取时按 [model_id] 解释。 */
+  models: string[] | null;
   provider_name: string | null; model_name: string | null; enabled: boolean;
   credential_present: boolean; created_at: Date | string; updated_at: Date | string; updated_by: string | null;
 }
@@ -125,7 +127,8 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
       new URL('../../task-domain/migrations/005_run_agent_settings.sql', import.meta.url),
       new URL('../../task-domain/migrations/006_provider_connections.sql', import.meta.url),
       new URL('../../task-domain/migrations/007_task_package_run_contract.sql', import.meta.url),
-      new URL('../../task-domain/migrations/008_output_package_and_failure.sql', import.meta.url)
+      new URL('../../task-domain/migrations/008_output_package_and_failure.sql', import.meta.url),
+      new URL('../../task-domain/migrations/009_provider_connection_models.sql', import.meta.url)
     ];
     const migrations = (await Promise.all(migrationUrls.map((url) => readFile(url, 'utf8'))))
       .map((sql) => sql.replace(/^\s*BEGIN;\s*/, '').replace(/\s*COMMIT;\s*$/, '').trim());
@@ -735,6 +738,7 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
       adapterKind: row.adapter_kind,
       baseUrl: row.base_url,
       modelId: row.model_id,
+      models: connectionModels({ modelId: row.model_id, models: row.models ?? [] }),
       ...(row.provider_name === null ? {} : { providerName: row.provider_name }),
       ...(row.model_name === null ? {} : { modelName: row.model_name }),
       enabled: row.enabled,
@@ -748,7 +752,7 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
   async listProviderConnections(tenantId: string): Promise<readonly ProviderConnectionRecord[]> {
     if (typeof tenantId !== 'string') throw new TaskStoreError('listProviderConnections.invalid');
     const result = await this.#query<ProviderConnectionRow>('listProviderConnections', `SELECT
-      c.tenant_id, c.id, c.name, c.source, c.adapter_kind, c.base_url, c.model_id,
+      c.tenant_id, c.id, c.name, c.source, c.adapter_kind, c.base_url, c.model_id, c.models,
       c.provider_name, c.model_name, c.enabled, c.created_at, c.updated_at, c.updated_by,
       (k.connection_id IS NOT NULL) AS credential_present
       FROM provider_connections c
@@ -760,7 +764,7 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
   async getProviderConnection(tenantId: string, id: string): Promise<ProviderConnectionRecord | undefined> {
     if (typeof tenantId !== 'string' || typeof id !== 'string') throw new TaskStoreError('getProviderConnection.invalid');
     const result = await this.#query<ProviderConnectionRow>('getProviderConnection', `SELECT
-      c.tenant_id, c.id, c.name, c.source, c.adapter_kind, c.base_url, c.model_id,
+      c.tenant_id, c.id, c.name, c.source, c.adapter_kind, c.base_url, c.model_id, c.models,
       c.provider_name, c.model_name, c.enabled, c.created_at, c.updated_at, c.updated_by,
       (k.connection_id IS NOT NULL) AS credential_present
       FROM provider_connections c
@@ -778,6 +782,7 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
     // 存储层只挡明显非法（非 https 前缀）；完整公网端点校验在 API 层（isPublicHttpsUrl）。
     if (typeof write.baseUrl !== 'string' || !write.baseUrl.startsWith('https://') || write.baseUrl.length > 2_048) return false;
     if (typeof write.modelId !== 'string' || write.modelId.length === 0 || write.modelId.length > 256) return false;
+    if (write.models !== undefined && (!Array.isArray(write.models) || normalizeConnectionModels(write.modelId, write.models) === undefined)) return false;
     if (typeof write.enabled !== 'boolean') return false;
     if (write.providerName !== undefined && (typeof write.providerName !== 'string' || write.providerName.length > 128)) return false;
     if (write.modelName !== undefined && (typeof write.modelName !== 'string' || write.modelName.length > 256)) return false;
@@ -800,12 +805,13 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
     try {
       await client.query('BEGIN');
       const inserted = await client.query<ProviderConnectionRow>(`INSERT INTO provider_connections
-        (tenant_id, id, name, source, adapter_kind, base_url, model_id, provider_name, model_name, enabled, created_at, updated_at, updated_by)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$11,$12)
+        (tenant_id, id, name, source, adapter_kind, base_url, model_id, provider_name, model_name, enabled, created_at, updated_at, updated_by, models)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$11,$12,$13)
         ON CONFLICT (tenant_id, id) DO NOTHING RETURNING
-        tenant_id, id, name, source, adapter_kind, base_url, model_id, provider_name, model_name, enabled, created_at, updated_at, updated_by`,
+        tenant_id, id, name, source, adapter_kind, base_url, model_id, models, provider_name, model_name, enabled, created_at, updated_at, updated_by`,
       [tenantId, id, write.name.trim(), write.source, write.adapterKind, write.baseUrl, write.modelId,
-        write.providerName ?? null, write.modelName ?? null, write.enabled, iso(createdAt), write.updatedBy ?? null]);
+        write.providerName ?? null, write.modelName ?? null, write.enabled, iso(createdAt), write.updatedBy ?? null,
+        [...normalizeConnectionModels(write.modelId, write.models)!]]);
       if (inserted.rows[0] === undefined) throw new TaskStoreError('createProviderConnection.conflict');
       if (write.credential !== undefined) {
         await client.query(`INSERT INTO provider_credentials (tenant_id, connection_id, ciphertext, key_version, updated_at)
@@ -833,11 +839,13 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
       await client.query('BEGIN');
       const updated = await client.query<ProviderConnectionRow>(`UPDATE provider_connections SET
         name=$3, source=$4, adapter_kind=$5, base_url=$6, model_id=$7, provider_name=$8, model_name=$9,
-        enabled=$10, updated_at=$11, updated_by=$12
+        enabled=$10, updated_at=$11, updated_by=$12, models=COALESCE($13::text[], models)
         WHERE tenant_id=$1 AND id=$2 RETURNING
-        tenant_id, id, name, source, adapter_kind, base_url, model_id, provider_name, model_name, enabled, created_at, updated_at, updated_by`,
+        tenant_id, id, name, source, adapter_kind, base_url, model_id, models, provider_name, model_name, enabled, created_at, updated_at, updated_by`,
       [tenantId, id, write.name.trim(), write.source, write.adapterKind, write.baseUrl, write.modelId,
-        write.providerName ?? null, write.modelName ?? null, write.enabled, iso(updatedAt), write.updatedBy ?? null]);
+        write.providerName ?? null, write.modelName ?? null, write.enabled, iso(updatedAt), write.updatedBy ?? null,
+        // models 缺省 = 保留既有列表（旧客户端只改元数据时不清空）；读取时默认模型恒并入。
+        write.models === undefined ? null : [...normalizeConnectionModels(write.modelId, write.models)!]]);
       const row = updated.rows[0];
       if (row === undefined) { await client.query('COMMIT'); return undefined; }
       let credentialPresent = false;

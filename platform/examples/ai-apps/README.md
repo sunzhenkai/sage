@@ -132,7 +132,8 @@ curl -sS http://127.0.0.1:9610/v1/apps/finance-briefing/releases -H 'x-authentic
 |----------|------|------|
 | `SAGE_BOOTSTRAP_PROVIDER_API_KEY` | 是（启用开关） | provider API key，密封后入库，不明文落盘 |
 | `SAGE_BOOTSTRAP_PROVIDER_BASE_URL` | 是 | 公共 HTTPS 端点（无默认值） |
-| `SAGE_BOOTSTRAP_PROVIDER_MODEL` | 是 | 模型名（无默认值） |
+| `SAGE_BOOTSTRAP_PROVIDER_MODEL` | 是 | 默认模型名（无默认值） |
+| `SAGE_BOOTSTRAP_PROVIDER_MODELS` | 否 | 额外允许的模型（逗号分隔），Chat 可在该条目下切换；默认模型恒包含在内 |
 | `SAGE_BOOTSTRAP_PROVIDER_NAME` | 否 | 条目显示名（缺省「部署环境 Provider」） |
 | `SAGE_BOOTSTRAP_PROVIDER_ADAPTER` | 否 | 适配器类型（缺省 `anthropic`，可选 `openai-compatible`） |
 

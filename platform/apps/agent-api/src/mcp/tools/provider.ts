@@ -80,12 +80,13 @@ export const providerConnectionTools: readonly ToolDef[] = [
   },
   {
     name: 'provider_connection_create',
-    description: 'Create a provider connection (apiKey sealed server-side).',
+    description: 'Create a provider connection (apiKey sealed server-side). modelId is the default model; optional models lists every allowed model id.',
     schema: {
       name: z.string().min(1),
       adapterKind: z.string().min(1),
       baseUrl: z.string().min(1),
       modelId: z.string().min(1),
+      models: z.array(z.string().min(1).max(256)).max(64).optional(),
       apiKey: z.string().min(1),
       providerName: z.string().optional(),
       modelName: z.string().optional(),
@@ -95,6 +96,7 @@ export const providerConnectionTools: readonly ToolDef[] = [
       path: '/v1/provider-connections',
       body: {
         name: a.name, adapterKind: a.adapterKind, baseUrl: a.baseUrl, modelId: a.modelId, apiKey: a.apiKey,
+        ...(a.models === undefined ? {} : { models: a.models }),
         ...(a.providerName === undefined ? {} : { providerName: a.providerName }),
         ...(a.modelName === undefined ? {} : { modelName: a.modelName }),
       },
@@ -109,6 +111,7 @@ export const providerConnectionTools: readonly ToolDef[] = [
       adapterKind: z.string().optional(),
       baseUrl: z.string().optional(),
       modelId: z.string().optional(),
+      models: z.array(z.string().min(1).max(256)).max(64).optional(),
       apiKey: z.string().optional(),
       providerName: z.string().optional(),
       modelName: z.string().optional(),
@@ -116,10 +119,13 @@ export const providerConnectionTools: readonly ToolDef[] = [
     build: (a) => ({
       method: 'PUT',
       path: `/v1/provider-connections/${a.id}`,
-      body: omitUndefined({
-        name: a.name, adapterKind: a.adapterKind, baseUrl: a.baseUrl, modelId: a.modelId,
-        apiKey: a.apiKey, providerName: a.providerName, modelName: a.modelName,
-      }),
+      body: {
+        ...omitUndefined({
+          name: a.name, adapterKind: a.adapterKind, baseUrl: a.baseUrl, modelId: a.modelId,
+          apiKey: a.apiKey, providerName: a.providerName, modelName: a.modelName,
+        }),
+        ...(a.models === undefined ? {} : { models: a.models }),
+      },
     }),
   },
   {

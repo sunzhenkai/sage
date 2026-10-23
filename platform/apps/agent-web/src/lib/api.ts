@@ -1,5 +1,6 @@
 import { isMock, MockHttpError, mockDownload, mockSend } from './mock';
 import { getSettings } from './settings';
+import type { ChatModelSelection } from './connection-models';
 import type {
   AppCreateResult, AppDetail, AppDraft, AppRelease, AppReleaseDetail, AppReleaseResult, AppRunDetail, AppRunList, AppSummary,
   CatalogModelPage, CatalogProviderPage, CatalogStatus, ChatRun, Message,
@@ -8,6 +9,10 @@ import type {
   RunLogPage, ScheduleDefinition, ScheduleSnapshot, ScheduleTriggerEvent, Session, SessionDetail, SessionList, TaskArtifact, TaskEvent,
   TaskStatus, TaskView, TimelineEvent
 } from './types';
+
+/** Chat provider reference: `modelId` only when a specific model of the connection was picked. */
+const providerBody = ({ connectionId, modelId }: ChatModelSelection): { connectionId: string; modelId?: string } =>
+  modelId === undefined || modelId === '' ? { connectionId } : { connectionId, modelId };
 
 export class ApiError extends Error {
   constructor(
@@ -111,10 +116,10 @@ export const api = {
     archive: (id: string) => request<Session>('POST', `/v1/chat/sessions/${enc(id)}/archive`),
     unarchive: (id: string) => request<Session>('POST', `/v1/chat/sessions/${enc(id)}/unarchive`),
     remove: (id: string) => request<void>('DELETE', `/v1/chat/sessions/${enc(id)}`),
-    submit: (id: string, text: string, connectionId?: string) => request<{ message: Message; run: ChatRun }>('POST', `/v1/chat/sessions/${enc(id)}/messages`, {
-      body: { parts: [{ kind: 'text', text }], ...(connectionId ? { provider: { connectionId } } : {}) }
+    submit: (id: string, text: string, provider?: ChatModelSelection) => request<{ message: Message; run: ChatRun }>('POST', `/v1/chat/sessions/${enc(id)}/messages`, {
+      body: { parts: [{ kind: 'text', text }], ...(provider ? { provider: providerBody(provider) } : {}) }
     }),
-    retryRun: (runId: string, connectionId?: string) => request<{ run: ChatRun }>('POST', `/v1/chat/runs/${enc(runId)}/retry`, { body: connectionId ? { provider: { connectionId } } : {} }),
+    retryRun: (runId: string, provider?: ChatModelSelection) => request<{ run: ChatRun }>('POST', `/v1/chat/runs/${enc(runId)}/retry`, { body: provider ? { provider: providerBody(provider) } : {} }),
     events: (id: string, afterSequence = 0) => request<{ events: TimelineEvent[] }>('GET', `/v1/chat/sessions/${enc(id)}/events`, { query: { afterSequence } }),
     timelineUrl: (id: string, afterSequence = 0) => apiUrl(`/v1/chat/sessions/${enc(id)}/timeline`, { afterSequence })
   },

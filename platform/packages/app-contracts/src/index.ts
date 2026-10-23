@@ -141,9 +141,11 @@ export type ChatProviderRoute = Static<typeof ChatProviderRouteSchema>;
 /**
  * Provider 引用形态（唯一合法形态）：connectionId 指向受信 provider 注册表条目，
  * 凭据在服务端密封，浏览器不带 key；只在 Chat 服务端提交边界解析。
+ * modelId 可选：须属于该条目允许的模型列表（models），缺省使用条目默认模型。
  */
 export const ChatProviderSelectionSchema = Type.Object({
-  connectionId: Type.String({ minLength: 1, maxLength: 128 })
+  connectionId: Type.String({ minLength: 1, maxLength: 128 }),
+  modelId: Type.Optional(Type.String({ minLength: 1, maxLength: 256 }))
 }, { $id: 'ChatProviderSelection.v2', additionalProperties: false });
 export type ChatProviderSelection = Static<typeof ChatProviderSelectionSchema>;
 

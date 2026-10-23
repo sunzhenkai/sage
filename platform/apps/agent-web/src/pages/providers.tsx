@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Check, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { PageHeader } from '@/components/layout/app-shell';
 import { CardRow, PageContent, PageDescription, Quiet, Section, SegmentedTabs, SettingsGroup, SettingsRow } from '@/components/layout/page';
@@ -16,6 +16,7 @@ import { api } from '@/lib/api';
 import { errorDisplay } from '@/lib/error-message';
 import { useT } from '@/lib/i18n';
 import { isMock, mockSeries } from '@/lib/mock';
+import { addModel, connectionModelList, extraModels, MAX_CONNECTION_MODELS, promoteDefault } from '@/lib/connection-models';
 import { adapterFromNpm, catalogBaseUrl, connectionName, isUsableBaseUrl, KNOWN_BASE_URLS } from '@/lib/provider-autofill';
 import type { CatalogModelItem, CatalogProviderItem, CatalogStatus, ProviderConnection, ProviderConnectionCheckResult, ProviderConnectionWrite } from '@/lib/types';
 import { cn, formatTime, relativeTime } from '@/lib/utils';
@@ -55,7 +56,7 @@ export function ProvidersPage() {
               <StatusIcon status={c.enabled && c.credentialPresent ? 'succeeded' : 'paused'} />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 text-[13px] text-fg">{c.name}{c.id === defaultId ? <Pill color="var(--accent)">{t('providers.connections.default')}</Pill> : null}{c.source === 'deployment-env' ? <Pill>{t('providers.connections.env')}</Pill> : null}</div>
-                <div className="mt-0.5 truncate text-[12px] text-muted">{c.providerName !== undefined ? `${c.providerName} · ` : ''}<Mono>{c.modelId}</Mono> · {c.adapterKind} · {c.baseUrl}</div>
+                <div className="mt-0.5 truncate text-[12px] text-muted">{c.providerName !== undefined ? `${c.providerName} · ` : ''}<Mono>{c.modelId}</Mono>{extraModels(c.modelId, c.models).length > 0 ? <span title={extraModels(c.modelId, c.models).join(', ')}> {t('providers.connections.moreModels', { count: extraModels(c.modelId, c.models).length })}</span> : null} · {c.adapterKind} · {c.baseUrl}</div>
               </div>
               <span className="text-[12px] text-faint">{relativeTime(c.updatedAt)}</span>
               <span className="flex w-[4.5rem] justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
@@ -133,6 +134,8 @@ function ConnectionForm({ catalog, existing, onDone }: { catalog: CatalogStatus 
   const [modelQuery, setModelQuery] = useState('');
   const [touched, setTouched] = useState({ name: editing, baseUrl: editing });
   const [probe, setProbe] = useState<ProviderConnectionCheckResult | undefined>();
+  /** Allowed models besides the default (form.modelId); submitted together as `models`. */
+  const [extras, setExtras] = useState<string[]>(() => existing === undefined ? [] : extraModels(existing.modelId, existing.models));
   const save = useMutation({
     mutationFn: (body: ProviderConnectionWrite) => editing
       ? api.providers.update(existing.id, body)
@@ -184,6 +187,7 @@ function ConnectionForm({ catalog, existing, onDone }: { catalog: CatalogStatus 
     setProvider(next);
     setModel(undefined);
     setModelQuery('');
+    setExtras([]);
     resetProbe();
     setForm((f) => normalized({
       ...f, providerName: next.name, modelId: '', modelName: undefined,
@@ -230,9 +234,10 @@ function ConnectionForm({ catalog, existing, onDone }: { catalog: CatalogStatus 
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
-    const body = normalized(form);
+    const body = { ...normalized(form), models: connectionModelList(form.modelId, extras) };
     if (editing && (body.apiKey === undefined || body.apiKey.trim() === '')) {
-      const { apiKey: _omit, ...rest } = body;
+      const rest: ProviderConnectionWrite = { ...body };
+      delete rest.apiKey;
       save.mutate(rest);
       return;
     }
@@ -272,6 +277,8 @@ function ConnectionForm({ catalog, existing, onDone }: { catalog: CatalogStatus 
       <Field label={t('providers.create.modelId')} hint={mode === 'catalog' ? t('providers.create.modelIdHint') : undefined}>
         <Input required value={form.modelId} onChange={(event) => { set('modelId')(event); setModel(undefined); }} placeholder="gpt-4o-mini" />
       </Field>
+      <ModelListField modelId={form.modelId} extras={extras} catalogProviderId={provider?.providerId} providerName={form.providerName}
+        onChange={(next) => { if (next.modelId !== form.modelId) { setForm((f) => normalized({ ...f, modelId: next.modelId, modelName: undefined })); setModel(undefined); resetProbe(); } setExtras(next.extras); }} />
       <Field label={t('providers.create.name')}><Input required value={form.name} onChange={set('name')} placeholder={t('providers.create.namePlaceholder')} /></Field>
       <Field label={t('providers.create.apiKey')} hint={editing ? t('providers.create.apiKeyKeep') : undefined}>
         <Input required={apiKeyRequired} type="password" autoComplete="off" value={form.apiKey ?? ''} onChange={set('apiKey')} placeholder={editing ? t('providers.create.apiKeyPlaceholder') : undefined} />
@@ -284,6 +291,74 @@ function ConnectionForm({ catalog, existing, onDone }: { catalog: CatalogStatus 
       {save.error ? <ErrorState error={save.error} /> : null}
       <div className="flex justify-end"><Button type="submit" disabled={save.isPending || !baseUrlValid || form.name.trim() === '' || form.modelId.trim() === '' || (apiKeyRequired && (form.apiKey ?? '').trim() === '')}>{editing ? t('common.save') : t('common.create')}</Button></div>
     </form>
+  );
+}
+
+/** Edits the connection's allowed models: default first, promote/remove others, add from catalog suggestions or free text. */
+function ModelListField({ modelId, extras, catalogProviderId, providerName, onChange }: {
+  modelId: string; extras: string[]; catalogProviderId?: string | undefined; providerName?: string | undefined;
+  onChange: (next: { modelId: string; extras: string[] }) => void;
+}) {
+  const t = useT();
+  const [query, setQuery] = useState('');
+  const search = useDebounced(query.trim());
+  const all = connectionModelList(modelId, extras);
+  const full = all.length >= MAX_CONNECTION_MODELS;
+  // Edit mode has no catalog pick: resolve the stored provider name back to a models.dev provider id.
+  const lookup = useQuery({
+    queryKey: ['providers', 'catalog', 'providers', 'lookup', providerName ?? ''],
+    queryFn: () => api.providers.catalogProviders({ limit: 20, q: providerName! }),
+    enabled: catalogProviderId === undefined && providerName !== undefined && providerName.trim() !== '',
+    retry: false
+  });
+  const providerId = catalogProviderId ?? lookup.data?.items.find((item) => item.name === providerName || item.providerId === providerName)?.providerId;
+  const suggestions = useQuery({
+    queryKey: ['providers', 'catalog', 'models', 'suggest', providerId ?? '', search],
+    queryFn: () => api.providers.catalogModels({ providerId: providerId!, status: 'all', limit: 60, ...(search === '' ? {} : { q: search }) }),
+    enabled: providerId !== undefined,
+    retry: false
+  });
+  const trimmed = query.trim();
+  const options: ComboboxOption[] = [
+    ...(trimmed !== '' && !all.includes(trimmed) && !(suggestions.data?.items ?? []).some((item) => item.modelId === trimmed)
+      ? [{ value: trimmed, label: t('providers.create.useCustom', { model: trimmed }), hint: t('providers.create.customModelId') }]
+      : []),
+    ...(suggestions.data?.items ?? []).filter((item) => !all.includes(item.modelId)).map((item) => ({
+      value: item.modelId,
+      label: item.name,
+      ...(item.modelId === item.name ? {} : { hint: item.modelId }),
+      ...(item.status === 'active' ? {} : { meta: <Pill>{item.status}</Pill> })
+    }))
+  ];
+  const hint = full ? t('providers.create.modelsLimit', { max: MAX_CONNECTION_MODELS }) : providerId !== undefined ? t('providers.create.addModelCatalogHint') : t('providers.create.modelsHint');
+  return (
+    <Field label={`${t('providers.create.models')} · ${t('providers.create.modelsCount', { count: all.length })}`} hint={hint}>
+      <div className="flex w-full flex-col gap-1.5">
+        {all.length > 0 ? (
+          <div className="divide-y divide-line rounded-control border border-line-strong">
+            {all.map((id) => {
+              const isDefault = id === modelId.trim();
+              return (
+                <div key={id} className="group flex h-8 items-center gap-2 px-2.5">
+                  <Mono className="min-w-0 flex-1 truncate text-[12.5px] text-ink">{id}</Mono>
+                  {isDefault ? <Pill color="var(--accent)">{t('providers.create.defaultBadge')}</Pill> : (
+                    <span className="flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                      <Button type="button" size="icon-sm" variant="ghost" title={t('providers.create.makeDefaultModel')} aria-label={t('providers.create.makeDefaultModel')} onClick={() => onChange(promoteDefault(modelId, extras, id))}><Check /></Button>
+                      <Button type="button" size="icon-sm" variant="ghost" title={t('providers.create.removeModel', { model: id })} aria-label={t('providers.create.removeModel', { model: id })} onClick={() => onChange({ modelId, extras: extras.filter((item) => item !== id) })}><X /></Button>
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : null}
+        <Combobox display="" query={query} onQueryChange={setQuery} disabled={full || modelId.trim() === ''}
+          onSelect={(option) => onChange({ modelId, extras: addModel(modelId, extras, option.value) })}
+          options={options} placeholder={t('providers.create.addModel')} loading={suggestions.isLoading && providerId !== undefined}
+          error={errorText(suggestions.error)} empty={t('providers.create.addModelNoSuggestions')}
+          footer={suggestions.data?.nextCursor !== undefined ? t('providers.create.showingFirst60') : undefined} />
+      </div>
+    </Field>
   );
 }
 

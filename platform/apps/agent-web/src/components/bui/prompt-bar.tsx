@@ -5,7 +5,11 @@ import { useT } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
 export type PromptMenuItem = { key: string; icon?: ReactNode | undefined; label: ReactNode; hint?: ReactNode | undefined; insert?: string | undefined; run?: () => void | undefined; disabled?: boolean | undefined };
-export type PromptModel = { id: string; label: string; disabled?: boolean | undefined };
+/**
+ * One selectable model. `label` is shown on the trigger (e.g. `connection / model`);
+ * items sharing a `group` render under one group heading with `menuLabel` as the row text.
+ */
+export type PromptModel = { id: string; label: string; menuLabel?: string | undefined; group?: string | undefined; hint?: string | undefined; disabled?: boolean | undefined };
 
 function Menu({ items, footer, active, onPick }: { items: PromptMenuItem[]; footer: ReactNode; active: number; onPick: (i: PromptMenuItem) => void }) {
   const t = useT();
@@ -73,21 +77,33 @@ export function PromptBar({ value, onChange, onSubmit, placeholder, models, mode
           className="block max-h-[200px] min-h-8 flex-1 resize-none bg-transparent py-[7px] text-[14px] leading-[18px] text-ink outline-none placeholder:text-ink-3" />
         <div className="relative flex shrink-0 items-center gap-1">
           {status}
-          <button type="button" onClick={(e) => { e.stopPropagation(); setModelOpen((o) => !o); }} className="flex h-8 max-w-[180px] items-center gap-1 rounded-full bg-surface px-2.5 text-[13px] text-ink-2 shadow-btn transition-colors hover:text-ink" title={t('promptBar.providerConnection')}>
+          <button type="button" onClick={(e) => { e.stopPropagation(); setModelOpen((o) => !o); }} className="flex h-8 max-w-[240px] items-center gap-1 rounded-full bg-surface px-2.5 text-[13px] text-ink-2 shadow-btn transition-colors hover:text-ink" title={current ? `${t('promptBar.model')}: ${current.label}` : t('promptBar.model')}>
             <span className="truncate">{current?.label ?? t('promptBar.serverDefault')}</span>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>
           </button>
           {modelOpen ? (
             <>
               <div className="fixed inset-0 z-20" onClick={(e) => { e.stopPropagation(); setModelOpen(false); }} />
-              <div className="absolute bottom-[calc(100%+10px)] right-8 z-30 w-56 rounded-[12px] bg-surface p-1 shadow-overlay" style={{ animation: 'pop-in 160ms cubic-bezier(0.23,1,0.32,1) both', transformOrigin: 'bottom right' }}>
-                <div className="px-2 pb-1 pt-1.5 text-[11px] font-medium text-ink-3">{t('promptBar.providerConnection')}</div>
-                {[{ id: '', label: t('promptBar.serverDefault') }, ...models].map((m) => (
-                  <button key={m.id} type="button" disabled={'disabled' in m && m.disabled} onClick={(e) => { e.stopPropagation(); onModel(m.id); setModelOpen(false); }} className="flex h-8 w-full items-center justify-between gap-2 rounded-control px-2 text-left text-[13px] text-ink hover:bg-hover disabled:opacity-40">
-                    <span className="truncate">{m.label}</span>
-                    {m.id === model ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg> : null}
-                  </button>
-                ))}
+              <div className="absolute bottom-[calc(100%+10px)] right-8 z-30 w-72 rounded-[12px] bg-surface p-1 shadow-overlay" style={{ animation: 'pop-in 160ms cubic-bezier(0.23,1,0.32,1) both', transformOrigin: 'bottom right' }}>
+                <div className="px-2 pb-1 pt-1.5 text-[11px] font-medium text-ink-3">{t('promptBar.model')}</div>
+                <div className="max-h-[320px] overflow-y-auto" role="listbox" aria-label={t('promptBar.model')}>
+                  {([{ id: '', label: t('promptBar.serverDefault') }, ...models] as PromptModel[]).map((m, i, all) => {
+                    const heading = m.group !== undefined && m.group !== all[i - 1]?.group;
+                    return (
+                      <div key={m.id}>
+                        {heading ? <div className="mt-1 truncate border-t border-line px-2 pb-0.5 pt-1.5 text-[11px] font-medium text-ink-3">{m.group}</div> : null}
+                        <button type="button" role="option" aria-selected={m.id === model} disabled={m.disabled} onClick={(e) => { e.stopPropagation(); onModel(m.id); setModelOpen(false); }}
+                          className={cn('flex h-8 w-full items-center justify-between gap-2 rounded-control text-left text-[13px] text-ink hover:bg-hover disabled:opacity-40', m.group !== undefined ? 'pl-3.5 pr-2' : 'px-2')} title={m.label}>
+                          <span className={cn('truncate', m.group !== undefined && 'font-mono text-[12.5px]')}>{m.menuLabel ?? m.label}</span>
+                          <span className="flex shrink-0 items-center gap-1.5">
+                            {m.hint ? <span className="text-[11px] text-ink-3">{m.hint}</span> : null}
+                            {m.id === model ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg> : null}
+                          </span>
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </>
           ) : null}

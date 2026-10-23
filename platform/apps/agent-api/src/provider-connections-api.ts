@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import {
-  DEPLOYMENT_ENV_CONNECTION_ID,
+  DEPLOYMENT_ENV_CONNECTION_ID, PROVIDER_CONNECTION_MAX_MODELS, PROVIDER_CONNECTION_MODEL_ID_MAX_LENGTH, connectionModels, normalizeConnectionModels,
   type ProviderConnectionAdapterKind, type ProviderConnectionRecord, type ProviderConnectionStore, type RunAgentSettingsStore
 } from '@sage/task-domain';
 import type { SecretBackend } from '@sage/secret-vault';
@@ -26,7 +26,10 @@ export interface ProviderConnectionView {
   readonly source: 'user' | 'deployment-env';
   readonly adapterKind: ProviderConnectionAdapterKind;
   readonly baseUrl: string;
+  /** 默认模型（未显式选择时使用），恒属于 models。 */
   readonly modelId: string;
+  /** 允许的模型 id（默认模型在首位）；存量条目为 [modelId]。 */
+  readonly models: readonly string[];
   readonly providerName?: string;
   readonly modelName?: string;
   readonly enabled: boolean;
@@ -37,7 +40,7 @@ export interface ProviderConnectionView {
 }
 
 const ADAPTER_KINDS: readonly ProviderConnectionAdapterKind[] = ['openai-compatible', 'anthropic'];
-const writeFields = new Set(['name', 'adapterKind', 'baseUrl', 'modelId', 'providerName', 'modelName', 'apiKey']);
+const writeFields = new Set(['name', 'adapterKind', 'baseUrl', 'modelId', 'models', 'providerName', 'modelName', 'apiKey']);
 
 export class SecretWriteUnavailable extends Error {
   constructor(message: string) { super(message); this.name = 'SecretWriteUnavailable'; }
@@ -53,6 +56,7 @@ const viewOf = (record: ProviderConnectionRecord): ProviderConnectionView => ({
   adapterKind: record.adapterKind,
   baseUrl: record.baseUrl,
   modelId: record.modelId,
+  models: connectionModels(record),
   ...(record.providerName === undefined ? {} : { providerName: record.providerName }),
   ...(record.modelName === undefined ? {} : { modelName: record.modelName }),
   enabled: record.enabled,
@@ -67,6 +71,8 @@ interface ParsedWrite {
   readonly adapterKind: ProviderConnectionAdapterKind;
   readonly baseUrl: string;
   readonly modelId: string;
+  /** 省略 = 创建时 [modelId]、更新时保留既有列表。 */
+  readonly models?: readonly string[];
   readonly providerName?: string;
   readonly modelName?: string;
   readonly apiKey?: string;
@@ -81,6 +87,17 @@ const parseWrite = (body: unknown): { readonly write?: ParsedWrite; readonly err
   }
   if (typeof raw.baseUrl !== 'string' || !isPublicHttpsUrl(raw.baseUrl)) return { error: 'baseUrl must be a public HTTPS endpoint' };
   if (typeof raw.modelId !== 'string' || raw.modelId.length === 0 || raw.modelId.length > 256) return { error: 'modelId must be 1-256 characters' };
+  let models: readonly string[] | undefined;
+  if (raw.models !== undefined) {
+    if (!Array.isArray(raw.models) || raw.models.length > PROVIDER_CONNECTION_MAX_MODELS) {
+      return { error: `models must be an array of at most ${PROVIDER_CONNECTION_MAX_MODELS} model ids` };
+    }
+    if (raw.models.some((item) => typeof item !== 'string' || item.trim().length === 0 || item.length > PROVIDER_CONNECTION_MODEL_ID_MAX_LENGTH)) {
+      return { error: `models entries must be non-empty strings of at most ${PROVIDER_CONNECTION_MODEL_ID_MAX_LENGTH} characters` };
+    }
+    models = normalizeConnectionModels(raw.modelId, raw.models as readonly string[]);
+    if (models === undefined) return { error: `models must contain at most ${PROVIDER_CONNECTION_MAX_MODELS} distinct model ids including modelId` };
+  }
   if (raw.providerName !== undefined && (typeof raw.providerName !== 'string' || raw.providerName.length > 128)) return { error: 'providerName must be a string of at most 128 characters' };
   if (raw.modelName !== undefined && (typeof raw.modelName !== 'string' || raw.modelName.length > 256)) return { error: 'modelName must be a string of at most 256 characters' };
   if (raw.apiKey !== undefined && (typeof raw.apiKey !== 'string' || raw.apiKey.length === 0)) return { error: 'apiKey must be a non-empty string when provided' };
@@ -90,6 +107,7 @@ const parseWrite = (body: unknown): { readonly write?: ParsedWrite; readonly err
       adapterKind: raw.adapterKind as ProviderConnectionAdapterKind,
       baseUrl: raw.baseUrl,
       modelId: raw.modelId,
+      ...(models === undefined ? {} : { models }),
       ...(raw.providerName === undefined ? {} : { providerName: raw.providerName as string }),
       ...(raw.modelName === undefined ? {} : { modelName: raw.modelName as string }),
       ...(raw.apiKey === undefined ? {} : { apiKey: raw.apiKey as string })
@@ -150,6 +168,7 @@ export function registerProviderConnectionRoutes(app: FastifyInstance, options: 
       const id = `conn-${randomUUID()}`;
       const record = await options.store.createProviderConnection(options.tenantId, id, {
         name: write.name, source: 'user', adapterKind: write.adapterKind, baseUrl: write.baseUrl, modelId: write.modelId,
+        ...(write.models === undefined ? {} : { models: write.models }),
         ...(write.providerName === undefined ? {} : { providerName: write.providerName }),
         ...(write.modelName === undefined ? {} : { modelName: write.modelName }),
         enabled: true, updatedBy: `principal://${principal.principalId}`, credential
@@ -185,6 +204,7 @@ export function registerProviderConnectionRoutes(app: FastifyInstance, options: 
     try {
       const updated = await options.store.updateProviderConnection(options.tenantId, request.params.id, {
         name: write.name, source: 'user', adapterKind: write.adapterKind, baseUrl: write.baseUrl, modelId: write.modelId,
+        ...(write.models === undefined ? {} : { models: write.models }),
         ...(write.providerName === undefined ? {} : { providerName: write.providerName }),
         ...(write.modelName === undefined ? {} : { modelName: write.modelName }),
         enabled: existing.enabled, updatedBy: `principal://${principal.principalId}`,
@@ -218,6 +238,7 @@ export function registerProviderConnectionRoutes(app: FastifyInstance, options: 
  * 部署 env 引导（vendor 中立）：SAGE_BOOTSTRAP_PROVIDER_API_KEY 非空且 SecretBackend 可用时幂等 upsert
  * deployment-env 条目；baseUrl/model 由 SAGE_BOOTSTRAP_PROVIDER_BASE_URL / SAGE_BOOTSTRAP_PROVIDER_MODEL
  * 必填提供（无任何 vendor 默认值），缺失或不合法时跳过（WARN 由调用方输出），不阻塞启动。
+ * 可选 SAGE_BOOTSTRAP_PROVIDER_MODELS（逗号分隔）声明额外允许的模型；不合法时仅保留默认模型。
  */
 export async function bootstrapDeploymentEnvProviderConnection(
   store: ProviderConnectionStore,
@@ -235,11 +256,13 @@ export async function bootstrapDeploymentEnvProviderConnection(
   if (baseUrl === undefined || baseUrl.length === 0 || !isPublicHttpsUrl(baseUrl)) return 'skipped';
   if (modelId === undefined || modelId.length === 0) return 'skipped';
   if (!ADAPTER_KINDS.includes(adapterKind)) return 'skipped';
+  const extraModels = (env.SAGE_BOOTSTRAP_PROVIDER_MODELS ?? '').split(',').map((item) => item.trim()).filter((item) => item.length > 0);
+  const models = normalizeConnectionModels(modelId, extraModels) ?? [modelId];
   const sealed = secretBackend.seal(apiKey);
   const credential = { ciphertext: sealed.ciphertext, keyVersion: sealed.keyVersion, updatedAt: now().toISOString() };
   const write = {
     name: env.SAGE_BOOTSTRAP_PROVIDER_NAME?.trim() || '部署环境 Provider', source: 'deployment-env' as const,
-    adapterKind, baseUrl, modelId, modelName: modelId,
+    adapterKind, baseUrl, modelId, models, modelName: modelId,
     enabled: true, updatedBy: 'bootstrap://deployment-env', credential
   };
   const existing = await store.getProviderConnection(tenantId, DEPLOYMENT_ENV_CONNECTION_ID);

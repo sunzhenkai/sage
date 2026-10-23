@@ -72,6 +72,23 @@ integration.sequential('PostgreSQL provider connections', () => {
     expect(noCredential.credentialPresent).toBe(false);
   });
 
+  it('stores allowed model lists, keeps them on metadata-only updates, and reads legacy rows as [model_id]', async () => {
+    const tenantId = `tenant-conn-${randomUUID()}`;
+    const id = `conn-${randomUUID()}`;
+    const created = await store.createProviderConnection(tenantId, id, writeFor({ models: ['MiniMax-M2.1', 'MiniMax-M3', ' MiniMax-M2.1 '] }), '2026-08-25T00:00:00.000Z');
+    expect(created.models).toEqual(['MiniMax-M3', 'MiniMax-M2.1']);
+    const kept = await store.updateProviderConnection(tenantId, id, writeFor({ name: '改名' }), '2026-08-25T01:00:00.000Z');
+    expect(kept?.models).toEqual(['MiniMax-M3', 'MiniMax-M2.1']);
+    const replaced = await store.updateProviderConnection(tenantId, id, writeFor({ modelId: 'MiniMax-M2.1', models: ['MiniMax-M4'] }), '2026-08-25T02:00:00.000Z');
+    expect(replaced?.models).toEqual(['MiniMax-M2.1', 'MiniMax-M4']);
+    const legacyId = `conn-${randomUUID()}`;
+    await admin.query(`INSERT INTO provider_connections (tenant_id, id, name, source, adapter_kind, base_url, model_id)
+      VALUES ($1, $2, 'legacy', 'user', 'anthropic', 'https://api.minimaxi.com/anthropic', 'MiniMax-M3')`, [tenantId, legacyId]);
+    expect((await store.getProviderConnection(tenantId, legacyId))?.models).toEqual(['MiniMax-M3']);
+    await expect(store.createProviderConnection(tenantId, `conn-${randomUUID()}`, writeFor({ models: [''] }), '2026-08-25T00:00:00.000Z'))
+      .rejects.toThrow(/createProviderConnection\.invalid/u);
+  });
+
   it('rejects malformed writes', async () => {
     const tenantId = `tenant-conn-${randomUUID()}`;
     await expect(store.createProviderConnection(tenantId, 'x', writeFor({ baseUrl: 'http://insecure.example' }), '2026-08-25T00:00:00.000Z'))
