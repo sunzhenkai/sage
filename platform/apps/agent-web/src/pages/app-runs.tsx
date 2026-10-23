@@ -2,11 +2,11 @@ import { useQuery } from '@tanstack/react-query';
 import { ArrowUpRight } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router';
-import { Crumb, PageHeader } from '@/components/layout/app-shell';
+import { Crumb, PageHeader, ViewTab } from '@/components/layout/app-shell';
 import { Artifacts } from '@/components/bui/artifacts';
 import { StatusGlyph } from '@/components/bui/atoms';
 import { RunLogs } from '@/components/bui/run-logs';
-import { PageContent, PageDescription, Quiet, Section, SegmentedTabs } from '@/components/layout/page';
+import { PageContent, PageDescription, Quiet, Section } from '@/components/layout/page';
 import { StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DetailLayout, ListRow, Property, PropertyGroup, RowId, RowTitle } from '@/components/ui/list';
@@ -39,6 +39,11 @@ export function AppRunDetailPage() {
       <PageHeader
         breadcrumb={<><Crumb to="/apps">{t('nav.apps')}</Crumb><Crumb to={`/apps/${encodeURIComponent(appId)}`}>{appId}</Crumb></>}
         title={<Mono>{taskId}</Mono>}
+        tabs={run === undefined ? undefined : <>
+          <ViewTab active={tab === 'overview'} onClick={() => setTab('overview')}>{t('apps.runDetail.tabs.overview')}</ViewTab>
+          <ViewTab active={tab === 'logs'} onClick={() => setTab('logs')}>{t('apps.runDetail.tabs.logs')}</ViewTab>
+          <ViewTab active={tab === 'artifacts'} onClick={() => setTab('artifacts')}>{t('apps.runDetail.tabs.artifacts')}</ViewTab>
+        </>}
         actions={run === undefined || pending ? null : (
           <Button variant="secondary" size="sm" asChild>
             <Link to={`/tasks/${encodeURIComponent(taskId)}`}>{t('apps.runDetail.openTask')}<ArrowUpRight /></Link>
@@ -65,12 +70,7 @@ export function AppRunDetailPage() {
               leading={<StatusGlyph status={run.status} />}
               title={run.releaseVersion === undefined ? taskId : `v${run.releaseVersion}`}
               description={run.updatedAt === undefined ? undefined : t('apps.runDetail.updatedAgo', { time: relativeTime(run.updatedAt) })} />
-            <SegmentedTabs value={tab} onChange={setTab} items={[
-              { value: 'overview', label: t('apps.runDetail.tabs.overview') },
-              { value: 'logs', label: t('apps.runDetail.tabs.logs') },
-              { value: 'artifacts', label: t('apps.runDetail.tabs.artifacts') }
-            ]} />
-            <div className="pt-5">
+            <div>
               {pending ? (
                 <Section card padded><Quiet>{t('apps.runDetail.pendingHint')}</Quiet></Section>
               ) : tab === 'overview' ? (

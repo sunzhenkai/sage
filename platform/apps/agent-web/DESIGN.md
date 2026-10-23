@@ -79,7 +79,7 @@
 |---|---|
 | 宽度 | 面板内**全宽**（设置、Providers、聊天例外，见下），不使用临时居中容器 |
 | 唯一 gutter | `--gutter: 24px`（`gutter-x`），header / toolbar / 内容 / 列表行一致 |
-| Header 高度 | **唯一** token `--header-h: 44px`（紧凑；改高度只改此 token，头部内控件 ≤28px：分段 h-6、图标按钮 size-7、头像 ≤28px）：PageHeader、PageToolbar、SessionHeader 及所有窗格头都用 `h-[var(--header-h)]` + 底部 1px `--line`，相邻窗格（如聊天会话列表与会话头）底边连成一条线；**页面级互斥筛选（2–4 个 ViewTab）放在 `PageHeader tabs`，与标题同行**（见 §11）；仅当工具行包含搜索框、其他控件或多组控件时才使用 `PageToolbar`；禁止仅含 ViewTabs 的空 `PageToolbar`（会造成双底边"夹心"）。禁止硬编码头部高度 |
+| Header 高度 | **唯一** token `--header-h: 44px`（紧凑；改高度只改此 token，头部内控件 ≤28px：分段 h-6、图标按钮 size-7、头像 ≤28px）：PageHeader、PageToolbar、SessionHeader 及所有窗格头都用 `h-[var(--header-h)]` + 底部 1px `--line`，相邻窗格（如聊天会话列表与会话头）底边连成一条线；**页面级互斥筛选（2–4 个 ViewTab）与详情页子视图（属性/活动/草稿…）放在 `PageHeader tabs`，与标题同行，标题与 tabs 之间以 `HeaderDivider`（1px 竖线 `|`，两侧各约 16px）分隔**（见 §11）；仅当工具行包含搜索框、其他控件或多组控件时才使用 `PageToolbar`；禁止仅含 ViewTabs 的空 `PageToolbar`（会造成双底边"夹心"）。禁止硬编码头部高度 |
 | 内容上下留白 | `PageContent`：`pt-6 pb-12`；`PageDescription` 下方 `pb-6` |
 | Section 间距 | `mt-8`（首个为 0），标题与内容 `mb-3` |
 | 间距刻度 | 4 · 6 · 8 · 12 · 16 · 24 · 32 · 48（px） |
@@ -225,8 +225,8 @@
 
 - 每个页面头部（`PageHeader`）标题左侧显示与侧边栏导航项**相同**的图标：16px（`size-4`）、`text-muted`、`strokeWidth 1.6`，与标题间距 `gap-1.5`。
 - 图标由 `PageHeader` 根据路由从 `nav.ts` 自动推导；详情页（`/tasks/:id`、`/apps/:id` 等）继承父级图标，放在面包屑之前；无匹配路由（Not found）使用 `FileQuestion`。
-- 页面不得手写头部图标或标题：**页面级互斥筛选（2–4 个 ViewTab，如 全部/进行中/已完成、7d/14d/30d）用 `PageHeader tabs`，与标题同行**；右侧操作用 `actions`。`check:design` 禁止页面内 `<PanelBar left={<><Icon …` 与 `<h1>`。
-- **禁止**仅含 ViewTabs 的独立 `PageToolbar`：这会在页头下方产生空工具行和双底边"夹心"；内容区的分段切换（如详情页 Activity/Logs/Raw）继续使用 `SegmentedTabs`。
+- 页面不得手写头部图标或标题：**页面级互斥筛选（2–4 个 ViewTab，如 全部/进行中/已完成、7d/14d/30d）与详情页的二级菜单（任务详情 属性/活动/运行日志/产物/原始，应用详情 属性/草稿/发布/运行，应用运行 概览/日志/产物）统一用 `PageHeader tabs`，与标题同行**；`PageHeader` 自动在标题（及 meta）与 tabs 之间插入 `HeaderDivider` 竖线并留出间距，页面不要手写分隔符；右侧操作用 `actions`。`check:design` 禁止页面内 `<PanelBar left={<><Icon …` 与 `<h1>`。
+- **禁止**仅含 ViewTabs 的独立 `PageToolbar`：这会在页头下方产生空工具行和双底边"夹心"；详情页子视图同样放进 `PageHeader tabs`，不再在内容区顶部放 `SegmentedTabs`；`SegmentedTabs` 仅用于对话框/表单内的模式切换（如 Providers「models.dev / 手动」）。
 
 - 折叠侧栏（56px）：顶部工具组与导航滚动区均用 `mx-2 items-center`，导航项 `size-8` 无额外 `px`，保证所有图标在轨道中水平居中。
 

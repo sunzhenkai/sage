@@ -3,7 +3,7 @@ import { Ban, CircleDot, Clock, Hash, ListChecks, Pause, Play, RefreshCw, Rotate
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { Crumb, PageHeader, ViewTab } from '@/components/layout/app-shell';
-import { PageContent, PageDescription, Quiet, Section, SegmentedTabs } from '@/components/layout/page';
+import { PageContent, PageDescription, Quiet, Section } from '@/components/layout/page';
 import { ApprovalCard } from '@/components/bui/approval-card';
 import { Artifacts } from '@/components/bui/artifacts';
 import { StatusGlyph, StatusPill, Tag, toneFor } from '@/components/bui/atoms';
@@ -113,6 +113,7 @@ export function TaskDetailPage() {
   return (
     <>
       <PageHeader breadcrumb={<Crumb to="/tasks">{t('nav.tasks')}</Crumb>} title={<Mono>{taskId}</Mono>}
+        tabs={<>{(['properties', 'activity', 'run-logs', 'artifacts', 'raw'] as Tab[]).map((name) => <ViewTab key={name} active={tab === name} onClick={() => setTab(name)}>{t(tabKeys[name])}</ViewTab>)}</>}
         actions={<>
           <Button variant="ghost" size="sm" disabled={detail?.status !== 'running' || control.isPending} onClick={() => control.mutate('pause')}><Pause />{t('common.pause')}</Button>
           <Button variant="ghost" size="sm" disabled={detail?.status !== 'paused' || control.isPending} onClick={() => control.mutate('resume')}><Play />{t('common.resume')}</Button>
@@ -133,8 +134,7 @@ export function TaskDetailPage() {
               busy={control.isPending}
               onConfirm={(k) => { if (k !== 'cancel' || confirm(t('tasks.detail.cancelConfirm'))) control.mutate(k as 'resume' | 'retry' | 'cancel'); }} />
           ) : null}
-          <SegmentedTabs value={tab} onChange={setTab} items={(['properties', 'activity', 'run-logs', 'artifacts', 'raw'] as Tab[]).map((name) => ({ value: name, label: t(tabKeys[name]) }))} />
-          <div className="pt-5">
+          <div>
             {tab === 'properties' ? (
               <Section card padded>
                 <PropertyGroup title={t('tasks.detail.properties')}>

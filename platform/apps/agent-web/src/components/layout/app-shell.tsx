@@ -158,13 +158,21 @@ export function ViewTab({ active, children, onClick }: { active?: boolean; child
   );
 }
 
-/** Page header. The leading icon is derived from the route's sidebar nav item (detail pages inherit their parent's icon), so it is always identical to the sidebar. */
+/** Hairline vertical divider (`|`) separating header groups (title ↔ tabs). */
+export function HeaderDivider() {
+  return <span aria-hidden className="mx-2.5 h-4 w-px shrink-0 bg-line-strong" />;
+}
+
+/**
+ * Page header. The leading icon is derived from the route's sidebar nav item (detail pages inherit their parent's icon), so it is always identical to the sidebar.
+ * `tabs` (page-level filters or a detail page's sub-views) sit after the title, separated by a `HeaderDivider`.
+ */
 export function PageHeader({ title, meta, actions, breadcrumb, tabs }: { title: React.ReactNode; meta?: React.ReactNode; actions?: React.ReactNode; breadcrumb?: React.ReactNode; tabs?: React.ReactNode }) {
   const { pathname } = useLocation();
   const Icon = navItems.find((i) => pathname === i.to || pathname.startsWith(`${i.to}/`))?.icon ?? FileQuestion;
   return (
     <PanelBar
-      left={<><Icon aria-hidden className="size-4 shrink-0 text-muted" strokeWidth={1.6} />{breadcrumb}<h1 className="truncate text-[13px] font-medium tracking-[-0.01em] text-fg">{title}</h1>{meta ? <div className="flex items-center gap-2 text-xs text-muted">{meta}</div> : null}{tabs ? <div className="ml-2"><ViewTabs>{tabs}</ViewTabs></div> : null}</>}
+      left={<><Icon aria-hidden className="size-4 shrink-0 text-muted" strokeWidth={1.6} />{breadcrumb}<h1 className="truncate text-[13px] font-medium tracking-[-0.01em] text-fg">{title}</h1>{meta ? <div className="flex items-center gap-2 text-xs text-muted">{meta}</div> : null}{tabs ? <><HeaderDivider /><ViewTabs>{tabs}</ViewTabs></> : null}</>}
       right={actions}
     />
   );

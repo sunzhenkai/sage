@@ -5,10 +5,10 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
-import { PageHeader } from '@/components/layout/app-shell';
+import { PageHeader, ViewTab } from '@/components/layout/app-shell';
 import { AppList, AppListSkeleton } from '@/components/bui/app-list';
 import { RunReleaseDialog } from '@/components/bui/run-release-dialog';
-import { PageContent, Quiet, Section, SegmentedTabs, SubPane } from '@/components/layout/page';
+import { PageContent, Quiet, Section, SubPane } from '@/components/layout/page';
 import { StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ActionMenu } from '@/components/ui/action-menu';
@@ -314,6 +314,12 @@ export function AppDetailPage() {
   return (
     <>
       <PageHeader title={appId}
+        tabs={app.data ? <>
+          <ViewTab active={tab === 'properties'} onClick={() => setTab('properties')}>{t('apps.detail.tabs.properties')}</ViewTab>
+          <ViewTab active={tab === 'draft'} onClick={() => setTab('draft')}>{t('apps.detail.tabs.draft')}</ViewTab>
+          <ViewTab active={tab === 'releases'} onClick={() => setTab('releases')}><span className="inline-flex items-center gap-1.5">{t('apps.detail.tabs.releases')}<span className="tabular-nums text-ink-3">{releases.length}</span></span></ViewTab>
+          <ViewTab active={tab === 'runs'} onClick={() => setTab('runs')}><span className="inline-flex items-center gap-1.5">{t('apps.detail.tabs.runs')}<span className="tabular-nums text-ink-3">{runs.length}</span></span></ViewTab>
+        </> : undefined}
         meta={app.data ? (
           <div className="flex items-center gap-2">
             <StatusBadge status={app.data.status} />
@@ -335,13 +341,7 @@ export function AppDetailPage() {
       {remove.error ? <ErrorState error={remove.error} /> : null}
       {app.isLoading ? <Loading /> : app.error ? <ErrorState error={app.error} /> : app.data ? (
         <PageContent>
-          <SegmentedTabs value={tab} onChange={setTab} items={[
-            { value: 'properties', label: t('apps.detail.tabs.properties') },
-            { value: 'draft', label: t('apps.detail.tabs.draft') },
-            { value: 'releases', label: <span className="inline-flex items-center gap-1.5">{t('apps.detail.tabs.releases')}<span className="tabular-nums text-ink-3">{releases.length}</span></span> },
-            { value: 'runs', label: <span className="inline-flex items-center gap-1.5">{t('apps.detail.tabs.runs')}<span className="tabular-nums text-ink-3">{runs.length}</span></span> }
-          ]} />
-          <div className="pt-5">
+          <div>
             {tab === 'properties' ? (
               <>
                 <Section card padded>
