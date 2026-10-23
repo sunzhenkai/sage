@@ -137,7 +137,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 :root { --scrim: oklch(0 0 0 / 0.5); --table-head: oklch(0.955 0.012 255); }
 .dark { --scrim: oklch(0 0 0 / 0.65); --table-head: oklch(0.295 0.012 265); }
 @theme inline { --color-scrim: var(--scrim); --color-table-head: var(--table-head); }
-:root { --gutter: 24px; --header-h: 44px; --aside-w: 320px; --readable: 72ch; --w-narrow: 900px; --w-chat: 1000px; --w-wide: 1120px; --w-settings: 760px; --w-subpane: 300px; }
+:root { --gutter: 24px; --header-h: 44px; --aside-w: 320px; --readable: 72ch; --w-narrow: 900px; --w-chat: 1000px; --w-wide: 1120px; --w-settings: 760px; --w-subpane: 300px; --page-pt: 24px; --stack-gap: 32px; }
 @utility t-title { font-size: 20px; line-height: 28px; font-weight: 600; letter-spacing: -0.02em; color: var(--ink); }
 @utility t-section { font-size: 13px; line-height: 20px; font-weight: 600; letter-spacing: -0.01em; color: var(--ink); }
 @utility t-desc { font-size: 13px; line-height: 20px; font-weight: 400; color: var(--ink-2); }
@@ -145,6 +145,9 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 @utility t-meta { font-size: 12px; line-height: 16px; font-weight: 400; color: var(--ink-3); }
 @utility t-mono { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0; }
 @utility gutter-x { padding-left: var(--gutter); padding-right: var(--gutter); }
+/* Page spacing (DESIGN.md §4): content starts --page-pt below the header; page blocks are separated ONLY by the stack gap. */
+@utility page-pt { padding-top: var(--page-pt); }
+@utility page-stack { display: flex; flex-direction: column; gap: var(--stack-gap); }
 @utility readable { max-width: var(--readable); }
 
 /* ── Scrollbars: thin, themed, hide after scroll idle without reflow ─────

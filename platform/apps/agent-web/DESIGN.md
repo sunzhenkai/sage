@@ -80,8 +80,7 @@
 | 宽度 | 面板内**全宽**（设置、Providers、聊天例外，见下），不使用临时居中容器 |
 | 唯一 gutter | `--gutter: 24px`（`gutter-x`），header / toolbar / 内容 / 列表行一致 |
 | Header 高度 | **唯一** token `--header-h: 44px`（紧凑；改高度只改此 token，头部内控件 ≤28px：分段 h-6、图标按钮 size-7、头像 ≤28px）：PageHeader、PageToolbar、SessionHeader 及所有窗格头都用 `h-[var(--header-h)]` + 底部 1px `--line`，相邻窗格（如聊天会话列表与会话头）底边连成一条线；**页面级互斥筛选（2–4 个 ViewTab）与详情页子视图（属性/活动/草稿…）放在 `PageHeader tabs`，与标题同行，标题与 tabs 之间以 `HeaderDivider`（1px 竖线 `|`，两侧各约 16px）分隔**（见 §11）；仅当工具行包含搜索框、其他控件或多组控件时才使用 `PageToolbar`；禁止仅含 ViewTabs 的空 `PageToolbar`（会造成双底边"夹心"）。禁止硬编码头部高度 |
-| 内容上下留白 | `PageContent`：`pt-6 pb-12`；`PageDescription` 下方 `pb-6` |
-| Section 间距 | `mt-8`（首个为 0），标题与内容 `mb-3` |
+| 内容区间距（唯一规则，见 §3a） | 顶部 `--page-pt: 24px`（`page-pt`），块间距 `--stack-gap: 32px`（`page-stack`），底部 `pb-12`；Section 标题与内容 `mb-3` |
 | 间距刻度 | 4 · 6 · 8 · 12 · 16 · 24 · 32 · 48（px） |
 | 详情页 | 两栏：主栏 `flex-1` + 属性侧栏 `--aside-w: 320px`（`DetailLayout`，`border-l`，同 Panel 背景） |
 | 设置页 / Providers | 900px 居中栏；`SettingsRow` 两列网格：标签列 `minmax(160px,220px)` + 控件列 `1fr`，输入框 `w-full` 填满控件列，开关/分段控件右对齐 |
@@ -91,6 +90,16 @@
 | 图表/列表页 | Overview、Tasks、Schedules、Apps 列表使用 `PageContent width="wide"`（`--w-wide: 1120px` + gutter），在剩余空间中**居中**；侧边栏折叠时内容不会拉伸到边缘 |
 | 其余页面 | 详情页（两栏 + 属性侧栏）保持全宽 |
 | `readable` | `--readable: 72ch`，仅限全宽块内的长正文 |
+
+### 3a. 页面区域间隔（唯一规则）
+
+- **内容起点**：header 底边 → 第一个内容块的距离恒为 `--page-pt`（24px）。所有内容容器都从这个 token 起步：`PageContent` 主体、`CardPane`（聊天）、`DetailLayout` 属性侧栏、`SettingsShell` 主体。任何 tab / 页面都不得自行加 `pt-*` / `mt-*` 改变起点。
+- **块间距**：`PageContent`（非 `flush`）主体是纵向 stack（`page-stack` = flex column + `gap: var(--stack-gap)`，32px）。`PageDescription`、`Section`、`SettingsGroup`/`SettingsCard`、`Quiet`、`ApprovalCard`、`details` 等页面块**不带任何外边距**，间距只来自 stack gap。
+- **为什么**：旧实现靠 `Section` 的 `mt-8 first:mt-0`——兄弟节点相关的间距。应用页「发布/运行」tab 前面有一个 `display:none` 的草稿面板，它仍占着 `:first-child`，可见的首个 Section 因此拿到 `mt-8`、多出 32px（属性 tab 24px，发布 tab 56px）。flex `gap` 不会为隐藏/条件渲染的节点留空，所以不再受兄弟节点影响。
+- **标题行**：`Section` 标题行不设 `min-h`（旧的 `min-h-7` 让无操作按钮的标题文字下沉 4px，发布详情页因此是 28px），标题顶边即块顶边。
+- **写法**：页面块必须是 `PageContent` 的**直接子节点**（tab 内容用 fragment，不要包 `<div>`；包了就会失去 stack 间距）。需要内部更紧凑节奏（如图表网格 `gap-3`、聊天 runs 列表 `gap-5`）时在块**内部**用 flex/grid gap，不要用外边距。
+- **水平**：唯一 gutter `--gutter: 24px`（`gutter-x`），宽度只通过 `width` token。
+- **守护**：`check:design` 禁止页面里出现 `first:mt-*`、页面块上的 `className="m[tby]-…"`、`PageContent` 上的 `p[ty]-/m[ty]-`，并校验 `PageContent`/`CardPane`/`DetailLayout`/`SettingsShell` 使用 `page-pt`（及 `page-stack`）。
 
 原语：`PageShell` → `PageHeader`/`PageToolbar` → `PageContent`（`flush` 用于整页列表/表格）→ `PageDescription` → `Section`；辅助 `Bleed`（让列表在内容区内贴边）、`Quiet`（空/静默提示）、`SegmentedTabs`。
 

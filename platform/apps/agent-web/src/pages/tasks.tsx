@@ -68,7 +68,7 @@ export function TasksPage() {
                 </div>
               </Section>
             {active.length && view !== 'done' ? (
-              <Section className="mt-8" title={t('tasks.inFlight.title')} description={t('tasks.inFlight.description')} count={active.length}>
+              <Section title={t('tasks.inFlight.title')} description={t('tasks.inFlight.description')} count={active.length}>
                 <TaskRows rows={active.slice(0, 4).map((x) => ({
                   key: x.taskId, status: x.status, step: x.attempt, label: x.taskId, amount: x.taskType, onOpen: () => { void navigate(`/tasks/${x.taskId}`); },
                   details: [{ label: t('tasks.inFlight.workflow'), meta: x.workflowId ?? '—' }, { label: t('tasks.inFlight.target'), meta: x.targetId ?? '—' }, { label: t('tasks.inFlight.updated'), meta: relativeTime(x.projectionUpdatedAt) }]
@@ -125,7 +125,7 @@ export function TaskDetailPage() {
         <PageContent>
           <PageDescription leading={<StatusGlyph status={detail.status} size={26} step={detail.attempt} />} title={detail.taskId} description={<>{detail.taskType ?? t('tasks.detail.taskFallback')} · {t(statusKeys[detail.status])}{detail.freshnessReason ? ` · ${detail.freshnessReason}` : ''}</>} />
           {detail.status === 'effect_unknown' || detail.status === 'paused' ? (
-            <ApprovalCard className="mb-8"
+            <ApprovalCard
               eyebrow={<><span className="size-1.5 rounded-full bg-orange" />{detail.status === 'paused' ? t('tasks.approval.pausedEyebrow') : t('tasks.approval.effectUnknownEyebrow')}</>}
               question={detail.status === 'paused' ? t('tasks.approval.pausedQuestion') : t('tasks.approval.effectUnknownQuestion')}
               options={detail.status === 'paused'
@@ -134,29 +134,27 @@ export function TaskDetailPage() {
               busy={control.isPending}
               onConfirm={(k) => { if (k !== 'cancel' || confirm(t('tasks.detail.cancelConfirm'))) control.mutate(k as 'resume' | 'retry' | 'cancel'); }} />
           ) : null}
-          <div>
-            {tab === 'properties' ? (
-              <Section card padded>
-                <PropertyGroup title={t('tasks.detail.properties')}>
-                  <Property label={t('tasks.detail.status')}><StatusBadge status={detail.status} /></Property>
-                  <Property label={t('tasks.detail.type')}>{detail.taskType ? <Pill color="var(--accent)">{detail.taskType}</Pill> : null}</Property>
-                  <Property label={t('tasks.detail.attempt')}>{detail.attempt}</Property>
-                  <Property label={t('tasks.detail.revision')}>{detail.revision}</Property>
-                  <Property label={t('tasks.detail.lifecycle')}>{detail.lifecyclePath}</Property>
-                </PropertyGroup>
-                <PropertyGroup title={t('tasks.detail.execution')}>
-                  <Property label={t('tasks.detail.workflow')}><Mono>{detail.workflowId}</Mono></Property>
-                  <Property label={t('tasks.detail.target')}><Mono>{detail.targetId}</Mono></Property>
-                  <Property label={t('tasks.detail.freshness')}>{detail.projectionFreshness}</Property>
-                  <Property label={t('tasks.detail.session')}>{detail.sessionId ? <Link className="text-accent-ink hover:underline" to={`/chat/${detail.sessionId}`}>{shortId(detail.sessionId)}</Link> : null}</Property>
-                </PropertyGroup>
-                <PropertyGroup title={t('tasks.detail.timestamps')}>
-                  <Property label={t('tasks.detail.updated')}>{formatTime(detail.projectionUpdatedAt)}</Property>
-                  <Property label={t('tasks.detail.observed')}>{formatTime(detail.historyObservedAt)}</Property>
-                </PropertyGroup>
-              </Section>
-            ) : tab === 'activity' ? <Section card padded><TaskEvents taskId={taskId} status={detail.status} /></Section> : tab === 'run-logs' ? <Section card padded><RunLogs taskId={taskId} /></Section> : tab === 'artifacts' ? <Artifacts taskId={taskId} /> : <JsonView value={detail} filename={`${detail.taskId}.json`} />}
-          </div>
+          {tab === 'properties' ? (
+            <Section card padded>
+              <PropertyGroup title={t('tasks.detail.properties')}>
+                <Property label={t('tasks.detail.status')}><StatusBadge status={detail.status} /></Property>
+                <Property label={t('tasks.detail.type')}>{detail.taskType ? <Pill color="var(--accent)">{detail.taskType}</Pill> : null}</Property>
+                <Property label={t('tasks.detail.attempt')}>{detail.attempt}</Property>
+                <Property label={t('tasks.detail.revision')}>{detail.revision}</Property>
+                <Property label={t('tasks.detail.lifecycle')}>{detail.lifecyclePath}</Property>
+              </PropertyGroup>
+              <PropertyGroup title={t('tasks.detail.execution')}>
+                <Property label={t('tasks.detail.workflow')}><Mono>{detail.workflowId}</Mono></Property>
+                <Property label={t('tasks.detail.target')}><Mono>{detail.targetId}</Mono></Property>
+                <Property label={t('tasks.detail.freshness')}>{detail.projectionFreshness}</Property>
+                <Property label={t('tasks.detail.session')}>{detail.sessionId ? <Link className="text-accent-ink hover:underline" to={`/chat/${detail.sessionId}`}>{shortId(detail.sessionId)}</Link> : null}</Property>
+              </PropertyGroup>
+              <PropertyGroup title={t('tasks.detail.timestamps')}>
+                <Property label={t('tasks.detail.updated')}>{formatTime(detail.projectionUpdatedAt)}</Property>
+                <Property label={t('tasks.detail.observed')}>{formatTime(detail.historyObservedAt)}</Property>
+              </PropertyGroup>
+            </Section>
+          ) : tab === 'activity' ? <Section card padded><TaskEvents taskId={taskId} status={detail.status} /></Section> : tab === 'run-logs' ? <Section card padded><RunLogs taskId={taskId} /></Section> : tab === 'artifacts' ? <Artifacts taskId={taskId} /> : <JsonView value={detail} filename={`${detail.taskId}.json`} />}
         </PageContent>
       ) : null}
     </>

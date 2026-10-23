@@ -15,9 +15,9 @@ export function SettingsShell({ groups, header, children }: { groups: { label: s
     <div className="flex min-h-0 flex-1">
       <SubPane>
         <PageHeader title={t('nav.settings')} />
-        <div className="flex-1 overflow-y-auto px-2.5 pb-4 pt-2">
+        <div className="flex flex-1 flex-col gap-3 overflow-y-auto px-2.5 pb-4 pt-3">
           {groups.map((g) => (
-            <div key={g.label} className="mt-3 first:mt-1">
+            <div key={g.label}>
               <div className="px-2 pb-1 text-[11.5px] font-medium text-faint">{g.label}</div>
               <nav className="flex flex-col gap-px">
                 {g.items.map(({ to, label, icon: Icon, external }) => (
@@ -33,7 +33,7 @@ export function SettingsShell({ groups, header, children }: { groups: { label: s
       <div className="flex min-w-0 flex-1 flex-col">
         <PanelBar left={<span className="truncate text-[13px] font-medium tracking-[-0.01em] text-fg">{header}</span>} />
         <div className="min-h-0 flex-1 overflow-y-auto">
-          <div className="mx-auto w-full max-w-[calc(var(--w-settings)+2*var(--gutter))] px-[var(--gutter)] pb-12 pt-6">{children}</div>
+          <div className="mx-auto w-full max-w-[calc(var(--w-settings)+2*var(--gutter))] gutter-x page-pt page-stack pb-12">{children}</div>
         </div>
       </div>
     </div>
@@ -43,7 +43,7 @@ export function SettingsShell({ groups, header, children }: { groups: { label: s
 /** Title row aligned with the sub-nav "Settings" title (h-9), grey one-line description, optional toolbar. */
 export function SettingsTitle({ title, description, toolbar }: { title: React.ReactNode; description?: React.ReactNode; toolbar?: React.ReactNode }) {
   return (
-    <div className="mb-6">
+    <div>
       <h1 className="flex h-9 items-center text-[22px] font-semibold tracking-[-0.02em] text-ink">{title}</h1>
       {description ? <p className="t-desc">{description}</p> : null}
       {toolbar ? <div className="mt-5 flex items-center gap-2">{toolbar}</div> : null}
@@ -53,7 +53,7 @@ export function SettingsTitle({ title, description, toolbar }: { title: React.Re
 
 export function SettingsCard({ title, children }: { title?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <section className="mt-6 first:mt-0">
+    <section>
       {title ? <h2 className="mb-2 px-0.5 text-[12px] font-semibold text-muted">{title}</h2> : null}
       <div className={cn(contentCard, 'divide-y divide-line')}>{children}</div>
     </section>

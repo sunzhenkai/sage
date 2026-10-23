@@ -341,92 +341,90 @@ export function AppDetailPage() {
       {remove.error ? <ErrorState error={remove.error} /> : null}
       {app.isLoading ? <Loading /> : app.error ? <ErrorState error={app.error} /> : app.data ? (
         <PageContent>
-          <div>
-            {tab === 'properties' ? (
-              <>
-                <Section card padded>
-                  <PropertyGroup title={t('apps.detail.properties')}>
-                    <Property label={t('apps.detail.status')}><StatusBadge status={app.data.status} /></Property>
-                    <Property label={t('apps.detail.version')}><Mono>{manifest?.version ?? app.data.latestVersion ?? '—'}</Mono></Property>
-                    <Property label={t('apps.detail.entry')}><Mono>{manifest?.entry ?? '—'}</Mono></Property>
-                    <Property label={t('apps.detail.model')}>{manifest?.modelRoute ? <Mono>{`${manifest.modelRoute.provider} / ${manifest.modelRoute.model}`}</Mono> : null}</Property>
-                    <Property label={t('apps.detail.created')}>{formatTime(app.data.createdAt)}</Property>
+          {tab === 'properties' ? (
+            <>
+              <Section card padded>
+                <PropertyGroup title={t('apps.detail.properties')}>
+                  <Property label={t('apps.detail.status')}><StatusBadge status={app.data.status} /></Property>
+                  <Property label={t('apps.detail.version')}><Mono>{manifest?.version ?? app.data.latestVersion ?? '—'}</Mono></Property>
+                  <Property label={t('apps.detail.entry')}><Mono>{manifest?.entry ?? '—'}</Mono></Property>
+                  <Property label={t('apps.detail.model')}>{manifest?.modelRoute ? <Mono>{`${manifest.modelRoute.provider} / ${manifest.modelRoute.model}`}</Mono> : null}</Property>
+                  <Property label={t('apps.detail.created')}>{formatTime(app.data.createdAt)}</Property>
+                </PropertyGroup>
+                {skills.length === 0 ? null : (
+                  <PropertyGroup title={t('apps.detail.skills')}>
+                    <div className="flex flex-wrap gap-1 px-2">{skills.map((s) => <Pill key={s} color="var(--violet)">{s.replace(/^skill:\/\//, '')}</Pill>)}</div>
                   </PropertyGroup>
-                  {skills.length === 0 ? null : (
-                    <PropertyGroup title={t('apps.detail.skills')}>
-                      <div className="flex flex-wrap gap-1 px-2">{skills.map((s) => <Pill key={s} color="var(--violet)">{s.replace(/^skill:\/\//, '')}</Pill>)}</div>
-                    </PropertyGroup>
-                  )}
-                  {capabilities.length === 0 ? null : (
-                    <PropertyGroup title={t('apps.detail.capabilities')}>
-                      <div className="flex flex-wrap gap-1 px-2">{capabilities.map((s) => <Pill key={s} color="var(--blue)">{s.replace(/^capability:\/\//, '')}</Pill>)}</div>
-                    </PropertyGroup>
-                  )}
-                </Section>
-                {tasks.length === 0 ? null : (
-                  <Section card title={t('apps.detail.tasks')} count={tasks.length}>
-                    {tasks.map((task) => (
-                      <ListRow key={task.name}><StatusIcon kind="todo" /><RowTitle sub={task.entry}>{task.name}</RowTitle></ListRow>
-                    ))}
-                  </Section>
                 )}
-                {inputs.length === 0 && dataSources.length === 0 ? null : (
-                  <Section card title={t('apps.detail.inputs')}>
-                    {inputs.map((input) => (
-                      <ListRow key={`i-${input.name}`}><RowId>{t('apps.detail.input')}</RowId><RowTitle sub={input.type}>{input.name}</RowTitle><RowMeta>{input.required ? <Pill>{t('apps.detail.required')}</Pill> : <span className="text-faint">{t('apps.detail.optional')}</span>}</RowMeta></ListRow>
-                    ))}
-                    {dataSources.map((source) => (
-                      <ListRow key={`d-${source.name}`}><RowId>{t('apps.detail.source')}</RowId><RowTitle sub={source.url}>{source.name}</RowTitle></ListRow>
-                    ))}
-                  </Section>
+                {capabilities.length === 0 ? null : (
+                  <PropertyGroup title={t('apps.detail.capabilities')}>
+                    <div className="flex flex-wrap gap-1 px-2">{capabilities.map((s) => <Pill key={s} color="var(--blue)">{s.replace(/^capability:\/\//, '')}</Pill>)}</div>
+                  </PropertyGroup>
                 )}
-                {tasks.length === 0 && inputs.length === 0 && dataSources.length === 0 && skills.length === 0 && capabilities.length === 0 && manifest === undefined
-                  ? <Quiet>{t('apps.detail.definitionEmpty')}</Quiet>
-                  : null}
-                {manifest === undefined ? null : (
-                  <details className="mt-8">
-                    <summary className="cursor-default text-[12px] text-muted hover:text-fg">{t('apps.detail.showManifest')}</summary>
-                    <div className="pt-2"><JsonView value={manifest} filename="manifest.json" /></div>
-                  </details>
-                )}
-              </>
-            ) : null}
-            <div className={tab === 'draft' ? undefined : 'hidden'}>
-              <DraftPanel key={appId} appId={appId} hasUnpublishedChanges={app.data.hasUnpublishedChanges} actionsRef={draftActions} onChrome={onChrome} />
-            </div>
-            {tab === 'releases' ? (
-              releases.length === 0 ? <Quiet>{t('apps.detail.releasesEmpty')}</Quiet> : (
-                <Section card>
-                  {releases.map((release) => (
-                    <ListRow key={release.releaseId}>
-                      <RowTitle sub={<Mono>{shortDigest(release.releaseId)}</Mono>}>{`v${release.packageVersion}`}</RowTitle>
-                      <RowMeta>
-                        <span className="text-faint">{formatTime(release.createdAt)}</span>
-                        <Link className="text-accent-ink hover:underline" to={`/apps/${encodeURIComponent(appId)}/releases/${encodeURIComponent(release.releaseId)}`}>{t('apps.detail.openRelease')}</Link>
-                        <Button size="sm" variant="secondary" disabled={isMock()} title={isMock() ? t('apps.run.mockDisabled') : undefined} onClick={() => setRunRelease(release)}><Play />{t('apps.detail.run')}</Button>
-                      </RowMeta>
-                    </ListRow>
+              </Section>
+              {tasks.length === 0 ? null : (
+                <Section card title={t('apps.detail.tasks')} count={tasks.length}>
+                  {tasks.map((task) => (
+                    <ListRow key={task.name}><StatusIcon kind="todo" /><RowTitle sub={task.entry}>{task.name}</RowTitle></ListRow>
                   ))}
                 </Section>
-              )
-            ) : null}
-            {tab === 'runs' ? (
-              appRuns.isLoading ? <Loading rows={3} /> : appRuns.error ? <ErrorState error={appRuns.error} /> : runs.length === 0 ? <Quiet>{t('apps.detail.runsEmpty')}</Quiet> : (
-                <Section card>
-                  {runs.map((run) => (
-                    <ListRow key={run.taskId} onClick={() => { void navigate(`/apps/${encodeURIComponent(appId)}/runs/${encodeURIComponent(run.taskId)}`); }}>
-                      <span className="w-[86px] shrink-0"><StatusBadge status={run.status} /></span>
-                      <RowTitle sub={<Mono>{run.taskId}</Mono>}>{run.releaseVersion ? `v${run.releaseVersion}` : t('apps.detail.unknownVersion')}</RowTitle>
-                      <RowMeta>
-                        <Pill>{run.source === 'schedule' ? t('apps.detail.sourceSchedule') : t('apps.detail.sourceManual')}</Pill>
-                        <span className="text-faint">{relativeTime(run.createdAt)}</span>
-                      </RowMeta>
-                    </ListRow>
+              )}
+              {inputs.length === 0 && dataSources.length === 0 ? null : (
+                <Section card title={t('apps.detail.inputs')}>
+                  {inputs.map((input) => (
+                    <ListRow key={`i-${input.name}`}><RowId>{t('apps.detail.input')}</RowId><RowTitle sub={input.type}>{input.name}</RowTitle><RowMeta>{input.required ? <Pill>{t('apps.detail.required')}</Pill> : <span className="text-faint">{t('apps.detail.optional')}</span>}</RowMeta></ListRow>
+                  ))}
+                  {dataSources.map((source) => (
+                    <ListRow key={`d-${source.name}`}><RowId>{t('apps.detail.source')}</RowId><RowTitle sub={source.url}>{source.name}</RowTitle></ListRow>
                   ))}
                 </Section>
-              )
-            ) : null}
+              )}
+              {tasks.length === 0 && inputs.length === 0 && dataSources.length === 0 && skills.length === 0 && capabilities.length === 0 && manifest === undefined
+                ? <Quiet>{t('apps.detail.definitionEmpty')}</Quiet>
+                : null}
+              {manifest === undefined ? null : (
+                <details>
+                  <summary className="cursor-default text-[12px] text-muted hover:text-fg">{t('apps.detail.showManifest')}</summary>
+                  <div className="pt-2"><JsonView value={manifest} filename="manifest.json" /></div>
+                </details>
+              )}
+            </>
+          ) : null}
+          <div className={tab === 'draft' ? undefined : 'hidden'}>
+            <DraftPanel key={appId} appId={appId} hasUnpublishedChanges={app.data.hasUnpublishedChanges} actionsRef={draftActions} onChrome={onChrome} />
           </div>
+          {tab === 'releases' ? (
+            releases.length === 0 ? <Quiet>{t('apps.detail.releasesEmpty')}</Quiet> : (
+              <Section card>
+                {releases.map((release) => (
+                  <ListRow key={release.releaseId}>
+                    <RowTitle sub={<Mono>{shortDigest(release.releaseId)}</Mono>}>{`v${release.packageVersion}`}</RowTitle>
+                    <RowMeta>
+                      <span className="text-faint">{formatTime(release.createdAt)}</span>
+                      <Link className="text-accent-ink hover:underline" to={`/apps/${encodeURIComponent(appId)}/releases/${encodeURIComponent(release.releaseId)}`}>{t('apps.detail.openRelease')}</Link>
+                      <Button size="sm" variant="secondary" disabled={isMock()} title={isMock() ? t('apps.run.mockDisabled') : undefined} onClick={() => setRunRelease(release)}><Play />{t('apps.detail.run')}</Button>
+                    </RowMeta>
+                  </ListRow>
+                ))}
+              </Section>
+            )
+          ) : null}
+          {tab === 'runs' ? (
+            appRuns.isLoading ? <Loading rows={3} /> : appRuns.error ? <ErrorState error={appRuns.error} /> : runs.length === 0 ? <Quiet>{t('apps.detail.runsEmpty')}</Quiet> : (
+              <Section card>
+                {runs.map((run) => (
+                  <ListRow key={run.taskId} onClick={() => { void navigate(`/apps/${encodeURIComponent(appId)}/runs/${encodeURIComponent(run.taskId)}`); }}>
+                    <span className="w-[86px] shrink-0"><StatusBadge status={run.status} /></span>
+                    <RowTitle sub={<Mono>{run.taskId}</Mono>}>{run.releaseVersion ? `v${run.releaseVersion}` : t('apps.detail.unknownVersion')}</RowTitle>
+                    <RowMeta>
+                      <Pill>{run.source === 'schedule' ? t('apps.detail.sourceSchedule') : t('apps.detail.sourceManual')}</Pill>
+                      <span className="text-faint">{relativeTime(run.createdAt)}</span>
+                    </RowMeta>
+                  </ListRow>
+                ))}
+              </Section>
+            )
+          ) : null}
         </PageContent>
       ) : null}
       <RunReleaseDialog appId={appId} release={runRelease} manifest={runRelease?.manifest ?? manifest} onClose={() => setRunRelease(undefined)} />

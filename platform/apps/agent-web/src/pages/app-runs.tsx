@@ -70,21 +70,19 @@ export function AppRunDetailPage() {
               leading={<StatusGlyph status={run.status} />}
               title={run.releaseVersion === undefined ? taskId : `v${run.releaseVersion}`}
               description={run.updatedAt === undefined ? undefined : t('apps.runDetail.updatedAgo', { time: relativeTime(run.updatedAt) })} />
-            <div>
-              {pending ? (
-                <Section card padded><Quiet>{t('apps.runDetail.pendingHint')}</Quiet></Section>
-              ) : tab === 'overview' ? (
-                run.failureCode === undefined ? <Quiet>{t(live ? 'apps.runDetail.runningHint' : 'apps.runDetail.finishedHint')}</Quiet> : (
-                  <Section card>
-                    <ListRow><RowId>{t('apps.runDetail.failureCode')}</RowId><RowTitle><span className="text-red">{run.failureCode}</span></RowTitle></ListRow>
-                  </Section>
-                )
-              ) : tab === 'logs' ? (
-                <Section card padded><RunLogs taskId={taskId} live={live} /></Section>
-              ) : (
-                <Section card padded><Artifacts taskId={taskId} live={live} /></Section>
-              )}
-            </div>
+            {pending ? (
+              <Section card padded><Quiet>{t('apps.runDetail.pendingHint')}</Quiet></Section>
+            ) : tab === 'overview' ? (
+              run.failureCode === undefined ? <Quiet>{t(live ? 'apps.runDetail.runningHint' : 'apps.runDetail.finishedHint')}</Quiet> : (
+                <Section card>
+                  <ListRow><RowId>{t('apps.runDetail.failureCode')}</RowId><RowTitle><span className="text-red">{run.failureCode}</span></RowTitle></ListRow>
+                </Section>
+              )
+            ) : tab === 'logs' ? (
+              <Section card padded><RunLogs taskId={taskId} live={live} /></Section>
+            ) : (
+              <Section card padded><Artifacts taskId={taskId} live={live} /></Section>
+            )}
           </PageContent>
         </DetailLayout>
       )}

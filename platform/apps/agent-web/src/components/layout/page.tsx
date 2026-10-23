@@ -13,7 +13,7 @@ export function PageShell({ children, className }: { children: React.ReactNode; 
 /** Page title + description band. Same bg as header/content; no border. */
 export function PageDescription({ title, description, leading, actions }: { title: React.ReactNode; description?: React.ReactNode; leading?: React.ReactNode; actions?: React.ReactNode }) {
   return (
-    <div className="flex items-start gap-3 pb-6">
+    <div className="flex items-start gap-3">
       {leading ? <div className="shrink-0 pt-0.5">{leading}</div> : null}
       <div className="min-w-0 flex-1">
         <h1 className="t-title truncate">{title}</h1>
@@ -24,7 +24,12 @@ export function PageDescription({ title, description, leading, actions }: { titl
   );
 }
 
-/** Scrollable content area. `flush` = edge-to-edge (lists/tables own their gutters); default pads with the gutter. */
+/**
+ * Scrollable content area. `flush` = edge-to-edge (lists/tables own their gutters); default pads with the gutter.
+ * Default body is THE page spacing rule: top inset `--page-pt` (24) below the header, and a vertical stack whose ONLY
+ * spacing between blocks (PageDescription, Section, cards, Quiet…) is `--stack-gap` (32). Blocks never carry outer margins;
+ * hidden (display:none) or conditional blocks therefore never shift the first block. Keep blocks as DIRECT children (no wrapper divs).
+ */
 export type ContentWidth = 'full' | 'wide' | 'narrow' | 'chat';
 const widthClass: Record<ContentWidth, string> = { full: '', wide: 'mx-auto w-full max-w-[calc(var(--w-wide)+2*var(--gutter))]', narrow: 'mx-auto w-full max-w-[calc(var(--w-narrow)+2*var(--gutter))]', chat: 'mx-auto w-full max-w-[calc(var(--w-chat)+2*var(--gutter))]' };
 
@@ -36,7 +41,7 @@ export function PageColumn({ width = 'full', className, children }: { width?: Co
 export function PageContent({ children, flush, width = 'full', className, scrollRef }: { children: React.ReactNode; flush?: boolean; width?: ContentWidth | undefined; className?: string; scrollRef?: React.Ref<HTMLDivElement> }) {
   return (
     <div ref={scrollRef} className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-      <div className={cn(flush ? 'flex min-h-0 flex-1 flex-col' : cn('gutter-x pb-12 pt-6', widthClass[width]), className)}>{children}</div>
+      <div data-page-body={flush ? undefined : ''} className={cn(flush ? 'flex min-h-0 flex-1 flex-col' : cn('gutter-x page-pt page-stack pb-12', widthClass[width]), className)}>{children}</div>
     </div>
   );
 }
@@ -50,9 +55,9 @@ export const contentCard = 'overflow-hidden rounded-card bg-surface shadow-card'
  */
 export function Section({ title, description, count, actions, children, className, card, padded }: { title?: React.ReactNode; description?: React.ReactNode; count?: React.ReactNode; actions?: React.ReactNode; children: React.ReactNode; className?: string | undefined; card?: boolean | undefined; padded?: boolean | undefined }) {
   return (
-    <section className={cn('mt-8 first:mt-0', className)}>
+    <section className={className}>
       {title ? (
-        <div className="mb-3 flex min-h-7 items-center gap-2">
+        <div className="mb-3 flex items-center gap-2">
           <div className="min-w-0 flex-1">
             <h2 className="t-section flex items-center gap-2">{title}{count !== undefined ? <span className="t-meta font-normal tabular-nums">{count}</span> : null}</h2>
             {description ? <p className="t-desc mt-0.5">{description}</p> : null}
@@ -76,7 +81,7 @@ export function SettingsGroup({ title, description, children }: { title?: string
 /** Fixed-height pane whose content scrolls INSIDE a bordered content card (chat transcript). Fills remaining height. */
 export function CardPane({ width = 'full', scrollRef, children }: { width?: ContentWidth | undefined; scrollRef?: React.Ref<HTMLDivElement> | undefined; children: React.ReactNode }) {
   return (
-    <div className={cn('flex min-h-0 w-full flex-1 flex-col pt-4 gutter-x', widthClass[width])}>
+    <div className={cn('flex min-h-0 w-full flex-1 flex-col page-pt gutter-x', widthClass[width])}>
       <div ref={scrollRef} className={cn(contentCard, 'min-h-0 flex-1 overflow-y-auto')}>
         <div className="px-6 py-6">{children}</div>
       </div>
@@ -118,7 +123,7 @@ export function DetailLayout({ children, properties }: { children: React.ReactNo
   return (
     <div className="flex min-h-0 flex-1">
       <div className="flex min-w-0 flex-1 flex-col">{children}</div>
-      <aside className="hidden w-[var(--aside-w)] shrink-0 overflow-y-auto border-l border-line px-4 py-6 lg:block">{properties}</aside>
+      <aside className="hidden w-[var(--aside-w)] shrink-0 overflow-y-auto border-l border-line page-pt px-4 pb-6 lg:block">{properties}</aside>
     </div>
   );
 }

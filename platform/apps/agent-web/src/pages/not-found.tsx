@@ -11,7 +11,7 @@ export function NotFoundPage() {
       <PageHeader title={t('notFound.header')} />
       <PageContent>
         <PageDescription title={t('notFound.title')} description={<>{t('notFound.descriptionLead')} <span className="t-mono">{pathname}</span>{t('notFound.descriptionTail')}</>} />
-        <Button asChild size="sm" variant="outline"><Link to="/overview">{t('notFound.back')}</Link></Button>
+        <div><Button asChild size="sm" variant="outline"><Link to="/overview">{t('notFound.back')}</Link></Button></div>
       </PageContent>
     </PageShell>
   );

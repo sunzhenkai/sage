@@ -165,7 +165,7 @@ export function OverviewPage() {
           </ChartCard>
         </div>
 
-        <Section card className="mt-8" title={t('overview.recentSessions.title')} count={sessions.data?.items.length ?? 0}>
+        <Section card title={t('overview.recentSessions.title')} count={sessions.data?.items.length ?? 0}>
           <>
             {(sessions.data?.items ?? []).slice(0, 6).map((s) => (
               <ListRow key={s.sessionId} onClick={() => navigate(`/chat/${s.sessionId}`)}>
