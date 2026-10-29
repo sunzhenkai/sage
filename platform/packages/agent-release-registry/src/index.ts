@@ -252,6 +252,23 @@ export interface AgentReleaseStore {
   auditLog(): readonly ReleaseRegistryAuditRecord[];
 }
 
+/** HTTP / Postgres 写穿层使用的异步视图；内存实现经 `toAsyncAgentReleaseStore` 包装即可。 */
+export type AsyncAgentReleaseStore = {
+  readonly [K in keyof AgentReleaseStore]: AgentReleaseStore[K] extends (...args: infer A) => infer R
+    ? (...args: A) => Promise<Awaited<R>>
+    : AgentReleaseStore[K];
+};
+
+export function toAsyncAgentReleaseStore(store: AgentReleaseStore): AsyncAgentReleaseStore {
+  return new Proxy(store, {
+    get(target, property, receiver) {
+      const value = Reflect.get(target, property, receiver);
+      if (typeof value !== 'function') return value;
+      return (...args: unknown[]) => Promise.resolve((value as (...inner: unknown[]) => unknown).apply(target, args));
+    }
+  }) as unknown as AsyncAgentReleaseStore;
+}
+
 const MAX_ID_LENGTH = 512;
 const MAX_AUDIT_REASON_LENGTH = 256;
 const DIGEST = /^sha256:[a-f0-9]{64}$/;
@@ -484,6 +501,36 @@ export class InMemoryAgentReleaseStore implements AgentReleaseStore {
   constructor(options: { readonly now?: () => Date; readonly auditWriter?: ReleaseAuditWriter } = {}) {
     this.#clock = options.now ?? (() => new Date());
     this.#auditWriter = options.auditWriter;
+  }
+
+  /**
+   * Postgres / 快照水合：直接注入已持久化的 App 与 Release，重建索引。
+   * 不跑 create/publish 校验；调用方须保证快照自洽。
+   */
+  hydrateSnapshot(input: {
+    readonly apps?: readonly AgentApp[];
+    readonly releases?: readonly StoredRelease[];
+  }): void {
+    for (const app of input.apps ?? []) {
+      this.#apps.set(appKey(app.tenantId, app.appId), clone(app));
+    }
+    for (const record of input.releases ?? []) {
+      const stored = clone(record);
+      this.#byRef.set(refKey(stored.tenantId, stored.release.releaseRef), stored);
+      this.#byContent.set(contentKey(stored.tenantId, stored.release.contentDigest), stored);
+      this.#byIdentity.set(identityKey({
+        tenantId: stored.tenantId,
+        ownerNamespace: stored.ownerNamespace,
+        packageId: stored.packageId,
+        packageVersion: stored.packageVersion,
+        idempotencyKey: stored.idempotencyKey,
+        release: stored.release,
+        lockPayload: stored.lockPayload
+      }), stored);
+      const packageKey = `${keyPart(stored.tenantId)}|${keyPart(stored.packageId)}`;
+      const existing = this.#byPackage.get(packageKey) ?? [];
+      this.#byPackage.set(packageKey, [...existing, stored]);
+    }
   }
 
   submit(request: ReleaseSubmitRequest): ReleaseSubmitResult {

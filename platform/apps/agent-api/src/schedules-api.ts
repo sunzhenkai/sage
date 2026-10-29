@@ -30,6 +30,15 @@ export interface SchedulesPrincipalAuthenticator {
   authenticateRequest(request: FastifyRequest): Promise<AuthenticatedPrincipal | undefined> | AuthenticatedPrincipal | undefined;
 }
 
+export interface ScheduleBudgetAccountPort {
+  upsertScheduleAccount(input: {
+    readonly tenantId: string;
+    readonly scheduleId: string;
+    readonly limits: Readonly<Record<string, number>>;
+    readonly windowMs?: number;
+  }): Promise<'stored' | 'existing'>;
+}
+
 export interface RegisterSchedulesRoutesOptions {
   readonly tenantId: string;
   readonly store: ScheduleControlStore;
@@ -40,7 +49,21 @@ export interface RegisterSchedulesRoutesOptions {
   /** 运行时注入的身份解析器；当前为固定开发 principal，后续换成用户登录/鉴权。 */
   readonly authenticator: SchedulesPrincipalAuthenticator;
   readonly audit: ScheduleApiAuditPort;
+  /** 创建成功后开通 schedule 预算账户；缺省时跳过（单测可用；本地/生产运行时必注入）。 */
+  readonly scheduleAccounts?: ScheduleBudgetAccountPort;
   readonly now?: () => Date;
+}
+
+function budgetLimitsOf(definition: { readonly budget: { readonly limits: readonly { readonly dimension: string; readonly limit: number }[]; readonly windowMs?: number } }): {
+  readonly limits: Readonly<Record<string, number>>;
+  readonly windowMs?: number;
+} {
+  const limits: Record<string, number> = {};
+  for (const item of definition.budget.limits) limits[item.dimension] = item.limit;
+  return {
+    limits,
+    ...(definition.budget.windowMs === undefined ? {} : { windowMs: definition.budget.windowMs })
+  };
 }
 
 function sendError(reply: FastifyReply, status: number, code: string, message: string, retryable = false): FastifyReply {
@@ -112,6 +135,27 @@ export function registerSchedulesRoutes(app: FastifyInstance, options: RegisterS
       const status = code === 'SCHEDULE_ALREADY_EXISTS' ? 409 : 502;
       return sendError(reply, status, code, cause instanceof Error ? cause.message.slice(0, 512) : 'schedule facility unavailable', status === 502);
     }
+    // 账本先于控制面记录：失败只撤设施，不留下 DELETED tombstone 占住 scheduleId。
+    if (options.scheduleAccounts !== undefined) {
+      try {
+        const budget = budgetLimitsOf(definition);
+        await options.scheduleAccounts.upsertScheduleAccount({
+          tenantId: options.tenantId,
+          scheduleId: definition.scheduleId,
+          limits: budget.limits,
+          ...(budget.windowMs === undefined ? {} : { windowMs: budget.windowMs })
+        });
+      } catch (cause) {
+        await options.adapter.remove({ tenantId: options.tenantId, scheduleId: definition.scheduleId }).catch(() => undefined);
+        return sendError(
+          reply,
+          502,
+          'SCHEDULE_BUDGET_ACCOUNT_UNAVAILABLE',
+          cause instanceof Error ? cause.message.slice(0, 512) : 'failed to provision schedule budget account',
+          true
+        );
+      }
+    }
     const stored = await options.store.putRecord({ snapshot: facilitySnapshot, followAnchorReleaseId: releaseId });
     if (stored === 'existing') {
       await options.adapter.remove({ tenantId: options.tenantId, scheduleId: definition.scheduleId }).catch(() => undefined);
@@ -126,7 +170,9 @@ export function registerSchedulesRoutes(app: FastifyInstance, options: RegisterS
     const principal = await principalFor(request);
     if (principal === undefined) return sendError(reply, 401, 'SCHEDULE_AUTHENTICATION_REQUIRED', 'Schedule API requires an authenticated principal');
     const records = await options.store.listRecords(options.tenantId, { limit: 200 });
-    const schedules = await Promise.all(records.map(record => toApiSnapshot(record, options.adapter)));
+    const schedules = await Promise.all(
+      records.filter(record => record.state !== 'DELETED').map(record => toApiSnapshot(record, options.adapter))
+    );
     const response: ApiScheduleListResponse = { schemaVersion: 'ScheduleListResult.v1', schedules };
     return reply.code(200).send(response);
   });

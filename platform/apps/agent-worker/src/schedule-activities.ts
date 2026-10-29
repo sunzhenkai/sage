@@ -124,7 +124,7 @@ export function createScheduleDispatcherActivities(options: CreateScheduleDispat
         } catch { /* 事件流不可用不改变稳定失败语义 */ }
         if (options.observability !== undefined) recordScheduleTriggerSignal(options.observability, { outcome: 'failed', reasonCode: code, correlation: { schedule_id: ref.scheduleId, occurrence_id: activityInput.occurrenceId } });
         // 预算拒止/绑定漂移/不兼容属稳定失败：不再重试；其余（设施/registry 短暂不可用）按 activity retry 有界重试。
-        if (['SCHEDULE_BUDGET_EXHAUSTED', 'SCHEDULE_BINDING_DRIFTED', 'SCHEDULE_BINDING_INCOMPATIBLE', 'SCHEDULE_BINDING_ANCHOR_MISSING', 'SCHEDULE_RELEASE_UNRESOLVABLE', 'LEDGER_SCHEDULE_ACCOUNTS_UNSUPPORTED'].includes(code)) {
+        if (['SCHEDULE_BUDGET_EXHAUSTED', 'SCHEDULE_BINDING_DRIFTED', 'SCHEDULE_BINDING_INCOMPATIBLE', 'SCHEDULE_BINDING_ANCHOR_MISSING', 'SCHEDULE_RELEASE_UNRESOLVABLE', 'LEDGER_SCHEDULE_ACCOUNTS_UNSUPPORTED', 'LEDGER_ACCOUNT_NOT_FOUND'].includes(code)) {
           return { outcome: 'FAILED', occurrenceKey: activityInput.occurrenceKey, errorCode: code };
         }
         throw cause;
