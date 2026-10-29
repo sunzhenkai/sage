@@ -37,6 +37,8 @@ import {
   enforceOutputContract, OutputContractViolation, OUTPUT_CONTRACT_VIOLATION_CODE
 } from './output-contract.js';
 import { runTaskAgentPath, type TaskCanonicalCompatibilityOptions } from './task-compatibility.js';
+import { appendLiveSliceRunLog } from './slice-run-log.js';
+import type { AgentEventStorePort } from '@sage/platform-ports';
 
 const ACTIVITY_RETRY_MAX_ATTEMPTS = 5;
 
@@ -62,6 +64,8 @@ export interface AgentTaskActivityOptions {
   readonly afterCommit?: (result: AgentSliceResult) => Promise<void> | void;
   readonly telemetry?:CrossChainTelemetryRecorder;
   readonly canonicalCompatibility?: TaskCanonicalCompatibilityOptions;
+  /** Live slice → canonical_agent_events（G-O1）；缺省跳过写日志。 */
+  readonly runLogEvents?: Pick<AgentEventStorePort, 'acquireWriterFence' | 'appendEvent'>;
 }
 export interface AgentTaskActivities { executeAgentSlice(input: ExecuteAgentSliceInput): Promise<AgentSliceResult> }
 
@@ -153,6 +157,7 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
       const signal = cancellationSignal();
       let execution: ReturnType<LocalAgentClient['run']> | undefined;
       let committed = false;
+      let livePackageLogOutcome: 'succeeded' | 'paused' | 'failed' | undefined;
       const outputDir = await mkdtemp(join(tmpdir(), `sage-out-${input.taskId.slice(0, 24)}-s${input.sliceNumber}-`));
       const cancelExecution = (): void => execution?.cancel();
       signal.addEventListener('abort', cancelExecution, { once: true });
@@ -209,6 +214,7 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
         if (outcome.status !== 'succeeded' && outcome.status !== 'paused') {
           const failure = (outcome as { readonly error?: { readonly message?: string } }).error;
           process.stderr.write(`agent slice outcome ${outcome.status} for ${input.taskId}: ${failure?.message ?? 'no error detail'}\n`);
+          livePackageLogOutcome = 'failed';
           throw new Error(`AGENT_SLICE_${outcome.status.toUpperCase()}`);
         }
 
@@ -282,10 +288,19 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
         const projection = projectionOf(input, result, result.done ? 'succeeded' : 'running', input.sliceNumber, now().toISOString());
         await options.store.commitSlice(idempotencyKey, ownerToken, result, projection);
         committed = true;
+        livePackageLogOutcome = outcome.status === 'paused' ? 'paused' : 'succeeded';
         heartbeat({ phase: 'committed', sliceNumber: input.sliceNumber });
         await options.afterCommit?.(result);
         return result;
       } catch (cause) {
+        if (
+          livePackageLogOutcome === undefined
+          && isPackageInput
+          && !(cause instanceof CancelledFailure)
+          && !signal.aborted
+        ) {
+          livePackageLogOutcome = 'failed';
+        }
         if (!committed && (signal.aborted || cause instanceof CancelledFailure)) {
           execution?.cancel();
           await execution?.result.catch(() => undefined);
@@ -327,6 +342,17 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
         clearInterval(heartbeatTimer);
         signal.removeEventListener('abort', cancelExecution);
         await rm(outputDir, { recursive: true, force: true }).catch(() => undefined);
+        if (options.runLogEvents !== undefined && isPackageInput && livePackageLogOutcome !== undefined) {
+          await appendLiveSliceRunLog({
+            events: options.runLogEvents,
+            tenantId: input.tenantId,
+            taskId: input.taskId,
+            outcome: livePackageLogOutcome,
+            source: 'package'
+          }).catch((cause) => {
+            process.stderr.write(`live slice run-log write failed for ${input.taskId}: ${cause instanceof Error ? cause.message : 'unknown'}\n`);
+          });
+        }
       }
     }
   };
