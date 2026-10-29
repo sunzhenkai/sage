@@ -103,10 +103,11 @@ task_package_input                         TaskProjectionView
 ## 7. 当前限制
 
 - release registry 与 App 存储是**进程内存态**：agent-api 重启后 App / Release 消失；`task_package_input` 仍在，但按 App 已不可达，需要重新导入。
+- Schedule **控制面记录与预算账户在 Postgres**（与 dispatcher 共用）；创建 schedule 时按 definition.budget 开通账本账户。App/Release 仍为内存，锚点 Release 重启后仍需重新导入。
 - 运行准入 local-only：控制台与本地 API 可发起；生产准入不属于当前能力。
 - package run 的日志与产物仍由 Task 链路提供，本模型不新增日志存储或保留策略。
 - 运行历史 v1 只做最近 N 条（默认 50、最大 100），不做游标分页；状态查询按条读取投影。
-- 尚无按 App 的权限模型、Release channel 与 Postgres 持久化。
+- 尚无按 App 的权限模型、Release channel 与 App/Release 的 Postgres 持久化。
 
 ## 8. 兼容名与后续
 

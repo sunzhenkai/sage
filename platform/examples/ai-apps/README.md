@@ -151,11 +151,12 @@ curl -sS http://127.0.0.1:9610/v1/apps/finance-briefing/releases -H 'x-authentic
 
 | 示例 | inputs | dataSources | 输出契约 |
 |------|--------|-------------|----------|
-| `github-trending` | `language`（可选，模型按其过滤快照） | `trending-snapshot`：GitHub Search API「2026 年新建、star 降序 Top 25」 | `trending-digest` 任务绑定 output.schema.json + `report.md` |
-| `finance-briefing` | `focus`（可选，关注的市场/币种） | `fx-rates`：Frankfurter 美元参考汇率；`index-quotes`：Yahoo Finance 七大全球股指 | `finance-brief` 任务绑定 output.schema.json + `brief.md` |
+| `github-trending` | `language`（可选，模型按其过滤快照） | `trending-snapshot`：GitHub Search API「2026 年新建、star 降序 Top 25」 | `trending-digest` 任务绑定 output.schema.json + `report.json` |
+| `finance-briefing` | `focus`（可选，关注的市场/币种） | `fx-rates`：Frankfurter 美元参考汇率；`index-quotes`：Yahoo Finance 七大全球股指 | `finance-brief` 任务绑定 output.schema.json + `brief.json` |
 | `lifecycle-probe` | — | — | 固定自检报告，逐字可断言 |
 
 - 发起运行请求体为 `{ task?, params? }`；旧自由文本 `input` 字段返回 `410 INPUT_REMOVED`。
-- 留空的参数由服务端按声明默认值补齐；声明 schema 的任务输出在物化点强制校验（不符即任务失败）。
+- 留空的参数由服务端按声明默认值补齐。
+- **产物物化（Live 路径）**：包运行 harness 为单轮纯文本、无写盘工具。若 `SAGE_OUTPUT_DIR` 为空，平台把模型回复正文物化为首个 `output.files`（无声明时为 `output.md`）。声明了 `output.schema` 时，物化前对正文做 JSON Schema 子集强制校验（不符 → `PACKAGE_OUTPUT_CONTRACT_VIOLATION`）；目录里已有文件时不改写、也不再对正文套 schema。
 - 数据源获取走受控出口白名单：agent-api env `SAGE_PACKAGE_SNAPSHOT_EGRESS_ALLOWLIST`（local compose 已配置 `api.github.com`、`api.frankfurter.dev`、`query1.finance.yahoo.com`；缺省即全拒绝，声明了数据源的运行会以 `PACKAGE_SNAPSHOT_SOURCE_UNAVAILABLE` 稳定失败）。
-- 已知限制：数据源 URL 为静态地址（无日期/参数模板）。github-trending 以「2026 年新建」为口径；finance-briefing 的两个数据源均声明 `markMissing`（源不可达时降级为缺失标注而非整体失败，汇率数据按 ECB 口径仅工作日更新）；动态时间窗需要后续的 URL 模板契约。
+- 已知限制：数据源 URL 为静态地址（无日期/参数模板）。github-trending 以「2026 年新建」为口径；finance-briefing 的两个数据源均声明 `markMissing`（源不可达时降级为缺失标注而非整体失败，汇率数据按 ECB 口径仅工作日更新）；动态时间窗需要后续的 URL 模板契约。`skillRefs` / `capabilityRefs` 目前为声明字段，运行时取数走 dataSources egress，不加载独立 skill/capability 包。
