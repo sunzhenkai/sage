@@ -46,7 +46,18 @@ class FakeFacility implements SchedulePort {
 
 interface Harness { app: ReturnType<typeof Fastify>; audit: { records: { decision: string }[] } }
 
-const build = (options: { readonly principal?: AuthenticatedPrincipal | null; readonly appStatus?: AppStatusLookup } = {}): Harness => {
+const build = (options: {
+  readonly principal?: AuthenticatedPrincipal | null;
+  readonly appStatus?: AppStatusLookup;
+  readonly scheduleAccounts?: {
+    upsertScheduleAccount: (input: {
+      readonly tenantId: string;
+      readonly scheduleId: string;
+      readonly limits: Readonly<Record<string, number>>;
+      readonly windowMs?: number;
+    }) => Promise<'stored' | 'existing'>;
+  };
+} = {}): Harness => {
   const app = Fastify();
   const store = new InMemoryScheduleControlStore();
   const audit: { records: { decision: string }[] } = { records: [] };
@@ -62,6 +73,7 @@ const build = (options: { readonly principal?: AuthenticatedPrincipal | null; re
       } : undefined
     },
     ...(options.appStatus === undefined ? {} : { appStatus: options.appStatus }),
+    ...(options.scheduleAccounts === undefined ? {} : { scheduleAccounts: options.scheduleAccounts }),
     authenticator: {
       authenticateRequest: (): AuthenticatedPrincipal | undefined => options.principal === undefined ? { authenticationId: 'local-dev-auth', principalId: 'local-dev-principal', tenantId: 'tenant-a', roles: ['schedule-operator'] } : options.principal ?? undefined
     },
@@ -95,6 +107,36 @@ describe('/v1/schedules API', () => {
     const duplicate = await app.inject({ method: 'POST', url: '/v1/schedules', payload: { definition, releaseId: 'release-1' } });
     expect(duplicate.statusCode).toBe(409);
     expect(duplicate.json().error.code).toBe('SCHEDULE_ALREADY_EXISTS');
+  });
+
+  it('provisions a schedule budget account from the definition limits on create', async () => {
+    const provisioned: Array<{ scheduleId: string; limits: Readonly<Record<string, number>> }> = [];
+    const { app } = build({
+      scheduleAccounts: {
+        async upsertScheduleAccount(input) {
+          provisioned.push({ scheduleId: input.scheduleId, limits: input.limits });
+          return 'stored';
+        }
+      }
+    });
+    const created = await app.inject({ method: 'POST', url: '/v1/schedules', payload: { definition, releaseId: 'release-1' } });
+    expect(created.statusCode).toBe(201);
+    expect(provisioned).toEqual([{ scheduleId: 'daily-brief', limits: { runs: 100 } }]);
+  });
+
+  it('rolls back facility create when budget account provisioning fails', async () => {
+    const { app } = build({
+      scheduleAccounts: {
+        async upsertScheduleAccount() {
+          throw new Error('LEDGER_UNAVAILABLE: boom');
+        }
+      }
+    });
+    const created = await app.inject({ method: 'POST', url: '/v1/schedules', payload: { definition, releaseId: 'release-1' } });
+    expect(created.statusCode).toBe(502);
+    expect(created.json().error.code).toBe('SCHEDULE_BUDGET_ACCOUNT_UNAVAILABLE');
+    const list = await app.inject({ method: 'GET', url: '/v1/schedules' });
+    expect(list.json().schedules).toEqual([]);
   });
 
   it('rejects creation when the bound task or params are not declared by the anchor release', async () => {

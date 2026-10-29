@@ -63,14 +63,13 @@ describe('validateJsonSchemaSubset', () => {
   });
 });
 
-describe('enforceOutputContract remains a deterministic-artifact helper', () => {
-  it('still validates JSON when invoked directly, but worker no longer calls it on model text', () => {
+describe('enforceOutputContract', () => {
+  it('validates fenced JSON when a schema is declared', () => {
     const schema = JSON.stringify({ type: 'object', required: ['overview'], properties: { overview: { type: 'string' } } });
     expect(enforceOutputContract('```json\n{"overview":"ok"}\n```', { schema })).toContain('overview');
-    expect(enforceOutputContract('plain markdown', { files: ['brief.md'] })).toBe('plain markdown');
   });
 
-  it('treats schema-present and schema-absent text as equivalent for materialization (no body gate)', () => {
+  it('passes plain text through when no schema is declared', () => {
     const body = 'not json at all';
     expect(enforceOutputContract(body, { files: ['brief.md'] })).toBe(body);
     expect(enforceOutputContract(body, { files: ['brief.md'], ...({ schema: undefined } as unknown as { schema?: string }) })).toBe(body);

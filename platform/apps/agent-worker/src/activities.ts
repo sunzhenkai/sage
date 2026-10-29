@@ -33,6 +33,9 @@ import { resolvePackageRunConnection } from '@sage/task-domain';
 import {
   assertDeclaredFiles, injectOutputDirectory, listOutputFiles, packOutputDirectory, writeCompatOutput, OutputArchiveError
 } from '@sage/agent-package-release';
+import {
+  enforceOutputContract, OutputContractViolation, OUTPUT_CONTRACT_VIOLATION_CODE
+} from './output-contract.js';
 import { runTaskAgentPath, type TaskCanonicalCompatibilityOptions } from './task-compatibility.js';
 
 const ACTIVITY_RETRY_MAX_ATTEMPTS = 5;
@@ -211,13 +214,34 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
 
         const outputContract = packageRecord?.runContract;
         const declaredFiles = outputContract?.files ?? [];
-        // Declared output.files must be written by the agent into SAGE_OUTPUT_DIR.
-        // Never invent them from chat text — that turns refusals into false "succeeded" runs.
-        if (declaredFiles.length === 0
-          && (await listOutputFiles(outputDir)).length === 0
-          && outcome.output !== undefined
-          && outcome.output.length > 0) {
-          await writeCompatOutput(outputDir, outcome.output, declaredFiles);
+        // Live package harness is text-only (no filesystem tools). When SAGE_OUTPUT_DIR is
+        // still empty, materialize the model body into the first declared file (or output.md).
+        // Schema is enforced only on that text→file path so tool-written dirs are unchanged.
+        if ((await listOutputFiles(outputDir)).length === 0) {
+          let materializeBody = outcome.output;
+          if (outputContract?.schema !== undefined) {
+            if (materializeBody === undefined || materializeBody.length === 0) {
+              throw ApplicationFailure.nonRetryable(
+                `${OUTPUT_CONTRACT_VIOLATION_CODE}:output is empty while the task declares an output schema`,
+                OUTPUT_CONTRACT_VIOLATION_CODE
+              );
+            }
+            try {
+              materializeBody = enforceOutputContract(materializeBody, outputContract);
+            } catch (cause) {
+              if (cause instanceof OutputContractViolation) {
+                throw ApplicationFailure.nonRetryable(cause.message, OUTPUT_CONTRACT_VIOLATION_CODE);
+              }
+              throw cause;
+            }
+          }
+          if (materializeBody !== undefined && materializeBody.length > 0) {
+            await writeCompatOutput(
+              outputDir,
+              materializeBody,
+              declaredFiles.length > 0 ? declaredFiles : undefined
+            );
+          }
         }
         if (declaredFiles.length > 0) {
           try {

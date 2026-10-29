@@ -1,6 +1,6 @@
 schemaVersion: '2'
 id: finance-briefing
-version: 2.0.0
+version: 2.1.0
 description: 财经简报助手：自动获取最新外汇汇率与全球主要股指快照并产出结构化财经简报，无需任何用户输入
 entry: prompts/system.md
 modelRoute:
@@ -35,4 +35,4 @@ tasks:
     entry: prompts/system.md
     output:
       schema: output.schema.json
-      files: [brief.md]
+      files: [brief.json]

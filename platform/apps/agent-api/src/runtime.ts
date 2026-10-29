@@ -12,13 +12,15 @@ import { LegacyAgentRunSpecV1Adapter, parseAgentExecutionFeatureConfig, runShado
 import { PostgresTaskStore } from '@sage/task-store-postgres';
 import { createLocalSecretBackendFromEnv } from '@sage/secret-vault';
 import { CatalogServiceError, CatalogSyncManager, ProviderCatalogService, ProviderCatalogStore } from '@sage/provider-catalog';
-import { InMemoryScheduleControlStore } from '@sage/local-fakes';
 import { TemporalScheduleAdapter } from '@sage/temporal-schedules';
 import { registerSchedulesRoutes } from './schedules-api.js';
 import { registerEffectResolutionsRoute } from './effect-resolutions-api.js';
 import { EffectResolutionService } from './effect-resolution.js';
 import { ServiceTokenAuthenticator } from './service-token.js';
-import { PostgresAgentStateAdapter, PostgresToolEffectLedger, PostgresTaskRunLogQuery } from '@sage/agent-state-postgres';
+import {
+  PostgresAgentStateAdapter, PostgresToolEffectLedger, PostgresTaskRunLogQuery,
+  PostgresScheduleStore, PostgresConsumptionLedger
+} from '@sage/agent-state-postgres';
 import { TASK_NAMESPACE, TASK_QUEUE } from '@sage/task-domain';
 import { createDevRegistryBundle, publishDevRegistry } from '@sage/temporal-registry';
 import { TemporalClientFactory, TrustedMultiTargetTaskController, TrustedTemporalRouter } from '@sage/temporal-routing';
@@ -252,10 +254,13 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
     });
     // service token 只用于 MCP 外部入口与 dispatcher 内部解析端点。
     // schedules 管理链路是 web→server：当前复用固定开发 principal，后续由用户登录/鉴权接管。
+    // 控制面记录与 dispatcher 共用 PostgresScheduleStore；创建时开通消费账本 schedule 账户。
     const serviceToken = ServiceTokenAuthenticator.fromEnv(process.env, config.tenantId);
+    const scheduleStore = new PostgresScheduleStore({ connectionString: config.postgresUrl });
+    const scheduleLedger = new PostgresConsumptionLedger({ connectionString: config.postgresUrl });
     registerSchedulesRoutes(app, {
       tenantId: config.tenantId,
-      store: new InMemoryScheduleControlStore(),
+      store: scheduleStore,
       adapter: await TemporalScheduleAdapter.connect({ address: config.temporalAddress, namespace: 'sage-dev' }),
       releaseResolver: {
         async resolveRelease(tenantId, releaseId) {
@@ -279,6 +284,7 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
       },
       appStatus: packageStore,
       authenticator,
+      scheduleAccounts: scheduleLedger,
       audit: { append: async (input: { readonly tenantId: string; readonly occurredAt: string; readonly category: 'schedule'; readonly decision: string; readonly reasonCode: string; readonly actorRef: string; readonly correlation: Readonly<Record<string, string | number>>; readonly authorityDigest: string }) => { process.stdout.write(`[schedule-audit] ${JSON.stringify(input)}\n`); } },
     });
     const scheduleDispatchToken = serviceToken;
