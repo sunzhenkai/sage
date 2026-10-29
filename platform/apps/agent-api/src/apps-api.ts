@@ -14,7 +14,7 @@ import {
   ReleaseRegistryError,
   type AgentApp,
   type AgentAppDetail,
-  type AgentReleaseStore,
+  type AsyncAgentReleaseStore,
   type AppDraft,
   type ReleasePayload,
   type StoredRelease,
@@ -34,7 +34,7 @@ export interface AppsPrincipalAuthenticator {
 
 export interface RegisterAppsRoutesOptions {
   readonly tenantId: string;
-  readonly store: AgentReleaseStore;
+  readonly store: AsyncAgentReleaseStore;
   readonly ownerNamespace: string;
   /** pilot 强认证（5.1）：true 时 stub 信任头停止提权，仅 service token 主体被认可。 */
   readonly serviceTokenRequired?: boolean;
@@ -217,7 +217,7 @@ export function registerAppsRoutes(app: FastifyInstance, options: RegisterAppsRo
       const principal = await principalFor(request, options);
       if (!principal) return unauthorized(reply);
       try {
-        const created = options.store.createApp({
+        const created = await options.store.createApp({
           tenantId: options.tenantId,
           ownerNamespace: options.ownerNamespace,
           appId: request.body.appId,
@@ -244,17 +244,18 @@ export function registerAppsRoutes(app: FastifyInstance, options: RegisterAppsRo
   app.get('/v1/apps', async (request, reply) => {
     const principal = await principalFor(request, options);
     if (!principal) return unauthorized(reply);
-    const apps = options.store.listApps(options.tenantId, { limit: 64 });
+    const apps = await options.store.listApps(options.tenantId, { limit: 64 });
+    const details = await Promise.all(apps.map((entry) => options.store.getApp(options.tenantId, entry.appId)));
     return {
       schemaVersion: 'AppList.v1',
-      apps: apps.map((entry) => draftWithFiles(entry, options.store.getApp(options.tenantId, entry.appId)?.releases ?? []))
+      apps: apps.map((entry, index) => draftWithFiles(entry, details[index]?.releases ?? []))
     };
   });
 
   app.get<{ Params: { appId: string } }>('/v1/apps/:appId', async (request, reply) => {
     const principal = await principalFor(request, options);
     if (!principal) return unauthorized(reply);
-    const detail = options.store.getApp(options.tenantId, request.params.appId);
+    const detail = await options.store.getApp(options.tenantId, request.params.appId);
     if (detail === undefined) return sendError(reply, 404, 'APP_NOT_FOUND', 'App not found');
     return appDetailPayload(detail);
   });
@@ -266,10 +267,10 @@ export function registerAppsRoutes(app: FastifyInstance, options: RegisterAppsRo
       const principal = await principalFor(request, options);
       if (!principal) return unauthorized(reply);
       try {
-        const detail = options.store.getApp(options.tenantId, request.params.appId);
+        const detail = await options.store.getApp(options.tenantId, request.params.appId);
         if (detail === undefined) return sendError(reply, 404, 'APP_NOT_FOUND', 'App not found');
         const expectedRevision = expectedRevisionFrom(request, detail.app.draft.revision);
-        const result = options.store.updateAppMetadata({
+        const result = await options.store.updateAppMetadata({
           tenantId: options.tenantId,
           appId: request.params.appId,
           expectedRevision,
@@ -278,7 +279,7 @@ export function registerAppsRoutes(app: FastifyInstance, options: RegisterAppsRo
         });
         if (result.status === 'conflict') return revisionConflict(reply, result.currentRevision);
         setRevisionEtag(reply, result.app.draft.revision);
-        return draftWithFiles(result.app, options.store.listAppReleases(options.tenantId, request.params.appId));
+        return draftWithFiles(result.app, await options.store.listAppReleases(options.tenantId, request.params.appId));
       } catch (cause) {
         return mapped(reply, cause);
       }
@@ -288,12 +289,12 @@ export function registerAppsRoutes(app: FastifyInstance, options: RegisterAppsRo
   app.delete<{ Params: { appId: string } }>('/v1/apps/:appId', async (request, reply) => {
     const principal = await principalFor(request, options);
     if (!principal) return unauthorized(reply);
-    const existing = options.store.getApp(options.tenantId, request.params.appId);
+    const existing = await options.store.getApp(options.tenantId, request.params.appId);
     if (existing === undefined) {
       // 幂等：不存在或已删除都视为成功
       return reply.code(200).send({ schemaVersion: 'AppDelete.v1', appId: request.params.appId, status: 'deleted' });
     }
-    const deleted = options.store.softDeleteApp(options.tenantId, request.params.appId);
+    const deleted = await options.store.softDeleteApp(options.tenantId, request.params.appId);
     if (deleted === undefined) return reply.code(200).send({ schemaVersion: 'AppDelete.v1', appId: request.params.appId, status: 'deleted' });
     return reply.code(200).send({ schemaVersion: 'AppDelete.v1', appId: deleted.appId, status: deleted.status, deletedAt: deleted.deletedAt });
   });
@@ -301,7 +302,7 @@ export function registerAppsRoutes(app: FastifyInstance, options: RegisterAppsRo
   app.get<{ Params: { appId: string } }>('/v1/apps/:appId/draft', async (request, reply) => {
     const principal = await principalFor(request, options);
     if (!principal) return unauthorized(reply);
-    const detail = options.store.getApp(options.tenantId, request.params.appId);
+    const detail = await options.store.getApp(options.tenantId, request.params.appId);
     if (detail === undefined) return sendError(reply, 404, 'APP_NOT_FOUND', 'App not found');
     setRevisionEtag(reply, detail.app.draft.revision);
     return draftPayload(detail.app.appId, detail.app.draft);
@@ -314,10 +315,10 @@ export function registerAppsRoutes(app: FastifyInstance, options: RegisterAppsRo
       const principal = await principalFor(request, options);
       if (!principal) return unauthorized(reply);
       try {
-        const detail = options.store.getApp(options.tenantId, request.params.appId);
+        const detail = await options.store.getApp(options.tenantId, request.params.appId);
         if (detail === undefined) return sendError(reply, 404, 'APP_NOT_FOUND', 'App not found');
         const expectedRevision = expectedRevisionFrom(request, detail.app.draft.revision);
-        const result = options.store.putAppDraft({
+        const result = await options.store.putAppDraft({
           tenantId: options.tenantId,
           appId: request.params.appId,
           expectedRevision,
@@ -338,11 +339,11 @@ export function registerAppsRoutes(app: FastifyInstance, options: RegisterAppsRo
       const principal = await principalFor(request, options);
       if (!principal) return unauthorized(reply);
       try {
-        const detail = options.store.getApp(options.tenantId, request.params.appId);
+        const detail = await options.store.getApp(options.tenantId, request.params.appId);
         if (detail === undefined) return sendError(reply, 404, 'APP_NOT_FOUND', 'App not found');
         const expectedRevision = expectedRevisionFrom(request, detail.app.draft.revision);
         const files = sourceArchiveFilesRecord(unpackSourceArchive(await readMultipartArchive(request)));
-        const result = options.store.putAppDraft({
+        const result = await options.store.putAppDraft({
           tenantId: options.tenantId,
           appId: request.params.appId,
           expectedRevision,
@@ -360,7 +361,7 @@ export function registerAppsRoutes(app: FastifyInstance, options: RegisterAppsRo
   app.get<{ Params: { appId: string } }>('/v1/apps/:appId/draft/export', async (request, reply) => {
     const principal = await principalFor(request, options);
     if (!principal) return unauthorized(reply);
-    const detail = options.store.getApp(options.tenantId, request.params.appId);
+    const detail = await options.store.getApp(options.tenantId, request.params.appId);
     if (detail === undefined) return sendError(reply, 404, 'APP_NOT_FOUND', 'App not found');
     const draft = detail.app.draft;
     setRevisionEtag(reply, draft.revision);
@@ -377,7 +378,7 @@ export function registerAppsRoutes(app: FastifyInstance, options: RegisterAppsRo
       const principal = await principalFor(request, options);
       if (!principal) return unauthorized(reply);
       try {
-        const detail = options.store.getApp(options.tenantId, request.params.appId);
+        const detail = await options.store.getApp(options.tenantId, request.params.appId);
         if (detail === undefined) return sendError(reply, 404, 'APP_NOT_FOUND', 'App not found');
         const app = detail.app;
         if (Object.keys(app.draft.files).length === 0) {
@@ -397,7 +398,7 @@ export function registerAppsRoutes(app: FastifyInstance, options: RegisterAppsRo
         });
         const release = compiled.release;
         const releasePayload: ReleasePayload = JSON.parse(serializeAgentPackageReleaseV1(release)) as ReleasePayload;
-        const result = options.store.publishAppRelease({
+        const result = await options.store.publishAppRelease({
           tenantId: options.tenantId,
           ownerNamespace: options.ownerNamespace,
           appId: request.params.appId,
@@ -431,7 +432,7 @@ export function registerAppsRoutes(app: FastifyInstance, options: RegisterAppsRo
   app.get<{ Params: { appId: string } }>('/v1/apps/:appId/releases', async (request, reply) => {
     const principal = await principalFor(request, options);
     if (!principal) return unauthorized(reply);
-    const detail = options.store.getApp(options.tenantId, request.params.appId);
+    const detail = await options.store.getApp(options.tenantId, request.params.appId);
     if (detail === undefined) return sendError(reply, 404, 'APP_NOT_FOUND', 'App not found');
     return {
       schemaVersion: 'AppReleaseList.v1',
@@ -443,7 +444,7 @@ export function registerAppsRoutes(app: FastifyInstance, options: RegisterAppsRo
   app.get<{ Params: { appId: string; releaseId: string } }>('/v1/apps/:appId/releases/:releaseId', async (request, reply) => {
     const principal = await principalFor(request, options);
     if (!principal) return unauthorized(reply);
-    const detail = options.store.getApp(options.tenantId, request.params.appId);
+    const detail = await options.store.getApp(options.tenantId, request.params.appId);
     if (detail === undefined) return sendError(reply, 404, 'APP_NOT_FOUND', 'App not found');
     const record = detail.releases.find((entry) => entry.release.releaseId === request.params.releaseId);
     if (record === undefined) return sendError(reply, 404, 'RELEASE_NOT_FOUND', 'Release not found');
@@ -459,7 +460,7 @@ export function registerAppsRoutes(app: FastifyInstance, options: RegisterAppsRo
       if (format !== 'source' && format !== 'bundle') {
         return sendError(reply, 400, 'APP_INVALID', "format must be 'source' or 'bundle'");
       }
-      const detail = options.store.getApp(options.tenantId, request.params.appId);
+      const detail = await options.store.getApp(options.tenantId, request.params.appId);
       if (detail === undefined) return sendError(reply, 404, 'APP_NOT_FOUND', 'App not found');
       const record = detail.releases.find((entry) => entry.release.releaseId === request.params.releaseId);
       if (record === undefined) return sendError(reply, 404, 'RELEASE_NOT_FOUND', 'Release not found');

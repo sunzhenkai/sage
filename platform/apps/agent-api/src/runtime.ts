@@ -7,6 +7,7 @@ import type { AuthenticatedPrincipal } from '@sage/app-contracts';
 import { ChatStore } from '@sage/chat-domain';
 import { InMemoryAgentTaskSpecStore, InMemoryCredentialProvider } from '@sage/local-fakes';
 import { InMemoryAgentReleaseStore } from '@sage/agent-release-registry';
+import { PostgresBackedAgentReleaseStore } from './postgres-release-store.js';
 import { createLocalKernelComposition } from '@sage/local-runtime';
 import { LegacyAgentRunSpecV1Adapter, parseAgentExecutionFeatureConfig, runShadowEngine, selectAgentExecutionMode, type AgentExecutionMode, type AgentLifecycleOwner, type LegacyAdapterResult } from '@sage/agent-client';
 import { PostgresTaskStore } from '@sage/task-store-postgres';
@@ -218,10 +219,11 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
       artifactResolver: createRunOutputArtifactResolver({ tenantId: config.tenantId, lookup: tasks }),
       runLogQuery: new PostgresTaskRunLogQuery({ connectionString: config.postgresUrl })
     });
-    const packageStore = new InMemoryAgentReleaseStore();
+    const packageRegistry = await PostgresBackedAgentReleaseStore.open({ connectionString: config.postgresUrl });
+    const packageStore: InMemoryAgentReleaseStore = packageRegistry.sync;
     const packageSpecStore = new InMemoryAgentTaskSpecStore();
     registerAppsRoutes(app, {
-      tenantId: config.tenantId, store: packageStore, ownerNamespace: 'package-platform',
+      tenantId: config.tenantId, store: packageRegistry, ownerNamespace: 'package-platform',
       authenticator, engineIds: ['engine-local']
     });
     registerAppRunsRoutes(app, {

@@ -73,7 +73,8 @@ export class PostgresAgentStateAdapter extends PostgresPort implements AgentStat
       // RLS 引导（sage_security schema/函数/角色）先于 005：005 的表策略引用 sage_security.current_tenant_id()。
       '004_agent_package_release_registry.sql', '004_production_rls_bootstrap.sql', '005_production_governance_core.sql',
       '006_production_rls_roles.sql',
-      '007_artifact_checkpoint_lifecycle.sql', '008_supply_chain_governance.sql', '009_p8_schedule_plane.sql'
+      '007_artifact_checkpoint_lifecycle.sql', '008_supply_chain_governance.sql', '009_p8_schedule_plane.sql',
+      '010_agent_apps.sql'
     ].map(async (name) => ({ name, sql: await readFile(new URL(`../migrations/${name}`, import.meta.url), 'utf8') })));
     const client = await this.pool.connect();
     try {
