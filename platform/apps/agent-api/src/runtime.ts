@@ -6,7 +6,8 @@ import { Connection } from '@temporalio/client';
 import type { AuthenticatedPrincipal } from '@sage/app-contracts';
 import { ChatStore } from '@sage/chat-domain';
 import { InMemoryCredentialProvider } from '@sage/local-fakes';
-import type { AgentReleaseStore } from '@sage/agent-release-registry';
+import type { AgentReleaseStore, InMemoryAgentReleaseStore } from '@sage/agent-release-registry';
+import { PostgresBackedAgentReleaseStore } from './postgres-release-store.js';
 import { createLocalKernelComposition } from '@sage/local-runtime';
 import { LegacyAgentRunSpecV1Adapter, parseAgentExecutionFeatureConfig, runShadowEngine, selectAgentExecutionMode, type AgentExecutionMode, type AgentLifecycleOwner, type LegacyAdapterResult } from '@sage/agent-client';
 import { PostgresTaskStore } from '@sage/task-store-postgres';
@@ -18,7 +19,7 @@ import { registerEffectResolutionsRoute } from './effect-resolutions-api.js';
 import { EffectResolutionService } from './effect-resolution.js';
 import { ServiceTokenAuthenticator } from './service-token.js';
 import {
-  PostgresAgentReleaseStore, PostgresAgentStateAdapter, PostgresAgentTaskSpecStore, PostgresToolEffectLedger, PostgresTaskRunLogQuery,
+  PostgresAgentStateAdapter, PostgresAgentTaskSpecStore, PostgresToolEffectLedger, PostgresTaskRunLogQuery,
   PostgresScheduleStore, PostgresConsumptionLedger
 } from '@sage/agent-state-postgres';
 import { TASK_NAMESPACE, TASK_QUEUE } from '@sage/task-domain';
@@ -218,29 +219,15 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
       artifactResolver: createRunOutputArtifactResolver({ tenantId: config.tenantId, lookup: tasks }),
       runLogQuery: new PostgresTaskRunLogQuery({ connectionString: config.postgresUrl })
     });
-    // Apps / Releases / TaskSpecs 持久化到 Postgres（010 迁移已由 migrateStores 执行），重启/重新部署不再丢失。
-    const packageStore = await PostgresAgentReleaseStore.open(
-      { connectionString: config.postgresUrl, connectionTimeoutMillis: 2_000 },
-      { log: (message) => app?.log.info(message) }
-    );
+    // App / Draft / Release：agent_apps + agent_package_releases 写穿（010_agent_apps）；TaskSpec：agent_task_specs。重启后水合。
+    const packageRegistry = await PostgresBackedAgentReleaseStore.open({ connectionString: config.postgresUrl, connectionTimeoutMillis: 2_000 });
+    const packageStore: InMemoryAgentReleaseStore = packageRegistry.sync;
     const packageSpecStore = new PostgresAgentTaskSpecStore({ connectionString: config.postgresUrl, connectionTimeoutMillis: 2_000 });
-    // 接口同步、写库异步：响应发出前等待落盘，保证 2xx 即已持久化；落盘失败返回 503 而非假成功。
-    app.addHook('onSend', async (_request, reply, payload) => {
-      try {
-        await packageStore.flush();
-      } catch {
-        if (reply.statusCode < 400) {
-          reply.code(503).header('content-type', 'application/json; charset=utf-8');
-          return JSON.stringify({ error: 'RELEASE_STORE_PERSISTENCE_FAILED' });
-        }
-      }
-      return payload;
-    });
     app.addHook('onClose', async () => {
-      await Promise.allSettled([packageStore.close(), packageSpecStore.close()]);
+      await Promise.allSettled([packageRegistry.close(), packageSpecStore.close()]);
     });
     registerAppsRoutes(app, {
-      tenantId: config.tenantId, store: packageStore, ownerNamespace: 'package-platform',
+      tenantId: config.tenantId, store: packageRegistry, ownerNamespace: 'package-platform',
       authenticator, engineIds: ['engine-local']
     });
     registerAppRunsRoutes(app, {

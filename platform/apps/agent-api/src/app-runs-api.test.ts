@@ -1,7 +1,7 @@
 import Fastify from 'fastify';
 import { describe, expect, it } from 'vitest';
 import type { AuthenticatedPrincipal } from '@sage/app-contracts';
-import { InMemoryAgentReleaseStore } from '@sage/agent-release-registry';
+import { InMemoryAgentReleaseStore, toAsyncAgentReleaseStore} from '@sage/agent-release-registry';
 import type { TaskPackageInputRecord, TaskPackageRunIndexEntry, TaskProjectionView, TaskStatus } from '@sage/task-domain';
 import { registerAppsRoutes } from './apps-api.js';
 import { registerAppRunsRoutes } from './app-runs-api.js';
@@ -45,7 +45,7 @@ async function api(options: { readonly authenticated?: boolean; readonly harness
   const app = Fastify({ logger: false });
   const store = new InMemoryAgentReleaseStore({ now: () => new Date('2026-10-20T00:00:00.000Z') });
   registerAppsRoutes(app, {
-    tenantId: 'tenant-local', store, ownerNamespace: 'package-platform',
+    tenantId: 'tenant-local', store: toAsyncAgentReleaseStore(store), ownerNamespace: 'package-platform',
     authenticator: { authenticateRequest: () => options.authenticated === false ? undefined : principal },
     engineIds: ['engine-local']
   });
