@@ -3,7 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
   "scripts": {
     "clean": "rm -rf dist",
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -11,9 +16,12 @@
   },
   "dependencies": {
     "@sage/agent-contracts": "workspace:*",
+    "@sage/agent-release-registry": "workspace:*",
     "@sage/platform-ports": "workspace:*",
     "@sage/production-governance": "workspace:*",
     "pg": "8.23.0"
   },
-  "devDependencies": { "@types/pg": "8.21.0" }
+  "devDependencies": {
+    "@types/pg": "8.21.0"
+  }
 }

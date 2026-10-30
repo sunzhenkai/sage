@@ -5,8 +5,8 @@ import { Pool } from 'pg';
 import { Connection } from '@temporalio/client';
 import type { AuthenticatedPrincipal } from '@sage/app-contracts';
 import { ChatStore } from '@sage/chat-domain';
-import { InMemoryAgentTaskSpecStore, InMemoryCredentialProvider } from '@sage/local-fakes';
-import { InMemoryAgentReleaseStore } from '@sage/agent-release-registry';
+import { InMemoryCredentialProvider } from '@sage/local-fakes';
+import type { AgentReleaseStore } from '@sage/agent-release-registry';
 import { createLocalKernelComposition } from '@sage/local-runtime';
 import { LegacyAgentRunSpecV1Adapter, parseAgentExecutionFeatureConfig, runShadowEngine, selectAgentExecutionMode, type AgentExecutionMode, type AgentLifecycleOwner, type LegacyAdapterResult } from '@sage/agent-client';
 import { PostgresTaskStore } from '@sage/task-store-postgres';
@@ -18,7 +18,7 @@ import { registerSchedulesRoutes } from './schedules-api.js';
 import { registerEffectResolutionsRoute } from './effect-resolutions-api.js';
 import { EffectResolutionService } from './effect-resolution.js';
 import { ServiceTokenAuthenticator } from './service-token.js';
-import { PostgresAgentStateAdapter, PostgresToolEffectLedger, PostgresTaskRunLogQuery } from '@sage/agent-state-postgres';
+import { PostgresAgentReleaseStore, PostgresAgentStateAdapter, PostgresAgentTaskSpecStore, PostgresToolEffectLedger, PostgresTaskRunLogQuery } from '@sage/agent-state-postgres';
 import { TASK_NAMESPACE, TASK_QUEUE } from '@sage/task-domain';
 import { createDevRegistryBundle, publishDevRegistry } from '@sage/temporal-registry';
 import { TemporalClientFactory, TrustedMultiTargetTaskController, TrustedTemporalRouter } from '@sage/temporal-routing';
@@ -216,8 +216,27 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
       artifactResolver: createRunOutputArtifactResolver({ tenantId: config.tenantId, lookup: tasks }),
       runLogQuery: new PostgresTaskRunLogQuery({ connectionString: config.postgresUrl })
     });
-    const packageStore = new InMemoryAgentReleaseStore();
-    const packageSpecStore = new InMemoryAgentTaskSpecStore();
+    // Apps / Releases / TaskSpecs 持久化到 Postgres（010 迁移已由 migrateStores 执行），重启/重新部署不再丢失。
+    const packageStore = await PostgresAgentReleaseStore.open(
+      { connectionString: config.postgresUrl, connectionTimeoutMillis: 2_000 },
+      { log: (message) => app?.log.info(message) }
+    );
+    const packageSpecStore = new PostgresAgentTaskSpecStore({ connectionString: config.postgresUrl, connectionTimeoutMillis: 2_000 });
+    // 接口同步、写库异步：响应发出前等待落盘，保证 2xx 即已持久化；落盘失败返回 503 而非假成功。
+    app.addHook('onSend', async (_request, reply, payload) => {
+      try {
+        await packageStore.flush();
+      } catch {
+        if (reply.statusCode < 400) {
+          reply.code(503).header('content-type', 'application/json; charset=utf-8');
+          return JSON.stringify({ error: 'RELEASE_STORE_PERSISTENCE_FAILED' });
+        }
+      }
+      return payload;
+    });
+    app.addHook('onClose', async () => {
+      await Promise.allSettled([packageStore.close(), packageSpecStore.close()]);
+    });
     registerAppsRoutes(app, {
       tenantId: config.tenantId, store: packageStore, ownerNamespace: 'package-platform',
       authenticator, engineIds: ['engine-local']
@@ -230,12 +249,12 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
       tenantId: config.tenantId,
       controller,
       releaseResolver: {
-        async resolveRelease(tenantId, releaseId): Promise<{ readonly release: ReturnType<InMemoryAgentReleaseStore['resolveImmutableRelease']>['release']; readonly lockPayload: ResolvedReleaseLockPayload } | undefined> {
+        async resolveRelease(tenantId, releaseId): Promise<{ readonly release: ReturnType<AgentReleaseStore['resolveImmutableRelease']>['release']; readonly lockPayload: ResolvedReleaseLockPayload } | undefined> {
           try {
             const resolution = packageStore.resolveImmutableRelease(tenantId, `release://${releaseId}`);
             const stored = packageStore.getStoredRelease(tenantId, `release://${releaseId}`);
             const lockPayload = stored === undefined ? {} : (stored.lockPayload as ResolvedReleaseLockPayload);
-            return { release: resolution.release as ReturnType<InMemoryAgentReleaseStore['resolveImmutableRelease']>['release'], lockPayload };
+            return { release: resolution.release as ReturnType<AgentReleaseStore['resolveImmutableRelease']>['release'], lockPayload };
           } catch {
             return undefined;
           }

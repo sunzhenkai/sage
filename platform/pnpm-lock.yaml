@@ -611,6 +611,9 @@ importers:
       '@sage/agent-contracts':
         specifier: workspace:*
         version: link:../agent-contracts
+      '@sage/agent-release-registry':
+        specifier: workspace:*
+        version: link:../agent-release-registry
       '@sage/platform-ports':
         specifier: workspace:*
         version: link:../platform-ports
