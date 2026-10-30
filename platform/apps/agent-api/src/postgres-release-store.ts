@@ -1,6 +1,8 @@
 import { Pool, type PoolClient, type PoolConfig, type QueryResultRow } from 'pg';
 import {
   InMemoryAgentReleaseStore,
+  ReleaseRegistryError,
+  type ReleaseChannelPointer,
   type AgentApp,
   type AsyncAgentReleaseStore,
   type CreateAppRequest,
@@ -43,6 +45,15 @@ interface ReleaseRow extends QueryResultRow {
   created_at: Date | string;
 }
 
+interface ChannelHistoryRow extends QueryResultRow {
+  tenant_id: string;
+  owner_namespace: string;
+  package_id: string;
+  channel: string;
+  pointer_revision: string | number;
+  release_ref: string;
+}
+
 const iso = (value: Date | string): string => (value instanceof Date ? value.toISOString() : new Date(value).toISOString());
 
 /**
@@ -52,6 +63,7 @@ const iso = (value: Date | string): string => (value instanceof Date ? value.toI
 export class PostgresBackedAgentReleaseStore implements AsyncAgentReleaseStore {
   readonly #memory = new InMemoryAgentReleaseStore();
   readonly #pool: Pool;
+  #queue: Promise<void> = Promise.resolve();
   readonly #ownsPool: boolean;
 
   private constructor(pool: Pool, ownsPool: boolean) {
@@ -118,23 +130,32 @@ export class PostgresBackedAgentReleaseStore implements AsyncAgentReleaseStore {
       ...(row.source_files_digest === null ? {} : { sourceFilesDigest: row.source_files_digest }),
       createdAt: iso(row.created_at)
     }));
-    this.#memory.hydrateSnapshot({ apps, releases });
+    const channelHistory = (await this.#pool.query<ChannelHistoryRow>(
+      'SELECT * FROM agent_release_channel_history ORDER BY tenant_id, owner_namespace, package_id, channel, pointer_revision'
+    )).rows.map((row): ReleaseChannelPointer => ({
+      tenantId: row.tenant_id,
+      ownerNamespace: row.owner_namespace,
+      packageId: row.package_id,
+      channel: row.channel,
+      releaseRef: row.release_ref,
+      pointerRevision: Number(row.pointer_revision)
+    }));
+    this.#memory.hydrateSnapshot({ apps, releases, channelHistory });
   }
 
-  async #upsertApp(app: AgentApp): Promise<void> {
-    await this.#tx(app.tenantId, async (client) => {
+  async #upsertApp(client: PoolClient, app: AgentApp, onConflict: 'update' | 'nothing' = 'update'): Promise<void> {
       await client.query(
         `INSERT INTO agent_apps(
           tenant_id, app_id, owner_namespace, name, description, status, draft, created_at, updated_at, deleted_at
         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-        ON CONFLICT (tenant_id, app_id) DO UPDATE SET
+        ON CONFLICT (tenant_id, app_id) DO ${onConflict === 'nothing' ? 'NOTHING' : `UPDATE SET
           owner_namespace = EXCLUDED.owner_namespace,
           name = EXCLUDED.name,
           description = EXCLUDED.description,
           status = EXCLUDED.status,
           draft = EXCLUDED.draft,
           updated_at = EXCLUDED.updated_at,
-          deleted_at = EXCLUDED.deleted_at`,
+          deleted_at = EXCLUDED.deleted_at`}`,
         [
           app.tenantId,
           app.appId,
@@ -148,13 +169,11 @@ export class PostgresBackedAgentReleaseStore implements AsyncAgentReleaseStore {
           app.deletedAt === undefined ? null : new Date(app.deletedAt)
         ]
       );
-    });
   }
 
-  async #insertRelease(record: StoredRelease): Promise<void> {
+  async #insertRelease(client: PoolClient, record: StoredRelease): Promise<void> {
     const attestationRefs = [...record.release.attestationRefs];
     if (attestationRefs.length === 0) attestationRefs.push(`attestation://bootstrap/${record.release.releaseId}`);
-    await this.#tx(record.tenantId, async (client) => {
       await client.query(
         `INSERT INTO agent_package_releases(
           tenant_id, owner_namespace, package_id, package_version, release_ref, release_id,
@@ -180,11 +199,54 @@ export class PostgresBackedAgentReleaseStore implements AsyncAgentReleaseStore {
           new Date(record.createdAt)
         ]
       );
+  }
+
+  async #recordChannel(client: PoolClient, pointer: ReleaseChannelPointer, action: 'publish' | 'rollback'): Promise<void> {
+    await client.query(
+      `INSERT INTO agent_release_channel_history(
+        tenant_id, owner_namespace, package_id, channel, pointer_revision, release_ref, action
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+      [pointer.tenantId, pointer.ownerNamespace, pointer.packageId, pointer.channel, pointer.pointerRevision, pointer.releaseRef, action]
+    );
+    await client.query(
+      `INSERT INTO agent_release_channels(tenant_id, owner_namespace, package_id, channel, release_ref, pointer_revision, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,clock_timestamp())
+       ON CONFLICT (tenant_id, owner_namespace, package_id, channel) DO UPDATE SET
+         release_ref = EXCLUDED.release_ref, pointer_revision = EXCLUDED.pointer_revision, updated_at = EXCLUDED.updated_at`,
+      [pointer.tenantId, pointer.ownerNamespace, pointer.packageId, pointer.channel, pointer.releaseRef, pointer.pointerRevision]
+    );
+  }
+
+  /**
+   * 一致性：变更串行化 → 内存域逻辑校验并产出结果（域错误照常抛出、不写库）→
+   * 单事务写库 → 失败则把内存恢复到变更前并抛 RELEASE_STORE_PERSISTENCE_FAILED（API 映射 503）。
+   */
+  async #mutate<T>(tenantId: string, apply: () => T, persist: (client: PoolClient, result: T) => Promise<void>): Promise<T> {
+    const run = this.#queue.then(async () => {
+      const checkpoint = this.#memory.captureState();
+      const result = apply();
+      try {
+        await this.#tx(tenantId, (client) => persist(client, result));
+      } catch (cause) {
+        this.#memory.restoreState(checkpoint);
+        const error = new ReleaseRegistryError('RELEASE_STORE_PERSISTENCE_FAILED', 'release store persistence failed; change was not applied');
+        (error as Error & { cause?: unknown }).cause = cause;
+        throw error;
+      }
+      return result;
     });
+    this.#queue = run.then(() => undefined, () => undefined);
+    return run;
   }
 
   submit(request: Parameters<AsyncAgentReleaseStore['submit']>[0]) {
-    return Promise.resolve(this.#memory.submit(request));
+    return this.#mutate(request.tenantId, () => this.#memory.submit(request), async (client, result) => {
+      if (result.status !== 'stored') return;
+      // 旧 submit 路径会隐式登记占位 App：先落占位 App（已存在则不覆盖），再落 Release。
+      const placeholder = this.#memory.getAppRecord(request.tenantId, request.packageId);
+      if (placeholder !== undefined) await this.#upsertApp(client, placeholder, 'nothing');
+      await this.#insertRelease(client, result.record);
+    });
   }
   getByRef(tenantId: string, releaseRef: string) {
     return Promise.resolve(this.#memory.getByRef(tenantId, releaseRef));
@@ -196,10 +258,14 @@ export class PostgresBackedAgentReleaseStore implements AsyncAgentReleaseStore {
     return Promise.resolve(this.#memory.getByContentDigest(tenantId, contentDigest));
   }
   publish(input: ReleasePublicationVerificationInput) {
-    return Promise.resolve(this.#memory.publish(input));
+    return this.#mutate(input.tenantId, () => this.#memory.publish(input), (client, pointer) => this.#recordChannel(client, pointer, 'publish'));
   }
   rollback(input: ReleasePublicationVerificationInput) {
-    return Promise.resolve(this.#memory.rollback(input));
+    return this.#mutate(input.tenantId, () => this.#memory.rollback(input), (client, pointer) => this.#recordChannel(client, pointer, 'rollback'));
+  }
+  /** 渠道指针历史（含当前指针，按 revision 升序）。 */
+  getChannelHistory(tenantId: string, ownerNamespace: string, packageId: string, channel: string) {
+    return Promise.resolve(this.#memory.getChannelHistory(tenantId, ownerNamespace, packageId, channel));
   }
   getChannel(tenantId: string, ownerNamespace: string, packageId: string, channel: string) {
     return Promise.resolve(this.#memory.getChannel(tenantId, ownerNamespace, packageId, channel));
@@ -223,10 +289,8 @@ export class PostgresBackedAgentReleaseStore implements AsyncAgentReleaseStore {
     return Promise.resolve(this.#memory.auditLog());
   }
 
-  async createApp(request: CreateAppRequest) {
-    const app = this.#memory.createApp(request);
-    await this.#upsertApp(app);
-    return app;
+  createApp(request: CreateAppRequest) {
+    return this.#mutate(request.tenantId, () => this.#memory.createApp(request), (client, app) => this.#upsertApp(client, app));
   }
 
   async listApps(tenantId: string, options?: { readonly limit?: number }) {
@@ -237,32 +301,33 @@ export class PostgresBackedAgentReleaseStore implements AsyncAgentReleaseStore {
     return this.#memory.getApp(tenantId, appId);
   }
 
-  async softDeleteApp(tenantId: string, appId: string, reason?: string) {
-    const deleted = this.#memory.softDeleteApp(tenantId, appId, reason);
-    if (deleted !== undefined) await this.#upsertApp(deleted);
-    return deleted;
+  softDeleteApp(tenantId: string, appId: string, reason?: string) {
+    return this.#mutate(tenantId, () => this.#memory.softDeleteApp(tenantId, appId, reason), async (client, deleted) => {
+      if (deleted !== undefined) await this.#upsertApp(client, deleted);
+    });
   }
 
-  async putAppDraft(input: PutAppDraftInput) {
-    const result = this.#memory.putAppDraft(input);
-    if (result.status === 'stored') {
-      const detail = this.#memory.getApp(input.tenantId, input.appId);
-      if (detail !== undefined) await this.#upsertApp(detail.app);
-    }
-    return result;
+  putAppDraft(input: PutAppDraftInput) {
+    return this.#mutate(input.tenantId, () => this.#memory.putAppDraft(input), async (client, result) => {
+      if (result.status !== 'stored') return;
+      const app = this.#memory.getAppRecord(input.tenantId, input.appId);
+      if (app !== undefined) await this.#upsertApp(client, app);
+    });
   }
 
-  async updateAppMetadata(input: UpdateAppMetadataInput) {
-    const result = this.#memory.updateAppMetadata(input);
-    if (result.status === 'updated') await this.#upsertApp(result.app);
-    return result;
+  updateAppMetadata(input: UpdateAppMetadataInput) {
+    return this.#mutate(input.tenantId, () => this.#memory.updateAppMetadata(input), async (client, result) => {
+      if (result.status === 'updated') await this.#upsertApp(client, result.app);
+    });
   }
 
-  async publishAppRelease(input: PublishAppReleaseInput) {
-    const result = this.#memory.publishAppRelease(input);
-    const detail = this.#memory.getApp(input.tenantId, input.appId);
-    if (detail !== undefined) await this.#upsertApp(detail.app);
-    if (result.status === 'stored') await this.#insertRelease(result.record);
-    return result;
+  publishAppRelease(input: PublishAppReleaseInput) {
+    return this.#mutate(input.tenantId, () => this.#memory.publishAppRelease(input), async (client, result) => {
+      // App 行与 Release 行同一事务：要么都落库，要么内存一并回滚。
+      if (result.status !== 'stored') return;
+      const app = this.#memory.getAppRecord(input.tenantId, input.appId);
+      if (app !== undefined) await this.#upsertApp(client, app);
+      await this.#insertRelease(client, result.record);
+    });
   }
 }

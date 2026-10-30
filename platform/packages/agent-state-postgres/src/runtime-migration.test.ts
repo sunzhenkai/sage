@@ -97,10 +97,11 @@ describe('Schedule plane migration', () => {
 describe('migration ordering', () => {
   it('runs the RLS bootstrap before any migration whose table policies reference sage_security', async () => {
     const source = await readFile(new URL('./index.ts', import.meta.url), 'utf8');
-    const list: string[] = source.match(/'(?:001|002|003|004|005|006|007|008|009|010)_[a-z0-9_]+\.sql'/g) ?? [];
+    const list: string[] = source.match(/'(?:001|002|003|004|005|006|007|008|009|010|011)_[a-z0-9_]+\.sql'/g) ?? [];
     expect(list.length).toBeGreaterThanOrEqual(11);
     expect(list.indexOf("'004_production_rls_bootstrap.sql'")).toBeGreaterThan(-1);
     expect(list.indexOf("'004_production_rls_bootstrap.sql'")).toBeLessThan(list.indexOf("'005_production_governance_core.sql'"));
-    expect(list.indexOf("'010_agent_apps.sql'")).toBe(list.length - 1);
+    expect(list.indexOf("'010_agent_apps.sql'")).toBe(list.length - 2);
+    expect(list.indexOf("'011_agent_release_channel_history.sql'")).toBe(list.length - 1);
   });
 });

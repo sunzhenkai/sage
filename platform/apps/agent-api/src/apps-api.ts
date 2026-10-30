@@ -189,6 +189,7 @@ function mapped(reply: FastifyReply, cause: unknown): FastifyReply {
   if (cause instanceof SourceArchiveError) return sendError(reply, 400, cause.code, cause.message);
   if (cause instanceof SourcePackageError) return sendError(reply, 400, cause.code, cause.detail);
   if (cause instanceof ReleaseRegistryError) {
+    if (cause.code === 'RELEASE_STORE_PERSISTENCE_FAILED') return sendError(reply, 503, cause.code, cause.message, true);
     const status = cause.code === 'APP_NOT_FOUND' || cause.code === 'APP_DELETED' || cause.code === 'RELEASE_NOT_FOUND' ? 404
       : cause.code === 'APP_INVALID' || cause.code === 'APP_DRAFT_INVALID' || cause.code === 'RELEASE_SUBMIT_INVALID' ? 400
       : 409;
@@ -294,7 +295,12 @@ export function registerAppsRoutes(app: FastifyInstance, options: RegisterAppsRo
       // 幂等：不存在或已删除都视为成功
       return reply.code(200).send({ schemaVersion: 'AppDelete.v1', appId: request.params.appId, status: 'deleted' });
     }
-    const deleted = await options.store.softDeleteApp(options.tenantId, request.params.appId);
+    let deleted;
+    try {
+      deleted = await options.store.softDeleteApp(options.tenantId, request.params.appId);
+    } catch (cause) {
+      return mapped(reply, cause);
+    }
     if (deleted === undefined) return reply.code(200).send({ schemaVersion: 'AppDelete.v1', appId: request.params.appId, status: 'deleted' });
     return reply.code(200).send({ schemaVersion: 'AppDelete.v1', appId: deleted.appId, status: deleted.status, deletedAt: deleted.deletedAt });
   });
