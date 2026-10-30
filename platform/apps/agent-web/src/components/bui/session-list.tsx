@@ -132,7 +132,6 @@ export function SessionHeader<T extends string>({ id, title, lastRun, meta, acti
     <header className="gutter-x flex h-[var(--header-h)] shrink-0 items-center gap-2.5 border-b border-line bg-panel">
       <Avatar id={id} title={title} tone={tone} compact />
       <h1 title={t('sessionList.sessionTitle')} className="-mx-1 min-w-0 cursor-text truncate rounded-[6px] px-1 text-[14px] font-semibold tracking-[-0.01em] text-ink hover:bg-hover">{title}</h1>
-      <span title={t(toneKey[tone])} className={cn('size-2 shrink-0 rounded-full', tone === 'active' && 'animate-pulse')} style={{ background: toneColor[tone] }} />
       {meta ? <span className="t-meta flex min-w-0 items-center gap-1.5 truncate">{meta}</span> : null}
       <div className="ml-auto flex shrink-0 items-center gap-2">
         <div role="tablist" aria-label={t('sessionList.sessionView')} onKeyDown={onKey} className="flex items-center gap-0.5 rounded-control bg-surface p-0.5 shadow-card">

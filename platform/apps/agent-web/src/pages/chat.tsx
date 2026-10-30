@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Empty, ErrorState, Kbd } from '@/components/ui/misc';
 import { LoadingState, formatElapsed } from '@/components/bui/loading-state';
-import { CardPane, PageColumn, PageContent, Quiet, SubPane } from '@/components/layout/page';
+import { PageColumn, PageContent, Quiet, SubPane } from '@/components/layout/page';
 import { PromptBar, UserBubble, type PromptMenuItem, type PromptModel } from '@/components/bui/prompt-bar';
 import { defaultSelectionKey, parseSelectionKey, pickerOptions } from '@/lib/connection-models';
 import { ArchiveToggle, SessionHeader, SessionList } from '@/components/bui/session-list';
@@ -94,6 +94,13 @@ function SessionSkeleton() {
 
 interface RunGroup { runId: string; userText: string[]; assistantText: string; events: TimelineEvent[]; status?: string; attempt?: number; at: string }
 
+/** User text is accepted with promotionEligibility 'explicit'; assistant replies carry 'none' (both have a messageId). */
+function textRole(p: { role?: 'user' | 'assistant' | undefined; messageId?: string | undefined; promotionEligibility?: 'explicit' | 'none' | undefined }): 'user' | 'assistant' {
+  if (p.role !== undefined) return p.role;
+  if (p.promotionEligibility !== undefined) return p.promotionEligibility === 'explicit' ? 'user' : 'assistant';
+  return p.messageId ? 'user' : 'assistant';
+}
+
 function groupTimeline(events: TimelineEvent[]): RunGroup[] {
   const groups = new Map<string, RunGroup>();
   for (const event of events) {
@@ -101,7 +108,7 @@ function groupTimeline(events: TimelineEvent[]): RunGroup[] {
     if (!group) { group = { runId: event.runId, userText: [], assistantText: '', events: [], at: event.occurredAt }; groups.set(event.runId, group); }
     group.events.push(event);
     const p = event.payload;
-    if (p.kind === 'text') { if (p.messageId) group.userText.push(p.text); else group.assistantText += p.text; }
+    if (p.kind === 'text') { if (textRole(p) === 'user') group.userText.push(p.text); else group.assistantText += p.text; }
     if (p.kind === 'run') { group.status = p.status; group.attempt = p.attempt; }
   }
   return [...groups.values()];
@@ -194,7 +201,7 @@ function SessionView({ sessionId }: { sessionId: string }) {
           <Button variant="ghost" size="icon" title={t('chat.sessionTitleAttr', { id: sessionId })} onClick={() => { void navigator.clipboard?.writeText(sessionId); }}><MoreHorizontal /></Button>
         </>}
       />
-      <CardPane width="chat" scrollRef={scroller}>
+      <ChatScroll scrollRef={scroller}>
         {detail.error ? <ErrorState error={detail.error} /> : null}
           {tab === 'runs' ? (
             allRuns.length ? <div className="flex flex-col gap-5"><RunDurations runs={allRuns} /><TaskRows variant="list" rows={[...allRuns].reverse().map((r, i) => ({
@@ -213,7 +220,7 @@ function SessionView({ sessionId }: { sessionId: string }) {
               </div>
             </>
           )}
-      </CardPane>
+      </ChatScroll>
       <PageColumn width="chat" className="pb-5 pt-3">
         <div>
           <PromptBar value={draft} onChange={setDraft} onSubmit={submit} models={models} model={selection} onModel={setSelection} sources={sources} commands={commands} busy={send.isPending}
@@ -263,7 +270,7 @@ function RunBlock({ group, run, onRetry, retrying, onFollowUp }: { group: RunGro
         </div>
       ))}
       <AgentResponse>
-        <ThinkingTrace working={working} activeLabel={t('chat.run.thinking')} doneLabel={status === 'failed' ? t('chat.run.failedAfter', { took: took ?? '—' }) : t('chat.run.workedFor', { took: took ?? '—' })} rows={trace} defaultOpen={working} />
+        <ThinkingTrace className="border-b border-line pb-2" working={working} activeLabel={t('chat.run.thinking')} doneLabel={status === 'failed' ? t('chat.run.failedAfter', { took: took ?? '—' }) : t('chat.run.workedFor', { took: took ?? '—' })} rows={trace} defaultOpen={working} />
         {tools.length || artifacts.length ? (
           <ToolChips header={artifacts.length ? t('chat.run.toolCallsAndArtifacts', { tools: toolCalls, artifacts: artifactCount }) : toolCalls}
             steps={tools.map((tool) => ({ key: tool.key, icon: toolIcon(tool.name), label: tool.done ? t('chat.run.calledChip') : t('chat.run.callingChip'), chip: tool.name, mono: true, active: !tool.done && working, ...(tool.artifact ? { detail: [{ text: `→ ${tool.artifact}` }] } : {}) }))}
@@ -286,6 +293,12 @@ function RunBlock({ group, run, onRetry, retrying, onFollowUp }: { group: RunGro
         })}
       </AgentResponse>
     </section>
+  );
+}
+
+function ChatScroll({ scrollRef, children }: { scrollRef: React.Ref<HTMLDivElement>; children: React.ReactNode }) {
+  return (
+    <PageContent width="chat" scrollRef={scrollRef} className="pb-6">{children}</PageContent>
   );
 }
 

@@ -17,7 +17,7 @@ export interface ChatRun { schemaVersion: '1'; runId: string; sessionId: string;
 export interface Summary { summaryId: string; throughTurn: number; content: string; createdAt: string }
 export interface SessionDetail { session: Session; messages: Message[]; runs: ChatRun[]; summaries: Summary[] }
 export type TimelinePayload =
-  | { kind: 'text'; text: string; messageId?: string; promotionEligibility?: 'explicit' | 'none' }
+  | { kind: 'text'; text: string; messageId?: string; promotionEligibility?: 'explicit' | 'none'; role?: 'user' | 'assistant' }
   | { kind: 'tool'; toolName: string; status: 'started' | 'completed'; artifact?: ArtifactReference }
   | { kind: 'artifact'; artifact: ArtifactReference }
   | { kind: 'error'; error: ChatError }

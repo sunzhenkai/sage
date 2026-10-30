@@ -1,17 +1,32 @@
+import ReactMarkdown, { type Components } from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 // Adapted from Beautiful UI "streaming-text" + "stream-text" (MIT © 2026 Shane Levine): answer body with caret, actions, follow-ups.
 import { useState, type ReactNode } from 'react';
 import { useT } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
-function renderBlocks(text: string): ReactNode[] {
-  const blocks = text.split(/\n{2,}/);
-  return blocks.map((block, i) => {
-    const lines = block.split('\n');
-    if (lines.every((l) => /^\s*([•\-*]|\d+[.)])\s+/.test(l))) {
-      return <ul key={i} className="flex flex-col gap-1 pl-1">{lines.map((l, j) => <li key={j} className="flex gap-2"><span className="mt-[9px] size-1 shrink-0 rounded-full bg-ink-3" /><span>{l.replace(/^\s*([•\-*]|\d+[.)])\s+/, '')}</span></li>)}</ul>;
-    }
-    return <p key={i} className="whitespace-pre-wrap">{block}</p>;
-  });
+const mdComponents: Components = {
+  h1: ({ children }) => <h3 className="mt-1 text-[17px] font-semibold tracking-[-0.01em]">{children}</h3>,
+  h2: ({ children }) => <h3 className="mt-1 text-[16px] font-semibold tracking-[-0.01em]">{children}</h3>,
+  h3: ({ children }) => <h4 className="mt-1 text-[15px] font-semibold">{children}</h4>,
+  h4: ({ children }) => <h5 className="text-[14px] font-semibold">{children}</h5>,
+  p: ({ children }) => <p className="whitespace-pre-wrap">{children}</p>,
+  strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+  ul: ({ children }) => <ul className="flex list-disc flex-col gap-1 pl-5 marker:text-ink-3">{children}</ul>,
+  ol: ({ children }) => <ol className="flex list-decimal flex-col gap-1 pl-5 marker:text-ink-3">{children}</ol>,
+  a: ({ href, children }) => <a href={href} target="_blank" rel="noreferrer noopener" className="text-accent-ink underline-offset-2 hover:underline">{children}</a>,
+  blockquote: ({ children }) => <blockquote className="border-l-2 border-line pl-3 text-ink-2">{children}</blockquote>,
+  hr: () => <hr className="border-line" />,
+  pre: ({ children }) => <pre className="overflow-x-auto rounded-control bg-inset px-3 py-2.5 font-mono text-[12.5px] leading-5 [&_code]:bg-transparent [&_code]:p-0">{children}</pre>,
+  code: ({ children }) => <code className="rounded-[4px] bg-inset px-1 py-0.5 font-mono text-[12.5px]">{children}</code>,
+  table: ({ children }) => <div className="overflow-x-auto"><table className="w-full border-collapse text-[13px]">{children}</table></div>,
+  th: ({ children }) => <th className="border-b border-line px-2 py-1.5 text-left font-semibold">{children}</th>,
+  td: ({ children }) => <td className="border-b border-line px-2 py-1.5 align-top">{children}</td>
+};
+
+/** Assistant markdown (GFM). Raw HTML is never rendered (react-markdown escapes it by default). */
+export function Markdown({ text }: { text: string }) {
+  return <ReactMarkdown remarkPlugins={[remarkGfm]} skipHtml components={mdComponents}>{text}</ReactMarkdown>;
 }
 
 export function StreamingText({ text, streaming, actions, followUps, onFollowUp, className }: { text: string; streaming?: boolean; actions?: ReactNode; followUps?: string[]; onFollowUp?: (s: string) => void; className?: string }) {
@@ -20,7 +35,7 @@ export function StreamingText({ text, streaming, actions, followUps, onFollowUp,
   return (
     <div className={cn('flex flex-col', className)}>
       <div className="flex flex-col gap-3 text-[14px] leading-[1.6] tracking-[-0.005em] text-ink">
-        {renderBlocks(text)}
+        <Markdown text={text} />
         {streaming ? <span className="stream-caret" style={{ animation: 'none' }} /> : null}
       </div>
       {!streaming ? (
