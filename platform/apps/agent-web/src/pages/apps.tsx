@@ -340,7 +340,7 @@ export function AppDetailPage() {
         ) : undefined} />
       {remove.error ? <ErrorState error={remove.error} /> : null}
       {app.isLoading ? <Loading /> : app.error ? <ErrorState error={app.error} /> : app.data ? (
-        <PageContent {...(tab === 'draft' ? { flush: true, className: 'px-2.5 pb-2.5' } : {})}>
+        <PageContent fill={tab === 'draft'}>
           {tab === 'properties' ? (
             <>
               <Section card title={t('apps.detail.properties')}>

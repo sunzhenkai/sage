@@ -49,7 +49,7 @@ export function AppRunDetailPage() {
           </Button>
         )} />
       {runQuery.isLoading ? <Loading /> : runQuery.error ? <ErrorState error={runQuery.error} /> : run === undefined ? null : (
-        <PageContent {...(tab === 'artifacts' && !pending ? { flush: true, className: 'px-2.5 pb-2.5' } : {})}>
+        <PageContent fill={tab === 'artifacts' && !pending}>
           {tab === 'overview' || pending ? <PageDescription
             leading={<StatusGlyph status={run.status} />}
             title={run.releaseVersion === undefined ? taskId : `v${run.releaseVersion}`}
