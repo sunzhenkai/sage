@@ -340,7 +340,7 @@ export function AppDetailPage() {
         ) : undefined} />
       {remove.error ? <ErrorState error={remove.error} /> : null}
       {app.isLoading ? <Loading /> : app.error ? <ErrorState error={app.error} /> : app.data ? (
-        <PageContent>
+        <PageContent {...(tab === 'draft' ? { flush: true, className: 'px-2.5 pb-2.5' } : {})}>
           {tab === 'properties' ? (
             <>
               <Section card title={t('apps.detail.properties')}>
@@ -387,7 +387,7 @@ export function AppDetailPage() {
               )}
             </>
           ) : null}
-          <div className={tab === 'draft' ? undefined : 'hidden'}>
+          <div className={tab === 'draft' ? 'flex min-h-0 flex-1 flex-col' : 'hidden'}>
             <DraftPanel key={appId} appId={appId} hasUnpublishedChanges={app.data.hasUnpublishedChanges} actionsRef={draftActions} onChrome={onChrome} />
           </div>
           {tab === 'releases' ? (
@@ -610,7 +610,7 @@ function DraftPanel({ appId, hasUnpublishedChanges, actionsRef, onChrome }: {
   }, [files, statusLine, attention, dirty, revision, busy, publishBlocked, save.isPending, publish.isPending, paths.length, onChrome, t]);
 
   return (
-    <div className={cn(contentCard, 'flex min-h-[calc(100dvh-10rem)] flex-col')}>
+    <div className={cn(contentCard, 'flex min-h-0 flex-1 flex-col')}>
       {draftQuery.isLoading ? <Loading rows={3} /> : draftQuery.error ? <ErrorState error={draftQuery.error} /> : files !== undefined ? (
         <>
           <div className="flex shrink-0 items-center gap-2 border-b border-line px-3 py-2.5">

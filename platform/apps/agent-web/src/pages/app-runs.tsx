@@ -6,14 +6,14 @@ import { Crumb, PageHeader, ViewTab } from '@/components/layout/app-shell';
 import { Artifacts } from '@/components/bui/artifacts';
 import { StatusGlyph } from '@/components/bui/atoms';
 import { RunLogs } from '@/components/bui/run-logs';
-import { PageContent, PageDescription, Quiet, Section } from '@/components/layout/page';
+import { PageContent, PageDescription, Quiet, Section, contentCard } from '@/components/layout/page';
 import { StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ListRow, RowId, RowTitle } from '@/components/ui/list';
 import { ErrorState, Loading, Mono } from '@/components/ui/misc';
 import { api } from '@/lib/api';
 import { useT } from '@/lib/i18n';
-import { formatTime, relativeTime } from '@/lib/utils';
+import { cn, formatTime, relativeTime } from '@/lib/utils';
 
 type Tab = 'overview' | 'artifacts';
 const terminal = new Set(['succeeded', 'failed', 'cancelled']);
@@ -49,11 +49,11 @@ export function AppRunDetailPage() {
           </Button>
         )} />
       {runQuery.isLoading ? <Loading /> : runQuery.error ? <ErrorState error={runQuery.error} /> : run === undefined ? null : (
-        <PageContent>
-          <PageDescription
+        <PageContent {...(tab === 'artifacts' && !pending ? { flush: true, className: 'px-2.5 pb-2.5' } : {})}>
+          {tab === 'overview' || pending ? <PageDescription
             leading={<StatusGlyph status={run.status} />}
             title={run.releaseVersion === undefined ? taskId : `v${run.releaseVersion}`}
-            description={run.updatedAt === undefined ? undefined : t('apps.runDetail.updatedAgo', { time: relativeTime(run.updatedAt) })} />
+            description={run.updatedAt === undefined ? undefined : t('apps.runDetail.updatedAgo', { time: relativeTime(run.updatedAt) })} /> : null}
           {pending ? (
             <Section card padded><Quiet>{t('apps.runDetail.pendingHint')}</Quiet></Section>
           ) : tab === 'overview' ? (
@@ -76,9 +76,9 @@ export function AppRunDetailPage() {
               </Section>
             </>
           ) : (
-            <Section card title={t('apps.runDetail.tabs.artifacts')}>
-              <Artifacts taskId={taskId} live={live} />
-            </Section>
+            <div className={cn(contentCard, 'flex min-h-0 flex-1 flex-col')}>
+              <Artifacts taskId={taskId} live={live} fill />
+            </div>
           )}
         </PageContent>
       )}

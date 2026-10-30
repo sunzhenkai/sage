@@ -31,7 +31,7 @@ function previewCode(name: string, bytes: Uint8Array): string {
   return text;
 }
 
-export function Artifacts({ taskId, live = false }: { taskId: string; live?: boolean }) {
+export function Artifacts({ taskId, live = false, fill = false }: { taskId: string; live?: boolean; fill?: boolean }) {
   const t = useT();
   const artifacts = useQuery({
     queryKey: ['task', taskId, 'artifacts'],
@@ -83,19 +83,19 @@ export function Artifacts({ taskId, live = false }: { taskId: string; live?: boo
   if (!list.length) return <Quiet>{t('tasks.artifacts.empty')}</Quiet>;
 
   return (
-    <div className="flex min-h-[min(70vh,640px)] flex-col md:flex-row md:items-stretch">
+    <div className={cn('flex flex-col md:flex-row md:items-stretch', fill ? 'min-h-0 flex-1' : 'min-h-[min(70vh,640px)]')}>
       <div className="flex w-full shrink-0 flex-col border-b border-line md:w-72 md:self-stretch md:border-b-0 md:border-r">
         <div className="flex h-8 shrink-0 items-center border-b border-line px-3 text-[11px] font-medium uppercase tracking-wide text-faint">
           {t('tasks.artifacts.files', { count: list.length })}
         </div>
-        <div className="flex flex-1 flex-col">
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
           {list.map((item) => (
             <ArtifactRow key={item.artifactId} item={item} active={item.artifactId === selected?.artifactId}
               onSelect={() => setSelectedId(item.artifactId)} />
           ))}
         </div>
       </div>
-      <div className="flex min-h-[320px] min-w-0 flex-1 flex-col">
+      <div className="flex min-h-[320px] min-w-0 flex-1 flex-col md:min-h-0">
         {selected === undefined ? (
           <p className="px-3 py-6 text-[12.5px] text-faint">{t('tasks.artifacts.select')}</p>
         ) : content.isLoading ? <Loading rows={4} /> : content.error ? <ErrorState error={content.error} /> : selectedIsArchive ? (
@@ -110,7 +110,7 @@ export function Artifacts({ taskId, live = false }: { taskId: string; live?: boo
                 <div className="flex h-8 shrink-0 items-center gap-1.5 px-3 text-[11px] font-medium uppercase tracking-wide text-faint">
                   <Folder className="size-3.5" />{selected.name ?? 'archive'}
                 </div>
-                <div className="flex flex-1 flex-col">
+                <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
                   {archiveGroups.length === 0 ? <p className="px-3 py-4 text-[12.5px] text-faint">{t('tasks.artifacts.archiveEmpty')}</p> : archiveGroups.map(([dir, paths]) => (
                     <div key={dir || '.'} className="flex flex-col">
                       <div className="flex h-8 items-center gap-1.5 px-3 text-[11px] font-medium uppercase tracking-wide text-faint">
@@ -138,7 +138,7 @@ export function Artifacts({ taskId, live = false }: { taskId: string; live?: boo
                 {activeArchive === undefined ? (
                   <p className="px-3 py-6 text-[12.5px] text-faint">{t('tasks.artifacts.selectEntry')}</p>
                 ) : (
-                  <div className="min-h-0 flex-1 p-3">
+                  <div className="min-h-0 flex-1 overflow-auto p-3">
                     <CodeBlock bare filename={activeArchive.name} language={/\.json$/i.test(activeArchive.name) ? 'json' : 'text'}
                       code={previewCode(activeArchive.name, activeArchive.bytes)} maxHeight="none" />
                   </div>
@@ -152,7 +152,7 @@ export function Artifacts({ taskId, live = false }: { taskId: string; live?: boo
               <Mono className="truncate text-faint">{selected.name ?? selected.artifactId}</Mono>
               {downloadHref ? <a className="shrink-0 text-[12px] text-accent-ink hover:underline" href={downloadHref}>{t('tasks.artifacts.download')}</a> : null}
             </div>
-            <div className="min-h-0 flex-1 p-3">
+            <div className="min-h-0 flex-1 overflow-auto p-3">
               <CodeBlock bare filename={selected.name ?? selected.artifactId}
                 language={/json/.test(String(selected.mediaType)) || /\.json$/i.test(String(selected.name)) ? 'json' : 'text'}
                 code={content.data?.content !== undefined && content.data.encoding !== 'base64'
