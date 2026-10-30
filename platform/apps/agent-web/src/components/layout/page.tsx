@@ -38,11 +38,11 @@ export function PageColumn({ width = 'full', className, children }: { width?: Co
   return <div className={cn('gutter-x', widthClass[width], className)}>{children}</div>;
 }
 
-/** `fill`: a single card fills the remaining height with an even inset on all four sides (scrolls inside the card). */
+/** `fill`: a single card fills the remaining height edge to edge with no outer card or inset (panes scroll inside). */
 export function PageContent({ children, flush, fill, width = 'full', className, scrollRef }: { children: React.ReactNode; flush?: boolean; fill?: boolean | undefined; width?: ContentWidth | undefined; className?: string; scrollRef?: React.Ref<HTMLDivElement> }) {
   return (
     <div ref={scrollRef} className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-      <div data-page-body={flush || fill ? undefined : ''} className={cn(fill ? 'flex min-h-0 flex-1 flex-col p-2.5' : flush ? 'flex min-h-0 flex-1 flex-col' : cn('gutter-x page-pt page-stack pb-12', widthClass[width]), className)}>{children}</div>
+      <div data-page-body={flush || fill ? undefined : ''} className={cn(fill ? 'flex min-h-0 flex-1 flex-col bg-surface' : flush ? 'flex min-h-0 flex-1 flex-col' : cn('gutter-x page-pt page-stack pb-12', widthClass[width]), className)}>{children}</div>
     </div>
   );
 }

@@ -8,7 +8,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { PageHeader, ViewTab } from '@/components/layout/app-shell';
 import { AppList, AppListSkeleton } from '@/components/bui/app-list';
 import { RunReleaseDialog } from '@/components/bui/run-release-dialog';
-import { PageContent, Quiet, Section, SubPane, contentCard } from '@/components/layout/page';
+import { PageContent, Quiet, Section, SubPane } from '@/components/layout/page';
 import { StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ActionMenu } from '@/components/ui/action-menu';
@@ -24,7 +24,7 @@ import { errorDisplay } from '@/lib/error-message';
 import { useT } from '@/lib/i18n';
 import { isMock } from '@/lib/mock';
 import type { AppDraft, AppRelease, AppReleaseResult } from '@/lib/types';
-import { cn, formatTime, relativeTime } from '@/lib/utils';
+import { formatTime, relativeTime } from '@/lib/utils';
 
 export function AppsPage() {
   const { appId } = useParams();
@@ -610,7 +610,7 @@ function DraftPanel({ appId, hasUnpublishedChanges, actionsRef, onChrome }: {
   }, [files, statusLine, attention, dirty, revision, busy, publishBlocked, save.isPending, publish.isPending, paths.length, onChrome, t]);
 
   return (
-    <div className={cn(contentCard, 'flex min-h-0 flex-1 flex-col')}>
+    <div className="flex min-h-0 flex-1 flex-col">
       {draftQuery.isLoading ? <Loading rows={3} /> : draftQuery.error ? <ErrorState error={draftQuery.error} /> : files !== undefined ? (
         <>
           <div className="flex shrink-0 items-center gap-2 border-b border-line px-3 py-2.5">

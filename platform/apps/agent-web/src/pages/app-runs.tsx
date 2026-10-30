@@ -6,14 +6,14 @@ import { Crumb, PageHeader, ViewTab } from '@/components/layout/app-shell';
 import { Artifacts } from '@/components/bui/artifacts';
 import { StatusGlyph } from '@/components/bui/atoms';
 import { RunLogs } from '@/components/bui/run-logs';
-import { PageContent, PageDescription, Quiet, Section, contentCard } from '@/components/layout/page';
+import { PageContent, PageDescription, Quiet, Section } from '@/components/layout/page';
 import { StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ListRow, RowId, RowTitle } from '@/components/ui/list';
 import { ErrorState, Loading, Mono } from '@/components/ui/misc';
 import { api } from '@/lib/api';
 import { useT } from '@/lib/i18n';
-import { cn, formatTime, relativeTime } from '@/lib/utils';
+import { formatTime, relativeTime } from '@/lib/utils';
 
 type Tab = 'overview' | 'artifacts';
 const terminal = new Set(['succeeded', 'failed', 'cancelled']);
@@ -76,7 +76,7 @@ export function AppRunDetailPage() {
               </Section>
             </>
           ) : (
-            <div className={cn(contentCard, 'flex min-h-0 flex-1 flex-col')}>
+            <div className="flex min-h-0 flex-1 flex-col">
               <Artifacts taskId={taskId} live={live} fill />
             </div>
           )}
