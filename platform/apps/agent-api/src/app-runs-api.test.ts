@@ -186,13 +186,13 @@ describe('App run history API', () => {
       tenantId: 'tenant-local', taskId: 'task-foreign', releaseId: otherReleaseId,
       releaseDigest: `sha256:${'a'.repeat(64)}`, assembledInput: 'prompt', assetDigests: {}, createdAt: '2026-10-20T00:00:00.000Z'
     });
-    harness.views.set('task-detail', view('task-detail', 'failed', { failureCode: 'AGENT_FAILED' }));
+    harness.views.set('task-detail', view('task-detail', 'failed', { failureCode: 'AGENT_FAILED', failureDetail: 'AGENT_FAILED: model refused' }));
 
     const detail = await app.inject('/v1/apps/demo-app/runs/task-detail');
     expect(detail.statusCode).toBe(200);
     expect(detail.json()).toMatchObject({
       schemaVersion: 'AppRunDetail.v1', appId: 'demo-app',
-      run: { taskId: 'task-detail', releaseId: releases.v1.releaseId, releaseVersion: '1.0.0', source: 'manual', status: 'failed', failureCode: 'AGENT_FAILED' }
+      run: { taskId: 'task-detail', releaseId: releases.v1.releaseId, releaseVersion: '1.0.0', source: 'manual', status: 'failed', failureCode: 'AGENT_FAILED', failureDetail: 'AGENT_FAILED: model refused' }
     });
 
     harness.inputs.delete('tenant-local:task-detail');

@@ -88,7 +88,7 @@ export interface AppReleaseResult {
 export type AppRunStatus = TaskStatus | 'pending';
 export interface AppRun {
   taskId: string; releaseId: string; releaseVersion?: string; source: 'manual' | 'schedule'; status: AppRunStatus;
-  freshness?: string; failureCode?: string; createdAt: string; updatedAt?: string;
+  freshness?: string; failureCode?: string; failureDetail?: string; createdAt: string; updatedAt?: string;
 }
 export interface AppRunList { schemaVersion: 'AppRunList.v1'; appId: string; runs: AppRun[] }
 export interface AppRunDetail { schemaVersion: 'AppRunDetail.v1'; appId: string; run: AppRun }

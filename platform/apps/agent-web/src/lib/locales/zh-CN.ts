@@ -662,6 +662,11 @@ export const zhCN = {
       openTask: '打开任务',
       overview: '概览',
       statusHint: '状态来自任务投影；等待中表示尚未观察到投影。',
+      failureDetail: '失败原因',
+      failedTitle: '运行失败，没有产生产物',
+      failedHint: '完整的失败信息与运行日志见「概览」。',
+      viewOverview: '查看概览',
+      noArtifactsYet: '运行仍在进行，产物会在完成后出现。',
       pendingHint: '运行已准入，正在等待第一次任务投影。任务启动后即可查看日志与产物。',
       tabs: {
         overview: '概览',

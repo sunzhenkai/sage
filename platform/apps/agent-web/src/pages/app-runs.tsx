@@ -1,9 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
-import { ArrowUpRight } from 'lucide-react';
+import { ArrowUpRight, CircleAlert, FileText } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { Crumb, PageHeader, ViewTab } from '@/components/layout/app-shell';
-import { Artifacts } from '@/components/bui/artifacts';
+import { Artifacts, EmptyPane } from '@/components/bui/artifacts';
 import { StatusGlyph } from '@/components/bui/atoms';
 import { RunLogs } from '@/components/bui/run-logs';
 import { PageContent, PageDescription, Quiet, Section } from '@/components/layout/page';
@@ -58,6 +58,15 @@ export function AppRunDetailPage() {
             <Section card padded><Quiet>{t('apps.runDetail.pendingHint')}</Quiet></Section>
           ) : tab === 'overview' ? (
             <>
+              {run.status === 'failed' && (run.failureCode !== undefined || run.failureDetail !== undefined) ? (
+                <div role="alert" className="flex gap-3 rounded-card bg-red-tint px-3 py-2.5">
+                  <CircleAlert className="mt-0.5 size-4 shrink-0 text-red" />
+                  <div className="min-w-0 space-y-1">
+                    <p className="text-[13px] font-medium text-red">{run.failureCode ?? t('apps.runDetail.failedTitle')}</p>
+                    {run.failureDetail === undefined ? null : <p className="break-words text-[12.5px] text-ink-2">{run.failureDetail}</p>}
+                  </div>
+                </div>
+              ) : null}
               <Section card title={t('apps.runDetail.properties')}>
                 <ListRow><RowId>{t('apps.runDetail.status')}</RowId><RowTitle><StatusBadge status={run.status} /></RowTitle></ListRow>
                 <ListRow><RowId>{t('apps.runDetail.version')}</RowId><RowTitle><Mono>{run.releaseVersion === undefined ? '—' : `v${run.releaseVersion}`}</Mono></RowTitle></ListRow>
@@ -70,6 +79,7 @@ export function AppRunDetailPage() {
                 <ListRow><RowId>{t('apps.runDetail.releaseId')}</RowId><RowTitle><Mono className="break-all">{run.releaseId}</Mono></RowTitle></ListRow>
                 <ListRow><RowId>{t('apps.runDetail.freshness')}</RowId><RowTitle>{run.freshness ?? '—'}</RowTitle></ListRow>
                 <ListRow><RowId>{t('apps.runDetail.failureCode')}</RowId><RowTitle>{run.failureCode === undefined ? '—' : <span className="text-red">{run.failureCode}</span>}</RowTitle></ListRow>
+                {run.failureDetail === undefined ? null : <ListRow><RowId>{t('apps.runDetail.failureDetail')}</RowId><RowTitle><span className="break-words">{run.failureDetail}</span></RowTitle></ListRow>}
               </Section>
               <Section card padded title={t('tasks.tabs.runLogs')}>
                 <RunLogs taskId={taskId} live={live} />
@@ -77,7 +87,16 @@ export function AppRunDetailPage() {
             </>
           ) : (
             <div className="flex min-h-0 flex-1 flex-col">
-              <Artifacts taskId={taskId} live={live} fill />
+              <Artifacts taskId={taskId} live={live} fill empty={
+                run.status === 'failed' ? (
+                  <EmptyPane icon={<CircleAlert className="text-red" />} title={t('apps.runDetail.failedTitle')}>
+                    {run.failureCode === undefined ? null : <p><Mono className="text-red">{run.failureCode}</Mono></p>}
+                    {run.failureDetail === undefined ? null : <p className="mt-1 break-words">{run.failureDetail}</p>}
+                    <p className="mt-3 text-faint">{t('apps.runDetail.failedHint')}</p>
+                    <Button variant="secondary" size="sm" className="mt-3" onClick={() => setTab('overview')}>{t('apps.runDetail.viewOverview')}</Button>
+                  </EmptyPane>
+                ) : live ? <EmptyPane icon={<FileText />} title={t('tasks.artifacts.empty')}>{t('apps.runDetail.noArtifactsYet')}</EmptyPane> : undefined
+              } />
             </div>
           )}
         </PageContent>

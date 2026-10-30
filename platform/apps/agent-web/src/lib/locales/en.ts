@@ -658,6 +658,11 @@ export const en = {
       openTask: 'Open task',
       overview: 'Overview',
       statusHint: 'Status comes from the task projection; pending means no projection has been observed yet.',
+      failureDetail: 'Failure reason',
+      failedTitle: 'Run failed — no artifacts were produced',
+      failedHint: 'See Overview for the full failure details and run logs.',
+      viewOverview: 'View overview',
+      noArtifactsYet: 'The run is still in progress; artifacts appear when it finishes.',
       pendingHint: 'The run was admitted and is waiting for the first task projection. Logs and artifacts appear once the task starts.',
       tabs: {
         overview: 'Overview',

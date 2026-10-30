@@ -31,7 +31,18 @@ function previewCode(name: string, bytes: Uint8Array): string {
   return text;
 }
 
-export function Artifacts({ taskId, live = false, fill = false }: { taskId: string; live?: boolean; fill?: boolean }) {
+/** Flush, centered empty state for full-bleed panes (no card, no stray box). */
+export function EmptyPane({ icon, title, children }: { icon?: React.ReactNode; title: React.ReactNode; children?: React.ReactNode }) {
+  return (
+    <div className="flex min-h-[320px] flex-1 flex-col items-center justify-center gap-2 px-6 py-12 text-center">
+      {icon === undefined ? null : <div className="mb-1 text-faint [&>svg]:size-6">{icon}</div>}
+      <p className="text-[13.5px] font-medium text-ink">{title}</p>
+      {children === undefined ? null : <div className="max-w-xl text-[12.5px] text-ink-2">{children}</div>}
+    </div>
+  );
+}
+
+export function Artifacts({ taskId, live = false, fill = false, empty }: { taskId: string; live?: boolean; fill?: boolean; empty?: React.ReactNode }) {
   const t = useT();
   const artifacts = useQuery({
     queryKey: ['task', taskId, 'artifacts'],
@@ -80,7 +91,10 @@ export function Artifacts({ taskId, live = false, fill = false }: { taskId: stri
 
   if (artifacts.isLoading) return <Loading rows={3} />;
   if (artifacts.error) return <ErrorState error={artifacts.error} />;
-  if (!list.length) return <Quiet>{t('tasks.artifacts.empty')}</Quiet>;
+  if (!list.length) {
+    if (empty !== undefined) return <>{empty}</>;
+    return fill ? <EmptyPane icon={<FileText />} title={t('tasks.artifacts.empty')} /> : <Quiet>{t('tasks.artifacts.empty')}</Quiet>;
+  }
 
   return (
     <div className={cn('flex flex-col md:flex-row md:items-stretch', fill ? 'min-h-0 flex-1' : 'min-h-[min(70vh,640px)]')}>
