@@ -29,6 +29,8 @@ const pick = <T,>(xs: readonly T[]): T => xs[Math.floor(rnd() * xs.length)]!;
 const hex = (n: number) => Array.from({ length: n }, () => Math.floor(rnd() * 16).toString(16)).join('');
 const uuid = () => `${hex(8)}-${hex(4)}-${hex(4)}-${hex(4)}-${hex(12)}`;
 const NOW = Date.now();
+/** Prebuilt tar.gz (brief.json + notes/readme.md) for artifact archive preview in mock mode. */
+const mockArtifactArchiveB64 = 'H4sIACgN5GoC/+3TwQrCMAzG8Zz7FGXeZ6elA99msg4UtkE7QZC9u6WXMe9OZP/fJSEEcsl3DTfflfc4DvI1JnHW5pp8VmMqt/R5XtcnK9rIBh5xakI6Kfv0UloX3bO4aKdmJdiZYZx8PAbftL0v+/ZH+Tfr/Fdp/Uz+t3DQ+QNIPgAAAAAAAAAAAAAAwJ96Axtzxw8AKAAA';
 const DAY = 86_400_000;
 const iso = (ms: number) => new Date(ms).toISOString();
 
@@ -364,8 +366,17 @@ function mockRead(path: string, query: MockQuery): unknown {
     return { events: ['task.created', 'task.routed', 'attempt.started', 'checkpoint.saved', 'tool.completed', `task.${t?.status ?? 'succeeded'}`].map((type, i) => ({ eventId: `evt-${i}`, type, occurredAt: iso(base + i * 95_000) })) };
   }
   r = m(/^\/v1\/tasks\/([^/]+)\/run-logs$/); if (r) return { attempts: [{ runId: 'run-1', attemptId: 'attempt-1' }], selected: { runId: 'run-1', attemptId: 'attempt-1' }, events: ['agent.started', 'model.request', 'model.response', 'tool.call', 'tool.result', 'agent.completed'].map((type, i) => ({ eventId: `rl-${i}`, runId: 'run-1', attemptId: 'attempt-1', sequence: i + 1, type, payload: { tokens: 120 + i * 37 } })) };
-  r = m(/^\/v1\/tasks\/([^/]+)\/artifacts$/); if (r) return { artifacts: [{ artifactId: 'art-1', name: 'briefing.md', mediaType: 'text/markdown', sizeBytes: 4182 }, { artifactId: 'art-2', name: 'output.json', mediaType: 'application/json', sizeBytes: 912 }] };
-  r = m(/^\/v1\/tasks\/([^/]+)\/artifacts\/([^/]+)$/); if (r) return { artifactId: r[2], name: 'briefing.md', mediaType: 'text/markdown', content: '# Morning brief\n\nUSD/CNY 7.12 …', encoding: 'utf8' };
+  r = m(/^\/v1\/tasks\/([^/]+)\/artifacts$/); if (r) return { artifacts: [
+    { artifactId: 'art-pkg', name: 'output.tar.gz', mediaType: 'application/gzip', sizeBytes: 2048 },
+    { artifactId: 'art-1', name: 'briefing.md', mediaType: 'text/markdown', sizeBytes: 4182 },
+    { artifactId: 'art-2', name: 'output.json', mediaType: 'application/json', sizeBytes: 912 }
+  ] };
+  r = m(/^\/v1\/tasks\/([^/]+)\/artifacts\/([^/]+)$/); if (r) {
+    const id = r[2]!;
+    if (id === 'art-pkg') return { artifactId: id, name: 'output.tar.gz', mediaType: 'application/gzip', encoding: 'base64', content: mockArtifactArchiveB64 };
+    if (id === 'art-2') return { artifactId: id, name: 'output.json', mediaType: 'application/json', content: '{\n  "ok": true\n}\n', encoding: 'utf8' };
+    return { artifactId: id, name: 'briefing.md', mediaType: 'text/markdown', content: '# Morning brief\n\nUSD/CNY 7.12 …', encoding: 'utf8' };
+  }
   r = m(/^\/v1\/tasks\/([^/]+)$/); if (r) return mockTasks.find((x) => x.taskId === decodeURIComponent(r![1]!));
   r = m(/^\/v1\/apps\/([^/]+)\/runs$/); if (r) {
     const appId = decodeURIComponent(r[1]!);

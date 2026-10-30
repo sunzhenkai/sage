@@ -8,11 +8,11 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { PageHeader, ViewTab } from '@/components/layout/app-shell';
 import { AppList, AppListSkeleton } from '@/components/bui/app-list';
 import { RunReleaseDialog } from '@/components/bui/run-release-dialog';
-import { PageContent, Quiet, Section, SubPane } from '@/components/layout/page';
+import { PageContent, Quiet, Section, SubPane, contentCard } from '@/components/layout/page';
 import { StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ActionMenu } from '@/components/ui/action-menu';
-import { ListRow, Pill, Property, PropertyGroup, RowId, RowMeta, RowTitle } from '@/components/ui/list';
+import { ListRow, Pill, RowId, RowMeta, RowTitle } from '@/components/ui/list';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Field, Input, Textarea } from '@/components/ui/input';
 import { Empty, ErrorState, JsonView, Loading, Mono } from '@/components/ui/misc';
@@ -24,7 +24,7 @@ import { errorDisplay } from '@/lib/error-message';
 import { useT } from '@/lib/i18n';
 import { isMock } from '@/lib/mock';
 import type { AppDraft, AppRelease, AppReleaseResult } from '@/lib/types';
-import { formatTime, relativeTime } from '@/lib/utils';
+import { cn, formatTime, relativeTime } from '@/lib/utils';
 
 export function AppsPage() {
   const { appId } = useParams();
@@ -343,25 +343,23 @@ export function AppDetailPage() {
         <PageContent>
           {tab === 'properties' ? (
             <>
-              <Section card padded>
-                <PropertyGroup title={t('apps.detail.properties')}>
-                  <Property label={t('apps.detail.status')}><StatusBadge status={app.data.status} /></Property>
-                  <Property label={t('apps.detail.version')}><Mono>{manifest?.version ?? app.data.latestVersion ?? '—'}</Mono></Property>
-                  <Property label={t('apps.detail.entry')}><Mono>{manifest?.entry ?? '—'}</Mono></Property>
-                  <Property label={t('apps.detail.model')}>{manifest?.modelRoute ? <Mono>{`${manifest.modelRoute.provider} / ${manifest.modelRoute.model}`}</Mono> : null}</Property>
-                  <Property label={t('apps.detail.created')}>{formatTime(app.data.createdAt)}</Property>
-                </PropertyGroup>
-                {skills.length === 0 ? null : (
-                  <PropertyGroup title={t('apps.detail.skills')}>
-                    <div className="flex flex-wrap gap-1 px-2">{skills.map((s) => <Pill key={s} color="var(--violet)">{s.replace(/^skill:\/\//, '')}</Pill>)}</div>
-                  </PropertyGroup>
-                )}
-                {capabilities.length === 0 ? null : (
-                  <PropertyGroup title={t('apps.detail.capabilities')}>
-                    <div className="flex flex-wrap gap-1 px-2">{capabilities.map((s) => <Pill key={s} color="var(--blue)">{s.replace(/^capability:\/\//, '')}</Pill>)}</div>
-                  </PropertyGroup>
-                )}
+              <Section card title={t('apps.detail.properties')}>
+                <ListRow><RowId>{t('apps.detail.status')}</RowId><RowTitle><StatusBadge status={app.data.status} /></RowTitle></ListRow>
+                <ListRow><RowId>{t('apps.detail.version')}</RowId><RowTitle><Mono>{manifest?.version ?? app.data.latestVersion ?? '—'}</Mono></RowTitle></ListRow>
+                <ListRow><RowId>{t('apps.detail.entry')}</RowId><RowTitle><Mono>{manifest?.entry ?? '—'}</Mono></RowTitle></ListRow>
+                <ListRow><RowId>{t('apps.detail.model')}</RowId><RowTitle>{manifest?.modelRoute ? <Mono>{`${manifest.modelRoute.provider} / ${manifest.modelRoute.model}`}</Mono> : '—'}</RowTitle></ListRow>
+                <ListRow><RowId>{t('apps.detail.created')}</RowId><RowTitle>{formatTime(app.data.createdAt)}</RowTitle></ListRow>
               </Section>
+              {skills.length === 0 ? null : (
+                <Section card title={t('apps.detail.skills')} count={skills.length}>
+                  <div className="flex flex-wrap gap-1.5 gutter-x py-3">{skills.map((s) => <Pill key={s} color="var(--violet)">{s.replace(/^skill:\/\//, '')}</Pill>)}</div>
+                </Section>
+              )}
+              {capabilities.length === 0 ? null : (
+                <Section card title={t('apps.detail.capabilities')} count={capabilities.length}>
+                  <div className="flex flex-wrap gap-1.5 gutter-x py-3">{capabilities.map((s) => <Pill key={s} color="var(--blue)">{s.replace(/^capability:\/\//, '')}</Pill>)}</div>
+                </Section>
+              )}
               {tasks.length === 0 ? null : (
                 <Section card title={t('apps.detail.tasks')} count={tasks.length}>
                   {tasks.map((task) => (
@@ -383,10 +381,9 @@ export function AppDetailPage() {
                 ? <Quiet>{t('apps.detail.definitionEmpty')}</Quiet>
                 : null}
               {manifest === undefined ? null : (
-                <details>
-                  <summary className="cursor-default text-[12px] text-muted hover:text-fg">{t('apps.detail.showManifest')}</summary>
-                  <div className="pt-2"><JsonView value={manifest} filename="manifest.json" /></div>
-                </details>
+                <Section title={t('apps.detail.rawManifest')}>
+                  <JsonView value={manifest} filename="manifest.json" />
+                </Section>
               )}
             </>
           ) : null}
@@ -613,10 +610,10 @@ function DraftPanel({ appId, hasUnpublishedChanges, actionsRef, onChrome }: {
   }, [files, statusLine, attention, dirty, revision, busy, publishBlocked, save.isPending, publish.isPending, paths.length, onChrome, t]);
 
   return (
-    <Section card>
+    <div className={cn(contentCard, 'flex min-h-[calc(100dvh-10rem)] flex-col')}>
       {draftQuery.isLoading ? <Loading rows={3} /> : draftQuery.error ? <ErrorState error={draftQuery.error} /> : files !== undefined ? (
         <>
-          <div className="flex items-center gap-2 border-b border-line gutter-x py-2.5">
+          <div className="flex shrink-0 items-center gap-2 border-b border-line px-3 py-2.5">
             <p className="min-w-0 truncate text-[13px] text-ink-2">{statusLine}</p>
             <input ref={uploadRef} type="file" accept=".tar.gz,.tgz,application/gzip" className="hidden" onChange={(event) => {
               const file = event.target.files?.[0];
@@ -624,44 +621,48 @@ function DraftPanel({ appId, hasUnpublishedChanges, actionsRef, onChrome }: {
               if (file !== undefined) void upload(file);
             }} />
           </div>
-          <div className="flex min-h-[420px] flex-col md:flex-row">
-            <div className="w-full shrink-0 border-b border-line p-2 md:w-56 md:border-b-0 md:border-r">
-              {groups.length === 0 ? <p className="px-2 py-3 text-[12px] text-faint">{t('apps.draft.noFiles')}</p> : groups.map(([dir, entries]) => (
-                <div key={dir || '.'} className="mb-1.5">
-                  <div className="flex items-center gap-1.5 px-2 py-1 text-[11px] font-medium uppercase tracking-wide text-faint">
-                    <Folder className="size-3.5" />{dir === '' ? '/' : dir}
-                  </div>
-                  {entries.map((path) => {
-                    const name = dir === '' ? path : path.slice(dir.length + 1);
-                    const active = path === selectedPath;
-                    return (
-                      <button key={path} type="button" aria-pressed={active} title={path}
-                        onClick={() => setSelectedPath(path)}
-                        className={`flex w-full items-center gap-1.5 rounded-md py-1.5 ps-4 pe-2 text-left text-[12.5px] transition-colors ${active ? 'bg-hover-2 text-ink' : 'text-ink-2 hover:bg-hover'}`}>
-                        <FileText className="size-3.5 shrink-0 text-faint" /><span className="truncate">{name}</span>
-                      </button>
-                    );
-                  })}
+          <div className="flex min-h-0 flex-1 flex-col md:flex-row md:items-stretch">
+            <div className="flex w-full shrink-0 flex-col border-b border-line md:w-72 md:self-stretch md:border-b-0 md:border-r">
+              {groups.length === 0 ? <p className="px-3 py-4 text-[12.5px] text-faint">{t('apps.draft.noFiles')}</p> : (
+                <div className="flex min-h-full flex-1 flex-col">
+                  {groups.map(([dir, entries]) => (
+                    <div key={dir || '.'} className="flex flex-col">
+                      <div className="flex h-8 items-center gap-1.5 px-3 text-[11px] font-medium uppercase tracking-wide text-faint">
+                        <Folder className="size-3.5" />{dir === '' ? '/' : dir}
+                      </div>
+                      {entries.map((path) => {
+                        const name = dir === '' ? path : path.slice(dir.length + 1);
+                        const active = path === selectedPath;
+                        return (
+                          <button key={path} type="button" aria-pressed={active} title={path}
+                            onClick={() => setSelectedPath(path)}
+                            className={`flex h-[38px] w-full items-center gap-2 px-3 text-left text-[13px] transition-colors duration-75 ${active ? 'bg-active text-ink' : 'text-ink-2 hover:bg-hover'}`}>
+                            <FileText className="size-3.5 shrink-0 text-faint" /><span className="min-w-0 flex-1 truncate">{name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
-            <div className="flex min-h-[280px] min-w-0 flex-1 flex-col">
+            <div className="flex min-h-[320px] min-w-0 flex-1 flex-col">
               {selectedPath === undefined ? (
-                <p className="gutter-x py-6 text-[12.5px] text-faint">{t('apps.draft.selectFile')}</p>
+                <p className="px-3 py-6 text-[12.5px] text-faint">{t('apps.draft.selectFile')}</p>
               ) : (
                 <>
-                  <div className="flex items-center gap-2 border-b border-line gutter-x py-1.5">
+                  <div className="flex h-8 shrink-0 items-center gap-2 border-b border-line px-3">
                     <Mono className="truncate text-faint">{selectedPath}</Mono>
                   </div>
                   <Textarea spellCheck={false} aria-label={selectedPath} value={files[selectedPath] ?? ''}
                     onChange={(event) => { const value = event.target.value; setFiles((current) => current === undefined ? current : { ...current, [selectedPath]: value }); }}
-                    className="min-h-[280px] flex-1 resize-none rounded-none border-0 px-3 py-3 font-mono text-[12px] leading-5 focus:shadow-none" />
+                    className="min-h-0 w-full flex-1 resize-none rounded-none border-0 px-3 py-3 font-mono text-[12px] leading-5 focus:shadow-none" />
                 </>
               )}
             </div>
           </div>
           {message === undefined ? null : (
-            <div role="status" className={`flex flex-wrap items-center gap-2 border-t border-line gutter-x py-2 text-[12.5px] ${message.tone === 'ok' ? 'text-green' : message.tone === 'warn' ? 'text-amber' : 'text-red'}`}>
+            <div role="status" className={`flex flex-wrap items-center gap-2 border-t border-line px-3 py-2 text-[12.5px] ${message.tone === 'ok' ? 'text-green' : message.tone === 'warn' ? 'text-amber' : 'text-red'}`}>
               <span>{message.text}</span>
               {message.release?.status === 'stored' ? (
                 <Link className="flex items-center gap-1 text-accent-ink hover:underline" to={`/apps/${encodeURIComponent(appId)}/releases/${encodeURIComponent(message.release.releaseId)}`}>
@@ -672,6 +673,6 @@ function DraftPanel({ appId, hasUnpublishedChanges, actionsRef, onChrome }: {
           )}
         </>
       ) : null}
-    </Section>
+    </div>
   );
 }

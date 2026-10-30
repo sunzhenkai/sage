@@ -9,13 +9,13 @@ import { RunLogs } from '@/components/bui/run-logs';
 import { PageContent, PageDescription, Quiet, Section } from '@/components/layout/page';
 import { StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { DetailLayout, ListRow, Property, PropertyGroup, RowId, RowTitle } from '@/components/ui/list';
+import { ListRow, RowId, RowTitle } from '@/components/ui/list';
 import { ErrorState, Loading, Mono } from '@/components/ui/misc';
 import { api } from '@/lib/api';
 import { useT } from '@/lib/i18n';
 import { formatTime, relativeTime } from '@/lib/utils';
 
-type Tab = 'overview' | 'logs' | 'artifacts';
+type Tab = 'overview' | 'artifacts';
 const terminal = new Set(['succeeded', 'failed', 'cancelled']);
 
 export function AppRunDetailPage() {
@@ -41,7 +41,6 @@ export function AppRunDetailPage() {
         title={<Mono>{taskId}</Mono>}
         tabs={run === undefined ? undefined : <>
           <ViewTab active={tab === 'overview'} onClick={() => setTab('overview')}>{t('apps.runDetail.tabs.overview')}</ViewTab>
-          <ViewTab active={tab === 'logs'} onClick={() => setTab('logs')}>{t('apps.runDetail.tabs.logs')}</ViewTab>
           <ViewTab active={tab === 'artifacts'} onClick={() => setTab('artifacts')}>{t('apps.runDetail.tabs.artifacts')}</ViewTab>
         </>}
         actions={run === undefined || pending ? null : (
@@ -50,41 +49,38 @@ export function AppRunDetailPage() {
           </Button>
         )} />
       {runQuery.isLoading ? <Loading /> : runQuery.error ? <ErrorState error={runQuery.error} /> : run === undefined ? null : (
-        <DetailLayout properties={<>
-          <PropertyGroup title={t('apps.runDetail.properties')}>
-            <Property label={t('apps.runDetail.status')}><StatusBadge status={run.status} /></Property>
-            <Property label={t('apps.runDetail.version')}><Mono>{run.releaseVersion === undefined ? '—' : `v${run.releaseVersion}`}</Mono></Property>
-            <Property label={t('apps.runDetail.source')}>{run.source === 'schedule' ? t('apps.detail.sourceSchedule') : t('apps.detail.sourceManual')}</Property>
-            <Property label={t('apps.runDetail.task')}><Mono className="break-all">{run.taskId}</Mono></Property>
-            <Property label={t('apps.runDetail.created')}>{formatTime(run.createdAt)}</Property>
-            <Property label={t('apps.runDetail.updated')}>{formatTime(run.updatedAt)}</Property>
-          </PropertyGroup>
-          <PropertyGroup title={t('apps.runDetail.release')}>
-            <Property label={t('apps.runDetail.releaseId')}><Mono className="break-all">{run.releaseId}</Mono></Property>
-            <Property label={t('apps.runDetail.freshness')}>{run.freshness ?? '—'}</Property>
-            <Property label={t('apps.runDetail.failureCode')}>{run.failureCode === undefined ? '—' : <span className="text-red">{run.failureCode}</span>}</Property>
-          </PropertyGroup>
-        </>}>
-          <PageContent>
-            <PageDescription
-              leading={<StatusGlyph status={run.status} />}
-              title={run.releaseVersion === undefined ? taskId : `v${run.releaseVersion}`}
-              description={run.updatedAt === undefined ? undefined : t('apps.runDetail.updatedAgo', { time: relativeTime(run.updatedAt) })} />
-            {pending ? (
-              <Section card padded><Quiet>{t('apps.runDetail.pendingHint')}</Quiet></Section>
-            ) : tab === 'overview' ? (
-              run.failureCode === undefined ? <Quiet>{t(live ? 'apps.runDetail.runningHint' : 'apps.runDetail.finishedHint')}</Quiet> : (
-                <Section card>
-                  <ListRow><RowId>{t('apps.runDetail.failureCode')}</RowId><RowTitle><span className="text-red">{run.failureCode}</span></RowTitle></ListRow>
-                </Section>
-              )
-            ) : tab === 'logs' ? (
-              <Section card padded><RunLogs taskId={taskId} live={live} /></Section>
-            ) : (
-              <Section card padded><Artifacts taskId={taskId} live={live} /></Section>
-            )}
-          </PageContent>
-        </DetailLayout>
+        <PageContent>
+          <PageDescription
+            leading={<StatusGlyph status={run.status} />}
+            title={run.releaseVersion === undefined ? taskId : `v${run.releaseVersion}`}
+            description={run.updatedAt === undefined ? undefined : t('apps.runDetail.updatedAgo', { time: relativeTime(run.updatedAt) })} />
+          {pending ? (
+            <Section card padded><Quiet>{t('apps.runDetail.pendingHint')}</Quiet></Section>
+          ) : tab === 'overview' ? (
+            <>
+              <Section card title={t('apps.runDetail.properties')}>
+                <ListRow><RowId>{t('apps.runDetail.status')}</RowId><RowTitle><StatusBadge status={run.status} /></RowTitle></ListRow>
+                <ListRow><RowId>{t('apps.runDetail.version')}</RowId><RowTitle><Mono>{run.releaseVersion === undefined ? '—' : `v${run.releaseVersion}`}</Mono></RowTitle></ListRow>
+                <ListRow><RowId>{t('apps.runDetail.source')}</RowId><RowTitle>{run.source === 'schedule' ? t('apps.detail.sourceSchedule') : t('apps.detail.sourceManual')}</RowTitle></ListRow>
+                <ListRow><RowId>{t('apps.runDetail.task')}</RowId><RowTitle><Mono className="break-all">{run.taskId}</Mono></RowTitle></ListRow>
+                <ListRow><RowId>{t('apps.runDetail.created')}</RowId><RowTitle>{formatTime(run.createdAt)}</RowTitle></ListRow>
+                <ListRow><RowId>{t('apps.runDetail.updated')}</RowId><RowTitle>{formatTime(run.updatedAt)}</RowTitle></ListRow>
+              </Section>
+              <Section card title={t('apps.runDetail.release')}>
+                <ListRow><RowId>{t('apps.runDetail.releaseId')}</RowId><RowTitle><Mono className="break-all">{run.releaseId}</Mono></RowTitle></ListRow>
+                <ListRow><RowId>{t('apps.runDetail.freshness')}</RowId><RowTitle>{run.freshness ?? '—'}</RowTitle></ListRow>
+                <ListRow><RowId>{t('apps.runDetail.failureCode')}</RowId><RowTitle>{run.failureCode === undefined ? '—' : <span className="text-red">{run.failureCode}</span>}</RowTitle></ListRow>
+              </Section>
+              <Section card padded title={t('tasks.tabs.runLogs')}>
+                <RunLogs taskId={taskId} live={live} />
+              </Section>
+            </>
+          ) : (
+            <Section card title={t('apps.runDetail.tabs.artifacts')}>
+              <Artifacts taskId={taskId} live={live} />
+            </Section>
+          )}
+        </PageContent>
       )}
     </>
   );

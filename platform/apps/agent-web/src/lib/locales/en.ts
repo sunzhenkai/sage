@@ -350,7 +350,11 @@ export const en = {
     artifacts: {
       empty: 'No artifacts.',
       download: 'Download',
-      select: 'Select an artifact to preview it.'
+      select: 'Select an artifact to preview it.',
+      selectEntry: 'Select a file inside the archive to preview it.',
+      files: '{count} files',
+      archiveEmpty: 'This archive has no files.',
+      archiveFailed: 'Could not open this archive. Download it instead.'
     }
   },
   schedules: {
@@ -568,13 +572,11 @@ export const en = {
       assets: 'Assets',
       assetsEmpty: 'No assets in this release.',
       provenance: 'Provenance',
-      showProvenance: 'Show full provenance',
       downloadSource: 'Download source',
       downloadBundle: 'Download bundle',
       downloading: 'Preparing…',
       downloadFailed: 'Release download failed.',
       raw: 'Raw release detail',
-      showRaw: 'Show raw JSON',
       run: 'Run',
       fields: {
         version: 'Version',
@@ -613,7 +615,6 @@ export const en = {
       runsEmpty: 'No runs yet. Start one from a release.',
       releasesEmpty: 'No releases yet. Publish the draft to create one.',
       definitionEmpty: 'This app has no tasks, inputs, or data sources.',
-      showManifest: 'Show raw manifest',
       tabs: {
         properties: 'Properties',
         draft: 'Draft',
@@ -658,11 +659,8 @@ export const en = {
       overview: 'Overview',
       statusHint: 'Status comes from the task projection; pending means no projection has been observed yet.',
       pendingHint: 'The run was admitted and is waiting for the first task projection. Logs and artifacts appear once the task starts.',
-      runningHint: 'This run is still going. Logs keep updating.',
-      finishedHint: 'This run has finished. Open logs or artifacts for the output.',
       tabs: {
         overview: 'Overview',
-        logs: 'Run logs',
         artifacts: 'Artifacts'
       }
     }

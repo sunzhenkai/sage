@@ -14,7 +14,7 @@ import { TaskRows } from '@/components/bui/task-rows';
 import { ThinkingTrace } from '@/components/bui/thinking';
 import { StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Pill, Property, PropertyGroup } from '@/components/ui/list';
+import { ListRow, Pill, RowId, RowTitle } from '@/components/ui/list';
 import { Empty, ErrorState, JsonView, Loading, Mono } from '@/components/ui/misc';
 import { api } from '@/lib/api';
 import { useT } from '@/lib/i18n';
@@ -135,25 +135,25 @@ export function TaskDetailPage() {
               onConfirm={(k) => { if (k !== 'cancel' || confirm(t('tasks.detail.cancelConfirm'))) control.mutate(k as 'resume' | 'retry' | 'cancel'); }} />
           ) : null}
           {tab === 'properties' ? (
-            <Section card padded>
-              <PropertyGroup title={t('tasks.detail.properties')}>
-                <Property label={t('tasks.detail.status')}><StatusBadge status={detail.status} /></Property>
-                <Property label={t('tasks.detail.type')}>{detail.taskType ? <Pill color="var(--accent)">{detail.taskType}</Pill> : null}</Property>
-                <Property label={t('tasks.detail.attempt')}>{detail.attempt}</Property>
-                <Property label={t('tasks.detail.revision')}>{detail.revision}</Property>
-                <Property label={t('tasks.detail.lifecycle')}>{detail.lifecyclePath}</Property>
-              </PropertyGroup>
-              <PropertyGroup title={t('tasks.detail.execution')}>
-                <Property label={t('tasks.detail.workflow')}><Mono>{detail.workflowId}</Mono></Property>
-                <Property label={t('tasks.detail.target')}><Mono>{detail.targetId}</Mono></Property>
-                <Property label={t('tasks.detail.freshness')}>{detail.projectionFreshness}</Property>
-                <Property label={t('tasks.detail.session')}>{detail.sessionId ? <Link className="text-accent-ink hover:underline" to={`/chat/${detail.sessionId}`}>{shortId(detail.sessionId)}</Link> : null}</Property>
-              </PropertyGroup>
-              <PropertyGroup title={t('tasks.detail.timestamps')}>
-                <Property label={t('tasks.detail.updated')}>{formatTime(detail.projectionUpdatedAt)}</Property>
-                <Property label={t('tasks.detail.observed')}>{formatTime(detail.historyObservedAt)}</Property>
-              </PropertyGroup>
-            </Section>
+            <>
+              <Section card title={t('tasks.detail.properties')}>
+                <ListRow><RowId>{t('tasks.detail.status')}</RowId><RowTitle><StatusBadge status={detail.status} /></RowTitle></ListRow>
+                <ListRow><RowId>{t('tasks.detail.type')}</RowId><RowTitle>{detail.taskType ? <Pill color="var(--accent)">{detail.taskType}</Pill> : '—'}</RowTitle></ListRow>
+                <ListRow><RowId>{t('tasks.detail.attempt')}</RowId><RowTitle>{detail.attempt}</RowTitle></ListRow>
+                <ListRow><RowId>{t('tasks.detail.revision')}</RowId><RowTitle>{detail.revision}</RowTitle></ListRow>
+                <ListRow><RowId>{t('tasks.detail.lifecycle')}</RowId><RowTitle>{detail.lifecyclePath}</RowTitle></ListRow>
+              </Section>
+              <Section card title={t('tasks.detail.execution')}>
+                <ListRow><RowId>{t('tasks.detail.workflow')}</RowId><RowTitle><Mono>{detail.workflowId}</Mono></RowTitle></ListRow>
+                <ListRow><RowId>{t('tasks.detail.target')}</RowId><RowTitle><Mono>{detail.targetId}</Mono></RowTitle></ListRow>
+                <ListRow><RowId>{t('tasks.detail.freshness')}</RowId><RowTitle>{detail.projectionFreshness}</RowTitle></ListRow>
+                <ListRow><RowId>{t('tasks.detail.session')}</RowId><RowTitle>{detail.sessionId ? <Link className="text-accent-ink hover:underline" to={`/chat/${detail.sessionId}`}>{shortId(detail.sessionId)}</Link> : '—'}</RowTitle></ListRow>
+              </Section>
+              <Section card title={t('tasks.detail.timestamps')}>
+                <ListRow><RowId>{t('tasks.detail.updated')}</RowId><RowTitle>{formatTime(detail.projectionUpdatedAt)}</RowTitle></ListRow>
+                <ListRow><RowId>{t('tasks.detail.observed')}</RowId><RowTitle>{formatTime(detail.historyObservedAt)}</RowTitle></ListRow>
+              </Section>
+            </>
           ) : tab === 'activity' ? <Section card padded><TaskEvents taskId={taskId} status={detail.status} /></Section> : tab === 'run-logs' ? <Section card padded><RunLogs taskId={taskId} /></Section> : tab === 'artifacts' ? <Artifacts taskId={taskId} /> : <JsonView value={detail} filename={`${detail.taskId}.json`} />}
         </PageContent>
       ) : null}

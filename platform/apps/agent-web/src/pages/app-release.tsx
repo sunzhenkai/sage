@@ -85,7 +85,16 @@ export function AppReleaseDetailPage() {
               {([
                 [t('apps.release.fields.releaseId'), detail.releaseId],
                 [t('apps.release.fields.contentDigest'), detail.contentDigest],
-                [t('apps.release.fields.compilerBuild'), detail.provenance.compilerBuild]
+                [t('apps.release.fields.compilerBuild'), detail.provenance.compilerBuild],
+                [t('apps.release.fields.releaseRef'), detail.releaseRef],
+                [t('apps.release.fields.sourceFilesDigest'), detail.sourceFilesDigest ?? detail.provenance.sourceDigest],
+                [t('apps.release.fields.lockDigest'), detail.provenance.lockDigest],
+                ['compilerRef', detail.provenance.compilerRef],
+                ['compilerDigest', detail.provenance.compilerDigest],
+                ['sbomDigest', detail.provenance.sbomDigest],
+                ['provenanceDigest', detail.provenance.provenanceDigest],
+                ['policyDigest', detail.provenance.policyDigest],
+                ['signatureDigest', detail.provenance.signatureDigest]
               ] as const).map(([label, value]) => (
                 <ListRow key={label}>
                   <RowId>{label}</RowId>
@@ -93,44 +102,21 @@ export function AppReleaseDetailPage() {
                   <RowMeta><Button variant="ghost" size="icon-sm" aria-label={t('common.copy')} title={t('common.copy')} onClick={() => { void navigator.clipboard?.writeText(value); }}><Copy /></Button></RowMeta>
                 </ListRow>
               ))}
-              <details>
-                <summary className="cursor-default gutter-x py-2 text-[12px] text-muted hover:text-fg">{t('apps.release.showProvenance')}</summary>
-                {([
-                  [t('apps.release.fields.releaseRef'), detail.releaseRef],
-                  [t('apps.release.fields.sourceFilesDigest'), detail.sourceFilesDigest ?? detail.provenance.sourceDigest],
-                  [t('apps.release.fields.lockDigest'), detail.provenance.lockDigest],
-                  ['compilerRef', detail.provenance.compilerRef],
-                  ['compilerDigest', detail.provenance.compilerDigest],
-                  ['sbomDigest', detail.provenance.sbomDigest],
-                  ['provenanceDigest', detail.provenance.provenanceDigest],
-                  ['policyDigest', detail.provenance.policyDigest],
-                  ['signatureDigest', detail.provenance.signatureDigest]
-                ] as const).map(([label, value]) => (
-                  <ListRow key={label}>
-                    <RowId>{label}</RowId>
-                    <RowTitle><Mono className="truncate">{value}</Mono></RowTitle>
-                    <RowMeta><Button variant="ghost" size="icon-sm" aria-label={t('common.copy')} title={t('common.copy')} onClick={() => { void navigator.clipboard?.writeText(value); }}><Copy /></Button></RowMeta>
-                  </ListRow>
-                ))}
-              </details>
             </Section>
             <Section card title={t('apps.release.assets')} count={detail.assets?.length ?? 0}>
               {detail.assets === undefined || detail.assets.length === 0 ? <div className="gutter-x py-5"><Quiet>{t('apps.release.assetsEmpty')}</Quiet></div> : (detail.assets ?? []).map((asset) => (
-                <details key={asset.relativePath}>
-                  <summary className="flex h-[38px] cursor-default list-none items-center gap-3 gutter-x hover:bg-hover">
+                <div key={asset.relativePath}>
+                  <ListRow>
                     <RowId>{asset.kind.toUpperCase().slice(0, 10)}</RowId>
                     <RowTitle><Mono className="text-[12.5px]">{asset.relativePath}</Mono></RowTitle>
                     <RowMeta><span className="text-faint">{asset.bytes} B</span></RowMeta>
-                  </summary>
-                  {asset.preview ? <div className="gutter-x pb-2"><CodeBlock code={asset.preview} filename={asset.relativePath} maxHeight={288} /></div> : null}
-                </details>
+                  </ListRow>
+                  {asset.preview ? <div className="border-b border-line gutter-x pb-3 pt-1"><CodeBlock code={asset.preview} filename={asset.relativePath} maxHeight={288} /></div> : null}
+                </div>
               ))}
             </Section>
             <Section title={t('apps.release.raw')}>
-              <details>
-                <summary className="cursor-default text-[12px] text-muted hover:text-fg">{t('apps.release.showRaw')}</summary>
-                <div className="pt-2"><JsonView value={detail} filename={`${appId}-${detail.packageVersion}.json`} /></div>
-              </details>
+              <JsonView value={detail} filename={`${appId}-${detail.packageVersion}.json`} />
             </Section>
           </PageContent>
         </DetailLayout>

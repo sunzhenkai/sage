@@ -354,7 +354,11 @@ export const zhCN = {
     artifacts: {
       empty: '没有产物。',
       download: '下载',
-      select: '选择一个产物进行预览。'
+      select: '选择一个产物进行预览。',
+      selectEntry: '选择压缩包内的文件进行预览。',
+      files: '{count} 个文件',
+      archiveEmpty: '压缩包里没有文件。',
+      archiveFailed: '无法打开这个压缩包，请下载后查看。'
     }
   },
   schedules: {
@@ -572,13 +576,11 @@ export const zhCN = {
       assets: '资产',
       assetsEmpty: '该 Release 没有资产。',
       provenance: '构建来源',
-      showProvenance: '显示全部来源',
       downloadSource: '下载源码',
       downloadBundle: '下载打包产物',
       downloading: '正在准备…',
       downloadFailed: 'Release 下载失败。',
       raw: 'Release 原始详情',
-      showRaw: '显示原始 JSON',
       run: '运行',
       fields: {
         version: '版本',
@@ -617,7 +619,6 @@ export const zhCN = {
       runsEmpty: '还没有运行记录。可从任一发布版本发起运行。',
       releasesEmpty: '还没有发布版本。编辑草稿后可以发布。',
       definitionEmpty: '这个应用没有任务、输入或数据源。',
-      showManifest: '显示原始清单',
       tabs: {
         properties: '属性',
         draft: '草稿',
@@ -662,11 +663,8 @@ export const zhCN = {
       overview: '概览',
       statusHint: '状态来自任务投影；等待中表示尚未观察到投影。',
       pendingHint: '运行已准入，正在等待第一次任务投影。任务启动后即可查看日志与产物。',
-      runningHint: '运行还在进行，日志会跟着更新。',
-      finishedHint: '这次运行已结束。日志和产物在上面的页签里。',
       tabs: {
         overview: '概览',
-        logs: '运行日志',
         artifacts: '产物'
       }
     }
