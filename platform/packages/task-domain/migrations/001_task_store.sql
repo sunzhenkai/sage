@@ -28,12 +28,14 @@ ALTER TABLE task_effect_ledger DROP CONSTRAINT IF EXISTS task_effect_ledger_stat
 ALTER TABLE task_effect_ledger DROP CONSTRAINT IF EXISTS task_effect_ledger_check;
 ALTER TABLE task_effect_ledger DROP CONSTRAINT IF EXISTS task_effect_ledger_status_v2_check;
 ALTER TABLE task_effect_ledger DROP CONSTRAINT IF EXISTS task_effect_ledger_terminal_v2_check;
+-- NOT VALID: migrations re-run on every boot and 008 supersedes these with v3 (which adds 'failed').
+-- Validating here would reject existing 'failed' ledger rows before 008 can drop the v2 checks.
 ALTER TABLE task_effect_ledger ADD CONSTRAINT task_effect_ledger_status_v2_check
-  CHECK (status IN ('claimed','committed','effect_unknown','cancelled'));
+  CHECK (status IN ('claimed','committed','effect_unknown','cancelled')) NOT VALID;
 ALTER TABLE task_effect_ledger ADD CONSTRAINT task_effect_ledger_terminal_v2_check
   CHECK ((status='claimed' AND result IS NULL AND committed_at IS NULL)
       OR (status IN ('committed','effect_unknown') AND result IS NOT NULL AND committed_at IS NOT NULL)
-      OR (status='cancelled' AND result IS NULL AND committed_at IS NOT NULL));
+      OR (status='cancelled' AND result IS NULL AND committed_at IS NOT NULL)) NOT VALID;
 
 CREATE TABLE IF NOT EXISTS task_projection (
   tenant_id text NOT NULL,
