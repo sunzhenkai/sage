@@ -71,6 +71,22 @@ claude mcp add --transport http sage http://127.0.0.1:9610/mcp \
 - **说明**：按 MCP 规范 authorization 为可选项，本实现用静态 `Bearer <api-key>`，不支持 OAuth 2.1 发现流程；持有该 key 即可通过 MCP 调用全部 tools。
 - **运行态证据**：`cd platform/apps/agent-api && node scripts/mcp-evidence.mjs http://127.0.0.1:9610 $SAGE_SERVICE_TOKEN`，跑判据闭环 + 各资源组代表 tool + 鉴权失败路径，输出落 `platform/.evidence/mcp-server/`（gitignored）。
 
+## 任务状态与投影
+
+任务状态分三层，读取顺序固定：
+
+- **工作流状态**（Temporal，权威）：`running / paused / failed / cancelled / effect_unknown / succeeded`
+- **分片账本**（`task_effect_ledger`）：每个 slice 一次认领，幂等键含执行代次 `generation`；认领租约默认 2s，执行期间每 500ms 心跳续期
+- **投影**（`task_projection`）：控制台与列表接口读取的状态，终态由工作流在返回前写入
+
+约定：
+
+- **手动重试**递增 `generation` 重跑失败 slice，不复用账本里的失败结果
+- **暂停**在途分片完成后仍保持 `paused`；分片完成整个任务时以 `succeeded` 收口
+- **投影缺失**时 `GET /v1/tasks/:id` 回落到工作流状态并保留 `freshness: unavailable`；`POST /v1/tasks/:id/reconcile` 可从工作流状态重建投影
+- **后台巡检**每 60s 补缺失投影并回收超过 1h 未续租的认领；`SAGE_TASK_RECONCILE_INTERVAL_MS=0` 可关闭
+- **存量挂死任务**：先 `POST /v1/tasks/:id/cancel` 收口；需要继续执行时再 `retry`，或直接 `reconcile` 修复投影
+
 ## 架构产物
 
 - 终版架构：[`platform/architecture/generic-agent-platform-final-architecture.md`](platform/architecture/generic-agent-platform-final-architecture.md)

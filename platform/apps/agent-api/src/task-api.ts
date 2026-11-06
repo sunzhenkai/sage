@@ -56,6 +56,8 @@ export interface TaskRouteOptions {
   readonly queryStore?:TaskProjectionQueryStore; readonly artifactResolver?:TaskArtifactResolver; readonly telemetry?:CrossChainTelemetryRecorder;
   readonly runLogQuery?:TaskRunLogQueryPort;
   readonly freshnessThresholdMs?:number; readonly now?:()=>Date;
+  /** 从工作流权威状态重建投影；未提供时不暴露 reconcile 端点。 */
+  readonly repairTask?:(taskId:string)=>Promise<TaskQueryResult>;
 }
 
 function routingError(reply: FastifyReply, cause: unknown): FastifyReply | undefined {
@@ -138,10 +140,12 @@ async function controlConflict(options:TaskRouteOptions,taskId:string,operation:
   if(!options.queryStore)return undefined;
   const task=await options.queryStore.getTaskView(options.tenantId,taskId,now(),threshold);
   if(!task)return 'TASK_NOT_FOUND';
-  if(operation==='pause'&&task.status!=='running')return 'TASK_CONTROL_NOT_APPLICABLE';
-  if(operation==='resume'&&task.status!=='paused')return 'TASK_CONTROL_NOT_APPLICABLE';
-  if(operation==='retry'&&task.status!=='failed')return 'TASK_CONTROL_NOT_APPLICABLE';
-  if(operation==='cancel'&&['succeeded','cancelled','effect_unknown'].includes(task.status))return 'TASK_CONTROL_NOT_APPLICABLE';
+  // 投影不可用/落后时状态不可信：交给工作流的幂等 signal handler 判定，而不是在这里拒绝。
+  const trusted=task.freshness==='fresh';
+  if(operation==='pause'&&trusted&&task.status!=='running')return 'TASK_CONTROL_NOT_APPLICABLE';
+  if(operation==='resume'&&trusted&&task.status!=='paused')return 'TASK_CONTROL_NOT_APPLICABLE';
+  if(operation==='retry'&&trusted&&task.status!=='failed')return 'TASK_CONTROL_NOT_APPLICABLE';
+  if(operation==='cancel'&&trusted&&['succeeded','cancelled','effect_unknown'].includes(task.status))return 'TASK_CONTROL_NOT_APPLICABLE';
   return undefined;
 }
 function conflictReply(reply:FastifyReply,code:string):FastifyReply{return reply.code(code==='TASK_NOT_FOUND'?404:409).send({error:{code,message:code==='TASK_NOT_FOUND'?'Task not found':'Task control is not applicable to the current persisted state',retryable:false}});}
@@ -184,7 +188,20 @@ export function registerTaskRoutes(app: FastifyInstance, controller: TaskControl
   });
   app.get<{ Params: { taskId: string } }>('/v1/tasks/:taskId', async (request,reply) => {
     await authorize(request,options,'read',request.params.taskId);
-    if(options.queryStore){const task=await options.queryStore.getTaskView(tenantId,request.params.taskId,now(),threshold);return task??reply.code(404).send({error:{code:'TASK_NOT_FOUND',retryable:false}});}
+    if(options.queryStore){
+      const task=await options.queryStore.getTaskView(tenantId,request.params.taskId,now(),threshold);
+      if(!task)return reply.code(404).send({error:{code:'TASK_NOT_FOUND',retryable:false}});
+      if(task.freshness!=='unavailable')return task;
+      // 投影缺失时以工作流状态为准，但保留 unavailable 新鲜度，避免把重建结果伪装成已同步投影。
+      try{
+        const authoritative=await controller.query(request.params.taskId);
+        const state=authoritative.workflow;
+        return {...task,status:state.status,revision:state.committedSlices,
+          ...(state.checkpointRef===undefined?{}:{checkpointRef:state.checkpointRef}),
+          ...(state.artifactRef===undefined?{}:{artifactRef:state.artifactRef}),
+          ...(state.failureCode===undefined?{}:{failureCode:state.failureCode})};
+      }catch{return task;}
+    }
     try{return await controller.query(request.params.taskId);}catch(cause){const response=routingError(reply,cause);if(response)return response;throw cause;}
   });
   app.get<{Params:{taskId:string}}>('/v1/tasks/:taskId/events',async(request)=>{await authorize(request,options,'read',request.params.taskId);return {events:await options.queryStore?.listTaskEvents(tenantId,request.params.taskId)??[]};});
@@ -246,6 +263,14 @@ export function registerTaskRoutes(app: FastifyInstance, controller: TaskControl
   app.post<{ Params: { taskId: string }; Body: { controlId?: string } }>('/v1/tasks/:taskId/cancel',{schema:{body:controlBodySchema},preValidation:controlPreValidation(options,'cancel',controlFields)}, async (request, reply) => {
     const rejected=rejectedControlFields(request.body,controlFields);if(rejected.length)return reply.code(400).send({error:{code:'TASK_CONTROL_UNTRUSTED_FIELD_REJECTED',message:rejected.join(','),retryable:false}});
     try{const principal=await authorize(request,options,'cancel',request.params.taskId);const conflict=await controlConflict(options,request.params.taskId,'cancel',now,threshold);if(conflict)return conflictReply(reply,conflict);return reply.code(202).send(await controller.cancel(request.params.taskId, request.body.controlId ?? `control-${randomUUID()}`,principal));}
+    catch(cause){const response=routingError(reply,cause);if(response)return response;throw cause;}
+  });
+  app.post<{ Params: { taskId: string }; Body: Record<string, never> }>('/v1/tasks/:taskId/reconcile', async (request,reply) => {
+    try{
+      await authorize(request,options,'retry',request.params.taskId);
+      if(!options.repairTask)return reply.code(503).send({error:{code:'TASK_RECONCILE_UNAVAILABLE',retryable:true}});
+      return reply.code(202).send(await options.repairTask(request.params.taskId));
+    }
     catch(cause){const response=routingError(reply,cause);if(response)return response;throw cause;}
   });
   app.post<{ Params: { taskId: string }; Body: { controlId?: string } }>('/v1/tasks/:taskId/retry',{schema:{body:controlBodySchema},preValidation:controlPreValidation(options,'retry',controlFields)}, async (request, reply) => {

@@ -446,6 +446,24 @@ describe('常规投影推进写入 Timeline 事件', () => {
     expect(projections.appended.at(-1)![0]!.type).toBe('projection.resume');
   });
 
+  it('repairProjection 从工作流权威状态重建缺失投影', async () => {
+    const registry = publishDevRegistry();
+    const routing = new MemoryRoutingStore();
+    const projections = new MemoryProjectionStore();
+    const us = new FakeTargetClient('sage-dev');
+    const subject = new TrustedMultiTargetTaskController({
+      router: new TrustedTemporalRouter({ registry }), clientFactory: new TemporalClientFactory({ credentials, connector: new MapConnector(new Map([['sage-dev-us', us]])), tenantId: 'tenant-fixture-5' }),
+      routingStore: routing, projectionStore: projections, tenantId: 'tenant-fixture-5', actorId: 'api-service', contextId: 'authenticated-request',
+      environment: 'development', region: 'us-east', residency: 'us'
+    });
+    await subject.create(request);
+    us.state = { ...us.state!, status: 'failed', failureCode: 'AGENT_SLICE_FAILED' };
+    projections.written.length = 0;
+    const repaired = await subject.repairProjection(request.taskId);
+    expect(projections.written.at(-1)).toMatchObject({ status: 'failed', revision: 0, failureCode: 'AGENT_SLICE_FAILED', projectionSource: 'writer' });
+    expect(repaired.workflow.status).toBe('failed');
+  });
+
   it('projection store 未提供事件追加能力时静默跳过', async () => {
     const registry = publishDevRegistry();
     const routing = new MemoryRoutingStore();

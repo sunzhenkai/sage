@@ -81,6 +81,27 @@ class ClaimFailureStore implements TaskCommitStore {
   cancelSlice(...args: Parameters<TaskCommitStore['cancelSlice']>): Promise<void> { return this.delegate.cancelSlice(...args); }
 }
 
+/** 模拟账本里已存在 failed 结果：第 1 代直接返回失败，重试代次才真正执行。 */
+class FailedFirstGenerationStore implements TaskCommitStore {
+  readonly claims: string[] = [];
+  constructor(readonly delegate: TaskCommitStore) {}
+  async claimSlice(input: ExecuteAgentSliceInput, key: string, owner: string, lease: string): Promise<SliceClaim> {
+    this.claims.push(key);
+    if ((input.generation ?? 1) === 1) {
+      return {
+        status: 'failed',
+        result: { schemaVersion: '1', taskId: input.taskId, sliceNumber: input.sliceNumber, outcome: 'failed', done: true,
+          duplicate: true, detail: 'INJECTED_SLICE_FAILURE', failureCode: 'INJECTED_SLICE_FAILURE' }
+      };
+    }
+    return this.delegate.claimSlice(input, key, owner, lease);
+  }
+  commitSlice(...args: Parameters<TaskCommitStore['commitSlice']>): Promise<void> { return this.delegate.commitSlice(...args); }
+  markEffectUnknown(...args: Parameters<TaskCommitStore['markEffectUnknown']>): Promise<void> { return this.delegate.markEffectUnknown(...args); }
+  markSliceFailed(...args: Parameters<TaskCommitStore['markSliceFailed']>): Promise<void> { return this.delegate.markSliceFailed(...args); }
+  cancelSlice(...args: Parameters<TaskCommitStore['cancelSlice']>): Promise<void> { return this.delegate.cancelSlice(...args); }
+}
+
 class CountingCommitStore implements TaskCommitStore {
   claims = 0;
   constructor(readonly delegate: TaskCommitStore) {}
@@ -160,11 +181,26 @@ async function createWorker(options: {
   commitStore?: TaskCommitStore; afterCommit?: (result: unknown) => Promise<void> | void;
 }): Promise<Worker> {
   if ((options.buildId === undefined) === (options.deploymentVersion === undefined)) throw new Error('EXACTLY_ONE_WORKER_VERSION_MODE_REQUIRED');
+  // 集成套件用 ScriptedHarness 代替真实 provider：注册表与设置只需让执行边界解析通过。
+  const connection = {
+    id: 'conn-integration', tenantId, name: 'integration', source: 'workspace', adapterKind: 'anthropic',
+    baseUrl: 'http://127.0.0.1:1', modelId: 'integration-model', models: ['integration-model'], providerName: 'integration',
+    modelName: 'integration-model', enabled: true, credentialPresent: true, createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z', updatedBy: 'test'
+  };
   return Worker.create({
     connection: nativeConnection, namespace: TASK_NAMESPACE, taskQueue: TASK_QUEUE, workflowBundle,
     activities: createAgentTaskActivities({
-      liveClientFactory: () => new LocalAgentClient({ harness: options.harness }), store: options.commitStore ?? store,
-      inputResolver: resolver, leaseMs: 250, ...(options.afterCommit === undefined ? {} : { afterCommit: options.afterCommit })
+      liveClientFactory: () => new LocalAgentClient({ harness: options.harness }), store: options.commitStore ?? store, projectionStore: store,
+      inputResolver: resolver, leaseMs: 2_000,
+      settingsStore: { async getRunAgentSettings() { return { tenantId, providerConnectionId: 'conn-integration', updatedAt: '2026-01-01T00:00:00.000Z', updatedBy: 'test' }; } },
+      providerConnections: {
+        async listProviderConnections() { return [connection]; },
+        async getProviderConnection() { return connection; },
+        async getProviderCredential() { return { ciphertext: Buffer.from('integration'), keyVersion: 1 }; }
+      } as never,
+      secretBackend: { open: () => 'integration-key', describe: () => ({ mode: 'test' }) } as never,
+      ...(options.afterCommit === undefined ? {} : { afterCommit: options.afterCommit })
     }),
     ...(options.deploymentVersion === undefined
       ? { buildId: options.buildId! }
@@ -488,6 +524,59 @@ runIntegration.sequential('Real Temporal and PostgreSQL integration', () => {
       await stopWorker(worker, running);
     }
   }, 45_000);
+
+  it('re-executes a failed slice on manual retry instead of replaying the failed result as success', async () => {
+    const harness = new ScriptedHarness();
+    const failedStore = new FailedFirstGenerationStore(store);
+    const worker = await createWorker({ harness, buildId: 'sage-retry-generation', commitStore: failedStore });
+    const running = worker.run();
+    const controller = new SingleTargetTaskController({ workflow: workflowClient, projectionStore: store, tenantId });
+    const app = Fastify({ logger: false });
+    registerTaskRoutes(app, controller, integrationAuth);
+    try {
+      const taskId = `retry-generation-${randomUUID()}`;
+      expect((await app.inject({ method: 'POST', headers: integrationHeaders, url: '/v1/tasks', payload: requestFor(taskId, 'retry-generation') })).statusCode).toBe(202);
+      const failed = await waitForState(taskId, (state) => state.status === 'failed');
+      expect(failed.failureCode).toBe('INJECTED_SLICE_FAILURE');
+      expect(harness.effects.get('retry-generation') ?? 0).toBe(0);
+      const retryId = `retry-generation-control-${randomUUID()}`;
+      expect((await app.inject({ method: 'POST', headers: integrationHeaders, url: `/v1/tasks/${taskId}/retry`, payload: { controlId: retryId } })).statusCode).toBe(202);
+      const final = await handleFor(taskId).result() as TaskWorkflowState;
+      expect(final).toMatchObject({ status: 'succeeded', manualRetries: 1 });
+      expect(harness.effects.get('retry-generation')).toBe(1);
+      expect(failedStore.claims.some((key) => key.endsWith(':gen:2'))).toBe(true);
+    } finally {
+      await app.close();
+      await stopWorker(worker, running);
+    }
+  }, 30_000);
+
+  it('keeps a task paused when an in-flight slice completes', async () => {
+    const harness = new ScriptedHarness();
+    const gate = harness.block('two-slice-paused-in-flight');
+    const worker = await createWorker({ harness, buildId: 'sage-pause-in-flight' });
+    const running = worker.run();
+    const controller = new SingleTargetTaskController({ workflow: workflowClient, projectionStore: store, tenantId });
+    const app = Fastify({ logger: false });
+    registerTaskRoutes(app, controller, integrationAuth);
+    try {
+      const taskId = `pause-in-flight-${randomUUID()}`;
+      await controller.create(requestFor(taskId, 'two-slice-paused-in-flight'));
+      await gate.started;
+      const pauseId = `pause-in-flight-control-${randomUUID()}`;
+      expect((await controller.signal(taskId, 'pause', pauseId)).workflow).toMatchObject({ status: 'paused', lastControlId: pauseId });
+      gate.release();
+      await waitForProjection(store, taskId, 1);
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      expect((await handleFor(taskId).query<TaskWorkflowState>(TASK_STATE_QUERY)).status).toBe('paused');
+      const resumeId = `resume-in-flight-control-${randomUUID()}`;
+      expect((await controller.signal(taskId, 'resume', resumeId)).workflow).toMatchObject({ status: 'running', lastControlId: resumeId });
+      expect((await handleFor(taskId).result() as TaskWorkflowState).status).toBe('succeeded');
+    } finally {
+      await app.close();
+      await stopWorker(worker, running);
+    }
+  }, 30_000);
 
   it('rolls a long Workflow through real Worker Deployment v1 to v2 and back to v1 without duplicate effects or invalid replay', async () => {
     const harness = new ScriptedHarness();

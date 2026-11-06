@@ -128,7 +128,8 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
       new URL('../../task-domain/migrations/006_provider_connections.sql', import.meta.url),
       new URL('../../task-domain/migrations/007_task_package_run_contract.sql', import.meta.url),
       new URL('../../task-domain/migrations/008_output_package_and_failure.sql', import.meta.url),
-      new URL('../../task-domain/migrations/009_provider_connection_models.sql', import.meta.url)
+      new URL('../../task-domain/migrations/009_provider_connection_models.sql', import.meta.url),
+      new URL('../../task-domain/migrations/010_task_state_generation.sql', import.meta.url)
     ];
     const migrations = (await Promise.all(migrationUrls.map((url) => readFile(url, 'utf8'))))
       .map((sql) => sql.replace(/^\s*BEGIN;\s*/, '').replace(/\s*COMMIT;\s*$/, '').trim());
@@ -152,9 +153,10 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
 
   async claimSlice(input: ExecuteAgentSliceInput, idempotencyKey: string, ownerToken: string, leaseExpiresAt: string): Promise<SliceClaim> {
     const inserted = await this.#query<LedgerRow>('claimSlice.insert', `INSERT INTO task_effect_ledger
-      (idempotency_key,tenant_id,task_id,workflow_id,attempt,slice_number,owner_token,status,lease_expires_at)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,'claimed',$8) ON CONFLICT DO NOTHING RETURNING status,lease_expires_at,result`,
-    [idempotencyKey, input.tenantId, input.taskId, input.workflowId, input.attempt, input.sliceNumber, ownerToken, leaseExpiresAt]);
+      (idempotency_key,tenant_id,task_id,workflow_id,attempt,slice_number,generation,owner_token,status,lease_expires_at)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'claimed',$9) ON CONFLICT DO NOTHING RETURNING status,lease_expires_at,result`,
+    [idempotencyKey, input.tenantId, input.taskId, input.workflowId, input.attempt, input.sliceNumber,
+      input.generation ?? 1, ownerToken, leaseExpiresAt]);
     if (inserted.rowCount === 1) return { status: 'claimed' };
     const existing = (await this.#query<LedgerRow>('claimSlice.get', `SELECT status,lease_expires_at,result FROM task_effect_ledger
       WHERE idempotency_key=$1`, [idempotencyKey])).rows[0];
@@ -185,6 +187,24 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
       if (latest?.status === 'failed' && isAgentSliceResult(latest.result)) return { status: 'failed', result: latest.result };
     }
     return { status: 'in_progress' };
+  }
+
+  async renewLease(idempotencyKey: string, ownerToken: string, leaseExpiresAt: string): Promise<boolean> {
+    const renewed = await this.#query<LedgerRow>('renewLease', `UPDATE task_effect_ledger
+      SET lease_expires_at=$3,updated_at=now()
+      WHERE idempotency_key=$1 AND owner_token=$2 AND status='claimed'
+      RETURNING status,lease_expires_at,result`, [idempotencyKey, ownerToken, leaseExpiresAt]);
+    return (renewed.rowCount ?? 0) === 1;
+  }
+
+  /** 把长期未续租的认领置为过期，供后续投递重新认领；不改动已结算结果。 */
+  async expireStaleClaims(olderThanMs: number): Promise<number> {
+    if (!Number.isFinite(olderThanMs) || olderThanMs < 0) throw new Error('INVALID_STALE_CLAIM_THRESHOLD');
+    const expired = await this.#query('expireStaleClaims', `UPDATE task_effect_ledger
+      SET lease_expires_at=now(),updated_at=now()
+      WHERE status='claimed' AND lease_expires_at IS NOT NULL
+        AND lease_expires_at < now() - ($1::double precision * interval '1 second')`, [olderThanMs / 1_000]);
+    return expired.rowCount ?? 0;
   }
 
   async commitSlice(idempotencyKey: string, ownerToken: string, result: AgentSliceResult, projection: TaskProjection): Promise<void> {
@@ -303,7 +323,8 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
         (EXCLUDED.projection_source='history' AND (task_projection.projection_source='writer' OR task_projection.history_event_id < EXCLUDED.history_event_id))
         OR (EXCLUDED.projection_source='writer' AND task_projection.projection_source='writer'
           AND (task_projection.revision < EXCLUDED.revision OR (task_projection.revision=EXCLUDED.revision AND task_projection.projection_updated_at < EXCLUDED.projection_updated_at))
-          AND NOT (task_projection.status IN ('succeeded','failed','cancelled','effect_unknown') AND EXCLUDED.status IN ('running','paused')))
+          -- failed 不是写死终态：手动重试会把它推进到 running；succeeded/cancelled/effect_unknown 才不可回退。
+          AND NOT (task_projection.status IN ('succeeded','cancelled','effect_unknown') AND EXCLUDED.status IN ('running','paused')))
       ))`,[projection.tenantId,projection.taskId,projection.workflowId,projection.taskType,projection.targetId,projection.attempt,projection.status,projection.revision,projection.projectionSource,projection.historyEventId,projection.checkpointRef??null,projection.artifactRef??null,projection.lastControlId??null,projection.projectionUpdatedAt,projection.historyObservedAt,lifecyclePath,ownerToken,adapterRef,runtimeRef,logicalCursor,projection.authorityReceiptDigest??null,freshness,projection.freshnessReason??null,projection.lastReconciledAt??null,projection.lastRepairId??null,projection.lastReconciliationError??null,projection.projectionAuditVersion??0,projection.failureCode??null,projection.failureDetail??null]);
     return (result.rowCount??0)>0;
   }
@@ -426,7 +447,7 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
     const rows = (await this.#query<TaskViewRow>('listTaskViews', `SELECT r.*,
       p.task_id AS projection_task_id,p.attempt,p.status AS projection_status,p.revision,p.projection_source,p.history_event_id,p.checkpoint_ref,p.artifact_ref,p.last_control_id,p.projection_updated_at,p.history_observed_at,p.failure_code AS projection_failure_code,p.failure_detail AS projection_failure_detail
       FROM task_routing r LEFT JOIN task_projection p ON p.tenant_id=r.tenant_id AND p.task_id=r.task_id
-      WHERE r.tenant_id=$1 AND ($2::text IS NULL OR p.status=$2) AND ($3::text IS NULL OR r.task_type=$3)
+      WHERE r.tenant_id=$1 AND ($2::text IS NULL OR COALESCE(p.status,'running')=$2) AND ($3::text IS NULL OR r.task_type=$3)
         AND ($4::text IS NULL OR r.target_snapshot->>'environment'=$4)
       ORDER BY r.created_at DESC LIMIT $5`, [tenantId,filter.status ?? null,filter.taskType ?? null,filter.environment ?? null,limit])).rows;
     return rows.map((row) => this.#viewFromRow(row, now, freshnessThresholdMs));
@@ -502,7 +523,7 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
   #viewFromRow(row: TaskViewRow, now: Date, thresholdMs: number): TaskProjectionView {
     const routing = this.#routingRecord(row);
     if (row.projection_task_id === null || row.projection_updated_at === undefined) return {
-      taskId:routing.taskId,taskType:routing.taskType,workflowId:routing.workflowId,targetId:routing.snapshot.targetId,attempt:1,status:'running',revision:0,
+      taskId:routing.taskId,taskType:routing.taskType,workflowId:routing.workflowId,targetId:routing.snapshot.targetId,attempt:routing.startEnvelope.input.attempt ?? 1,status:'running',revision:0,
       freshness:'unavailable',staleReason:routing.status==='target_unavailable'?'target_unavailable':'projection_unavailable',targetSnapshot:routing.snapshot,
       ...(routing.startEnvelope.input.sessionId?{sessionId:routing.startEnvelope.input.sessionId}:{}),...(routing.startEnvelope.input.runId?{runId:routing.startEnvelope.input.runId}:{}),
       ...(routing.startEnvelope.input.messageId?{messageId:routing.startEnvelope.input.messageId}:{})

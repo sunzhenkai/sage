@@ -159,6 +159,8 @@ export const ExecuteAgentSliceInputSchema = Type.Object({
   schemaVersion: Type.Literal('1'), taskType: TaskTypeIdSchema, taskId: Id, tenantId: Id, workflowId: Id, targetId: Id,
   sessionId: Type.Optional(Id), runId: Type.Optional(Id), messageId: Type.Optional(Id),
   attempt: Type.Integer({ minimum: 1 }), sliceNumber: Type.Integer({ minimum: 1, maximum: 100 }),
+  /** 手动重试的执行代次；缺省为 1（旧历史与旧二进制一致）。 */
+  generation: Type.Optional(Type.Integer({ minimum: 1 })),
   inputRef: TaskInputRefSchema, checkpointRef: Type.Optional(TaskCheckpointRefSchema), limits: TaskSliceLimitsSchema
 }, { additionalProperties: false, $id: 'ExecuteAgentSliceInput.v1' });
 export type ExecuteAgentSliceInput = Static<typeof ExecuteAgentSliceInputSchema>;
@@ -217,6 +219,8 @@ export interface TaskCommitStore {
   markEffectUnknown(idempotencyKey: string, ownerToken: string, result: AgentSliceResult, projection: TaskProjection): Promise<void>;
   markSliceFailed(idempotencyKey: string, ownerToken: string, result: AgentSliceResult, projection: TaskProjection): Promise<void>;
   cancelSlice(idempotencyKey: string, ownerToken: string, projection: TaskProjection): Promise<void>;
+  /** 心跳续租；返回 false 表示认领已丢失。实现方可选提供。 */
+  renewLease?(idempotencyKey: string, ownerToken: string, leaseExpiresAt: string): Promise<boolean>;
 }
 export interface TaskProjectionStore {
   getProjection(tenantId: string, taskId: string): Promise<TaskProjection | undefined>;
@@ -493,6 +497,8 @@ export interface TaskReconciliationStore extends TaskProjectionStore, TaskProjec
   completePendingRepairAudit(repairId: string): Promise<void>;
   appendRepairAudit(audit: ProjectionRepairAudit): Promise<void>;
   listRepairAudits(tenantId: string, taskId: string): Promise<readonly ProjectionRepairAudit[]>;
+  /** 回收超过阈值的未结算认领；返回回收数量。 */
+  expireStaleClaims?(olderThanMs: number): Promise<number>;
 }
 
 export interface TaskLifecycleAdmissionPolicy {

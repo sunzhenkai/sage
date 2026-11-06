@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS task_effect_ledger (
   attempt integer NOT NULL CHECK (attempt >= 1),
   slice_number integer NOT NULL CHECK (slice_number >= 1),
   owner_token text NOT NULL,
-  status text NOT NULL CHECK (status IN ('claimed','committed','effect_unknown','cancelled')),
+  status text NOT NULL CHECK (status IN ('claimed','committed','effect_unknown','cancelled','failed')),
   lease_expires_at timestamptz,
   result jsonb,
   checkpoint_ref text,
@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS task_effect_ledger (
   committed_at timestamptz,
   UNIQUE (tenant_id, task_id, attempt, slice_number),
   CHECK ((status='claimed' AND result IS NULL AND committed_at IS NULL)
-      OR (status IN ('committed','effect_unknown') AND result IS NOT NULL AND committed_at IS NOT NULL)
+      OR (status IN ('committed','effect_unknown','failed') AND result IS NOT NULL AND committed_at IS NOT NULL)
       OR (status='cancelled' AND result IS NULL AND committed_at IS NOT NULL)),
   CHECK (checkpoint_ref IS NULL OR checkpoint_ref LIKE 'checkpoint://%'),
   CHECK (artifact_ref IS NULL OR artifact_ref LIKE 'artifact://%')
@@ -28,11 +28,12 @@ ALTER TABLE task_effect_ledger DROP CONSTRAINT IF EXISTS task_effect_ledger_stat
 ALTER TABLE task_effect_ledger DROP CONSTRAINT IF EXISTS task_effect_ledger_check;
 ALTER TABLE task_effect_ledger DROP CONSTRAINT IF EXISTS task_effect_ledger_status_v2_check;
 ALTER TABLE task_effect_ledger DROP CONSTRAINT IF EXISTS task_effect_ledger_terminal_v2_check;
+-- 重跑时表里可能已有 failed 行；约束必须包含 failed，否则迁移在 ADD CONSTRAINT 阶段失败。
 ALTER TABLE task_effect_ledger ADD CONSTRAINT task_effect_ledger_status_v2_check
-  CHECK (status IN ('claimed','committed','effect_unknown','cancelled'));
+  CHECK (status IN ('claimed','committed','effect_unknown','cancelled','failed'));
 ALTER TABLE task_effect_ledger ADD CONSTRAINT task_effect_ledger_terminal_v2_check
   CHECK ((status='claimed' AND result IS NULL AND committed_at IS NULL)
-      OR (status IN ('committed','effect_unknown') AND result IS NOT NULL AND committed_at IS NOT NULL)
+      OR (status IN ('committed','effect_unknown','failed') AND result IS NOT NULL AND committed_at IS NOT NULL)
       OR (status='cancelled' AND result IS NULL AND committed_at IS NOT NULL));
 
 CREATE TABLE IF NOT EXISTS task_projection (
