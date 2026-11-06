@@ -738,6 +738,9 @@ async function repairTaskProjection(workflow: WorkflowClient, context: RepairCon
     } catch { /* 审计失败不改变修复结果 */ }
   };
   if (unchanged) { await audit('noop'); return; }
+  // 乐观并发：读取状态后如果已有新投影（控制操作/提交），不要用更早读到的状态覆盖它。
+  const current = await store.getProjection(context.tenantId, context.taskId).catch(() => undefined);
+  if (current !== undefined && current.projectionUpdatedAt !== existing?.projectionUpdatedAt) { await audit('noop'); return; }
   try {
     await store.writeProjection({
       ...projectionFromWorkflow(context.tenantId, state, timestamp),
