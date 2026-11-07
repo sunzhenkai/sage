@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { activityInfo, cancellationSignal, CancelledFailure, ApplicationFailure, heartbeat } from '@temporalio/activity';
@@ -38,6 +38,7 @@ import {
 } from './output-contract.js';
 import { runTaskAgentPath, type TaskCanonicalCompatibilityOptions } from './task-compatibility.js';
 import { appendLiveSliceRunLog } from './slice-run-log.js';
+import { buildRunResult, RUN_RESULT_FILE_NAME } from './run-result.js';
 import type { AgentEventStorePort } from '@sage/platform-ports';
 
 const ACTIVITY_RETRY_MAX_ATTEMPTS = 5;
@@ -289,6 +290,21 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
             throw cause;
           }
         }
+        if (isPackageInput && packageRecord !== undefined) {
+          // RunResult.v1：平台保留的结果文件随产物包物化（概念见 ai-app-concept.md §7）；
+          // files 清单只列业务产物，不含其自身；包产物同名文件在此被覆盖。
+          const businessFiles = await listOutputFiles(outputDir);
+          const runResultText = buildRunResult({
+            taskId: input.taskId,
+            releaseId: packageRecord.releaseId,
+            status: 'succeeded',
+            files: await Promise.all(businessFiles.map(async (name) => ({
+              name, bytes: (await stat(join(outputDir, name))).size
+            }))),
+            finishedAt: now().toISOString()
+          });
+          await writeFile(join(outputDir, RUN_RESULT_FILE_NAME), runResultText, 'utf8');
+        }
         let packed: Awaited<ReturnType<typeof packOutputDirectory>>;
         try {
           packed = await packOutputDirectory(outputDir);
@@ -367,6 +383,27 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
         };
         await options.store.markSliceFailed(idempotencyKey, ownerToken, failed,
           projectionOf(input, failed, 'failed', input.sliceNumber - 1, now().toISOString(), classified.failureCode, classified.detail));
+        if (isPackageInput && packageRecord !== undefined && options.outputStore !== undefined) {
+          // 失败也产出可校验运行结果（最小形态）；写入失败只记日志，不改变失败语义。
+          try {
+            await options.outputStore.writeRunOutput({
+              tenantId: input.tenantId, taskId: input.taskId,
+              artifactRef: `artifact://tasks/${encodeURIComponent(input.taskId)}/attempt-${input.attempt}/slice-${input.sliceNumber}` as TaskArtifactRef,
+              output: buildRunResult({
+                taskId: input.taskId,
+                releaseId: packageRecord.releaseId,
+                status: 'failed',
+                failureCode: classified.failureCode,
+                failureDetail: classified.detail.slice(0, 2_048),
+                finishedAt: now().toISOString()
+              }),
+              mediaType: 'application/json', createdAt: now().toISOString(),
+              files: [RUN_RESULT_FILE_NAME]
+            });
+          } catch (writeCause) {
+            process.stderr.write(`run-result write failed for ${input.taskId}: ${writeCause instanceof Error ? writeCause.message : 'unknown'}\n`);
+          }
+        }
         throw cause;
       } finally {
         clearInterval(heartbeatTimer);
