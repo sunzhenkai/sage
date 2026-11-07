@@ -59,10 +59,7 @@ export function PromptBar({ value, onChange, onSubmit, placeholder, models, mode
   return (
     <div className={cn('relative', className)}>
       {menu ? <Menu items={items} active={active} onPick={pick} footer={menu === '@' ? t('promptBar.footerSources') : t('promptBar.footerCommands')} /> : null}
-      <div onClick={() => ref.current?.focus()} className="flex cursor-text items-end gap-1.5 rounded-[14px] bg-surface p-1.5 shadow-raised transition-shadow focus-within:shadow-overlay">
-        <button type="button" title={t('promptBar.reference')} onClick={(e) => { e.stopPropagation(); onChange(`${value}${value && !value.endsWith(' ') ? ' ' : ''}@`); ref.current?.focus(); }} className="flex size-8 shrink-0 items-center justify-center rounded-full text-ink-3 transition-colors hover:bg-hover hover:text-ink">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
-        </button>
+      <div onClick={() => ref.current?.focus()} className="flex cursor-text flex-col gap-1 rounded-[18px] border border-line bg-surface px-3 pb-2 pt-3 shadow-card transition-[border-color,box-shadow] focus-within:border-line-strong focus-within:shadow-raised">
         <textarea ref={ref} rows={1} value={value} placeholder={placeholder ?? t('promptBar.placeholder')} aria-label={t('promptBar.promptAria')}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={(e) => {
@@ -74,11 +71,15 @@ export function PromptBar({ value, onChange, onSubmit, placeholder, models, mode
             if (e.key === 'Escape') { setMenu(null); return; }
             if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); if (canSend) onSubmit(); }
           }}
-          className="block max-h-[200px] min-h-8 flex-1 resize-none bg-transparent py-[7px] text-[14px] leading-[18px] text-ink outline-none placeholder:text-ink-3" />
-        <div className="relative flex shrink-0 items-center gap-1">
+          className="block max-h-[200px] min-h-11 w-full resize-none bg-transparent px-0.5 py-1 text-[14px] leading-[20px] text-ink outline-none placeholder:text-ink-3" />
+        <div className="relative flex items-center gap-1">
+          <button type="button" title={t('promptBar.reference')} onClick={(e) => { e.stopPropagation(); onChange(`${value}${value && !value.endsWith(' ') ? ' ' : ''}@`); ref.current?.focus(); }} className="flex size-8 shrink-0 items-center justify-center rounded-full text-ink-3 transition-colors hover:bg-hover hover:text-ink">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
+          </button>
+          <span className="flex-1" />
           {status}
-          <button type="button" onClick={(e) => { e.stopPropagation(); setModelOpen((o) => !o); }} className="flex h-8 max-w-[240px] items-center gap-1 rounded-full bg-surface px-2.5 text-[13px] text-ink-2 shadow-btn transition-colors hover:text-ink" title={current ? `${t('promptBar.model')}: ${current.label}` : t('promptBar.model')}>
-            <span className="truncate">{current?.label ?? t('promptBar.serverDefault')}</span>
+          <button type="button" onClick={(e) => { e.stopPropagation(); setModelOpen((o) => !o); }} className="flex h-8 max-w-[min(360px,55vw)] items-center gap-1 rounded-full px-2.5 text-[13px] text-ink-2 transition-colors hover:bg-hover hover:text-ink" title={current ? `${t('promptBar.model')}: ${current.label}` : t('promptBar.model')}>
+            <span className="truncate">{current?.menuLabel ?? current?.label ?? t('promptBar.serverDefault')}</span>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>
           </button>
           {modelOpen ? (
@@ -121,5 +122,5 @@ export function PromptBar({ value, onChange, onSubmit, placeholder, models, mode
 
 /** Right-aligned user message bubble (chat-composer). */
 export function UserBubble({ children }: { children: ReactNode }) {
-  return <div className="readable whitespace-pre-wrap rounded-xl bg-field px-3 py-1.5 text-[14px] leading-[1.45] text-ink">{children}</div>;
+  return <div className="readable whitespace-pre-wrap rounded-[14px] border border-line bg-field px-3.5 py-2 text-[14px] leading-[1.45] text-ink">{children}</div>;
 }

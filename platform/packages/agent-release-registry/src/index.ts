@@ -217,7 +217,8 @@ export type ReleaseRegistryErrorCode =
   | 'APP_NOT_FOUND'
   | 'APP_DELETED'
   | 'APP_DRAFT_INVALID'
-  | 'APP_DRAFT_CONFLICT';
+  | 'APP_DRAFT_CONFLICT'
+  | 'RELEASE_STORE_PERSISTENCE_FAILED';
 
 export class ReleaseRegistryError extends Error {
   constructor(readonly code: ReleaseRegistryErrorCode, message: string = code) {
@@ -250,6 +251,23 @@ export interface AgentReleaseStore {
   publishAppRelease(input: PublishAppReleaseInput): ReleaseSubmitResult;
   listAppReleases(tenantId: string, appId: string): readonly StoredRelease[];
   auditLog(): readonly ReleaseRegistryAuditRecord[];
+}
+
+/** HTTP / Postgres 写穿层使用的异步视图；内存实现经 `toAsyncAgentReleaseStore` 包装即可。 */
+export type AsyncAgentReleaseStore = {
+  readonly [K in keyof AgentReleaseStore]: AgentReleaseStore[K] extends (...args: infer A) => infer R
+    ? (...args: A) => Promise<Awaited<R>>
+    : AgentReleaseStore[K];
+};
+
+export function toAsyncAgentReleaseStore(store: AgentReleaseStore): AsyncAgentReleaseStore {
+  return new Proxy(store, {
+    get(target, property, receiver) {
+      const value = Reflect.get(target, property, receiver);
+      if (typeof value !== 'function') return value;
+      return (...args: unknown[]) => Promise.resolve((value as (...inner: unknown[]) => unknown).apply(target, args));
+    }
+  }) as unknown as AsyncAgentReleaseStore;
 }
 
 const MAX_ID_LENGTH = 512;
@@ -469,6 +487,9 @@ const MAX_APP_DESCRIPTION_LENGTH = 2048;
  * provider dependency; production persistence is supplied by a separate adapter. Every lookup
  * requires a tenant and every index is tenant-prefixed, so a valid URI/digest is never global.
  */
+/** 不透明回滚点，仅供 restoreState 使用。 */
+export interface ReleaseStoreStateCheckpoint { readonly __brand: 'ReleaseStoreStateCheckpoint' }
+
 export class InMemoryAgentReleaseStore implements AgentReleaseStore {
   readonly #byIdentity = new Map<string, StoredRelease>();
   readonly #byContent = new Map<string, StoredRelease>();
@@ -484,6 +505,79 @@ export class InMemoryAgentReleaseStore implements AgentReleaseStore {
   constructor(options: { readonly now?: () => Date; readonly auditWriter?: ReleaseAuditWriter } = {}) {
     this.#clock = options.now ?? (() => new Date());
     this.#auditWriter = options.auditWriter;
+  }
+
+  /**
+   * Postgres / 快照水合：直接注入已持久化的 App 与 Release，重建索引。
+   * 不跑 create/publish 校验；调用方须保证快照自洽。
+   */
+  hydrateSnapshot(input: {
+    readonly apps?: readonly AgentApp[];
+    readonly releases?: readonly StoredRelease[];
+    /** 渠道指针完整历史（按 pointerRevision 升序）；最后一条即当前指针。 */
+    readonly channelHistory?: readonly ReleaseChannelPointer[];
+  }): void {
+    for (const pointer of input.channelHistory ?? []) {
+      const key = channelKey(pointer.tenantId, pointer.ownerNamespace, pointer.packageId, pointer.channel);
+      this.#channelHistory.set(key, [...(this.#channelHistory.get(key) ?? []), clone(pointer)]);
+      this.#channels.set(key, clone(pointer));
+    }
+    for (const app of input.apps ?? []) {
+      this.#apps.set(appKey(app.tenantId, app.appId), clone(app));
+    }
+    for (const record of input.releases ?? []) {
+      const stored = clone(record);
+      this.#byRef.set(refKey(stored.tenantId, stored.release.releaseRef), stored);
+      this.#byContent.set(contentKey(stored.tenantId, stored.release.contentDigest), stored);
+      this.#byIdentity.set(identityKey({
+        tenantId: stored.tenantId,
+        ownerNamespace: stored.ownerNamespace,
+        packageId: stored.packageId,
+        packageVersion: stored.packageVersion,
+        idempotencyKey: stored.idempotencyKey,
+        release: stored.release,
+        lockPayload: stored.lockPayload
+      }), stored);
+      const packageKey = `${keyPart(stored.tenantId)}|${keyPart(stored.packageId)}`;
+      const existing = this.#byPackage.get(packageKey) ?? [];
+      this.#byPackage.set(packageKey, [...existing, stored]);
+    }
+  }
+
+  /**
+   * 持久化层的事务回滚点：浅拷贝全部索引（条目不可变，均整体替换）。
+   * 写库失败时 restoreState 把内存恢复到变更前，保证内存与库一致。
+   */
+  captureState(): ReleaseStoreStateCheckpoint {
+    return {
+      byIdentity: new Map(this.#byIdentity), byContent: new Map(this.#byContent), byRef: new Map(this.#byRef),
+      byPackage: new Map(this.#byPackage), channels: new Map(this.#channels), apps: new Map(this.#apps),
+      channelHistory: new Map(this.#channelHistory), auditLength: this.#audit.length
+    } as unknown as ReleaseStoreStateCheckpoint;
+  }
+
+  restoreState(checkpoint: ReleaseStoreStateCheckpoint): void {
+    const state = checkpoint as unknown as {
+      byIdentity: Map<string, StoredRelease>; byContent: Map<string, StoredRelease>; byRef: Map<string, StoredRelease>;
+      byPackage: Map<string, StoredRelease[]>; channels: Map<string, ReleaseChannelPointer>; apps: Map<string, AgentApp>;
+      channelHistory: Map<string, ReleaseChannelPointer[]>; auditLength: number;
+    };
+    const reset = <K, V>(target: Map<K, V>, source: Map<K, V>): void => { target.clear(); for (const [k, v] of source) target.set(k, v); };
+    reset(this.#byIdentity, state.byIdentity); reset(this.#byContent, state.byContent); reset(this.#byRef, state.byRef);
+    reset(this.#byPackage, state.byPackage); reset(this.#channels, state.channels); reset(this.#apps, state.apps);
+    reset(this.#channelHistory, state.channelHistory);
+    this.#audit.length = Math.min(this.#audit.length, state.auditLength);
+  }
+
+  /** 渠道指针历史（按 pointerRevision 升序）；持久化层据此写库。 */
+  getChannelHistory(tenantId: string, ownerNamespace: string, packageId: string, channel: string): readonly ReleaseChannelPointer[] {
+    return clone(this.#channelHistory.get(channelKey(tenantId, ownerNamespace, packageId, channel)) ?? []);
+  }
+
+  /** 读取 App 原始记录（含已删除）；持久化层用于写回 submit 隐式登记的占位 App。 */
+  getAppRecord(tenantId: string, appId: string): AgentApp | undefined {
+    const app = this.#apps.get(appKey(tenantId, appId));
+    return app === undefined ? undefined : clone(app);
   }
 
   submit(request: ReleaseSubmitRequest): ReleaseSubmitResult {

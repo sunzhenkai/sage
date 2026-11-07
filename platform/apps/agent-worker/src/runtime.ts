@@ -7,7 +7,7 @@ import { ChatStore } from '@sage/chat-domain';
 import { CHAT_SLICE_SYSTEM_PROMPT, createLivePackageAgentClient, createLocalKernelComposition, PACKAGE_RUN_SYSTEM_PROMPT, type LiveProviderRoute } from '@sage/local-runtime';
 import { createLocalSecretBackendFromEnv } from '@sage/secret-vault';
 import { LegacyAgentRunSpecV1Adapter, parseAgentExecutionFeatureConfig, selectAgentExecutionMode, type AgentExecutionMode, type AgentLifecycleOwner, type LegacyAdapterResult } from '@sage/agent-client';
-import { PostgresAgentStateAdapter } from '@sage/agent-state-postgres';
+import { PostgresAgentAuthorityStore, PostgresAgentStateAdapter } from '@sage/agent-state-postgres';
 import { PostgresTaskStore } from '@sage/task-store-postgres';
 import { TASK_NAMESPACE, TASK_QUEUE, type TaskInputRef } from '@sage/task-domain';
 import { createAgentTaskActivities, type TaskSliceInputResolver } from './activities.js';
@@ -180,7 +180,9 @@ export async function createWorkerRuntime(config = readWorkerRuntimeConfig()): P
           { scheme: 'chat', resolver: new ChatTaskInputResolver(chat) },
           { scheme: 'package', resolver: new PackageTaskInputResolver(tasks) }
         ]),
-        packageInputReader: tasks
+        packageInputReader: tasks,
+        // Live 包路径旁路写 canonical_agent_events，供 run-logs API 查询（G-O1）。
+        runLogEvents: new PostgresAgentAuthorityStore({ connectionString: config.postgresUrl })
       }),
       buildId: env('SAGE_WORKER_BUILD_ID', 'sage-local-worker-v1')
     });

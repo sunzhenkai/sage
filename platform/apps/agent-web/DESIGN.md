@@ -234,7 +234,7 @@
 
 - 每个页面头部（`PageHeader`）标题左侧显示与侧边栏导航项**相同**的图标：16px（`size-4`）、`text-muted`、`strokeWidth 1.6`，与标题间距 `gap-1.5`。
 - 图标由 `PageHeader` 根据路由从 `nav.ts` 自动推导；详情页（`/tasks/:id`、`/apps/:id` 等）继承父级图标，放在面包屑之前；无匹配路由（Not found）使用 `FileQuestion`。
-- 页面不得手写头部图标或标题：**页面级互斥筛选（2–4 个 ViewTab，如 全部/进行中/已完成、7d/14d/30d）与详情页的二级菜单（任务详情 属性/活动/运行日志/产物/原始，应用详情 属性/草稿/发布/运行，应用运行 概览/日志/产物）统一用 `PageHeader tabs`，与标题同行**；`PageHeader` 自动在标题（及 meta）与 tabs 之间插入 `HeaderDivider` 竖线并留出间距，页面不要手写分隔符；右侧操作用 `actions`。`check:design` 禁止页面内 `<PanelBar left={<><Icon …` 与 `<h1>`。
+- 页面不得手写头部图标或标题：**页面级互斥筛选（2–4 个 ViewTab，如 全部/进行中/已完成、7d/14d/30d）与详情页的二级菜单（任务详情 属性/活动/运行日志/产物/原始，应用详情 属性/草稿/发布/运行，应用运行 概览/产物）统一用 `PageHeader tabs`，与标题同行**；`PageHeader` 自动在标题（及 meta）与 tabs 之间插入 `HeaderDivider` 竖线并留出间距，页面不要手写分隔符；右侧操作用 `actions`。`check:design` 禁止页面内 `<PanelBar left={<><Icon …` 与 `<h1>`。
 - **禁止**仅含 ViewTabs 的独立 `PageToolbar`：这会在页头下方产生空工具行和双底边"夹心"；详情页子视图同样放进 `PageHeader tabs`，不再在内容区顶部放 `SegmentedTabs`；`SegmentedTabs` 仅用于对话框/表单内的模式切换（如 Providers「models.dev / 手动」）。
 
 - 折叠侧栏（56px）：顶部工具组与导航滚动区均用 `mx-2 items-center`，导航项 `size-8` 无额外 `px`，保证所有图标在轨道中水平居中。

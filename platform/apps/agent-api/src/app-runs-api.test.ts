@@ -1,7 +1,7 @@
 import Fastify from 'fastify';
 import { describe, expect, it } from 'vitest';
 import type { AuthenticatedPrincipal } from '@sage/app-contracts';
-import { InMemoryAgentReleaseStore } from '@sage/agent-release-registry';
+import { InMemoryAgentReleaseStore, toAsyncAgentReleaseStore} from '@sage/agent-release-registry';
 import type { TaskPackageInputRecord, TaskPackageRunIndexEntry, TaskProjectionView, TaskStatus } from '@sage/task-domain';
 import { registerAppsRoutes } from './apps-api.js';
 import { registerAppRunsRoutes } from './app-runs-api.js';
@@ -45,7 +45,7 @@ async function api(options: { readonly authenticated?: boolean; readonly harness
   const app = Fastify({ logger: false });
   const store = new InMemoryAgentReleaseStore({ now: () => new Date('2026-10-20T00:00:00.000Z') });
   registerAppsRoutes(app, {
-    tenantId: 'tenant-local', store, ownerNamespace: 'package-platform',
+    tenantId: 'tenant-local', store: toAsyncAgentReleaseStore(store), ownerNamespace: 'package-platform',
     authenticator: { authenticateRequest: () => options.authenticated === false ? undefined : principal },
     engineIds: ['engine-local']
   });
@@ -186,13 +186,13 @@ describe('App run history API', () => {
       tenantId: 'tenant-local', taskId: 'task-foreign', releaseId: otherReleaseId,
       releaseDigest: `sha256:${'a'.repeat(64)}`, assembledInput: 'prompt', assetDigests: {}, createdAt: '2026-10-20T00:00:00.000Z'
     });
-    harness.views.set('task-detail', view('task-detail', 'failed', { failureCode: 'AGENT_FAILED' }));
+    harness.views.set('task-detail', view('task-detail', 'failed', { failureCode: 'AGENT_FAILED', failureDetail: 'AGENT_FAILED: model refused' }));
 
     const detail = await app.inject('/v1/apps/demo-app/runs/task-detail');
     expect(detail.statusCode).toBe(200);
     expect(detail.json()).toMatchObject({
       schemaVersion: 'AppRunDetail.v1', appId: 'demo-app',
-      run: { taskId: 'task-detail', releaseId: releases.v1.releaseId, releaseVersion: '1.0.0', source: 'manual', status: 'failed', failureCode: 'AGENT_FAILED' }
+      run: { taskId: 'task-detail', releaseId: releases.v1.releaseId, releaseVersion: '1.0.0', source: 'manual', status: 'failed', failureCode: 'AGENT_FAILED', failureDetail: 'AGENT_FAILED: model refused' }
     });
 
     harness.inputs.delete('tenant-local:task-detail');

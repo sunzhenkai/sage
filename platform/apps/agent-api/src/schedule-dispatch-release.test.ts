@@ -1,6 +1,6 @@
 import Fastify from 'fastify';
 import { describe, expect, it } from 'vitest';
-import { InMemoryAgentReleaseStore, type ReleasePayload } from '@sage/agent-release-registry';
+import { InMemoryAgentReleaseStore, type ReleasePayload, toAsyncAgentReleaseStore} from '@sage/agent-release-registry';
 import type { AuthenticatedPrincipal } from '@sage/app-contracts';
 import { registerAppsRoutes } from './apps-api.js';
 import { resolveDispatchRelease, type DispatchReleaseStore } from './schedule-dispatch-release.js';
@@ -32,7 +32,7 @@ async function seededStore() {
   let tick = 0;
   const store = new InMemoryAgentReleaseStore({ now: () => new Date(Date.UTC(2026, 9, 20, 0, 0, tick++)) });
   registerAppsRoutes(app, {
-    tenantId: 'tenant-local', store, ownerNamespace: 'package-platform',
+    tenantId: 'tenant-local', store: toAsyncAgentReleaseStore(store), ownerNamespace: 'package-platform',
     authenticator: { authenticateRequest: () => principal }, engineIds: ['engine-local']
   });
   await app.inject({ method: 'POST', url: '/v1/apps', payload: { appId: 'demo-app', name: 'Demo' } });

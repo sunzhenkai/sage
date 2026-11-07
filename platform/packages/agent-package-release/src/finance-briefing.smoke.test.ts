@@ -21,12 +21,12 @@ describe('finance-briefing sample package smoke', () => {
     });
     expect(isAgentPackageReleaseV1(result.release)).toBe(true);
     expect(result.release.packageId).toBe('finance-briefing');
-    expect(result.release.packageVersion).toBe('2.0.0');
+    expect(result.release.packageVersion).toBe('2.1.0');
     // v2 自闭环声明进 lock：参数、双数据源与任务输出契约。
     expect(result.assetLock.manifest.inputs?.[0]).toMatchObject({ name: 'focus', type: 'string', default: '' });
     expect(result.assetLock.manifest.dataSources?.map((source) => source.name)).toEqual(['fx-rates', 'index-quotes']);
     expect(result.assetLock.manifest.dataSources?.every((source) => source.onFailure === 'markMissing')).toBe(true);
-    expect(result.assetLock.manifest.tasks?.[0]).toMatchObject({ name: 'finance-brief', output: { schema: 'output.schema.json', files: ['brief.md'] } });
+    expect(result.assetLock.manifest.tasks?.[0]).toMatchObject({ name: 'finance-brief', output: { schema: 'output.schema.json', files: ['brief.json'] } });
     expect(result.release.provenance.compilerBuild).toBe('local-dev');
     expect(result.assetLock.manifest.entry).toBe('prompts/system.md');
     // 编译确定性。

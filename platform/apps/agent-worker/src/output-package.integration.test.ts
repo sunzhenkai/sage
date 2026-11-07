@@ -43,16 +43,24 @@ function fakeStore(): TaskCommitStore & { readonly failed: unknown[]; readonly c
   } as TaskCommitStore & { readonly failed: unknown[]; readonly committed: unknown[] };
 }
 
-function packageRecord(taskId: string, files: readonly string[] = ['brief.md']) {
+function packageRecord(taskId: string, options: {
+  readonly files?: readonly string[];
+  readonly schema?: string;
+} = {}) {
+  const files = options.files ?? ['brief.md'];
   return {
     tenantId: 'tenant-local', taskId, releaseId: 'rel-1', releaseDigest: 'sha256:aa',
     assembledInput: 'write a briefing', assetDigests: {},
-    runContract: { files, modelRoute: { provider: 'minimax-cn', model: 'MiniMax-M3' } },
+    runContract: {
+      files,
+      modelRoute: { provider: 'minimax-cn', model: 'MiniMax-M3' },
+      ...(options.schema === undefined ? {} : { schema: options.schema })
+    },
     createdAt: '2026-08-30T00:00:00.000Z'
   };
 }
 
-function succeedClient(writeFiles: (dir: string) => void) {
+function succeedClient(writeFiles: (dir: string) => void, output = 'model body') {
   return {
     run: (spec: { readonly input: string; readonly runId: string }) => {
       const dir = /## SAGE_OUTPUT_DIR\n([^\n]+)/.exec(spec.input)?.[1];
@@ -61,7 +69,7 @@ function succeedClient(writeFiles: (dir: string) => void) {
         events: (async function* () { /* no events */ })(),
         result: Promise.resolve({
           schemaVersion: '1' as const, runId: spec.runId, status: 'succeeded' as const,
-          output: 'model body', usage: { turns: 1, toolCalls: 0, tokens: 8 },
+          output, usage: { turns: 1, toolCalls: 0, tokens: 8 },
           completedAt: '2026-08-30T00:00:01.000Z'
         }),
         cancel: () => undefined
@@ -72,13 +80,15 @@ function succeedClient(writeFiles: (dir: string) => void) {
 
 function activitiesOf(store: TaskCommitStore, options: {
   readonly files?: readonly string[];
+  readonly schema?: string;
+  readonly modelOutput?: string;
   readonly writeFiles?: (dir: string) => void;
   readonly missingProvider?: boolean;
   readonly written?: TaskRunOutputRecord[];
 }) {
   const written = options.written ?? [];
   return createAgentTaskActivities({
-    liveClientFactory: () => succeedClient(options.writeFiles ?? (() => undefined)) as never,
+    liveClientFactory: () => succeedClient(options.writeFiles ?? (() => undefined), options.modelOutput ?? 'model body') as never,
     store,
     outputStore: { async writeRunOutput(record) { written.push(record); return { status: 'stored' as const }; }, async getRunOutput() { return undefined; } },
     inputResolver: { async resolve() { return '# finance-briefing\nwrite brief.md'; } },
@@ -96,7 +106,12 @@ function activitiesOf(store: TaskCommitStore, options: {
       secretBackend: { open: () => 'key', seal: () => ({ ciphertext: Buffer.from('sealed'), keyVersion: 1 }), describe: () => ({ mode: 'local-aes-gcm' as const }) }
     }),
     packageInputReader: {
-      async getPackageInput(_tenant, taskId) { return packageRecord(taskId, options.files ?? ['brief.md']); }
+      async getPackageInput(_tenant, taskId) {
+        return packageRecord(taskId, {
+          files: options.files ?? ['brief.md'],
+          ...(options.schema === undefined ? {} : { schema: options.schema })
+        });
+      }
     }
   });
 }
@@ -138,11 +153,43 @@ describe('package output materialization', () => {
     expect(store.failed[0]).toMatchObject({ outcome: 'failed', failureCode: 'PACKAGE_OUTPUT_MISSING_FILE' });
   });
 
-  it('does not invent declared files from chat text when the output directory is empty', async () => {
+  it('materializes model text into the first declared file when the output directory is empty', async () => {
     const store = fakeStore();
-    const activities = activitiesOf(store, { writeFiles: () => undefined });
-    await expect(activities.executeAgentSlice(input('task-refusal'))).rejects.toMatchObject({ type: 'PACKAGE_OUTPUT_MISSING_FILE' });
-    expect(store.failed[0]).toMatchObject({ outcome: 'failed', failureCode: 'PACKAGE_OUTPUT_MISSING_FILE' });
+    const written: TaskRunOutputRecord[] = [];
+    const activities = activitiesOf(store, { writeFiles: () => undefined, written, modelOutput: '# briefing from model' });
+    const result = await activities.executeAgentSlice(input('task-live-text'));
+    expect(result.outcome).toBe('committed');
+    expect(store.failed).toHaveLength(0);
+    expect(Buffer.from(extractOutputFile(written[0]!.packageBytes!, 'brief.md')!).toString('utf8')).toBe('# briefing from model');
+  });
+
+  it('rejects empty-dir runs that declare a schema when model text is not valid JSON', async () => {
+    const store = fakeStore();
+    const schema = JSON.stringify({ type: 'object', required: ['headline'], properties: { headline: { type: 'string' } } });
+    const activities = activitiesOf(store, {
+      files: ['brief.json'],
+      schema,
+      writeFiles: () => undefined,
+      modelOutput: 'sorry I cannot help'
+    });
+    await expect(activities.executeAgentSlice(input('task-schema-bad'))).rejects.toMatchObject({ type: 'PACKAGE_OUTPUT_CONTRACT_VIOLATION' });
+    expect(store.failed[0]).toMatchObject({ outcome: 'failed', failureCode: 'PACKAGE_OUTPUT_CONTRACT_VIOLATION' });
     expect(store.committed).toHaveLength(0);
+  });
+
+  it('enforces schema then packs JSON into the declared file on the live text path', async () => {
+    const store = fakeStore();
+    const written: TaskRunOutputRecord[] = [];
+    const schema = JSON.stringify({ type: 'object', required: ['headline'], properties: { headline: { type: 'string' } } });
+    const activities = activitiesOf(store, {
+      files: ['brief.json'],
+      schema,
+      writeFiles: () => undefined,
+      written,
+      modelOutput: '```json\n{"headline":"ok"}\n```'
+    });
+    const result = await activities.executeAgentSlice(input('task-schema-ok'));
+    expect(result.outcome).toBe('committed');
+    expect(JSON.parse(Buffer.from(extractOutputFile(written[0]!.packageBytes!, 'brief.json')!).toString('utf8'))).toEqual({ headline: 'ok' });
   });
 });

@@ -1,7 +1,7 @@
 import Fastify from 'fastify';
 import { describe, expect, it } from 'vitest';
 import type { AuthenticatedPrincipal } from '@sage/app-contracts';
-import { InMemoryAgentReleaseStore, type ReleasePayload } from '@sage/agent-release-registry';
+import { InMemoryAgentReleaseStore, toAsyncAgentReleaseStore, type ReleasePayload } from '@sage/agent-release-registry';
 import {
   compileSourcePackage,
   encodeTarGz,
@@ -42,7 +42,7 @@ async function api(options: { readonly principal?: AuthenticatedPrincipal; reado
   });
   registerAppsRoutes(app, {
     tenantId: 'tenant-local',
-    store,
+    store: toAsyncAgentReleaseStore(store),
     ownerNamespace: 'package-platform',
     authenticator: { authenticateRequest: () => options.principal },
     engineIds: ['engine-local']

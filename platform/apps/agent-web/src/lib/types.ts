@@ -17,7 +17,7 @@ export interface ChatRun { schemaVersion: '1'; runId: string; sessionId: string;
 export interface Summary { summaryId: string; throughTurn: number; content: string; createdAt: string }
 export interface SessionDetail { session: Session; messages: Message[]; runs: ChatRun[]; summaries: Summary[] }
 export type TimelinePayload =
-  | { kind: 'text'; text: string; messageId?: string; promotionEligibility?: 'explicit' | 'none' }
+  | { kind: 'text'; text: string; messageId?: string; promotionEligibility?: 'explicit' | 'none'; role?: 'user' | 'assistant' }
   | { kind: 'tool'; toolName: string; status: 'started' | 'completed'; artifact?: ArtifactReference }
   | { kind: 'artifact'; artifact: ArtifactReference }
   | { kind: 'error'; error: ChatError }
@@ -88,7 +88,7 @@ export interface AppReleaseResult {
 export type AppRunStatus = TaskStatus | 'pending';
 export interface AppRun {
   taskId: string; releaseId: string; releaseVersion?: string; source: 'manual' | 'schedule'; status: AppRunStatus;
-  freshness?: string; failureCode?: string; createdAt: string; updatedAt?: string;
+  freshness?: string; failureCode?: string; failureDetail?: string; createdAt: string; updatedAt?: string;
 }
 export interface AppRunList { schemaVersion: 'AppRunList.v1'; appId: string; runs: AppRun[] }
 export interface AppRunDetail { schemaVersion: 'AppRunDetail.v1'; appId: string; run: AppRun }

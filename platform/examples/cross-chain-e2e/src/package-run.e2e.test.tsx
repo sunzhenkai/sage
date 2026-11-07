@@ -7,7 +7,7 @@ import { LocalAgentClient } from '@sage/agent-client';
 import { createAgentTaskActivities, PackageTaskInputResolver } from '@sage/agent-worker';
 import { registerAppsRoutes, registerPackageRunsRoutes, type ResolvedReleaseLockPayload } from '@sage/agent-api';
 import { InMemoryAgentTaskSpecStore } from '@sage/local-fakes';
-import { InMemoryAgentReleaseStore } from '@sage/agent-release-registry';
+import { InMemoryAgentReleaseStore, toAsyncAgentReleaseStore} from '@sage/agent-release-registry';
 import type { CredentialProvider } from '@sage/platform-ports';
 import { PostgresTaskStore } from '@sage/task-store-postgres';
 import { LocalAesGcmSecretBackend } from '@sage/secret-vault';
@@ -144,7 +144,7 @@ integration.sequential('Package run e2e acceptance', () => {
     const principal = { authenticationId: 'auth-pkg', principalId: 'pkg-user', tenantId, roles: ['package-registrar', 'task-operator'] };
     const authenticator = { authenticateRequest: () => principal };
     registerAppsRoutes(app, {
-      tenantId, store: packageStore, ownerNamespace: 'package-platform', authenticator, engineIds: ['engine-local'],
+      tenantId, store: toAsyncAgentReleaseStore(packageStore), ownerNamespace: 'package-platform', authenticator, engineIds: ['engine-local'],
     });
     registerPackageRunsRoutes(app, {
       tenantId,

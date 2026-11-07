@@ -33,6 +33,7 @@ interface AppRunSummary {
   readonly status: AppRunStatus;
   readonly freshness?: ProjectionFreshness;
   readonly failureCode?: string;
+  readonly failureDetail?: string;
   readonly createdAt: string;
   readonly updatedAt?: string;
 }
@@ -69,6 +70,7 @@ function runSummary(
     ...(view === undefined ? {} : {
       freshness: view.freshness,
       ...(view.failureCode === undefined ? {} : { failureCode: view.failureCode }),
+      ...(view.failureDetail === undefined ? {} : { failureDetail: view.failureDetail }),
       ...(view.projectionUpdatedAt === undefined ? {} : { updatedAt: view.projectionUpdatedAt })
     }),
     createdAt: entry.createdAt

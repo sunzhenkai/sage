@@ -33,7 +33,7 @@ export function ThinkingTrace({ working, activeLabel, doneLabel, rows, defaultOp
         <span className="flex shrink-0" style={{ color: working ? 'var(--ink-2)' : 'var(--ink-3)' }}>{icon ?? <Sparkle color={working ? 'var(--ink-2)' : 'var(--ink-3)'} />}</span>
         <span role="status" className="contents">
           {working ? <span className="shimmer-label whitespace-nowrap text-[13px] font-medium">{activeLabel ?? t('thinking.active')}</span>
-            : <span className="whitespace-nowrap text-[13px] font-medium text-ink-2" style={{ animation: 'fade-in 350ms ease-out both' }}>{doneLabel}</span>}
+            : <span className="whitespace-nowrap text-[13px] text-ink-3" style={{ animation: 'fade-in 350ms ease-out both' }}>{doneLabel}</span>}
         </span>
         {rows.length ? <Chevron open={open} /> : null}
       </button>

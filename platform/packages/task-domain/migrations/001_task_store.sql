@@ -28,13 +28,20 @@ ALTER TABLE task_effect_ledger DROP CONSTRAINT IF EXISTS task_effect_ledger_stat
 ALTER TABLE task_effect_ledger DROP CONSTRAINT IF EXISTS task_effect_ledger_check;
 ALTER TABLE task_effect_ledger DROP CONSTRAINT IF EXISTS task_effect_ledger_status_v2_check;
 ALTER TABLE task_effect_ledger DROP CONSTRAINT IF EXISTS task_effect_ledger_terminal_v2_check;
--- 重跑时表里可能已有 failed 行；约束必须包含 failed，否则迁移在 ADD CONSTRAINT 阶段失败。
-ALTER TABLE task_effect_ledger ADD CONSTRAINT task_effect_ledger_status_v2_check
-  CHECK (status IN ('claimed','committed','effect_unknown','cancelled','failed'));
-ALTER TABLE task_effect_ledger ADD CONSTRAINT task_effect_ledger_terminal_v2_check
-  CHECK ((status='claimed' AND result IS NULL AND committed_at IS NULL)
-      OR (status IN ('committed','effect_unknown','failed') AND result IS NOT NULL AND committed_at IS NOT NULL)
-      OR (status='cancelled' AND result IS NULL AND committed_at IS NOT NULL));
+-- 重跑时：若 008 已装 status_v3 则跳过 v2；否则加含 failed 的 v2（NOT VALID，不校验既有行）。
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'task_effect_ledger_status_v3_check'
+  ) THEN
+    ALTER TABLE task_effect_ledger ADD CONSTRAINT task_effect_ledger_status_v2_check
+      CHECK (status IN ('claimed','committed','effect_unknown','cancelled','failed')) NOT VALID;
+    ALTER TABLE task_effect_ledger ADD CONSTRAINT task_effect_ledger_terminal_v2_check
+      CHECK ((status='claimed' AND result IS NULL AND committed_at IS NULL)
+          OR (status IN ('committed','effect_unknown','failed') AND result IS NOT NULL AND committed_at IS NOT NULL)
+          OR (status='cancelled' AND result IS NULL AND committed_at IS NOT NULL)) NOT VALID;
+  END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS task_projection (
   tenant_id text NOT NULL,

@@ -91,6 +91,7 @@
       "owner": "Platform",
       "mayDependOn": [
         "agent-contracts",
+        "agent-release-registry",
         "platform-ports",
         "production-governance"
       ]

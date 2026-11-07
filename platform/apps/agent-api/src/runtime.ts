@@ -5,20 +5,23 @@ import { Pool } from 'pg';
 import { Connection } from '@temporalio/client';
 import type { AuthenticatedPrincipal } from '@sage/app-contracts';
 import { ChatStore } from '@sage/chat-domain';
-import { InMemoryAgentTaskSpecStore, InMemoryCredentialProvider } from '@sage/local-fakes';
-import { InMemoryAgentReleaseStore } from '@sage/agent-release-registry';
+import { InMemoryCredentialProvider } from '@sage/local-fakes';
+import type { AgentReleaseStore, InMemoryAgentReleaseStore } from '@sage/agent-release-registry';
+import { PostgresBackedAgentReleaseStore } from './postgres-release-store.js';
 import { createLocalKernelComposition } from '@sage/local-runtime';
 import { LegacyAgentRunSpecV1Adapter, parseAgentExecutionFeatureConfig, runShadowEngine, selectAgentExecutionMode, type AgentExecutionMode, type AgentLifecycleOwner, type LegacyAdapterResult } from '@sage/agent-client';
 import { PostgresTaskStore } from '@sage/task-store-postgres';
 import { createLocalSecretBackendFromEnv } from '@sage/secret-vault';
 import { CatalogServiceError, CatalogSyncManager, ProviderCatalogService, ProviderCatalogStore } from '@sage/provider-catalog';
-import { InMemoryScheduleControlStore } from '@sage/local-fakes';
 import { TemporalScheduleAdapter } from '@sage/temporal-schedules';
 import { registerSchedulesRoutes } from './schedules-api.js';
 import { registerEffectResolutionsRoute } from './effect-resolutions-api.js';
 import { EffectResolutionService } from './effect-resolution.js';
 import { ServiceTokenAuthenticator } from './service-token.js';
-import { PostgresAgentStateAdapter, PostgresToolEffectLedger, PostgresTaskRunLogQuery } from '@sage/agent-state-postgres';
+import {
+  PostgresAgentStateAdapter, PostgresAgentTaskSpecStore, PostgresToolEffectLedger, PostgresTaskRunLogQuery,
+  PostgresScheduleStore, PostgresConsumptionLedger
+} from '@sage/agent-state-postgres';
 import { TASK_NAMESPACE, TASK_QUEUE } from '@sage/task-domain';
 import { createDevRegistryBundle, publishDevRegistry } from '@sage/temporal-registry';
 import { TemporalClientFactory, TrustedMultiTargetTaskController, TrustedTemporalRouter } from '@sage/temporal-routing';
@@ -217,7 +220,7 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
       runLogQuery: new PostgresTaskRunLogQuery({ connectionString: config.postgresUrl }),
       repairTask: (taskId) => controller.repairProjection(taskId)
     });
-    // 投影巡检：修复缺失/落后的投影，并回收长期未续租的认领。0 表示关闭。
+    // 投影巡检：修复缺失投影，并回收长期未续租的认领。0 表示关闭。
     const reconcileIntervalMs = Number(process.env.SAGE_TASK_RECONCILE_INTERVAL_MS ?? 60_000);
     if (Number.isFinite(reconcileIntervalMs) && reconcileIntervalMs > 0) {
       const reconcileTimer = setInterval(() => {
@@ -235,10 +238,15 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
       reconcileTimer.unref();
       app.addHook('onClose', () => { clearInterval(reconcileTimer); });
     }
-    const packageStore = new InMemoryAgentReleaseStore();
-    const packageSpecStore = new InMemoryAgentTaskSpecStore();
+    // App / Draft / Release：agent_apps + agent_package_releases 写穿（010_agent_apps）；TaskSpec：agent_task_specs。重启后水合。
+    const packageRegistry = await PostgresBackedAgentReleaseStore.open({ connectionString: config.postgresUrl, connectionTimeoutMillis: 2_000 });
+    const packageStore: InMemoryAgentReleaseStore = packageRegistry.sync;
+    const packageSpecStore = new PostgresAgentTaskSpecStore({ connectionString: config.postgresUrl, connectionTimeoutMillis: 2_000 });
+    app.addHook('onClose', async () => {
+      await Promise.allSettled([packageRegistry.close(), packageSpecStore.close()]);
+    });
     registerAppsRoutes(app, {
-      tenantId: config.tenantId, store: packageStore, ownerNamespace: 'package-platform',
+      tenantId: config.tenantId, store: packageRegistry, ownerNamespace: 'package-platform',
       authenticator, engineIds: ['engine-local']
     });
     registerAppRunsRoutes(app, {
@@ -249,12 +257,12 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
       tenantId: config.tenantId,
       controller,
       releaseResolver: {
-        async resolveRelease(tenantId, releaseId): Promise<{ readonly release: ReturnType<InMemoryAgentReleaseStore['resolveImmutableRelease']>['release']; readonly lockPayload: ResolvedReleaseLockPayload } | undefined> {
+        async resolveRelease(tenantId, releaseId): Promise<{ readonly release: ReturnType<AgentReleaseStore['resolveImmutableRelease']>['release']; readonly lockPayload: ResolvedReleaseLockPayload } | undefined> {
           try {
             const resolution = packageStore.resolveImmutableRelease(tenantId, `release://${releaseId}`);
             const stored = packageStore.getStoredRelease(tenantId, `release://${releaseId}`);
             const lockPayload = stored === undefined ? {} : (stored.lockPayload as ResolvedReleaseLockPayload);
-            return { release: resolution.release as ReturnType<InMemoryAgentReleaseStore['resolveImmutableRelease']>['release'], lockPayload };
+            return { release: resolution.release as ReturnType<AgentReleaseStore['resolveImmutableRelease']>['release'], lockPayload };
           } catch {
             return undefined;
           }
@@ -271,10 +279,13 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
     });
     // service token 只用于 MCP 外部入口与 dispatcher 内部解析端点。
     // schedules 管理链路是 web→server：当前复用固定开发 principal，后续由用户登录/鉴权接管。
+    // 控制面记录与 dispatcher 共用 PostgresScheduleStore；创建时开通消费账本 schedule 账户。
     const serviceToken = ServiceTokenAuthenticator.fromEnv(process.env, config.tenantId);
+    const scheduleStore = new PostgresScheduleStore({ connectionString: config.postgresUrl });
+    const scheduleLedger = new PostgresConsumptionLedger({ connectionString: config.postgresUrl });
     registerSchedulesRoutes(app, {
       tenantId: config.tenantId,
-      store: new InMemoryScheduleControlStore(),
+      store: scheduleStore,
       adapter: await TemporalScheduleAdapter.connect({ address: config.temporalAddress, namespace: 'sage-dev' }),
       releaseResolver: {
         async resolveRelease(tenantId, releaseId) {
@@ -298,6 +309,7 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
       },
       appStatus: packageStore,
       authenticator,
+      scheduleAccounts: scheduleLedger,
       audit: { append: async (input: { readonly tenantId: string; readonly occurredAt: string; readonly category: 'schedule'; readonly decision: string; readonly reasonCode: string; readonly actorRef: string; readonly correlation: Readonly<Record<string, string | number>>; readonly authorityDigest: string }) => { process.stdout.write(`[schedule-audit] ${JSON.stringify(input)}\n`); } },
     });
     const scheduleDispatchToken = serviceToken;
