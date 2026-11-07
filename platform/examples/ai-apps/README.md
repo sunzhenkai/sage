@@ -159,4 +159,5 @@ curl -sS http://127.0.0.1:9610/v1/apps/finance-briefing/releases -H 'x-authentic
 - 留空的参数由服务端按声明默认值补齐。
 - **产物物化（Live 路径）**：包运行 harness 为单轮纯文本、无写盘工具。若 `SAGE_OUTPUT_DIR` 为空，平台把模型回复正文物化为首个 `output.files`（无声明时为 `output.md`）。声明了 `output.schema` 时，物化前对正文做 JSON Schema 子集强制校验（不符 → `PACKAGE_OUTPUT_CONTRACT_VIOLATION`）；目录里已有文件时不改写、也不再对正文套 schema。
 - 数据源获取走受控出口白名单：agent-api env `SAGE_PACKAGE_SNAPSHOT_EGRESS_ALLOWLIST`（local compose 已配置 `api.github.com`、`api.frankfurter.dev`、`query1.finance.yahoo.com`；缺省即全拒绝，声明了数据源的运行会以 `PACKAGE_SNAPSHOT_SOURCE_UNAVAILABLE` 稳定失败）。
+- **运行结果文件（RunResult.v1）**：每次运行额外产出平台保留的 `run-result.json`（`schemaVersion` / `taskId` / `releaseId` / `status` / `files` 产物清单 / `failureCode` / `finishedAt`），由 worker 生成并按内置 schema 自检；失败运行也产出最小形态（仅状态与失败原因）。产物包内业务文件同名时被平台生成覆盖。经 `GET /v1/tasks/<taskId>/artifacts` 以 `#file/run-result.json` 取回。
 - 已知限制：数据源 URL 为静态地址（无日期/参数模板）。github-trending 以「2026 年新建」为口径；finance-briefing 的两个数据源均声明 `markMissing`（源不可达时降级为缺失标注而非整体失败，汇率数据按 ECB 口径仅工作日更新）；动态时间窗需要后续的 URL 模板契约。`skillRefs` / `capabilityRefs` 目前为声明字段，运行时取数走 dataSources egress，不加载独立 skill/capability 包。
