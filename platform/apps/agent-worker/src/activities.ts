@@ -85,7 +85,9 @@ export async function resolveConnectionLiveClient(
   tenantId: string,
   connectionId: string | undefined,
   mode: 'package' | 'chat',
-  maxOutputTokens?: number
+  maxOutputTokens?: number,
+  /** 已解析的运行模型（manifest 命中的模型），缺省用连接默认模型。 */
+  modelId?: string
 ): Promise<LocalAgentClient> {
   const failure = (): string =>
     connectionId === undefined
@@ -111,7 +113,7 @@ export async function resolveConnectionLiveClient(
   return liveClientFactory({
     adapterKind: connection.adapterKind,
     baseUrl: connection.baseUrl,
-    modelId: connection.modelId,
+    modelId: modelId ?? connection.modelId,
     apiKey
   }, mode, maxOutputTokens);
 }
@@ -189,7 +191,8 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
         const sliceClient = await resolveConnectionLiveClient(
           options.providerConnections, options.secretBackend, options.liveClientFactory,
           input.tenantId, resolvedConnection!.connectionId, isPackageInput ? 'package' : 'chat',
-          ...(isPackageInput ? [input.limits.maxTokens] as const : [] as const)
+          isPackageInput ? input.limits.maxTokens : undefined,
+          resolvedConnection!.modelId
         );
         if (signal.aborted) throw new CancelledFailure('TASK_SLICE_CANCELLED');
         const resolvedInput = injectOutputDirectory(

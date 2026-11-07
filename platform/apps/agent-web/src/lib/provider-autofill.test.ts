@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { adapterFromNpm, baseUrlSourceLabel, catalogBaseUrl, connectionName, isUsableBaseUrl, KNOWN_BASE_URLS } from './provider-autofill';
+import { adapterBaseUrl, adapterFromNpm, baseUrlSourceLabel, catalogBaseUrl, connectionName, isUsableBaseUrl, KNOWN_BASE_URLS } from './provider-autofill';
 
 const provider = (value: Partial<Parameters<typeof catalogBaseUrl>[0]> = {}) => ({ providerId: 'alpha', name: 'Alpha', ...value });
 const model = (value: Partial<NonNullable<Parameters<typeof catalogBaseUrl>[1]>> = {}) => ({ modelId: 'm', providerId: 'alpha', name: 'Model', status: 'active' as const, capabilities: [], ...value });
@@ -42,5 +42,35 @@ describe('provider connection auto-fill', () => {
     expect(connectionName({ name: 'OpenRouter' }, undefined)).toBe('OpenRouter');
     expect(connectionName(undefined, { name: 'Claude Opus 4.5' })).toBe('Claude Opus 4.5');
     expect(connectionName(undefined, undefined)).toBeUndefined();
+  });
+});
+
+describe('catalogBaseUrl with an adapter', () => {
+  it('prefers the known Anthropic endpoint when the adapter is anthropic', () => {
+    expect(catalogBaseUrl(provider({ providerId: 'anthropic', name: 'Anthropic' }), undefined, 'anthropic')).toEqual({ url: 'https://api.anthropic.com/v1', source: 'known' });
+    expect(catalogBaseUrl(provider({ providerId: 'zhipuai', name: 'Zhipu AI', api: 'https://open.bigmodel.cn/api/paas/v4' }), undefined, 'anthropic')).toEqual({ url: 'https://open.bigmodel.cn/api/anthropic', source: 'known' });
+  });
+
+  it('keeps the catalog endpoint for openai-compatible and for providers without a known Anthropic endpoint', () => {
+    expect(catalogBaseUrl(provider({ providerId: 'zhipuai', name: 'Zhipu AI', api: 'https://open.bigmodel.cn/api/paas/v4' }), undefined, 'openai-compatible')).toEqual({ url: 'https://open.bigmodel.cn/api/paas/v4', source: 'known' });
+    expect(catalogBaseUrl(provider({ providerId: 'moonshotai', name: 'Moonshot AI', api: 'https://api.moonshot.ai/v1' }), undefined, 'anthropic')).toEqual({ url: 'https://api.moonshot.ai/v1', source: 'provider' });
+    expect(catalogBaseUrl(undefined, undefined, 'anthropic')).toBeUndefined();
+  });
+
+  it('resolves an adapter endpoint by host when the provider is unknown', () => {
+    expect(adapterBaseUrl('anthropic', undefined, 'https://open.bigmodel.cn/api/paas/v4')).toBe('https://open.bigmodel.cn/api/anthropic');
+    expect(adapterBaseUrl('openai-compatible', undefined, 'https://open.bigmodel.cn/api/anthropic')).toBe('https://open.bigmodel.cn/api/paas/v4');
+    expect(adapterBaseUrl('anthropic', undefined, 'https://api.minimaxi.com/anthropic')).toBe('https://api.minimaxi.com/anthropic');
+    expect(adapterBaseUrl('openai-compatible', undefined, 'https://api.minimaxi.com/anthropic')).toBe('https://api.minimaxi.com/v1');
+    expect(adapterBaseUrl('openai-compatible', 'minimax-cn', 'https://api.minimax.cn/anthropic/v1')).toBe('https://api.minimax.cn/v1');
+    expect(adapterBaseUrl('anthropic', undefined, 'https://api.moonshot.ai/v1')).toBe('https://api.moonshot.ai/v1');
+    expect(adapterBaseUrl('anthropic', 'deepseek', undefined)).toBe('https://api.deepseek.com/anthropic');
+  });
+
+  it('projects models.dev anthropic paths onto openai-compatible siblings', () => {
+    expect(catalogBaseUrl(provider({ providerId: 'minimax-cn', api: 'https://api.minimax.cn/anthropic/v1' }), undefined, 'openai-compatible'))
+      .toEqual({ url: 'https://api.minimax.cn/v1', source: 'known' });
+    expect(catalogBaseUrl(provider({ providerId: 'minimax-cn', api: 'https://api.minimax.cn/anthropic/v1' }), undefined, 'anthropic'))
+      .toEqual({ url: 'https://api.minimax.cn/anthropic/v1', source: 'known' });
   });
 });

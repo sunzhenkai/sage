@@ -13,19 +13,19 @@ const route = { provider: 'anthropic', model: 'claude-sonnet-4-5', fallbacks: ['
 describe('resolvePackageRunConnection', () => {
   it('prefers the manifest route model, then fallbacks, in order', () => {
     const registry = [entry('conn-haiku', 'claude-haiku-4-5'), entry('conn-sonnet', 'claude-sonnet-4-5')];
-    expect(resolvePackageRunConnection(route, registry, undefined)).toEqual({ source: 'manifest', connectionId: 'conn-sonnet' });
+    expect(resolvePackageRunConnection(route, registry, undefined)).toEqual({ source: 'manifest', connectionId: 'conn-sonnet', modelId: 'claude-sonnet-4-5' });
     const haikuOnly = [entry('conn-haiku', 'claude-haiku-4-5')];
-    expect(resolvePackageRunConnection(route, haikuOnly, undefined)).toEqual({ source: 'manifest', connectionId: 'conn-haiku' });
+    expect(resolvePackageRunConnection(route, haikuOnly, undefined)).toEqual({ source: 'manifest', connectionId: 'conn-haiku', modelId: 'claude-haiku-4-5' });
   });
 
   it('ignores disabled or credential-less manifest matches', () => {
     const registry = [entry('disabled', 'claude-sonnet-4-5', { enabled: false }), entry('no-cred', 'claude-haiku-4-5', { credentialPresent: false }), entry('conn-default', 'minimax-m3')];
-    expect(resolvePackageRunConnection(route, registry, 'conn-default')).toEqual({ source: 'settings', connectionId: 'conn-default' });
+    expect(resolvePackageRunConnection(route, registry, 'conn-default')).toEqual({ source: 'settings', connectionId: 'conn-default', modelId: 'minimax-m3' });
   });
 
   it('falls back to the settings default when the manifest route has no match', () => {
     expect(resolvePackageRunConnection(route, [entry('conn-default', 'minimax-m3')], 'conn-default'))
-      .toEqual({ source: 'settings', connectionId: 'conn-default' });
+      .toEqual({ source: 'settings', connectionId: 'conn-default', modelId: 'minimax-m3' });
   });
 
   it('requires the settings default to be enabled with a credential', () => {
@@ -36,7 +36,14 @@ describe('resolvePackageRunConnection', () => {
   it('returns undefined when both sources are unavailable, and skips manifest matching when no route is declared', () => {
     expect(resolvePackageRunConnection(route, [], undefined)).toBeUndefined();
     expect(resolvePackageRunConnection(undefined, [entry('default', 'any')], 'default'))
-      .toEqual({ source: 'settings', connectionId: 'default' });
+      .toEqual({ source: 'settings', connectionId: 'default', modelId: 'any' });
     expect(resolvePackageRunConnection(undefined, [entry('default', 'any')], undefined)).toBeUndefined();
+  });
+
+  it('matches any allowed model of a connection, not only its default', () => {
+    const multi = [entry('conn-multi', 'claude-sonnet-4-5', { models: ['claude-sonnet-4-5', 'claude-haiku-4-5'] })];
+    expect(resolvePackageRunConnection({ provider: 'anthropic', model: 'claude-haiku-4-5' }, multi, undefined))
+      .toEqual({ source: 'manifest', connectionId: 'conn-multi', modelId: 'claude-haiku-4-5' });
+    expect(resolvePackageRunConnection({ provider: 'anthropic', model: 'claude-opus-4-5' }, multi, undefined)).toBeUndefined();
   });
 });

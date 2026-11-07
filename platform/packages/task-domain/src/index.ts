@@ -295,21 +295,21 @@ export interface TaskPackageInputRecord {
 }
 
 
-/** 包运行 provider 路由解析（准入与 worker 共享的纯函数）：manifest modelRoute 依序精确匹配（model/fallbacks，条目启用且凭据在场）优先，运行 agent 设置默认兜底；两来源皆不可用返回 undefined（fail-closed）。 */
+/** 包运行 provider 路由解析（准入与 worker 共享的纯函数）：manifest modelRoute 依序精确匹配（model/fallbacks，条目启用且凭据在场，按连接的 models 列表匹配）优先，运行 agent 设置默认兜底；两来源皆不可用返回 undefined（fail-closed）。返回的 modelId 是本次运行实际使用的模型。 */
 export function resolvePackageRunConnection(
   route: PackageRunContract['modelRoute'],
   registry: readonly ProviderConnectionRecord[],
   settingsConnectionId: string | undefined
-): { readonly source: 'manifest' | 'settings'; readonly connectionId: string } | undefined {
+): { readonly source: 'manifest' | 'settings'; readonly connectionId: string; readonly modelId: string } | undefined {
   if (route !== undefined) {
     for (const model of [route.model, ...(route.fallbacks ?? [])]) {
-      const entry = registry.find((item) => item.enabled && item.credentialPresent && item.modelId === model);
-      if (entry !== undefined) return { source: 'manifest', connectionId: entry.id };
+      const entry = registry.find((item) => item.enabled && item.credentialPresent && connectionModels(item).includes(model));
+      if (entry !== undefined) return { source: 'manifest', connectionId: entry.id, modelId: model };
     }
   }
   if (settingsConnectionId === undefined) return undefined;
   const entry = registry.find((item) => item.id === settingsConnectionId && item.enabled && item.credentialPresent);
-  return entry === undefined ? undefined : { source: 'settings', connectionId: entry.id };
+  return entry === undefined ? undefined : { source: 'settings', connectionId: entry.id, modelId: entry.modelId };
 }
 
 export interface TaskPackageInputStore {

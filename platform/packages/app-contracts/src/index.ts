@@ -350,6 +350,21 @@ export const ProviderConnectionCheckResponseSchema = Type.Object({
 }, { $id: 'ProviderConnectionCheckResponse.v1', additionalProperties: false });
 export type ProviderConnectionCheckResponse = Static<typeof ProviderConnectionCheckResponseSchema>;
 
+/** Live model listing: either an existing connection (stored credential) or an unsaved draft (baseUrl + apiKey). */
+export const ProviderConnectionModelsRequestSchema = Type.Object({
+  connectionId: Type.Optional(Type.String({ minLength: 1, maxLength: 128 })),
+  adapterKind: Type.Optional(ProviderConnectionAdapterSchema),
+  baseUrl: Type.Optional(Type.String({ minLength: 1, maxLength: 2048, format: 'uri' })),
+  apiKey: Type.Optional(Type.String({ maxLength: 4096 }))
+}, { $id: 'ProviderConnectionModelsRequest.v1', additionalProperties: false });
+export type ProviderConnectionModelsRequest = Static<typeof ProviderConnectionModelsRequestSchema>;
+export const ProviderConnectionModelsResponseSchema = Type.Object({
+  schemaVersion: Type.Literal('ProviderConnectionModels.v1'),
+  models: Type.Array(Type.String({ minLength: 1, maxLength: 256 }), { maxItems: 500 }),
+  fetchedAt: Timestamp
+}, { $id: 'ProviderConnectionModelsResponse.v1', additionalProperties: false });
+export type ProviderConnectionModelsResponse = Static<typeof ProviderConnectionModelsResponseSchema>;
+
 export const ListProvidersQuerySchema = Type.Object({
   limit: Type.Optional(Type.String({ pattern: '^(?:[1-9]|[1-9][0-9]|100)$' })),
   q: Type.Optional(Type.String({ maxLength: 100 })),

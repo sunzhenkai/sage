@@ -5,7 +5,7 @@ import type {
   AppCreateResult, AppDetail, AppDraft, AppRelease, AppReleaseDetail, AppReleaseResult, AppRunDetail, AppRunList, AppSummary,
   CatalogModelPage, CatalogProviderPage, CatalogStatus, ChatRun, Message,
   PackageRunResult, ProviderConnection,
-  ProviderConnectionCheck, ProviderConnectionCheckResult, ProviderConnectionWrite, RunAgentSettings,
+  ProviderConnectionCheck, ProviderConnectionCheckResult, ProviderConnectionModelsQuery, ProviderConnectionModelsResult, ProviderConnectionWrite, RunAgentSettings,
   RunLogPage, ScheduleDefinition, ScheduleSnapshot, ScheduleTriggerEvent, Session, SessionDetail, SessionList, TaskArtifact, TaskEvent,
   TaskStatus, TaskView, TimelineEvent
 } from './types';
@@ -182,6 +182,7 @@ export const api = {
     catalogStatus: () => request<CatalogStatus>('GET', '/v1/provider-catalog/status'),
     catalogProviders: (query: { q?: string; limit?: number; cursor?: string } = {}) => request<CatalogProviderPage>('GET', '/v1/provider-catalog/providers', { query }),
     catalogModels: (query: { providerId?: string; q?: string; status?: string; limit?: number; cursor?: string } = {}) => request<CatalogModelPage>('GET', '/v1/provider-catalog/models', { query }),
-    checkConnection: (body: ProviderConnectionCheck) => request<ProviderConnectionCheckResult>('POST', '/v1/provider-catalog/check-connection', { body })
+    checkConnection: (body: ProviderConnectionCheck) => request<ProviderConnectionCheckResult>('POST', '/v1/provider-catalog/check-connection', { body }),
+    connectionModels: (body: ProviderConnectionModelsQuery) => request<ProviderConnectionModelsResult>('POST', '/v1/provider-connections/models', { body })
   }
 };

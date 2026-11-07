@@ -6,6 +6,8 @@ import {
 } from '@sage/task-domain';
 import type { SecretBackend } from '@sage/secret-vault';
 import { isPublicHttpsUrl } from './provider-connection.js';
+import { listProviderConnectionModels, ProviderConnectionInputError, ProviderModelsUnavailable, type ProviderModelsListing } from './provider-connection.js';
+import { ProviderConnectionModelsRequestSchema, type ProviderConnectionModelsRequest } from '@sage/app-contracts';
 
 export interface ProviderConnectionsPrincipalAuthenticator {
   authenticateRequest?(request: FastifyRequest): { readonly principalId: string; readonly tenantId: string } | undefined;
@@ -18,6 +20,8 @@ export interface RegisterProviderConnectionRoutesOptions {
   readonly secretBackend?: SecretBackend;
   readonly authenticator: ProviderConnectionsPrincipalAuthenticator;
   readonly now?: () => Date;
+  /** 模型列表探测（缺省打真实 `/models`）；测试注入用。 */
+  readonly listModels?: (input: { adapterKind: ProviderConnectionAdapterKind; baseUrl: string; apiKey?: string | undefined }) => Promise<ProviderModelsListing>;
 }
 
 export interface ProviderConnectionView {
@@ -143,6 +147,44 @@ export function registerProviderConnectionRoutes(app: FastifyInstance, options: 
       const connections = await options.store.listProviderConnections(options.tenantId);
       return { schemaVersion: 'ProviderConnections.v1', connections: connections.map(viewOf) };
     } catch {
+      return sendError(reply, 503, 'PROVIDER_CONNECTIONS_UNAVAILABLE', 'Provider connection store is unavailable', true);
+    }
+  });
+
+  /**
+   * 模型候选：已保存连接用它的已存凭据与端点，未保存草稿用请求里的 baseUrl + apiKey。
+   * 连接编辑器的模型下拉据此列出候选，不再要求手输模型 id。
+   */
+  app.post<{ Body: ProviderConnectionModelsRequest }>('/v1/provider-connections/models', { schema: { body: ProviderConnectionModelsRequestSchema }, attachValidation: true }, async (request, reply) => {
+    const principal = principalFor(request);
+    if (!principal) return sendError(reply, 401, 'PROVIDER_CONNECTIONS_AUTHENTICATION_REQUIRED', 'Provider connections API requires authentication');
+    if (request.validationError) return sendError(reply, 400, 'PROVIDER_CONNECTION_INVALID_REQUEST', request.validationError.message);
+    const body = request.body;
+    let adapterKind: ProviderConnectionAdapterKind | undefined = body.adapterKind === 'unassigned' ? undefined : body.adapterKind;
+    let baseUrl = body.baseUrl;
+    let apiKey = body.apiKey;
+    if (body.connectionId !== undefined) {
+      const existing = await options.store.getProviderConnection(options.tenantId, body.connectionId);
+      if (existing === undefined) return sendError(reply, 404, 'PROVIDER_CONNECTION_NOT_FOUND', 'Provider connection not found');
+      const sealed = await options.store.getProviderCredential(options.tenantId, body.connectionId);
+      if (sealed === undefined) return sendError(reply, 409, 'PROVIDER_CONNECTION_CREDENTIAL_MISSING', 'Provider connection has no stored credential');
+      if (options.secretBackend === undefined) return sendError(reply, 503, 'SECRET_BACKEND_UNAVAILABLE', 'SAGE_SECRET_MASTER_KEY is not configured; stored credentials cannot be used', true);
+      try { apiKey = options.secretBackend.open({ ciphertext: sealed.ciphertext, keyVersion: sealed.keyVersion }); }
+      catch { return sendError(reply, 503, 'PROVIDER_CONNECTION_CREDENTIAL_UNAVAILABLE', 'Stored provider credential cannot be opened', true); }
+      adapterKind = existing.adapterKind;
+      baseUrl = existing.baseUrl;
+    }
+    if (adapterKind === undefined || baseUrl === undefined) {
+      return sendError(reply, 400, 'PROVIDER_CONNECTION_INVALID_REQUEST', 'adapterKind and baseUrl are required when connectionId is omitted');
+    }
+    try {
+      const listing = await (options.listModels ?? listProviderConnectionModels)({
+        adapterKind, baseUrl, ...(apiKey === undefined ? {} : { apiKey })
+      });
+      return { schemaVersion: 'ProviderConnectionModels.v1', models: listing.models, fetchedAt: listing.fetchedAt };
+    } catch (cause) {
+      if (cause instanceof ProviderConnectionInputError) return sendError(reply, 400, 'PROVIDER_CONNECTION_INVALID_REQUEST', cause.message);
+      if (cause instanceof ProviderModelsUnavailable) return sendError(reply, 502, cause.code, cause.message, true);
       return sendError(reply, 503, 'PROVIDER_CONNECTIONS_UNAVAILABLE', 'Provider connection store is unavailable', true);
     }
   });

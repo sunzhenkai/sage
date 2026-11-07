@@ -6,6 +6,7 @@ import type {
 } from '@sage/task-domain';
 import { LocalAesGcmSecretBackend, type SecretBackend } from '@sage/secret-vault';
 import { bootstrapDeploymentEnvProviderConnection, registerProviderConnectionRoutes } from './provider-connections-api.js';
+import { ProviderModelsUnavailable, type ProviderModelsListing } from './provider-connection.js';
 
 class FakeRegistryStore implements ProviderConnectionStore, RunAgentSettingsStore {
   readonly connections = new Map<string, ProviderConnectionRecord>();
@@ -68,7 +69,7 @@ class FakeRegistryStore implements ProviderConnectionStore, RunAgentSettingsStor
 
 const backendWithKey = (): SecretBackend => new LocalAesGcmSecretBackend([randomBytes(32)]);
 
-async function api(options: { readonly authenticated?: boolean; readonly backend?: SecretBackend | false; readonly store?: FakeRegistryStore } = {}) {
+async function api(options: { readonly authenticated?: boolean; readonly backend?: SecretBackend | false; readonly store?: FakeRegistryStore; readonly listModels?: (input: { adapterKind: string; baseUrl: string; apiKey?: string | undefined }) => Promise<ProviderModelsListing> } = {}) {
   const app = Fastify({ logger: false, ajv: { customOptions: { removeAdditional: false } } });
   const store = options.store ?? new FakeRegistryStore();
   registerProviderConnectionRoutes(app, {
@@ -78,7 +79,8 @@ async function api(options: { readonly authenticated?: boolean; readonly backend
     authenticator: options.authenticated === false
       ? { authenticateRequest: () => undefined }
       : { authenticateRequest: () => ({ principalId: 'op', tenantId: 'tenant-local' }) },
-    now: () => new Date('2026-08-25T00:00:00.000Z')
+    now: () => new Date('2026-08-25T00:00:00.000Z'),
+    ...(options.listModels === undefined ? {} : { listModels: options.listModels as never })
   });
   return { app, store };
 }
@@ -166,6 +168,32 @@ describe('Provider connections API', () => {
     expect(switched.json().connection).toMatchObject({ modelId: 'MiniMax-M2.1', models: ['MiniMax-M2.1', 'MiniMax-M3', 'MiniMax-M4'] });
     const metadataOnly = await app.inject({ method: 'PUT', url: `/v1/provider-connections/${id}`, payload: createPayload({ name: '改名', modelId: 'MiniMax-M2.1', apiKey: undefined }) });
     expect(metadataOnly.json().connection.models).toEqual(['MiniMax-M2.1', 'MiniMax-M3', 'MiniMax-M4']);
+    await app.close();
+  });
+
+  it('lists endpoint models for a draft and for a stored connection', async () => {
+    const calls: { adapterKind: string; baseUrl: string; apiKey?: string | undefined }[] = [];
+    const { app } = await api({ listModels: async (input) => { calls.push(input); return { models: ['model-1', 'model-2'], fetchedAt: '2026-08-25T00:00:01.000Z' }; } });
+    const draft = await app.inject({ method: 'POST', url: '/v1/provider-connections/models', payload: { adapterKind: 'anthropic', baseUrl: 'https://api.example.test/anthropic', apiKey: 'sk-draft' } });
+    expect(draft.statusCode).toBe(200);
+    expect(draft.json()).toEqual({ schemaVersion: 'ProviderConnectionModels.v1', models: ['model-1', 'model-2'], fetchedAt: '2026-08-25T00:00:01.000Z' });
+    expect(calls[0]).toEqual({ adapterKind: 'anthropic', baseUrl: 'https://api.example.test/anthropic', apiKey: 'sk-draft' });
+    const created = await app.inject({ method: 'POST', url: '/v1/provider-connections', payload: createPayload() });
+    const stored = await app.inject({ method: 'POST', url: '/v1/provider-connections/models', payload: { connectionId: created.json().connection.id } });
+    expect(stored.statusCode).toBe(200);
+    expect(calls[1]).toEqual({ adapterKind: 'anthropic', baseUrl: createPayload().baseUrl, apiKey: 'sk-test-material' });
+    await app.close();
+  });
+
+  it('rejects model listings without a target and reports unavailable endpoints', async () => {
+    const { app } = await api({ listModels: async () => { throw new ProviderModelsUnavailable(); } });
+    const untargeted = await app.inject({ method: 'POST', url: '/v1/provider-connections/models', payload: {} });
+    expect(untargeted.statusCode).toBe(400);
+    const missing = await app.inject({ method: 'POST', url: '/v1/provider-connections/models', payload: { connectionId: 'nope' } });
+    expect(missing.statusCode).toBe(404);
+    const upstream = await app.inject({ method: 'POST', url: '/v1/provider-connections/models', payload: { adapterKind: 'openai-compatible', baseUrl: 'https://api.example.test/v1' } });
+    expect(upstream.statusCode).toBe(502);
+    expect(upstream.json().error).toMatchObject({ code: 'PROVIDER_MODELS_UNAVAILABLE', retryable: true });
     await app.close();
   });
 
