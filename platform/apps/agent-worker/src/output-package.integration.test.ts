@@ -134,6 +134,12 @@ describe('package output materialization', () => {
     expect(written[0]?.mediaType).toBe('application/gzip');
     expect(Buffer.from(extractOutputFile(written[0]!.packageBytes!, 'brief.md')!).toString('utf8')).toBe('# brief\n');
     expect(Buffer.from(extractOutputFile(written[0]!.packageBytes!, 'data.bin')!).equals(Buffer.from([0, 1, 255]))).toBe(true);
+    const runResult = JSON.parse(Buffer.from(extractOutputFile(written[0]!.packageBytes!, 'run-result.json')!).toString('utf8'));
+    expect(runResult).toMatchObject({
+      schemaVersion: 'RunResult.v1', taskId: 'task-pack', releaseId: 'rel-1', status: 'succeeded',
+      finishedAt: expect.any(String)
+    });
+    expect(runResult.files).toEqual([{ name: 'brief.md', bytes: 8 }, { name: 'data.bin', bytes: 3 }]);
   });
 
   it('marks PROVIDER_DEPENDENCY_MISSING as failed after claim, not effect_unknown', async () => {
@@ -175,6 +181,28 @@ describe('package output materialization', () => {
     await expect(activities.executeAgentSlice(input('task-schema-bad'))).rejects.toMatchObject({ type: 'PACKAGE_OUTPUT_CONTRACT_VIOLATION' });
     expect(store.failed[0]).toMatchObject({ outcome: 'failed', failureCode: 'PACKAGE_OUTPUT_CONTRACT_VIOLATION' });
     expect(store.committed).toHaveLength(0);
+  });
+
+  it('writes a failed run-result.json for contract violations', async () => {
+    const store = fakeStore();
+    const written: TaskRunOutputRecord[] = [];
+    const schema = JSON.stringify({ type: 'object', required: ['headline'], properties: { headline: { type: 'string' } } });
+    const activities = activitiesOf(store, {
+      files: ['brief.json'],
+      schema,
+      writeFiles: () => undefined,
+      modelOutput: 'sorry I cannot help',
+      written
+    });
+    await expect(activities.executeAgentSlice(input('task-run-result-failed'))).rejects.toMatchObject({ type: 'PACKAGE_OUTPUT_CONTRACT_VIOLATION' });
+    expect(written).toHaveLength(1);
+    expect(written[0]?.mediaType).toBe('application/json');
+    const runResult = JSON.parse(written[0]!.output!);
+    expect(runResult).toMatchObject({
+      schemaVersion: 'RunResult.v1', taskId: 'task-run-result-failed', releaseId: 'rel-1', status: 'failed',
+      failureCode: 'PACKAGE_OUTPUT_CONTRACT_VIOLATION', finishedAt: expect.any(String)
+    });
+    expect(runResult.files).toBeUndefined();
   });
 
   it('enforces schema then packs JSON into the declared file on the live text path', async () => {
