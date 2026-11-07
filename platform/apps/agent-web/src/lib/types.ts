@@ -41,7 +41,11 @@ export interface TaskArtifactList {
   artifacts: TaskArtifact[];
   bundle: TaskArtifact | null;
 }
-export interface RunLogAttempt { runId: string; attemptId: string; [key: string]: unknown }
+export interface RunLogAttempt {
+  runId: string; attemptId: string;
+  eventCount?: number; firstSequence?: number; lastSequence?: number; lastWrittenAt?: string;
+  [key: string]: unknown
+}
 export interface RunLogEvent { eventId: string; runId: string; attemptId: string; sequence: number; type: string; payload: Record<string, unknown>; [key: string]: unknown }
 export interface RunLogPage { attempts: RunLogAttempt[]; selected?: { runId: string; attemptId: string }; events: RunLogEvent[]; nextFromSequence?: number }
 

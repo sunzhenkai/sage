@@ -37,7 +37,7 @@ import {
   enforceOutputContract, OutputContractViolation, OUTPUT_CONTRACT_VIOLATION_CODE
 } from './output-contract.js';
 import { runTaskAgentPath, type TaskCanonicalCompatibilityOptions } from './task-compatibility.js';
-import { appendLiveSliceRunLog } from './slice-run-log.js';
+import { LiveSliceRunLogSession } from './slice-run-log.js';
 import type { AgentEventStorePort } from '@sage/platform-ports';
 
 const ACTIVITY_RETRY_MAX_ATTEMPTS = 5;
@@ -181,6 +181,7 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
       let execution: ReturnType<LocalAgentClient['run']> | undefined;
       let committed = false;
       let livePackageLogOutcome: 'succeeded' | 'paused' | 'failed' | undefined;
+      let liveRunLog: LiveSliceRunLogSession | undefined;
       const outputDir = await mkdtemp(join(tmpdir(), `sage-out-${input.taskId.slice(0, 24)}-s${input.sliceNumber}-`));
       const cancelExecution = (): void => execution?.cancel();
       signal.addEventListener('abort', cancelExecution, { once: true });
@@ -208,6 +209,18 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
           outputDir
         );
         if (signal.aborted) throw new CancelledFailure('TASK_SLICE_CANCELLED');
+        if (options.runLogEvents !== undefined && isPackageInput) {
+          liveRunLog = await LiveSliceRunLogSession.open({
+            events: options.runLogEvents,
+            tenantId: input.tenantId,
+            taskId: input.taskId,
+            attempt: input.attempt,
+            source: 'package'
+          }).catch((cause) => {
+            process.stderr.write(`live slice run-log open failed for ${input.taskId}: ${cause instanceof Error ? cause.message : 'unknown'}\n`);
+            return undefined;
+          });
+        }
         const startedAt = now().getTime();
         const runId = `task-${input.taskId.slice(0, 96)}-a${input.attempt}-s${input.sliceNumber}`;
         const spec: AgentRunSpec = {
@@ -237,7 +250,14 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
         });
         if (signal.aborted) execution.cancel();
         const consumeEvents = (async (): Promise<void> => {
-          for await (const event of execution!.events) heartbeat({ phase: event.type, sequence: event.sequence, sliceNumber: input.sliceNumber });
+          for await (const event of execution!.events) {
+            heartbeat({ phase: event.type, sequence: event.sequence, sliceNumber: input.sliceNumber });
+            if (liveRunLog !== undefined) {
+              await liveRunLog.observe(event).catch((cause) => {
+                process.stderr.write(`live slice run-log observe failed for ${input.taskId}: ${cause instanceof Error ? cause.message : 'unknown'}\n`);
+              });
+            }
+          }
         })();
         const [outcome] = await Promise.all([execution.result, consumeEvents]);
         if (signal.aborted || outcome.status === 'cancelled') throw new CancelledFailure('TASK_SLICE_CANCELLED');
@@ -373,15 +393,9 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
         clearInterval(leaseTimer);
         signal.removeEventListener('abort', cancelExecution);
         await rm(outputDir, { recursive: true, force: true }).catch(() => undefined);
-        if (options.runLogEvents !== undefined && isPackageInput && livePackageLogOutcome !== undefined) {
-          await appendLiveSliceRunLog({
-            events: options.runLogEvents,
-            tenantId: input.tenantId,
-            taskId: input.taskId,
-            outcome: livePackageLogOutcome,
-            source: 'package'
-          }).catch((cause) => {
-            process.stderr.write(`live slice run-log write failed for ${input.taskId}: ${cause instanceof Error ? cause.message : 'unknown'}\n`);
+        if (liveRunLog !== undefined && livePackageLogOutcome !== undefined) {
+          await liveRunLog.finish(livePackageLogOutcome).catch((cause) => {
+            process.stderr.write(`live slice run-log finish failed for ${input.taskId}: ${cause instanceof Error ? cause.message : 'unknown'}\n`);
           });
         }
       }

@@ -21,6 +21,7 @@ import {
   InMemoryCheckpointStore,
 } from '@sage/local-fakes';
 import type {
+  AgentEventStorePort,
   ArtifactFinalizePort,
   CapabilityBrokerPort,
   ContextResolverPort,
@@ -35,9 +36,14 @@ export interface LocalKernelComposition {
   readonly kernelClient: KernelClient & BoundedKernelClient;
   readonly engine: EngineAdapter<KernelEngineResult>;
   readonly specs: InMemoryAgentTaskSpecStore;
-  readonly events: InMemoryAgentEventStore;
+  readonly events: AgentEventStorePort;
   readonly receipts: InMemoryBoundedRunReceiptStore;
   readonly checkpoints: InMemoryCheckpointStore;
+}
+
+export interface LocalKernelCompositionOptions {
+  /** Defaults to in-memory; worker injects Postgres so run-logs API can read kernel events. */
+  readonly events?: AgentEventStorePort;
 }
 
 const withLineage = (
@@ -93,9 +99,9 @@ const withLineage = (
  * uses the same AgentRuntimeKernel and callback-only Pi Engine; production
  * providers/stores are injected by a later composition root.
  */
-export function createLocalKernelComposition(): LocalKernelComposition {
+export function createLocalKernelComposition(options: LocalKernelCompositionOptions = {}): LocalKernelComposition {
   const specs = new InMemoryAgentTaskSpecStore();
-  const events = new InMemoryAgentEventStore();
+  const events = options.events ?? new InMemoryAgentEventStore();
   const receipts = new InMemoryBoundedRunReceiptStore();
   const checkpoints = new InMemoryCheckpointStore();
   const model = new DeterministicModelBroker();

@@ -303,7 +303,7 @@ export class CanonicalInvocationRunner {
     const acquired = await this.stores.events.acquireWriterFence({ tenantId: input.tenantId, taskId: envelope.taskId, runId: envelope.runId, attemptId: envelope.attemptId, ownerToken: input.ownerToken });
     if (acquired.status !== 'acquired') return { status: 'rejected', code: 'EVENT_WRITER_FENCED' };
     let sequence = 0;
-    const append = async (type: 'run.started' | 'engine.started' | 'checkpoint.sealed' | 'run.completed' | 'run.failed', payload: Record<string, string | number | boolean> = { engine: spec.engineId }): Promise<boolean> => {
+    const append = async (type: 'run.started' | 'engine.started' | 'model.completed' | 'tool.completed' | 'checkpoint.sealed' | 'run.completed' | 'run.failed', payload: Record<string, string | number | boolean> = { engine: spec.engineId }): Promise<boolean> => {
       sequence += 1;
       const result = await this.stores.events.appendEvent({ fence: acquired.fence, event: { schemaVersion: '2', eventId: sha256Digest({ invocationId: envelope.invocationId, sequence }), taskId: envelope.taskId, runId: envelope.runId, attemptId: envelope.attemptId, invocationId: envelope.invocationId, specDigest: envelope.specDigest, sequence, type, payload } });
       return result.status === 'appended' || result.status === 'existing';
@@ -312,6 +312,12 @@ export class CanonicalInvocationRunner {
       await append('run.failed', { code }) ? { status: 'rejected', code } : { status: 'rejected', code: 'EVENT_WRITE_CONFLICT' };
     if (!await append('run.started') || !await append('engine.started')) return { status: 'rejected', code: 'EVENT_WRITE_CONFLICT' };
     const outcome = await input.engine.run({ envelope, spec, ...(checkpoint === undefined ? {} : { checkpoint }), ...(input.priorReceiptRefs === undefined ? {} : { priorReceiptRefs: input.priorReceiptRefs }) });
+    if (!await append('model.completed', { engine: spec.engineId })) return { status: 'rejected', code: 'EVENT_WRITE_CONFLICT' };
+    const receiptCount = outcome.receiptRefs?.length ?? 0;
+    // Pi/kernel receipts are context+model[+tool]; a third receipt means a tool effect ran.
+    if (receiptCount > 2) {
+      if (!await append('tool.completed', { count: receiptCount - 2 })) return { status: 'rejected', code: 'EVENT_WRITE_CONFLICT' };
+    }
     let sealedCheckpoint: SealedCheckpointRef | undefined;
     if (outcome.checkpointCandidate !== undefined) {
       const candidate = outcome.checkpointCandidate;

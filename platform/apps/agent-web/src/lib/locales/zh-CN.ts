@@ -347,9 +347,14 @@ export const zhCN = {
       waiting: '等待下一步'
     },
     runLogs: {
-      empty: '没有运行日志。只有持久化协调器（v2）任务才有运行日志。',
+      empty: '没有运行日志。',
       eventsIn: '{attempt} 中的 {count} 个事件',
-      more: '还有更多事件…'
+      more: '还有更多事件…',
+      loadEarlier: '加载更早日志',
+      loadingEarlier: '正在加载…',
+      follow: '跟随最新',
+      historicalHint: '此次运行若未采集执行事件，无法事后补回。',
+      sparseHint: '当前只有生命周期摘要；细粒度模型/工具事件取决于当时是否已采集。'
     },
     artifacts: {
       empty: '没有产物。',
@@ -666,12 +671,14 @@ export const zhCN = {
       statusHint: '状态来自任务投影；等待中表示尚未观察到投影。',
       failureDetail: '失败原因',
       failedTitle: '运行失败，没有产生产物',
-      failedHint: '完整的失败信息与运行日志见「概览」。',
+      failedHint: '完整的失败信息见「概览」，执行过程见「日志」。',
       viewOverview: '查看概览',
+      viewLogs: '查看日志',
       noArtifactsYet: '运行仍在进行，产物会在完成后出现。',
       pendingHint: '运行已准入，正在等待第一次任务投影。任务启动后即可查看日志与产物。',
       tabs: {
         overview: '概览',
+        logs: '日志',
         artifacts: '产物'
       }
     }

@@ -343,9 +343,14 @@ export const en = {
       waiting: 'Waiting for the next step'
     },
     runLogs: {
-      empty: 'No run logs. Run logs exist only for durable coordinator (v2) tasks.',
+      empty: 'No run logs.',
       eventsIn: '{count} events in {attempt}',
-      more: 'More events available…'
+      more: 'More events available…',
+      loadEarlier: 'Load earlier',
+      loadingEarlier: 'Loading…',
+      follow: 'Follow latest',
+      historicalHint: 'Events that were never collected for this run cannot be reconstructed later.',
+      sparseHint: 'Only lifecycle summaries are present; finer model/tool events depend on what was collected at the time.'
     },
     artifacts: {
       empty: 'No artifacts.',
@@ -662,12 +667,14 @@ export const en = {
       statusHint: 'Status comes from the task projection; pending means no projection has been observed yet.',
       failureDetail: 'Failure reason',
       failedTitle: 'Run failed — no artifacts were produced',
-      failedHint: 'See Overview for the full failure details and run logs.',
+      failedHint: 'See Overview for failure details and Logs for the execution trace.',
       viewOverview: 'View overview',
+      viewLogs: 'View logs',
       noArtifactsYet: 'The run is still in progress; artifacts appear when it finishes.',
       pendingHint: 'The run was admitted and is waiting for the first task projection. Logs and artifacts appear once the task starts.',
       tabs: {
         overview: 'Overview',
+        logs: 'Logs',
         artifacts: 'Artifacts'
       }
     }
