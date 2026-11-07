@@ -75,12 +75,13 @@ export function RunLogs({ taskId, live = false }: { taskId: string; live?: boole
   }, [taskId, attemptKey, firstSequence, lastSequence, meta.data?.selected?.runId, meta.data?.selected?.attemptId]);
 
   useEffect(() => {
-    if (!live || meta.data?.selected === undefined || latest === undefined) return;
+    const selectedAttemptIds = meta.data?.selected;
+    if (!live || selectedAttemptIds === undefined || latest === undefined) return;
     let cancelled = false;
     const tick = async (): Promise<void> => {
       const page = await api.tasks.runLogs(taskId, {
-        runId: meta.data.selected!.runId,
-        attemptId: meta.data.selected!.attemptId,
+        runId: selectedAttemptIds.runId,
+        attemptId: selectedAttemptIds.attemptId,
         fromSequence: latest + 1,
         limit: PAGE
       });
