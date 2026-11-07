@@ -73,9 +73,9 @@ describe('CanonicalInvocationRunner', () => {
     const subject = invocationHarness();
     const first = await subject.runner.invoke({ tenantId: 'tenant', ownerToken: 'owner', envelope, engine: subject.engine });
     const replay = await subject.runner.invoke({ tenantId: 'tenant', ownerToken: 'owner', envelope, engine: subject.engine });
-    expect(first).toMatchObject({ status: 'committed', receipt: { eventRange: { first: 1, last: 3 }, invocationId: 'invoke' } });
+    expect(first).toMatchObject({ status: 'committed', receipt: { eventRange: { first: 1, last: 4 }, invocationId: 'invoke' } });
     expect(replay).toEqual({ status: 'existing', receipt: (first as { receipt: BoundedRunReceipt }).receipt });
-    expect(subject.events.map((event) => [event.sequence, event.type])).toEqual([[1, 'run.started'], [2, 'engine.started'], [3, 'run.completed']]);
+    expect(subject.events.map((event) => [event.sequence, event.type])).toEqual([[1, 'run.started'], [2, 'engine.started'], [3, 'model.completed'], [4, 'run.completed']]);
     expect(subject.engineCalls).toBe(1);
   });
 
@@ -88,9 +88,9 @@ describe('CanonicalInvocationRunner', () => {
 
   it('stages and seals a compatible candidate before exposing its ref in Event and Receipt', async () => {
     const subject = invocationHarness({ candidate });
-    await expect(subject.runner.invoke({ tenantId: 'tenant', ownerToken: 'owner', envelope, engine: subject.engine })).resolves.toMatchObject({ status: 'committed', receipt: { checkpointRef: sealed.checkpointRef, eventRange: { first: 1, last: 4 } } });
-    expect(subject.events.map((event) => [event.sequence, event.type])).toEqual([[1, 'run.started'], [2, 'engine.started'], [3, 'checkpoint.sealed'], [4, 'run.completed']]);
-    expect(subject.events[2]?.payload).toMatchObject({ checkpointRef: sealed.checkpointRef, candidateDigest: candidate.candidateDigest });
+    await expect(subject.runner.invoke({ tenantId: 'tenant', ownerToken: 'owner', envelope, engine: subject.engine })).resolves.toMatchObject({ status: 'committed', receipt: { checkpointRef: sealed.checkpointRef, eventRange: { first: 1, last: 5 } } });
+    expect(subject.events.map((event) => [event.sequence, event.type])).toEqual([[1, 'run.started'], [2, 'engine.started'], [3, 'model.completed'], [4, 'checkpoint.sealed'], [5, 'run.completed']]);
+    expect(subject.events[3]?.payload).toMatchObject({ checkpointRef: sealed.checkpointRef, candidateDigest: candidate.candidateDigest });
     expect([subject.stages, subject.seals]).toEqual([1, 1]);
   });
 
@@ -101,7 +101,7 @@ describe('CanonicalInvocationRunner', () => {
     ] as const) {
       const subject = invocationHarness(options);
       await expect(subject.runner.invoke({ tenantId: 'tenant', ownerToken: 'owner', envelope, engine: subject.engine })).resolves.toEqual({ status: 'rejected', code });
-      expect(subject.events.map((event) => event.type)).toEqual(['run.started', 'engine.started', 'run.failed']);
+      expect(subject.events.map((event) => event.type)).toEqual(['run.started', 'engine.started', 'model.completed', 'run.failed']);
       expect(subject.events.some((event) => event.payload.checkpointRef !== undefined)).toBe(false);
       expect([subject.stages, subject.seals]).toEqual([1, expectedSeals]);
     }
@@ -110,7 +110,7 @@ describe('CanonicalInvocationRunner', () => {
   it('accepts an idempotent existing seal with the same stable checkpoint ref', async () => {
     const subject = invocationHarness({ candidate, sealExisting: true });
     await expect(subject.runner.invoke({ tenantId: 'tenant', ownerToken: 'owner', envelope, engine: subject.engine })).resolves.toMatchObject({ status: 'committed', receipt: { checkpointRef: sealed.checkpointRef } });
-    expect(subject.events[2]).toMatchObject({ type: 'checkpoint.sealed', payload: { checkpointRef: sealed.checkpointRef } });
+    expect(subject.events[3]).toMatchObject({ type: 'checkpoint.sealed', payload: { checkpointRef: sealed.checkpointRef } });
     expect([subject.stages, subject.seals]).toEqual([1, 1]);
   });
 
@@ -118,7 +118,7 @@ describe('CanonicalInvocationRunner', () => {
     const subject = invocationHarness({ candidate: { ...candidate, runId: 'other-run' } });
     await expect(subject.runner.invoke({ tenantId: 'tenant', ownerToken: 'owner', envelope, engine: subject.engine })).resolves.toEqual({ status: 'rejected', code: 'CHECKPOINT_CANDIDATE_INVALID' });
     expect([subject.stages, subject.seals]).toEqual([0, 0]);
-    expect(subject.events.map((event) => event.type)).toEqual(['run.started', 'engine.started', 'run.failed']);
+    expect(subject.events.map((event) => event.type)).toEqual(['run.started', 'engine.started', 'model.completed', 'run.failed']);
     expect(subject.events.some((event) => event.payload.checkpointRef !== undefined)).toBe(false);
   });
 });

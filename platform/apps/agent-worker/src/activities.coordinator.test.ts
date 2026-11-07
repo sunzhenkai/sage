@@ -50,7 +50,7 @@ describe('Durable Coordinator Host Activity binding', () => {
     expect(first.receiptDigest).toMatch(/^sha256:[a-f0-9]{64}$/u);
     expect(JSON.stringify(first)).not.toMatch(/body|prompt|credential|secret/iu);
     const events = await composition.events.listEvents({ tenantId: spec.tenantId, taskId: spec.taskId, runId: spec.runId, attemptId: spec.attemptId });
-    expect(events.map((event) => event.type)).toEqual(['run.started', 'engine.started', 'checkpoint.sealed', 'run.completed']);
+    expect(events.map((event) => event.type)).toEqual(['run.started', 'engine.started', 'model.completed', 'checkpoint.sealed', 'run.completed']);
   });
 
   it('returns a deterministic bounded failure summary when the sealed checkpoint is unavailable', async () => {

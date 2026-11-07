@@ -15,7 +15,7 @@ import { api } from '@/lib/api';
 import { useT } from '@/lib/i18n';
 import { formatTime, relativeTime } from '@/lib/utils';
 
-type Tab = 'overview' | 'artifacts';
+type Tab = 'overview' | 'logs' | 'artifacts';
 const terminal = new Set(['succeeded', 'failed', 'cancelled']);
 
 export function AppRunDetailPage() {
@@ -41,6 +41,7 @@ export function AppRunDetailPage() {
         title={<Mono>{taskId}</Mono>}
         tabs={run === undefined ? undefined : <>
           <ViewTab active={tab === 'overview'} onClick={() => setTab('overview')}>{t('apps.runDetail.tabs.overview')}</ViewTab>
+          <ViewTab active={tab === 'logs'} onClick={() => setTab('logs')}>{t('apps.runDetail.tabs.logs')}</ViewTab>
           <ViewTab active={tab === 'artifacts'} onClick={() => setTab('artifacts')}>{t('apps.runDetail.tabs.artifacts')}</ViewTab>
         </>}
         actions={run === undefined || pending ? null : (
@@ -49,7 +50,7 @@ export function AppRunDetailPage() {
           </Button>
         )} />
       {runQuery.isLoading ? <Loading /> : runQuery.error ? <ErrorState error={runQuery.error} /> : run === undefined ? null : (
-        <PageContent fill={tab === 'artifacts' && !pending}>
+        <PageContent fill={(tab === 'artifacts' || tab === 'logs') && !pending}>
           {tab === 'overview' || pending ? <PageDescription
             leading={<StatusGlyph status={run.status} />}
             title={run.releaseVersion === undefined ? taskId : `v${run.releaseVersion}`}
@@ -81,10 +82,11 @@ export function AppRunDetailPage() {
                 <ListRow><RowId>{t('apps.runDetail.failureCode')}</RowId><RowTitle>{run.failureCode === undefined ? '—' : <span className="text-red">{run.failureCode}</span>}</RowTitle></ListRow>
                 {run.failureDetail === undefined ? null : <ListRow><RowId>{t('apps.runDetail.failureDetail')}</RowId><RowTitle><span className="break-words">{run.failureDetail}</span></RowTitle></ListRow>}
               </Section>
-              <Section card padded title={t('tasks.tabs.runLogs')}>
-                <RunLogs taskId={taskId} live={live} />
-              </Section>
             </>
+          ) : tab === 'logs' ? (
+            <div className="flex min-h-0 flex-1 flex-col p-3">
+              <RunLogs taskId={taskId} live={live} />
+            </div>
           ) : (
             <div className="flex min-h-0 flex-1 flex-col">
               <Artifacts taskId={taskId} live={live} fill empty={
@@ -93,7 +95,7 @@ export function AppRunDetailPage() {
                     {run.failureCode === undefined ? null : <p><Mono className="text-red">{run.failureCode}</Mono></p>}
                     {run.failureDetail === undefined ? null : <p className="mt-1 break-words">{run.failureDetail}</p>}
                     <p className="mt-3 text-faint">{t('apps.runDetail.failedHint')}</p>
-                    <Button variant="secondary" size="sm" className="mt-3" onClick={() => setTab('overview')}>{t('apps.runDetail.viewOverview')}</Button>
+                    <Button variant="secondary" size="sm" className="mt-3" onClick={() => setTab('logs')}>{t('apps.runDetail.viewLogs')}</Button>
                   </EmptyPane>
                 ) : live ? <EmptyPane icon={<FileText />} title={t('tasks.artifacts.empty')}>{t('apps.runDetail.noArtifactsYet')}</EmptyPane> : undefined
               } />

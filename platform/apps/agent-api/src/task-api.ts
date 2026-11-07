@@ -205,10 +205,20 @@ export function registerTaskRoutes(app: FastifyInstance, controller: TaskControl
     try{return await controller.query(request.params.taskId);}catch(cause){const response=routingError(reply,cause);if(response)return response;throw cause;}
   });
   app.get<{Params:{taskId:string}}>('/v1/tasks/:taskId/events',async(request)=>{await authorize(request,options,'read',request.params.taskId);return {events:await options.queryStore?.listTaskEvents(tenantId,request.params.taskId)??[]};});
-  app.get<{Params:{taskId:string}}>('/v1/tasks/:taskId/artifacts',async(request)=>{await authorize(request,options,'read',request.params.taskId);return {artifacts:await options.queryStore?.listTaskArtifacts(tenantId,request.params.taskId)??[]};});
+  app.get<{Params:{taskId:string}}>('/v1/tasks/:taskId/artifacts',async(request)=>{
+    await authorize(request,options,'read',request.params.taskId);
+    const store=options.queryStore;
+    if(!store)return {artifacts:[],bundle:null};
+    const [artifacts,bundle]=await Promise.all([
+      store.listTaskArtifacts(tenantId,request.params.taskId),
+      store.getTaskArtifactBundle(tenantId,request.params.taskId)
+    ]);
+    return {artifacts,bundle:bundle??null};
+  });
   app.get<{Params:{taskId:string;artifactId:string}}>('/v1/tasks/:taskId/artifacts/:artifactId',async(request,reply)=>{
-    const principal=await authorize(request,options,'read',request.params.taskId);const artifacts=await options.queryStore?.listTaskArtifacts(tenantId,request.params.taskId)??[];
-    const reference=artifacts.find((item)=>item.artifactId===request.params.artifactId);if(!reference)return reply.code(404).send({error:{code:'TASK_ARTIFACT_NOT_FOUND',retryable:false}});
+    const principal=await authorize(request,options,'read',request.params.taskId);
+    const reference=await options.queryStore?.getTaskArtifact(tenantId,request.params.taskId,request.params.artifactId);
+    if(!reference)return reply.code(404).send({error:{code:'TASK_ARTIFACT_NOT_FOUND',retryable:false}});
     try{
       const resolved=options.artifactResolver?await options.artifactResolver.resolve(reference,principal):reference;
       if(request.query && (request.query as {download?:string}).download==='1' && resolved.content!==undefined){

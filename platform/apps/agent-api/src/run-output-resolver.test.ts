@@ -5,7 +5,7 @@ import type { TaskArtifactReference } from '@sage/task-domain';
 
 const reference: TaskArtifactReference = {
   artifactId: 'output', artifactRef: 'artifact://tasks/task-1/attempt-1/slice-1',
-  taskId: 'task-1', attempt: 1, name: 'output.txt', mediaType: 'text/plain'
+  taskId: 'task-1', attempt: 1, name: 'output.txt', mediaType: 'text/plain', role: 'file'
 };
 const principal = { authenticationId: 'auth', principalId: 'p-1', tenantId: 'tenant-local', roles: [] };
 
@@ -38,7 +38,7 @@ describe('run output artifact resolver', () => {
   it('resolves declared file-name references to the same run output content', async () => {
     const output = { tenantId: 'tenant-local', taskId: 't1', artifactRef: 'artifact://tasks/t1/attempt-1/slice-1' as const, output: 'body', mediaType: 'text/plain', createdAt: '2026-08-29T00:00:00.000Z' };
     const resolver = createRunOutputArtifactResolver({ tenantId: 'tenant-local', lookup: { getRunOutput: async () => output } });
-    const resolved = await resolver.resolve({ taskId: 't1', attempt: 1, artifactId: 'artifact-a-file-report.md', name: 'report.md', mediaType: 'text/plain', artifactRef: 'artifact://tasks/t1/attempt-1/slice-1#file/report.md' }, principal);
+    const resolved = await resolver.resolve({ taskId: 't1', attempt: 1, artifactId: 'artifact-a-file-report.md', name: 'report.md', mediaType: 'text/plain', role: 'file', artifactRef: 'artifact://tasks/t1/attempt-1/slice-1#file/report.md' }, principal);
     expect(resolved).toMatchObject({ name: 'report.md', content: 'body', encoding: 'utf-8' });
   });
 

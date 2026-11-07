@@ -129,7 +129,8 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
       new URL('../../task-domain/migrations/007_task_package_run_contract.sql', import.meta.url),
       new URL('../../task-domain/migrations/008_output_package_and_failure.sql', import.meta.url),
       new URL('../../task-domain/migrations/009_provider_connection_models.sql', import.meta.url),
-      new URL('../../task-domain/migrations/010_task_state_generation.sql', import.meta.url)
+      new URL('../../task-domain/migrations/010_task_state_generation.sql', import.meta.url),
+      new URL('../../task-domain/migrations/011_artifact_role.sql', import.meta.url)
     ];
     const migrations = (await Promise.all(migrationUrls.map((url) => readFile(url, 'utf8'))))
       .map((sql) => sql.replace(/^\s*BEGIN;\s*/, '').replace(/\s*COMMIT;\s*$/, '').trim());
@@ -469,9 +470,28 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
   }
 
   async listTaskArtifacts(tenantId: string, taskId: string): Promise<readonly TaskArtifactReference[]> {
-    const rows = (await this.#query<QueryResultRow & { artifact_id:string;artifact_ref:string;attempt:number;name:string;media_type:string }>(
-      'listTaskArtifacts','SELECT * FROM task_artifact_reference WHERE tenant_id=$1 AND task_id=$2 ORDER BY artifact_id',[tenantId,taskId])).rows;
-    return rows.map((row) => ({artifactId:row.artifact_id,artifactRef:row.artifact_ref as TaskArtifactReference['artifactRef'],taskId,attempt:row.attempt,name:row.name,mediaType:row.media_type}));
+    const rows = (await this.#query<QueryResultRow & { artifact_id:string;artifact_ref:string;attempt:number;name:string;media_type:string;role:string }>(
+      'listTaskArtifacts','SELECT * FROM task_artifact_reference WHERE tenant_id=$1 AND task_id=$2 AND role=$3 ORDER BY artifact_id',[tenantId,taskId,'file'])).rows;
+    return rows.map((row) => this.#artifactReference(taskId, row));
+  }
+
+  async getTaskArtifact(tenantId: string, taskId: string, artifactId: string): Promise<TaskArtifactReference | undefined> {
+    const rows = (await this.#query<QueryResultRow & { artifact_id:string;artifact_ref:string;attempt:number;name:string;media_type:string;role:string }>(
+      'getTaskArtifact','SELECT * FROM task_artifact_reference WHERE tenant_id=$1 AND task_id=$2 AND artifact_id=$3 LIMIT 1',[tenantId,taskId,artifactId])).rows;
+    const row = rows[0];
+    return row === undefined ? undefined : this.#artifactReference(taskId, row);
+  }
+
+  async getTaskArtifactBundle(tenantId: string, taskId: string): Promise<TaskArtifactReference | undefined> {
+    const rows = (await this.#query<QueryResultRow & { artifact_id:string;artifact_ref:string;attempt:number;name:string;media_type:string;role:string }>(
+      'getTaskArtifactBundle','SELECT * FROM task_artifact_reference WHERE tenant_id=$1 AND task_id=$2 AND role=$3 ORDER BY artifact_id LIMIT 1',[tenantId,taskId,'bundle'])).rows;
+    const row = rows[0];
+    return row === undefined ? undefined : this.#artifactReference(taskId, row);
+  }
+
+  #artifactReference(taskId: string, row: { artifact_id:string;artifact_ref:string;attempt:number;name:string;media_type:string;role:string }): TaskArtifactReference {
+    const role = row.role === 'bundle' ? 'bundle' : 'file';
+    return {artifactId:row.artifact_id,artifactRef:row.artifact_ref as TaskArtifactReference['artifactRef'],taskId,attempt:row.attempt,name:row.name,mediaType:row.media_type,role};
   }
 
   async listReconciliationCandidates(tenantId: string, limit: number, now: Date, freshnessThresholdMs: number): Promise<readonly ReconciliationCandidate[]> {
@@ -494,10 +514,8 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT (tenant_id,task_id,source_event_id) DO NOTHING`,
       [event.tenantId,event.taskId,event.eventId,event.sourceEventId,event.workflowId,event.targetId,event.attempt,event.sequence,event.kind,event.type,event.occurredAt,json(event.payload)]);
       inserted += result.rowCount ?? 0;
-      const artifactRef = typeof event.payload.artifactRef === 'string' && event.payload.artifactRef.startsWith('artifact://') ? event.payload.artifactRef : undefined;
-      if (artifactRef) await this.#query('appendProjectionArtifact',`INSERT INTO task_artifact_reference
-        (tenant_id,task_id,artifact_id,artifact_ref,attempt,name,media_type) VALUES ($1,$2,$3,$4,$5,$6,$7)
-        ON CONFLICT (tenant_id,task_id,artifact_ref) DO NOTHING`,[event.tenantId,event.taskId,`artifact-${event.sourceEventId}`,artifactRef,event.attempt,'task-output','application/octet-stream']);
+      // Artifact rows are owned by writeRunOutput (bundle/file roles). Projection events must not
+      // insert a competing base artifact_ref with name=task-output.
     }
     return inserted;
   }
@@ -664,14 +682,22 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
       [record.tenantId, record.taskId, record.artifactRef, textOutput ?? null, packageBytes ?? null, json(manifest), record.mediaType, iso(record.createdAt)]);
     const artifactId = `artifact-${record.artifactRef.split('/').slice(-2).join('-')}`;
     const packageName = packageBytes === undefined ? 'task-output' : 'output.tar.gz';
+    // Plain text outputs are the deliverable (role=file). Packaged runs keep an internal bundle row
+    // plus one file row per manifest entry.
+    const baseRole = packageBytes === undefined ? 'file' : 'bundle';
     await this.#query('writeRunOutput.artifactRef', `INSERT INTO task_artifact_reference
-      (tenant_id, task_id, artifact_id, artifact_ref, attempt, name, media_type) VALUES ($1,$2,$3,$4,1,$5,$6)
-      ON CONFLICT (tenant_id, task_id, artifact_ref) DO NOTHING`,
-      [record.tenantId, record.taskId, artifactId, record.artifactRef, packageName, record.mediaType]);
+      (tenant_id, task_id, artifact_id, artifact_ref, attempt, name, media_type, role) VALUES ($1,$2,$3,$4,1,$5,$6,$7)
+      ON CONFLICT (tenant_id, task_id, artifact_ref) DO UPDATE SET
+        name = EXCLUDED.name, media_type = EXCLUDED.media_type, role = EXCLUDED.role
+        WHERE task_artifact_reference.role IS DISTINCT FROM EXCLUDED.role
+           OR task_artifact_reference.name IS DISTINCT FROM EXCLUDED.name
+           OR task_artifact_reference.media_type IS DISTINCT FROM EXCLUDED.media_type`,
+      [record.tenantId, record.taskId, artifactId, record.artifactRef, packageName, record.mediaType, baseRole]);
     for (const entry of manifest) {
       await this.#query('writeRunOutput.artifactFile', `INSERT INTO task_artifact_reference
-        (tenant_id, task_id, artifact_id, artifact_ref, attempt, name, media_type) VALUES ($1,$2,$3,$4,1,$5,$6)
-        ON CONFLICT (tenant_id, task_id, artifact_ref) DO NOTHING`,
+        (tenant_id, task_id, artifact_id, artifact_ref, attempt, name, media_type, role) VALUES ($1,$2,$3,$4,1,$5,$6,'file')
+        ON CONFLICT (tenant_id, task_id, artifact_ref) DO UPDATE SET
+          name = EXCLUDED.name, media_type = EXCLUDED.media_type, role = 'file'`,
         [record.tenantId, record.taskId, `${artifactId}-file-${entry.name}`, `${record.artifactRef}#file/${entry.name}`, entry.name, entry.mediaType]);
     }
     if (inserted.rowCount === 1) return { status: 'stored' };

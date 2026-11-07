@@ -16,7 +16,7 @@ class MemoryReconcileStore{
   async writeProjectionWithRepairAudit(value:TaskProjection,audit:ProjectionRepairAudit){if(this.projectionFailures-->0)throw new Error('PROJECTION_STORE_DOWN');this.projection=structuredClone(value);this.pending.set(audit.repairId,structuredClone(audit));return audit;}
   async getPendingRepairAudit(){return [...this.pending.values()][0];}async completePendingRepairAudit(repairId:string){this.pending.delete(repairId);}
   async appendRepairAudit(audit:ProjectionRepairAudit){if(this.auditFailures-->0)throw new Error('AUDIT_STORE_DOWN');if(!this.audits.has(audit.repairId))this.audits.set(audit.repairId,audit);}async listRepairAudits(){return [...this.audits.values()];}
-  async listTaskViews(){return [];}async getTaskView(){return undefined;}async listTaskEvents(){return [...this.events.values()];}async listTaskArtifacts(){return [];}
+  async listTaskViews(){return [];}async getTaskView(){return undefined;}async listTaskEvents(){return [...this.events.values()];}async listTaskArtifacts(){return [];}async getTaskArtifact(){return undefined;}async getTaskArtifactBundle(){return undefined;}
 }
 class RecoveringConnector implements TemporalClientConnector{failures=1;readonly snapshots:WorkflowTargetSnapshot[]=[];async connect(value:WorkflowTargetSnapshot){this.snapshots.push(structuredClone(value));if(this.failures-->0)throw new Error('target down');return {} as WorkflowClient;}}
 const credentials:CredentialProvider={async resolveCredential(request){return {value:new Uint8Array(),expiresAt:'2099-01-01T00:00:00.000Z',scope:request.scope};},async health(){return {healthy:true,checkedAt:new Date(0).toISOString()};}};

@@ -60,7 +60,7 @@ describe('AgentRuntimeKernel', () => {
     }) });
     expect(result.status).toBe('committed');
     expect(fixture.getReceipt()?.specDigest).toBe(spec.specDigest);
-    expect(fixture.events.map((event) => event.type)).toEqual(['run.started', 'engine.started', 'run.completed']);
+    expect(fixture.events.map((event) => event.type)).toEqual(['run.started', 'engine.started', 'model.completed', 'run.completed']);
     expect(observedIdentity).toMatchObject({ principalRef: spec.principalRef, tenantId: spec.tenantId, taskId: spec.taskId, runId: spec.runId, attemptId: spec.attemptId, invocationId: 'invocation-1', specDigest: spec.specDigest });
   });
 

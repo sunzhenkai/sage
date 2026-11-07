@@ -18,6 +18,7 @@ import { TaskRows } from '@/components/bui/task-rows';
 import { ThinkingTrace, type TraceRow } from '@/components/bui/thinking';
 import { ToolChips } from '@/components/bui/tool-chips';
 import { api } from '@/lib/api';
+import { isArchiveName } from '@/lib/archive';
 import { errorDisplay } from '@/lib/error-message';
 import { useLocale, useT } from '@/lib/i18n';
 import { isMock } from '@/lib/mock';
@@ -250,7 +251,8 @@ function RunBlock({ group, run, onRetry, retrying, onFollowUp }: { group: RunGro
     if (p.status === 'completed' && open) { open.done = true; open.artifact = p.artifact?.name; }
     else tools.push({ key: String(e.sequence), name: p.toolName, done: p.status === 'completed', artifact: p.artifact?.name });
   }
-  const artifacts = group.events.flatMap((e) => (e.payload.kind === 'artifact' ? [e.payload.artifact] : []));
+  const artifacts = group.events.flatMap((e) => (e.payload.kind === 'artifact' ? [e.payload.artifact] : []))
+    .filter((artifact) => !isArchiveName(artifact.name, artifact.mediaType));
   const taskEvents = group.events.flatMap((e) => (e.payload.kind === 'task' ? [{ seq: e.sequence, ...e.payload }] : []));
   const errors = group.events.flatMap((e) => (e.payload.kind === 'error' ? [{ seq: e.sequence, error: e.payload.error }] : []));
   const trace: TraceRow[] = [

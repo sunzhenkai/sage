@@ -139,7 +139,9 @@ export async function createWorkerRuntime(config = readWorkerRuntimeConfig()): P
 
       workflowsPath: fileURLToPath(new URL('../../../packages/temporal-workflows/src/workflows.ts', import.meta.url))
     });
-    const kernelComposition = config.executionMode === 'kernel' ? createLocalKernelComposition() : undefined;
+    // Kernel 与 Live 包共用 Postgres event authority，避免 API 读库却写内存。
+    const durableEvents = new PostgresAgentAuthorityStore({ connectionString: config.postgresUrl });
+    const kernelComposition = config.executionMode === 'kernel' ? createLocalKernelComposition({ events: durableEvents }) : undefined;
     const canonicalAdapter = kernelComposition === undefined ? undefined : new LegacyAgentRunSpecV1Adapter({ specs: kernelComposition.specs });
     const canonicalCompatibility: TaskCanonicalCompatibilityOptions | undefined = kernelComposition === undefined || canonicalAdapter === undefined ? undefined : {
       lifecycleOwner: config.lifecycleOwner,
@@ -182,7 +184,7 @@ export async function createWorkerRuntime(config = readWorkerRuntimeConfig()): P
         ]),
         packageInputReader: tasks,
         // Live 包路径旁路写 canonical_agent_events，供 run-logs API 查询（G-O1）。
-        runLogEvents: new PostgresAgentAuthorityStore({ connectionString: config.postgresUrl })
+        runLogEvents: durableEvents
       }),
       buildId: env('SAGE_WORKER_BUILD_ID', 'sage-local-worker-v1')
     });

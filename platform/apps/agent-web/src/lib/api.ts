@@ -6,7 +6,7 @@ import type {
   CatalogModelPage, CatalogProviderPage, CatalogStatus, ChatRun, Message,
   PackageRunResult, ProviderConnection,
   ProviderConnectionCheck, ProviderConnectionCheckResult, ProviderConnectionModelsQuery, ProviderConnectionModelsResult, ProviderConnectionWrite, RunAgentSettings,
-  RunLogPage, ScheduleDefinition, ScheduleSnapshot, ScheduleTriggerEvent, Session, SessionDetail, SessionList, TaskArtifact, TaskEvent,
+  RunLogPage, ScheduleDefinition, ScheduleSnapshot, ScheduleTriggerEvent, Session, SessionDetail, SessionList, TaskArtifact, TaskArtifactList, TaskEvent,
   TaskStatus, TaskView, TimelineEvent
 } from './types';
 
@@ -128,7 +128,7 @@ export const api = {
     list: (query: { status?: TaskStatus | undefined; taskType?: string | undefined; environment?: string | undefined; limit?: number | undefined } = {}) => request<{ tasks: TaskView[] }>('GET', '/v1/tasks', { query }),
     get: (id: string) => request<TaskView>('GET', `/v1/tasks/${enc(id)}`),
     events: (id: string) => request<{ events: TaskEvent[] }>('GET', `/v1/tasks/${enc(id)}/events`),
-    artifacts: (id: string) => request<{ artifacts: TaskArtifact[] }>('GET', `/v1/tasks/${enc(id)}/artifacts`),
+    artifacts: (id: string) => request<TaskArtifactList>('GET', `/v1/tasks/${enc(id)}/artifacts`),
     artifact: (id: string, artifactId: string) => request<TaskArtifact & { content?: string; encoding?: string }>('GET', `/v1/tasks/${enc(id)}/artifacts/${enc(artifactId)}`),
     runLogs: (id: string, query: { runId?: string; attemptId?: string; fromSequence?: number; limit?: number } = {}) => request<RunLogPage>('GET', `/v1/tasks/${enc(id)}/run-logs`, { query }),
     signal: (id: string, kind: 'pause' | 'resume') => request<unknown>('POST', `/v1/tasks/${enc(id)}/signals`, { body: { kind } }),
