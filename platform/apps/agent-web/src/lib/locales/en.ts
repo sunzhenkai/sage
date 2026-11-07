@@ -350,6 +350,8 @@ export const en = {
     artifacts: {
       empty: 'No artifacts.',
       download: 'Download',
+      downloadAll: 'Download all',
+      bundleOnly: 'No file manifest is available; the packaged output can still be downloaded.',
       select: 'Select an artifact to preview it.',
       selectEntry: 'Select a file inside the archive to preview it.',
       files: '{count} files',

@@ -31,6 +31,10 @@ function previewCode(name: string, bytes: Uint8Array): string {
   return text;
 }
 
+function artifactDownloadHref(taskId: string, artifactId: string): string {
+  return `/v1/tasks/${encodeURIComponent(taskId)}/artifacts/${encodeURIComponent(artifactId)}?download=1`;
+}
+
 /** Flush, centered empty state for full-bleed panes (no card, no stray box). */
 export function EmptyPane({ icon, title, children }: { icon?: React.ReactNode; title: React.ReactNode; children?: React.ReactNode }) {
   return (
@@ -50,6 +54,7 @@ export function Artifacts({ taskId, live = false, fill = false, empty }: { taskI
     ...(live ? { refetchInterval: 5_000 } : {})
   });
   const list = artifacts.data?.artifacts ?? [];
+  const bundle = artifacts.data?.bundle ?? null;
   const [selectedId, setSelectedId] = useState<string>();
   const selected = list.find((item) => item.artifactId === selectedId) ?? list[0];
   const selectedIsArchive = selected !== undefined && isArchiveName(selected.name, selected.mediaType);
@@ -57,8 +62,7 @@ export function Artifacts({ taskId, live = false, fill = false, empty }: { taskI
   useEffect(() => {
     if (list.length === 0) { setSelectedId(undefined); return; }
     if (selectedId !== undefined && list.some((item) => item.artifactId === selectedId)) return;
-    const preferred = list.find((item) => !isArchiveName(item.name, item.mediaType)) ?? list[0];
-    setSelectedId(preferred?.artifactId);
+    setSelectedId(list[0]?.artifactId);
   }, [list, selectedId]);
 
   const content = useQuery({
@@ -86,12 +90,20 @@ export function Artifacts({ taskId, live = false, fill = false, empty }: { taskI
   const archiveEntries = archiveQuery.data ?? [];
   const archiveGroups = useMemo(() => groupPaths(archiveEntries.map((entry) => entry.name)), [archiveEntries]);
   const activeArchive = archiveEntries.find((entry) => entry.name === archivePath);
-  const downloadHref = selected === undefined ? undefined
-    : `/v1/tasks/${encodeURIComponent(taskId)}/artifacts/${encodeURIComponent(selected.artifactId)}?download=1`;
+  const downloadHref = selected === undefined ? undefined : artifactDownloadHref(taskId, selected.artifactId);
+  const bundleHref = bundle === null ? undefined : artifactDownloadHref(taskId, bundle.artifactId);
+  const showDownloadAll = bundleHref !== undefined && list.length !== 1;
 
   if (artifacts.isLoading) return <Loading rows={3} />;
   if (artifacts.error) return <ErrorState error={artifacts.error} />;
   if (!list.length) {
+    if (bundleHref !== undefined) {
+      return (
+        <EmptyPane icon={<Folder />} title={t('tasks.artifacts.bundleOnly')}>
+          <a className="mt-3 inline-block text-[12.5px] text-accent-ink hover:underline" href={bundleHref}>{t('tasks.artifacts.downloadAll')}</a>
+        </EmptyPane>
+      );
+    }
     if (empty !== undefined) return <>{empty}</>;
     return fill ? <EmptyPane icon={<FileText />} title={t('tasks.artifacts.empty')} /> : <Quiet>{t('tasks.artifacts.empty')}</Quiet>;
   }
@@ -99,8 +111,9 @@ export function Artifacts({ taskId, live = false, fill = false, empty }: { taskI
   return (
     <div className={cn('flex flex-col md:flex-row md:items-stretch', fill ? 'min-h-0 flex-1' : 'min-h-[min(70vh,640px)]')}>
       <div className="flex w-full shrink-0 flex-col border-b border-line md:w-72 md:self-stretch md:border-b-0 md:border-r">
-        <div className="flex h-8 shrink-0 items-center border-b border-line px-3 text-[11px] font-medium uppercase tracking-wide text-faint">
-          {t('tasks.artifacts.files', { count: list.length })}
+        <div className="flex h-8 shrink-0 items-center justify-between gap-2 border-b border-line px-3 text-[11px] font-medium uppercase tracking-wide text-faint">
+          <span>{t('tasks.artifacts.files', { count: list.length })}</span>
+          {showDownloadAll ? <a className="shrink-0 normal-case tracking-normal text-accent-ink hover:underline" href={bundleHref}>{t('tasks.artifacts.downloadAll')}</a> : null}
         </div>
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
           {list.map((item) => (

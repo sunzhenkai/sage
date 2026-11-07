@@ -71,6 +71,8 @@ async function api(options: { readonly authenticated?: boolean; readonly harness
       async listTaskViews() { return []; },
       async listTaskEvents() { return []; },
       async listTaskArtifacts() { return []; },
+      async getTaskArtifact() { return undefined; },
+      async getTaskArtifactBundle() { return undefined; },
       async getTaskView(_tenantId: string, taskId: string) {
         if (harness.viewFailure !== undefined) throw harness.viewFailure;
         return harness.views.get(taskId);

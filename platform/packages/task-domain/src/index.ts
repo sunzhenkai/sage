@@ -260,9 +260,13 @@ export interface TaskProjectionEvent {
   readonly attempt: number; readonly sequence: number; readonly kind: TaskProjectionEventKind;
   readonly type: string; readonly occurredAt: string; readonly payload: Readonly<Record<string, unknown>>;
 }
+/** Internal package row vs deliverable file entry in task_artifact_reference. */
+export type TaskArtifactRole = 'bundle' | 'file';
+
 export interface TaskArtifactReference {
   readonly artifactId: string; readonly artifactRef: TaskArtifactRef; readonly taskId: string;
   readonly attempt: number; readonly name: string; readonly mediaType: string;
+  readonly role: TaskArtifactRole;
   /** Resolved content, present only when the local run-output store holds the body. */
   readonly content?: string;
   readonly encoding?: 'utf-8' | 'base64';
@@ -486,7 +490,10 @@ export interface TaskProjectionQueryStore {
   listTaskViews(tenantId: string, filter: TaskListFilter, now: Date, freshnessThresholdMs: number): Promise<readonly TaskProjectionView[]>;
   getTaskView(tenantId: string, taskId: string, now: Date, freshnessThresholdMs: number): Promise<TaskProjectionView | undefined>;
   listTaskEvents(tenantId: string, taskId: string): Promise<readonly TaskProjectionEvent[]>;
+  /** Deliverable file rows only (`role=file`); internal packages are excluded. */
   listTaskArtifacts(tenantId: string, taskId: string): Promise<readonly TaskArtifactReference[]>;
+  getTaskArtifact(tenantId: string, taskId: string, artifactId: string): Promise<TaskArtifactReference | undefined>;
+  getTaskArtifactBundle(tenantId: string, taskId: string): Promise<TaskArtifactReference | undefined>;
 }
 export interface TaskReconciliationStore extends TaskProjectionStore, TaskProjectionQueryStore {
   listReconciliationCandidates(tenantId: string, limit: number, now: Date, freshnessThresholdMs: number): Promise<readonly ReconciliationCandidate[]>;

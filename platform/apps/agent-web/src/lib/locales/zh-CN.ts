@@ -354,6 +354,8 @@ export const zhCN = {
     artifacts: {
       empty: '没有产物。',
       download: '下载',
+      downloadAll: '下载全部',
+      bundleOnly: '没有文件清单，仍可下载打包产物。',
       select: '选择一个产物进行预览。',
       selectEntry: '选择压缩包内的文件进行预览。',
       files: '{count} 个文件',

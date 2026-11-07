@@ -366,11 +366,13 @@ function mockRead(path: string, query: MockQuery): unknown {
     return { events: ['task.created', 'task.routed', 'attempt.started', 'checkpoint.saved', 'tool.completed', `task.${t?.status ?? 'succeeded'}`].map((type, i) => ({ eventId: `evt-${i}`, type, occurredAt: iso(base + i * 95_000) })) };
   }
   r = m(/^\/v1\/tasks\/([^/]+)\/run-logs$/); if (r) return { attempts: [{ runId: 'run-1', attemptId: 'attempt-1' }], selected: { runId: 'run-1', attemptId: 'attempt-1' }, events: ['agent.started', 'model.request', 'model.response', 'tool.call', 'tool.result', 'agent.completed'].map((type, i) => ({ eventId: `rl-${i}`, runId: 'run-1', attemptId: 'attempt-1', sequence: i + 1, type, payload: { tokens: 120 + i * 37 } })) };
-  r = m(/^\/v1\/tasks\/([^/]+)\/artifacts$/); if (r) return { artifacts: [
-    { artifactId: 'art-pkg', name: 'output.tar.gz', mediaType: 'application/gzip', sizeBytes: 2048 },
-    { artifactId: 'art-1', name: 'briefing.md', mediaType: 'text/markdown', sizeBytes: 4182 },
-    { artifactId: 'art-2', name: 'output.json', mediaType: 'application/json', sizeBytes: 912 }
-  ] };
+  r = m(/^\/v1\/tasks\/([^/]+)\/artifacts$/); if (r) return {
+    artifacts: [
+      { artifactId: 'art-1', name: 'briefing.md', mediaType: 'text/markdown', sizeBytes: 4182, role: 'file' },
+      { artifactId: 'art-2', name: 'output.json', mediaType: 'application/json', sizeBytes: 912, role: 'file' }
+    ],
+    bundle: { artifactId: 'art-pkg', name: 'output.tar.gz', mediaType: 'application/gzip', sizeBytes: 2048, role: 'bundle' }
+  };
   r = m(/^\/v1\/tasks\/([^/]+)\/artifacts\/([^/]+)$/); if (r) {
     const id = r[2]!;
     if (id === 'art-pkg') return { artifactId: id, name: 'output.tar.gz', mediaType: 'application/gzip', encoding: 'base64', content: mockArtifactArchiveB64 };

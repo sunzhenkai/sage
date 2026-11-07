@@ -33,7 +33,14 @@ export interface TaskView {
   projectionUpdatedAt?: string; historyObservedAt?: string; lifecyclePath?: string; [key: string]: unknown;
 }
 export interface TaskEvent { [key: string]: unknown }
-export interface TaskArtifact { artifactId: string; name?: string; mediaType?: string; sizeBytes?: number; [key: string]: unknown }
+export interface TaskArtifact {
+  artifactId: string; name?: string; mediaType?: string; sizeBytes?: number;
+  role?: 'bundle' | 'file'; [key: string]: unknown
+}
+export interface TaskArtifactList {
+  artifacts: TaskArtifact[];
+  bundle: TaskArtifact | null;
+}
 export interface RunLogAttempt { runId: string; attemptId: string; [key: string]: unknown }
 export interface RunLogEvent { eventId: string; runId: string; attemptId: string; sequence: number; type: string; payload: Record<string, unknown>; [key: string]: unknown }
 export interface RunLogPage { attempts: RunLogAttempt[]; selected?: { runId: string; attemptId: string }; events: RunLogEvent[]; nextFromSequence?: number }
