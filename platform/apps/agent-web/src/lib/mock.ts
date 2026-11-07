@@ -509,6 +509,13 @@ export function mockSend(method: string, path: string, body?: unknown, query: Mo
     mockReleases.delete(appId);
     return { schemaVersion: 'AppDelete.v1', appId, status: 'deleted' };
   }
+  if (method === 'POST' && p === '/v1/provider-connections/models') {
+    const input = body as { connectionId?: string } | undefined;
+    const name = providers.find((item) => item.id === input?.connectionId)?.providerName;
+    const providerId = catalogProviders.find((item) => item.name === name || item.providerId === name)?.providerId;
+    const models = catalogModels.filter((item) => providerId !== undefined && item.providerId === providerId).map((item) => item.modelId);
+    return { schemaVersion: 'ProviderConnectionModels.v1', models, fetchedAt: iso(NOW) };
+  }
   if (method === 'POST' && p === '/v1/provider-catalog/check-connection') {
     const apiKey = (body as { apiKey?: string } | undefined)?.apiKey;
     return apiKey ? { status: 'connected', checkedAt: iso(NOW), message: 'Connected' } : { status: 'unauthorized', checkedAt: iso(NOW), message: 'API key was rejected' };

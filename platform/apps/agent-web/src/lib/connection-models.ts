@@ -8,6 +8,16 @@
 export const MAX_CONNECTION_MODELS = 64;
 export const MAX_MODEL_ID_LENGTH = 256;
 
+/** 模型候选合并：目录（models.dev）与端点实时拉取的 id 取并集，目录顺序在前，忽略已存在的重复项。 */
+export function mergeModelCandidates(catalog: readonly string[], live: readonly string[]): string[] {
+  const result: string[] = [];
+  for (const raw of [...catalog, ...live]) {
+    const id = raw.trim();
+    if (id !== '' && !result.includes(id)) result.push(id);
+  }
+  return result;
+}
+
 /** Default model first, then the remaining ids in order — trimmed, de-duplicated, blanks dropped. */
 export function connectionModelList(modelId: string, models: readonly string[] | undefined): string[] {
   const result: string[] = [];
