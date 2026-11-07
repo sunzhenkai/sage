@@ -176,7 +176,7 @@ export async function createWorkerRuntime(config = readWorkerRuntimeConfig()): P
           ...(maxOutputTokens === undefined ? {} : { maxOutputTokens })
         }),
         ...(canonicalCompatibility === undefined ? {} : { canonicalCompatibility }),
-        store: tasks, outputStore: tasks, inputResolver: new CompositeTaskInputResolver([
+        store: tasks, projectionStore: tasks, outputStore: tasks, inputResolver: new CompositeTaskInputResolver([
           { scheme: 'chat', resolver: new ChatTaskInputResolver(chat) },
           { scheme: 'package', resolver: new PackageTaskInputResolver(tasks) }
         ]),

@@ -116,6 +116,9 @@ export interface ProviderConnectionWrite { name: string; adapterKind: 'openai-co
 export interface ProviderConnectionCheck { adapterKind: 'openai-compatible' | 'anthropic'; baseUrl: string; modelId: string; apiKey?: string }
 export type ProviderConnectionCheckStatus = 'connected' | 'unauthorized' | 'unavailable';
 export interface ProviderConnectionCheckResult { status: ProviderConnectionCheckStatus; checkedAt: string; message: string }
+/** Live `/models` listing: an existing connection (stored credential) or an unsaved draft (baseUrl + apiKey). */
+export interface ProviderConnectionModelsQuery { connectionId?: string; adapterKind?: 'openai-compatible' | 'anthropic'; baseUrl?: string; apiKey?: string }
+export interface ProviderConnectionModelsResult { schemaVersion: 'ProviderConnectionModels.v1'; models: string[]; fetchedAt: string }
 
 // ---- provider catalog (models.dev snapshot, apps/agent-api/src/catalog-api.ts) ----
 export interface CatalogProviderItem { providerId: string; name: string; api?: string; npm?: string }

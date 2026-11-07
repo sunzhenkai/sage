@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  addModel, connectionModelList, defaultSelectionKey, extraModels, MAX_CONNECTION_MODELS, parseSelectionKey, pickerOptions, promoteDefault, selectionKey
+  addModel, connectionModelList, defaultSelectionKey, extraModels, MAX_CONNECTION_MODELS, mergeModelCandidates, parseSelectionKey, pickerOptions, promoteDefault, selectionKey
 } from './connection-models';
 
 describe('connection model lists', () => {
@@ -17,6 +17,12 @@ describe('connection model lists', () => {
     expect(addModel('a', [], 'x'.repeat(257))).toEqual([]);
     const full = Array.from({ length: MAX_CONNECTION_MODELS - 1 }, (_, i) => `m${i}`);
     expect(addModel('a', full, 'one-more')).toEqual(full);
+  });
+
+  it('merges catalog and live candidates with catalog order first', () => {
+    expect(mergeModelCandidates(['gpt-4o', 'gpt-4o-mini'], ['gpt-4o-mini', 'gpt-5', '  '])).toEqual(['gpt-4o', 'gpt-4o-mini', 'gpt-5']);
+    expect(mergeModelCandidates([], ['only-live'])).toEqual(['only-live']);
+    expect(mergeModelCandidates(['a', 'b'], [])).toEqual(['a', 'b']);
   });
 
   it('promotes another model to default and keeps the previous default allowed', () => {

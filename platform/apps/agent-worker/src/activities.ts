@@ -25,7 +25,7 @@ import type { BoundedKernelClient, LocalAgentClient } from '@sage/agent-client';
 import type { LiveProviderRoute } from '@sage/local-runtime';
 import {
   type AgentSliceResult, type ExecuteAgentSliceInput, type TaskArtifactRef,
-  type TaskCommitStore, type TaskInputRef, type TaskProjection, type ProviderConnectionStore, type RunAgentSettingsStore, type TaskRunOutputStore,
+  type TaskCommitStore, type TaskInputRef, type TaskProjection, type TaskProjectionStore, type ProviderConnectionStore, type RunAgentSettingsStore, type TaskRunOutputStore,
   type TaskPackageInputRecord
 } from '@sage/task-domain';
 import type { SecretBackend } from '@sage/secret-vault';
@@ -41,6 +41,10 @@ import { appendLiveSliceRunLog } from './slice-run-log.js';
 import type { AgentEventStorePort } from '@sage/platform-ports';
 
 const ACTIVITY_RETRY_MAX_ATTEMPTS = 5;
+/** 认领租约：必须短于 Temporal 的重试窗口（约 3s），否则重试永远撞上未过期租约。 */
+const DEFAULT_SLICE_LEASE_MS = 2_000;
+const LEASE_RENEW_INTERVAL_MS = 500;
+const HEARTBEAT_INTERVAL_MS = 50;
 
 export interface TaskSliceInputResolver {
   resolve(inputRef: TaskInputRef, tenantId: string): Promise<string>;
@@ -55,6 +59,8 @@ export interface AgentTaskActivityOptions {
   /** 凭据解密后端；必需，缺失即 fail-closed。 */
   readonly secretBackend?: SecretBackend;
   readonly store: TaskCommitStore;
+  /** 终态投影写入；与 store 分离以便只读提交存储的测试替身不实现投影。 */
+  readonly projectionStore?: Pick<TaskProjectionStore, 'writeProjection'>;
   readonly outputStore?: TaskRunOutputStore;
   readonly inputResolver: TaskSliceInputResolver;
   /** 包输入读取：物化点取任务输出契约（声明 schema 的 Task 才进入强制管线）。 */
@@ -67,7 +73,12 @@ export interface AgentTaskActivityOptions {
   /** Live slice → canonical_agent_events（G-O1）；缺省跳过写日志。 */
   readonly runLogEvents?: Pick<AgentEventStorePort, 'acquireWriterFence' | 'appendEvent'>;
 }
-export interface AgentTaskActivities { executeAgentSlice(input: ExecuteAgentSliceInput): Promise<AgentSliceResult> }
+export type TaskProjectionSeed = Omit<TaskProjection, 'projectionUpdatedAt' | 'historyObservedAt'>;
+export interface AgentTaskActivities {
+  executeAgentSlice(input: ExecuteAgentSliceInput): Promise<AgentSliceResult>;
+  /** 由工作流在终态写入投影；时间戳由 activity 侧补齐，保持工作流确定性。 */
+  recordProjection(input: TaskProjectionSeed): Promise<void>;
+}
 
 /**
  * 执行边界解析：注册表条目 + 密封凭据 → live 路由。设置 unset、条目缺失/停用/无凭据/后端不可用
@@ -81,7 +92,9 @@ export async function resolveConnectionLiveClient(
   tenantId: string,
   connectionId: string | undefined,
   mode: 'package' | 'chat',
-  maxOutputTokens?: number
+  maxOutputTokens?: number,
+  /** 已解析的运行模型（manifest 命中的模型），缺省用连接默认模型。 */
+  modelId?: string
 ): Promise<LocalAgentClient> {
   const failure = (): string =>
     connectionId === undefined
@@ -107,17 +120,25 @@ export async function resolveConnectionLiveClient(
   return liveClientFactory({
     adapterKind: connection.adapterKind,
     baseUrl: connection.baseUrl,
-    modelId: connection.modelId,
+    modelId: modelId ?? connection.modelId,
     apiKey
   }, mode, maxOutputTokens);
 }
 
 export function createAgentTaskActivities(options: AgentTaskActivityOptions): AgentTaskActivities {
   const now = options.now ?? (() => new Date());
-  const leaseMs = options.leaseMs ?? 35_000;
+  const leaseMs = options.leaseMs ?? DEFAULT_SLICE_LEASE_MS;
+  if (!Number.isFinite(leaseMs) || leaseMs < 3 * LEASE_RENEW_INTERVAL_MS) throw new Error('INVALID_SLICE_LEASE');
   return {
+    async recordProjection(input): Promise<void> {
+      if (options.projectionStore === undefined) return;
+      const timestamp = now().toISOString();
+      await options.projectionStore.writeProjection({ ...input, projectionUpdatedAt: timestamp, historyObservedAt: timestamp });
+    },
     async executeAgentSlice(input): Promise<AgentSliceResult> {
       const info = activityInfo();
+      // 依赖检查（含 DB 往返）可能超过心跳超时；进入 activity 先发一次心跳。
+      heartbeat({ phase: 'starting' });
       if(input.sessionId&&input.runId&&input.messageId)try{options.telemetry?.record('sage_task_worker_attempt_total',1,{tenant_id:input.tenantId,message_id:input.messageId,session_id:input.sessionId,run_id:input.runId,task_id:input.taskId,workflow_id:input.workflowId,target_id:input.targetId,attempt:input.attempt},{activity_attempt:info.attempt,slice_number:input.sliceNumber});}catch{/* Telemetry cannot change Activity semantics. */}
       // 执行前依赖检查（fail-closed，双来源）：包 slice 按 manifest modelRoute（model/fallbacks 依序）匹配注册表可用条目优先，
       // 未匹配回退运行 agent 设置默认；两来源皆不可用即不可重试失败，不 claim slice、不写 run 输出。chat slice 仅按设置。每 slice 现读，改设置即时生效。
@@ -144,9 +165,11 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
           'PROVIDER_DEPENDENCY_MISSING'
         )
         : undefined;
-      const idempotencyKey = `${input.workflowId}:attempt:${input.attempt}:slice:${input.sliceNumber}`;
+      const generation = input.generation ?? 1;
+      const idempotencyKey = `${input.workflowId}:attempt:${input.attempt}:slice:${input.sliceNumber}:gen:${generation}`;
       const ownerToken = `${info.activityId}:delivery:${info.attempt}`;
-      const claim = await options.store.claimSlice(input, idempotencyKey, ownerToken, new Date(now().getTime() + leaseMs).toISOString());
+      const leaseUntil = (): string => new Date(now().getTime() + leaseMs).toISOString();
+      const claim = await options.store.claimSlice(input, idempotencyKey, ownerToken, leaseUntil());
       if (claim.status === 'committed') return { ...claim.result, duplicate: true };
       if (claim.status === 'effect_unknown') return { ...claim.result, duplicate: true };
       if (claim.status === 'failed') return { ...claim.result, duplicate: true };
@@ -164,13 +187,20 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
       const heartbeatTimer = setInterval(() => {
         try { heartbeat({ phase: 'running', sliceNumber: input.sliceNumber }); }
         catch { execution?.cancel(); }
-      }, 50);
+      }, HEARTBEAT_INTERVAL_MS);
+      // 租约独立续期：即使 Temporal 心跳失败，也由账本侧判断认领是否仍属于本次投递。
+      const leaseTimer = setInterval(() => {
+        options.store.renewLease?.(idempotencyKey, ownerToken, leaseUntil())
+          .then((renewed) => { if (renewed === false) execution?.cancel(); })
+          .catch(() => undefined);
+      }, LEASE_RENEW_INTERVAL_MS);
       try {
         if (providerFailure !== undefined) throw providerFailure;
         const sliceClient = await resolveConnectionLiveClient(
           options.providerConnections, options.secretBackend, options.liveClientFactory,
           input.tenantId, resolvedConnection!.connectionId, isPackageInput ? 'package' : 'chat',
-          ...(isPackageInput ? [input.limits.maxTokens] as const : [] as const)
+          isPackageInput ? input.limits.maxTokens : undefined,
+          resolvedConnection!.modelId
         );
         if (signal.aborted) throw new CancelledFailure('TASK_SLICE_CANCELLED');
         const resolvedInput = injectOutputDirectory(
@@ -336,10 +366,11 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
           duplicate: false, detail, failureCode: classified.failureCode
         };
         await options.store.markSliceFailed(idempotencyKey, ownerToken, failed,
-          projectionOf(input, failed, 'failed', input.sliceNumber, now().toISOString(), classified.failureCode, classified.detail));
+          projectionOf(input, failed, 'failed', input.sliceNumber - 1, now().toISOString(), classified.failureCode, classified.detail));
         throw cause;
       } finally {
         clearInterval(heartbeatTimer);
+        clearInterval(leaseTimer);
         signal.removeEventListener('abort', cancelExecution);
         await rm(outputDir, { recursive: true, force: true }).catch(() => undefined);
         if (options.runLogEvents !== undefined && isPackageInput && livePackageLogOutcome !== undefined) {

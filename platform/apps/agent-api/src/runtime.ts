@@ -217,8 +217,27 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
         principal.tenantId === config.tenantId && (operation === 'read' || principal.roles.includes('task-operator')) },
       queryStore: tasks, deploymentMode: 'development',
       artifactResolver: createRunOutputArtifactResolver({ tenantId: config.tenantId, lookup: tasks }),
-      runLogQuery: new PostgresTaskRunLogQuery({ connectionString: config.postgresUrl })
+      runLogQuery: new PostgresTaskRunLogQuery({ connectionString: config.postgresUrl }),
+      repairTask: (taskId) => controller.repairProjection(taskId)
     });
+    // 投影巡检：修复缺失投影，并回收长期未续租的认领。0 表示关闭。
+    const reconcileIntervalMs = Number(process.env.SAGE_TASK_RECONCILE_INTERVAL_MS ?? 60_000);
+    if (Number.isFinite(reconcileIntervalMs) && reconcileIntervalMs > 0) {
+      const reconcileTimer = setInterval(() => {
+        void (async () => {
+          try {
+            const candidates = await tasks.listReconciliationCandidates(config.tenantId, 20, new Date(), 30_000);
+            // 只补缺失的投影；运行中的投影落后于工作流是常态，交给手动 reconcile。
+            for (const candidate of candidates.filter((item) => item.projection === undefined).slice(0, 10)) {
+              await controller.repairProjection(candidate.routing.taskId);
+            }
+          } catch { /* 巡检失败不改变 API 可用性 */ }
+          try { await tasks.expireStaleClaims?.(3_600_000); } catch { /* best effort */ }
+        })();
+      }, reconcileIntervalMs);
+      reconcileTimer.unref();
+      app.addHook('onClose', () => { clearInterval(reconcileTimer); });
+    }
     // App / Draft / Release：agent_apps + agent_package_releases 写穿（010_agent_apps）；TaskSpec：agent_task_specs。重启后水合。
     const packageRegistry = await PostgresBackedAgentReleaseStore.open({ connectionString: config.postgresUrl, connectionTimeoutMillis: 2_000 });
     const packageStore: InMemoryAgentReleaseStore = packageRegistry.sync;

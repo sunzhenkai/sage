@@ -359,6 +359,12 @@ export class SingleTargetTaskController {
     if (state.status === 'effect_unknown') throw new TaskRetryRejectedError();
     return this.#control(taskId, { kind: 'retry', controlId });
   }
+  async repairProjection(taskId: string): Promise<TaskQueryResult> {
+    await repairTaskProjection(
+      this.#workflow, { tenantId: this.#tenantId, taskId, workflowId: this.workflowId(taskId), targetId: TASK_TARGET, snapshotId: 'snapshot-local' },
+      this.#projectionStore, this.#now);
+    return this.query(taskId);
+  }
   async #control(taskId: string, control: TaskControl): Promise<TaskQueryResult> {
     const state = await sendControl(this.#workflow, this.workflowId(taskId), control, this.#controlTimeoutMs);
     await this.#tryProjection(projectionFromWorkflow(this.#tenantId, state, this.#now().toISOString(), control.controlId), control.kind);
@@ -460,6 +466,14 @@ export class TrustedMultiTargetTaskController {
     const state = await workflowState(workflow, record.workflowId);
     if (state.status === 'effect_unknown') throw new TaskRetryRejectedError();
     return this.#controlBound(record, workflow, { kind: 'retry', controlId });
+  }
+  async repairProjection(taskId: string): Promise<TaskQueryResult> {
+    const { record, workflow } = await this.#bound(taskId);
+    await repairTaskProjection(workflow, {
+      tenantId: record.tenantId, taskId: record.taskId, workflowId: record.workflowId,
+      targetId: record.snapshot.targetId, snapshotId: record.snapshot.snapshotId
+    }, this.#options.projectionStore, this.#now);
+    return this.query(taskId);
   }
 
   #coordinateStart(record: TaskRoutingRecord, reservationCreated: boolean): Promise<TaskQueryResult> {
@@ -687,6 +701,7 @@ function projectionFromWorkflow(tenantId: string, state: TaskWorkflowState, time
     projectionSource: 'writer', historyEventId: '0',
     ...(state.checkpointRef === undefined ? {} : { checkpointRef: state.checkpointRef }),
     ...(state.artifactRef === undefined ? {} : { artifactRef: state.artifactRef }),
+    ...(state.failureCode === undefined ? {} : { failureCode: state.failureCode }),
     ...(controlId === undefined ? {} : { lastControlId: controlId }), projectionUpdatedAt: timestamp, historyObservedAt: timestamp };
 }
 async function workflowState(workflow: WorkflowClient, workflowId: string): Promise<TaskWorkflowState> {
@@ -696,6 +711,49 @@ async function workflowState(workflow: WorkflowClient, workflowId: string): Prom
   try { return await handle.query<TaskWorkflowState>(TASK_STATE_QUERY); }
   catch (cause) { const after = await handle.describe(); if (after.status.name === 'RUNNING') throw cause; return await handle.result() as TaskWorkflowState; }
 }
+interface RepairContext { readonly tenantId: string; readonly taskId: string; readonly workflowId: string; readonly targetId: string; readonly snapshotId: string }
+
+/** 从工作流权威状态重建投影；工作流已结束用 history 源，仍在运行用 writer 源以免冻结后续写入。 */
+async function repairTaskProjection(workflow: WorkflowClient, context: RepairContext, store: TaskProjectionStore | undefined, now: () => Date): Promise<void> {
+  if (store === undefined) return;
+  const handle = workflow.getHandle(context.workflowId);
+  const description = await handle.describe();
+  const state = description.status.name === 'RUNNING'
+    ? await handle.query<TaskWorkflowState>(TASK_STATE_QUERY)
+    : await handle.result() as TaskWorkflowState;
+  const timestamp = now().toISOString();
+  const existing = await store.getProjection(context.tenantId, context.taskId).catch(() => undefined);
+  const unchanged = existing !== undefined && existing.status === state.status && existing.revision === state.committedSlices;
+  const auditStore = store as TaskProjectionStore & Partial<Pick<TaskReconciliationStore, 'appendRepairAudit'>>;
+  const audit = async (outcome: ProjectionRepairAudit['outcome'], extra: Partial<ProjectionRepairAudit> = {}): Promise<void> => {
+    if (typeof auditStore.appendRepairAudit !== 'function') return;
+    try {
+      await auditStore.appendRepairAudit({
+        repairId: `repair-${randomUUID()}`, tenantId: context.tenantId, taskId: context.taskId, workflowId: context.workflowId,
+        targetId: context.targetId, snapshotId: context.snapshotId, observedHistoryEventId: '0',
+        outcome, retryable: false, repairedEventCount: outcome === 'repaired' ? 1 : 0,
+        ...(existing === undefined ? {} : { previousRevision: existing.revision }),
+        repairedRevision: state.committedSlices, repairedAt: timestamp, ...extra
+      });
+    } catch { /* 审计失败不改变修复结果 */ }
+  };
+  if (unchanged) { await audit('noop'); return; }
+  // 乐观并发：读取状态后如果已有新投影（控制操作/提交），不要用更早读到的状态覆盖它。
+  const current = await store.getProjection(context.tenantId, context.taskId).catch(() => undefined);
+  if (current !== undefined && current.projectionUpdatedAt !== existing?.projectionUpdatedAt) { await audit('noop'); return; }
+  try {
+    await store.writeProjection({
+      ...projectionFromWorkflow(context.tenantId, state, timestamp),
+      projectionSource: description.status.name === 'RUNNING' ? 'writer' : 'history',
+      historyEventId: '0', projectionFreshness: 'fresh', lastReconciledAt: timestamp
+    });
+  } catch (cause) {
+    await audit('retryable_failure', { retryable: true, failureCode: 'PROJECTION_WRITE_FAILED', repairedEventCount: 0 });
+    throw cause;
+  }
+  await audit('repaired');
+}
+
 async function queryTask(workflow: WorkflowClient, store: TaskProjectionStore | undefined, tenantId: string, taskId: string, workflowId: string, now: () => Date, freshnessThresholdMs: number): Promise<TaskQueryResult> {
   const state = await workflowState(workflow, workflowId);
   let projection: TaskProjection | undefined;

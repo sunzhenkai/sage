@@ -159,6 +159,8 @@ export const ExecuteAgentSliceInputSchema = Type.Object({
   schemaVersion: Type.Literal('1'), taskType: TaskTypeIdSchema, taskId: Id, tenantId: Id, workflowId: Id, targetId: Id,
   sessionId: Type.Optional(Id), runId: Type.Optional(Id), messageId: Type.Optional(Id),
   attempt: Type.Integer({ minimum: 1 }), sliceNumber: Type.Integer({ minimum: 1, maximum: 100 }),
+  /** 手动重试的执行代次；缺省为 1（旧历史与旧二进制一致）。 */
+  generation: Type.Optional(Type.Integer({ minimum: 1 })),
   inputRef: TaskInputRefSchema, checkpointRef: Type.Optional(TaskCheckpointRefSchema), limits: TaskSliceLimitsSchema
 }, { additionalProperties: false, $id: 'ExecuteAgentSliceInput.v1' });
 export type ExecuteAgentSliceInput = Static<typeof ExecuteAgentSliceInputSchema>;
@@ -217,6 +219,8 @@ export interface TaskCommitStore {
   markEffectUnknown(idempotencyKey: string, ownerToken: string, result: AgentSliceResult, projection: TaskProjection): Promise<void>;
   markSliceFailed(idempotencyKey: string, ownerToken: string, result: AgentSliceResult, projection: TaskProjection): Promise<void>;
   cancelSlice(idempotencyKey: string, ownerToken: string, projection: TaskProjection): Promise<void>;
+  /** 心跳续租；返回 false 表示认领已丢失。实现方可选提供。 */
+  renewLease?(idempotencyKey: string, ownerToken: string, leaseExpiresAt: string): Promise<boolean>;
 }
 export interface TaskProjectionStore {
   getProjection(tenantId: string, taskId: string): Promise<TaskProjection | undefined>;
@@ -291,21 +295,21 @@ export interface TaskPackageInputRecord {
 }
 
 
-/** 包运行 provider 路由解析（准入与 worker 共享的纯函数）：manifest modelRoute 依序精确匹配（model/fallbacks，条目启用且凭据在场）优先，运行 agent 设置默认兜底；两来源皆不可用返回 undefined（fail-closed）。 */
+/** 包运行 provider 路由解析（准入与 worker 共享的纯函数）：manifest modelRoute 依序精确匹配（model/fallbacks，条目启用且凭据在场，按连接的 models 列表匹配）优先，运行 agent 设置默认兜底；两来源皆不可用返回 undefined（fail-closed）。返回的 modelId 是本次运行实际使用的模型。 */
 export function resolvePackageRunConnection(
   route: PackageRunContract['modelRoute'],
   registry: readonly ProviderConnectionRecord[],
   settingsConnectionId: string | undefined
-): { readonly source: 'manifest' | 'settings'; readonly connectionId: string } | undefined {
+): { readonly source: 'manifest' | 'settings'; readonly connectionId: string; readonly modelId: string } | undefined {
   if (route !== undefined) {
     for (const model of [route.model, ...(route.fallbacks ?? [])]) {
-      const entry = registry.find((item) => item.enabled && item.credentialPresent && item.modelId === model);
-      if (entry !== undefined) return { source: 'manifest', connectionId: entry.id };
+      const entry = registry.find((item) => item.enabled && item.credentialPresent && connectionModels(item).includes(model));
+      if (entry !== undefined) return { source: 'manifest', connectionId: entry.id, modelId: model };
     }
   }
   if (settingsConnectionId === undefined) return undefined;
   const entry = registry.find((item) => item.id === settingsConnectionId && item.enabled && item.credentialPresent);
-  return entry === undefined ? undefined : { source: 'settings', connectionId: entry.id };
+  return entry === undefined ? undefined : { source: 'settings', connectionId: entry.id, modelId: entry.modelId };
 }
 
 export interface TaskPackageInputStore {
@@ -493,6 +497,8 @@ export interface TaskReconciliationStore extends TaskProjectionStore, TaskProjec
   completePendingRepairAudit(repairId: string): Promise<void>;
   appendRepairAudit(audit: ProjectionRepairAudit): Promise<void>;
   listRepairAudits(tenantId: string, taskId: string): Promise<readonly ProjectionRepairAudit[]>;
+  /** 回收超过阈值的未结算认领；返回回收数量。 */
+  expireStaleClaims?(olderThanMs: number): Promise<number>;
 }
 
 export interface TaskLifecycleAdmissionPolicy {

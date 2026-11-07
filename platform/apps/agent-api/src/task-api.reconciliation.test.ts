@@ -52,6 +52,35 @@ describe('Task operations API',()=>{
 });
 
 
+describe('projection-unavailable task operations',()=>{
+  const unavailableView:TaskProjectionView={...view,status:'running',revision:0,freshness:'unavailable',staleReason:'projection_unavailable'};
+  const unavailableStore:TaskProjectionQueryStore={async listTaskViews(){return [unavailableView];},async getTaskView(){return unavailableView;},async listTaskEvents(){return [];},async listTaskArtifacts(){return [];}};
+  const failureResult:TaskQueryResult={workflow:{schemaVersion:'1',taskType:TASK_TYPE,taskId:'task-fixture-6',workflowId:'workflow-fixture-6',targetId:'target-original',attempt:1,status:'failed',committedSlices:0,manualRetries:0,failureCode:'AGENT_SLICE_FAILED'},projectionFreshness:'unavailable',targetSnapshot:snapshot};
+
+  it('accepts retry when the projection is unavailable instead of rejecting the ambiguous running view',async()=>{
+    let retried=0;const controller:TaskControllerPort={async create(){return result;},async query(){return failureResult;},async signal(){return result;},async cancel(){return result;},async retry(){retried+=1;return failureResult;}};
+    const app=Fastify({logger:false});registerTaskRoutes(app,controller,{tenantId:'tenant-fixture-6',queryStore:unavailableStore,authenticator:{authenticate:()=>principal},authorizer:{authorize:()=>true}});
+    const response=await app.inject({method:'POST',url:'/v1/tasks/task-fixture-6/retry',headers:{'x-authentication-id':'auth-operator'},payload:{}});
+    expect(response.statusCode).toBe(202);expect(retried).toBe(1);await app.close();
+  });
+
+  it('reports the authoritative workflow status while keeping freshness unavailable',async()=>{
+    const controller:TaskControllerPort={async create(){return result;},async query(){return failureResult;},async signal(){return result;},async cancel(){return result;},async retry(){return result;}};
+    const app=Fastify({logger:false});registerTaskRoutes(app,controller,{tenantId:'tenant-fixture-6',queryStore:unavailableStore,authenticator:{authenticate:()=>principal},authorizer:{authorize:()=>true}});
+    const response=await app.inject({method:'GET',url:'/v1/tasks/task-fixture-6',headers:{'x-authentication-id':'auth-operator'}});
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({taskId:'task-fixture-6',status:'failed',revision:0,freshness:'unavailable',failureCode:'AGENT_SLICE_FAILED'});
+    await app.close();
+  });
+
+  it('exposes a reconcile endpoint that rebuilds the projection',async()=>{
+    let repaired=0;const controller:TaskControllerPort={async create(){return result;},async query(){return failureResult;},async signal(){return result;},async cancel(){return result;},async retry(){return result;}};
+    const app=Fastify({logger:false});registerTaskRoutes(app,controller,{tenantId:'tenant-fixture-6',queryStore:unavailableStore,authenticator:{authenticate:()=>principal},authorizer:{authorize:()=>true},repairTask:async()=>{repaired+=1;return failureResult;}});
+    const response=await app.inject({method:'POST',url:'/v1/tasks/task-fixture-6/reconcile',headers:{'x-authentication-id':'auth-operator'},payload:{}});
+    expect(response.statusCode).toBe(202);expect(repaired).toBe(1);await app.close();
+  });
+});
+
 describe('bounded lifecycle audit',()=>{
   it('records path, owner, adapter/runtime, snapshot versions, command, cursor, actor and reason without payload bodies',()=>{
     const audit=buildTaskLifecycleAuditRecord({tenantId:'tenant-fixture-6',principalId:'operator-1',authenticationId:'auth-operator',operation:'retry',taskId:'task-fixture-6',runId:'run-fixture-6',attemptId:'attempt-1',specDigest:`sha256:${'a'.repeat(64)}`,path:'DURABLE_COORDINATOR_V2',ownerRef:'owner://task-fixture-6',adapterRef:'adapter://coordinator-v2',runtimeRef:'runtime://v2',snapshotVersions:{spec:'1',target:'target-v1'},commandKey:'command-1',logicalCursor:'cursor://task-fixture-6/4',actor:'operator-1',reason:'accepted',outcome:'allowed',occurredAt:'2026-08-12T00:00:00.000Z'});

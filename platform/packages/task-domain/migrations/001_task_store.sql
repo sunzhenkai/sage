@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS task_effect_ledger (
   attempt integer NOT NULL CHECK (attempt >= 1),
   slice_number integer NOT NULL CHECK (slice_number >= 1),
   owner_token text NOT NULL,
-  status text NOT NULL CHECK (status IN ('claimed','committed','effect_unknown','cancelled')),
+  status text NOT NULL CHECK (status IN ('claimed','committed','effect_unknown','cancelled','failed')),
   lease_expires_at timestamptz,
   result jsonb,
   checkpoint_ref text,
@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS task_effect_ledger (
   committed_at timestamptz,
   UNIQUE (tenant_id, task_id, attempt, slice_number),
   CHECK ((status='claimed' AND result IS NULL AND committed_at IS NULL)
-      OR (status IN ('committed','effect_unknown') AND result IS NOT NULL AND committed_at IS NOT NULL)
+      OR (status IN ('committed','effect_unknown','failed') AND result IS NOT NULL AND committed_at IS NOT NULL)
       OR (status='cancelled' AND result IS NULL AND committed_at IS NOT NULL)),
   CHECK (checkpoint_ref IS NULL OR checkpoint_ref LIKE 'checkpoint://%'),
   CHECK (artifact_ref IS NULL OR artifact_ref LIKE 'artifact://%')
@@ -28,18 +28,17 @@ ALTER TABLE task_effect_ledger DROP CONSTRAINT IF EXISTS task_effect_ledger_stat
 ALTER TABLE task_effect_ledger DROP CONSTRAINT IF EXISTS task_effect_ledger_check;
 ALTER TABLE task_effect_ledger DROP CONSTRAINT IF EXISTS task_effect_ledger_status_v2_check;
 ALTER TABLE task_effect_ledger DROP CONSTRAINT IF EXISTS task_effect_ledger_terminal_v2_check;
--- NOT VALID：迁移每次启动全量重跑；即使 v3 不存在，也不在此校验既有行（可能含 failed）。
--- 008 已升到 status_v3（含 failed）。已演进的库重跑 001 时跳过 v2，避免与 failed 行冲突。
+-- 重跑时：若 008 已装 status_v3 则跳过 v2；否则加含 failed 的 v2（NOT VALID，不校验既有行）。
 DO $$
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_constraint WHERE conname = 'task_effect_ledger_status_v3_check'
   ) THEN
     ALTER TABLE task_effect_ledger ADD CONSTRAINT task_effect_ledger_status_v2_check
-      CHECK (status IN ('claimed','committed','effect_unknown','cancelled')) NOT VALID;
+      CHECK (status IN ('claimed','committed','effect_unknown','cancelled','failed')) NOT VALID;
     ALTER TABLE task_effect_ledger ADD CONSTRAINT task_effect_ledger_terminal_v2_check
       CHECK ((status='claimed' AND result IS NULL AND committed_at IS NULL)
-          OR (status IN ('committed','effect_unknown') AND result IS NOT NULL AND committed_at IS NOT NULL)
+          OR (status IN ('committed','effect_unknown','failed') AND result IS NOT NULL AND committed_at IS NOT NULL)
           OR (status='cancelled' AND result IS NULL AND committed_at IS NOT NULL)) NOT VALID;
   END IF;
 END $$;
