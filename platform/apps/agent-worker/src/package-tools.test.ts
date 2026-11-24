@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { InMemoryAgentEventStore } from '@sage/local-fakes';
 import {
   createLivePackageAgentClient,
   type LiveProviderToolExecutor,
   type LiveProviderToolSpec
 } from '@sage/local-runtime';
+import { LiveSliceRunLogSession } from './slice-run-log.js';
 import {
   createNetProbeCapabilityTools,
   createSshInspectCapabilityTools,
@@ -172,5 +174,89 @@ describe('package run capability tool injection & output contract', () => {
 
     expect(outcome.status).toBe('succeeded');
     expect(outcome.usage).toEqual({ turns: 3, toolCalls: 2, tokens: 35 });
+  });
+
+  it('streams per-tool and per-model progress into LiveSliceRunLogSession and records failure details', async () => {
+    const events = new InMemoryAgentEventStore();
+    const taskId = 'pkg-tools-log-1';
+    const session = await LiveSliceRunLogSession.open({
+      events,
+      tenantId: 'tenant-local',
+      taskId,
+      attempt: 1,
+      deliveryAttempt: 1,
+      source: 'package',
+      metadata: { modelId: 'model-x', adapterKind: 'openai-compatible', toolsEnabled: true, toolCount: 1 }
+    });
+    expect(session).toBeDefined();
+
+    const bindings = createNetProbeCapabilityTools({
+      allowlistRaw: 'ok.example.com',
+      dnsResolver: { async resolve() { return ['93.184.216.34']; } },
+      clients: {
+        async httpRequest() {
+          return { statusCode: 200, headers: {}, body: new Uint8Array(Buffer.from('ok')) };
+        }
+      }
+    });
+    const byName = new Map<string, RuntimeToolBinding>(bindings.map((b) => [b.name, b]));
+    const tools: LiveProviderToolSpec[] = bindings.map((b) => ({ name: b.name, description: b.description, parameters: b.parameters }));
+    let turn = 0;
+    const client = createLivePackageAgentClient({
+      route,
+      tools,
+      executeTool: async (call, signal) => byName.get(call.name)!.execute(call.arguments, signal),
+      onProgress: (ev) => session!.recordProgress(ev),
+      invoker: async () => {
+        turn += 1;
+        if (turn === 1) {
+          return {
+            text: '',
+            tokens: 10,
+            done: false,
+            toolCalls: [{ id: 'c1', name: 'http_probe', arguments: { url: 'https://ok.example.com/' } }]
+          };
+        }
+        throw new Error('upstream 502');
+      }
+    });
+
+    const run = client.run({
+      schemaVersion: '1',
+      runId: 'run-tools-log',
+      input: 'audit',
+      skillRefs: [],
+      requiredCapabilities: ['events', 'tools'],
+      limits: { maxTurns: 4, maxToolCalls: 4, maxTokens: 1_000, deadlineAt: new Date(Date.now() + 30_000).toISOString() }
+    });
+    for await (const ev of run.events) {
+      await session!.observe(ev);
+    }
+    const outcome = await run.result;
+    expect(outcome.status).toBe('failed');
+    await session!.finish('failed', {
+      errorCode: outcome.error?.code ?? 'HARNESS_FAILURE',
+      message: outcome.error?.message ?? 'failed',
+      retryable: true,
+      deliveryAttempt: 1
+    });
+
+    const listed = await events.listEvents({
+      tenantId: 'tenant-local',
+      taskId,
+      runId: session!.runId,
+      attemptId: session!.attemptId
+    });
+    expect(listed.map((e) => e.type)).toEqual([
+      'run.started',
+      'engine.started',
+      'model.completed',
+      'tool.completed',
+      'model.completed',
+      'run.failed'
+    ]);
+    expect(listed[3]?.payload).toMatchObject({ toolName: 'http_probe', ok: true });
+    expect(listed[4]?.payload).toMatchObject({ ok: false, error: 'upstream 502' });
+    expect(listed[5]?.payload).toMatchObject({ status: 'failed', errorCode: 'HARNESS_FAILURE', message: 'upstream 502', retryable: true });
   });
 });

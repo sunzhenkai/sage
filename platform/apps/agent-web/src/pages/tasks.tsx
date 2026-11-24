@@ -154,7 +154,7 @@ export function TaskDetailPage() {
                 <ListRow><RowId>{t('tasks.detail.observed')}</RowId><RowTitle>{formatTime(detail.historyObservedAt)}</RowTitle></ListRow>
               </Section>
             </>
-          ) : tab === 'activity' ? <Section card padded><TaskEvents taskId={taskId} status={detail.status} /></Section> : tab === 'run-logs' ? <Section card padded><RunLogs taskId={taskId} /></Section> : tab === 'artifacts' ? <Artifacts taskId={taskId} /> : <JsonView value={detail} filename={`${detail.taskId}.json`} />}
+          ) : tab === 'activity' ? <Section card padded><TaskEvents taskId={taskId} status={detail.status} /></Section> : tab === 'run-logs' ? <Section card><RunLogs taskId={taskId} live={detail.status === 'running' || detail.status === 'paused'} /></Section> : tab === 'artifacts' ? <Artifacts taskId={taskId} /> : <JsonView value={detail} filename={`${detail.taskId}.json`} />}
         </PageContent>
       ) : null}
     </>

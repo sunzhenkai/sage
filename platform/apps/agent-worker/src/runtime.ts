@@ -9,6 +9,7 @@ import {
   createLivePackageAgentClient,
   createLocalKernelComposition,
   PACKAGE_RUN_SYSTEM_PROMPT,
+  type LiveProviderProgressObserver,
   type LiveProviderRoute,
   type LiveProviderToolExecutor,
   type LiveProviderToolSpec
@@ -233,13 +234,14 @@ export async function createWorkerRuntime(config = readWorkerRuntimeConfig()): P
         secretBackend,
         hasRuntimeTools: (capabilityRefs) =>
           capabilityRefs.includes(NET_PROBE_CAPABILITY_REF) || capabilityRefs.includes(SSH_INSPECT_CAPABILITY_REF),
-        liveClientFactory: (route: LiveProviderRoute, mode: 'package' | 'chat', maxOutputTokens?: number, capabilityRefs?: readonly string[]) => {
+        liveClientFactory: (route: LiveProviderRoute, mode: 'package' | 'chat', maxOutputTokens?: number, capabilityRefs?: readonly string[], onProgress?: LiveProviderProgressObserver) => {
           const bundle = mode === 'package' ? resolveCapabilityBundle(capabilityRefs) : undefined;
           return createLivePackageAgentClient({
             route,
             systemPrompt: mode === 'package' ? PACKAGE_RUN_SYSTEM_PROMPT : CHAT_SLICE_SYSTEM_PROMPT,
             ...(maxOutputTokens === undefined ? {} : { maxOutputTokens }),
-            ...(bundle === undefined ? {} : { tools: bundle.tools, executeTool: bundle.executeTool })
+            ...(bundle === undefined ? {} : { tools: bundle.tools, executeTool: bundle.executeTool }),
+            ...(onProgress === undefined ? {} : { onProgress })
           });
         },
         ...(canonicalCompatibility === undefined ? {} : { canonicalCompatibility }),

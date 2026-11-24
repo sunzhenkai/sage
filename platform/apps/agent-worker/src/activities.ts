@@ -22,7 +22,7 @@ import {
 } from '@sage/platform-ports';
 import type { EngineAdapter, KernelEngineResult, KernelInvocationResult, KernelBounds } from '@sage/agent-lib';
 import type { BoundedKernelClient, LocalAgentClient } from '@sage/agent-client';
-import type { LiveProviderRoute } from '@sage/local-runtime';
+import type { LiveProviderProgressObserver, LiveProviderRoute } from '@sage/local-runtime';
 import {
   type AgentSliceResult, type ExecuteAgentSliceInput, type TaskArtifactRef,
   type TaskCommitStore, type TaskInputRef, type TaskProjection, type TaskProjectionStore, type ProviderConnectionStore, type RunAgentSettingsStore, type TaskRunOutputStore,
@@ -37,7 +37,7 @@ import {
   enforceOutputContract, OutputContractViolation, OUTPUT_CONTRACT_VIOLATION_CODE
 } from './output-contract.js';
 import { runTaskAgentPath, type TaskCanonicalCompatibilityOptions } from './task-compatibility.js';
-import { LiveSliceRunLogSession } from './slice-run-log.js';
+import { LiveSliceRunLogSession, type LiveSliceRunLogFinishDetail, type LiveSliceRunLogOutcome } from './slice-run-log.js';
 import { buildRunResult, RUN_RESULT_FILE_NAME } from './run-result.js';
 import type { AgentEventStorePort } from '@sage/platform-ports';
 
@@ -51,8 +51,8 @@ export interface TaskSliceInputResolver {
   resolve(inputRef: TaskInputRef, tenantId: string): Promise<string>;
 }
 export interface AgentTaskActivityOptions {
-  /** live provider 客户端工厂：所有 slice（package 与 chat）在执行边界按解析路由构造；第三参为包运行声明的输出 token 预算，第四参为声明的 capabilityRefs。 */
-  readonly liveClientFactory: (route: LiveProviderRoute, mode: 'package' | 'chat', maxOutputTokens?: number, capabilityRefs?: readonly string[]) => LocalAgentClient;
+  /** live provider 客户端工厂：所有 slice（package 与 chat）在执行边界按解析路由构造；第三参为包运行声明的输出 token 预算，第四参为声明的 capabilityRefs，第五参为实时进度回调。 */
+  readonly liveClientFactory: (route: LiveProviderRoute, mode: 'package' | 'chat', maxOutputTokens?: number, capabilityRefs?: readonly string[], onProgress?: LiveProviderProgressObserver) => LocalAgentClient;
   /** 判定声明的 capabilityRefs 是否需要在 AgentRunSpec 中开启 tools 能力。 */
   readonly hasRuntimeTools?: (capabilityRefs: readonly string[]) => boolean;
   /** 运行 agent 设置读取：缺省视 unset（无默认 provider，fail-closed）。 */
@@ -91,14 +91,15 @@ export interface AgentTaskActivities {
 export async function resolveConnectionLiveClient(
   providerConnections: ProviderConnectionStore | undefined,
   secretBackend: SecretBackend | undefined,
-  liveClientFactory: ((route: LiveProviderRoute, mode: 'package' | 'chat', maxOutputTokens?: number, capabilityRefs?: readonly string[]) => LocalAgentClient) | undefined,
+  liveClientFactory: ((route: LiveProviderRoute, mode: 'package' | 'chat', maxOutputTokens?: number, capabilityRefs?: readonly string[], onProgress?: LiveProviderProgressObserver) => LocalAgentClient) | undefined,
   tenantId: string,
   connectionId: string | undefined,
   mode: 'package' | 'chat',
   maxOutputTokens?: number,
   /** 已解析的运行模型（manifest 命中的模型），缺省用连接默认模型。 */
   modelId?: string,
-  capabilityRefs?: readonly string[]
+  capabilityRefs?: readonly string[],
+  onProgress?: LiveProviderProgressObserver
 ): Promise<LocalAgentClient> {
   const failure = (): string =>
     connectionId === undefined
@@ -126,7 +127,7 @@ export async function resolveConnectionLiveClient(
     baseUrl: connection.baseUrl,
     modelId: modelId ?? connection.modelId,
     apiKey
-  }, mode, maxOutputTokens, capabilityRefs);
+  }, mode, maxOutputTokens, capabilityRefs, onProgress);
 }
 
 export function createAgentTaskActivities(options: AgentTaskActivityOptions): AgentTaskActivities {
@@ -181,11 +182,13 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
       if (claim.status === 'in_progress') throw new Error('TASK_SLICE_ALREADY_IN_PROGRESS');
 
       heartbeat({ phase: 'claimed', sliceNumber: input.sliceNumber });
+      const sliceStartedAt = now().getTime();
       const signal = cancellationSignal();
       let execution: ReturnType<LocalAgentClient['run']> | undefined;
       let committed = false;
-      let livePackageLogOutcome: 'succeeded' | 'paused' | 'failed' | undefined;
+      let livePackageLogDetail: (LiveSliceRunLogFinishDetail & { readonly outcome: LiveSliceRunLogOutcome }) | undefined;
       let liveRunLog: LiveSliceRunLogSession | undefined;
+      let businessFiles: readonly string[] = [];
       const outputDir = await mkdtemp(join(tmpdir(), `sage-out-${input.taskId.slice(0, 24)}-s${input.sliceNumber}-`));
       const cancelExecution = (): void => execution?.cancel();
       signal.addEventListener('abort', cancelExecution, { once: true });
@@ -200,14 +203,45 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
           .catch(() => undefined);
       }, LEASE_RENEW_INTERVAL_MS);
       try {
-        if (providerFailure !== undefined) throw providerFailure;
         const packageCapabilityRefs = isPackageInput ? (packageRecord?.runContract?.capabilityRefs ?? []) : [];
+        const toolsEnabled = packageCapabilityRefs.length > 0 && options.hasRuntimeTools?.(packageCapabilityRefs) === true;
+        const resolvedAdapterKind = resolvedConnection === undefined
+          ? undefined
+          : registry.find((item) => item.id === resolvedConnection.connectionId)?.adapterKind;
+        if (options.runLogEvents !== undefined && isPackageInput) {
+          liveRunLog = await LiveSliceRunLogSession.open({
+            events: options.runLogEvents,
+            tenantId: input.tenantId,
+            taskId: input.taskId,
+            attempt: input.attempt,
+            deliveryAttempt: info.attempt,
+            sliceNumber: input.sliceNumber,
+            source: 'package',
+            metadata: {
+              ...(resolvedConnection?.modelId === undefined ? {} : { modelId: resolvedConnection.modelId }),
+              ...(resolvedAdapterKind === undefined ? {} : { adapterKind: resolvedAdapterKind }),
+              toolsEnabled,
+              ...(packageCapabilityRefs.length === 0 ? {} : { capabilities: packageCapabilityRefs }),
+              maxTurns: input.limits.maxTurns,
+              maxToolCalls: input.limits.maxToolCalls,
+              maxTokens: input.limits.maxTokens,
+              timeoutMs: input.limits.timeoutMs
+            }
+          }).catch((cause) => {
+            process.stderr.write(`live slice run-log open failed for ${input.taskId}: ${cause instanceof Error ? cause.message : 'unknown'}\n`);
+            return undefined;
+          });
+        }
+        if (providerFailure !== undefined) throw providerFailure;
         const sliceClient = await resolveConnectionLiveClient(
           options.providerConnections, options.secretBackend, options.liveClientFactory,
           input.tenantId, resolvedConnection!.connectionId, isPackageInput ? 'package' : 'chat',
           isPackageInput ? input.limits.maxTokens : undefined,
           resolvedConnection!.modelId,
-          packageCapabilityRefs.length > 0 ? packageCapabilityRefs : undefined
+          packageCapabilityRefs.length > 0 ? packageCapabilityRefs : undefined,
+          liveRunLog === undefined ? undefined : (progressEvent) => liveRunLog!.recordProgress(progressEvent).catch((cause) => {
+            process.stderr.write(`live slice run-log progress failed for ${input.taskId}: ${cause instanceof Error ? cause.message : 'unknown'}\n`);
+          })
         );
         if (signal.aborted) throw new CancelledFailure('TASK_SLICE_CANCELLED');
         const resolvedInput = injectOutputDirectory(
@@ -215,21 +249,23 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
           outputDir
         );
         if (signal.aborted) throw new CancelledFailure('TASK_SLICE_CANCELLED');
-        if (options.runLogEvents !== undefined && isPackageInput) {
-          liveRunLog = await LiveSliceRunLogSession.open({
-            events: options.runLogEvents,
-            tenantId: input.tenantId,
-            taskId: input.taskId,
-            attempt: input.attempt,
-            source: 'package'
+        if (liveRunLog !== undefined) {
+          await liveRunLog.recordContextResolved({
+            inputBytes: Buffer.byteLength(resolvedInput, 'utf8'),
+            ...(resolvedConnection?.modelId === undefined ? {} : { modelId: resolvedConnection.modelId }),
+            ...(resolvedAdapterKind === undefined ? {} : { adapterKind: resolvedAdapterKind }),
+            toolsEnabled,
+            ...(packageCapabilityRefs.length === 0 ? {} : { capabilities: packageCapabilityRefs }),
+            maxTurns: input.limits.maxTurns,
+            maxToolCalls: input.limits.maxToolCalls,
+            maxTokens: input.limits.maxTokens,
+            timeoutMs: input.limits.timeoutMs
           }).catch((cause) => {
-            process.stderr.write(`live slice run-log open failed for ${input.taskId}: ${cause instanceof Error ? cause.message : 'unknown'}\n`);
-            return undefined;
+            process.stderr.write(`live slice run-log context failed for ${input.taskId}: ${cause instanceof Error ? cause.message : 'unknown'}\n`);
           });
         }
         const startedAt = now().getTime();
         const runId = `task-${input.taskId.slice(0, 96)}-a${input.attempt}-s${input.sliceNumber}`;
-        const toolsEnabled = packageCapabilityRefs.length > 0 && options.hasRuntimeTools?.(packageCapabilityRefs) === true;
         const spec: AgentRunSpec = {
           schemaVersion: '1', runId, input: resolvedInput, skillRefs: [],
           requiredCapabilities: toolsEnabled ? ['events', 'tools'] : ['events'],
@@ -270,9 +306,19 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
         const [outcome] = await Promise.all([execution.result, consumeEvents]);
         if (signal.aborted || outcome.status === 'cancelled') throw new CancelledFailure('TASK_SLICE_CANCELLED');
         if (outcome.status !== 'succeeded' && outcome.status !== 'paused') {
-          const failure = (outcome as { readonly error?: { readonly message?: string } }).error;
+          const failure = (outcome as { readonly error?: { readonly code?: string; readonly message?: string } }).error;
           process.stderr.write(`agent slice outcome ${outcome.status} for ${input.taskId}: ${failure?.message ?? 'no error detail'}\n`);
-          livePackageLogOutcome = 'failed';
+          livePackageLogDetail = {
+            outcome: 'failed',
+            errorCode: failure?.code ?? `AGENT_SLICE_${outcome.status.toUpperCase()}`,
+            ...(failure?.message === undefined ? {} : { message: failure.message }),
+            stage: 'execution',
+            deliveryAttempt: info.attempt,
+            turns: outcome.usage.turns,
+            toolCalls: outcome.usage.toolCalls,
+            tokens: outcome.usage.tokens,
+            durationMs: now().getTime() - sliceStartedAt
+          };
           throw new Error(`AGENT_SLICE_${outcome.status.toUpperCase()}`);
         }
 
@@ -320,7 +366,7 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
         if (isPackageInput && packageRecord !== undefined) {
           // RunResult.v1：平台保留的结果文件随产物包物化（概念见 ai-app-concept.md §7）；
           // files 清单只列业务产物，不含其自身；包产物同名文件在此被覆盖。
-          const businessFiles = await listOutputFiles(outputDir);
+          businessFiles = await listOutputFiles(outputDir);
           const runResultText = buildRunResult({
             taskId: input.taskId,
             releaseId: packageRecord.releaseId,
@@ -361,18 +407,43 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
         const projection = projectionOf(input, result, result.done ? 'succeeded' : 'running', input.sliceNumber, now().toISOString());
         await options.store.commitSlice(idempotencyKey, ownerToken, result, projection);
         committed = true;
-        livePackageLogOutcome = outcome.status === 'paused' ? 'paused' : 'succeeded';
+        livePackageLogDetail = {
+          outcome: outcome.status === 'paused' ? 'paused' : 'succeeded',
+          turns: outcome.usage.turns,
+          toolCalls: outcome.usage.toolCalls,
+          tokens: outcome.usage.tokens,
+          durationMs: now().getTime() - sliceStartedAt,
+          ...(businessFiles.length > 0 ? { files: businessFiles.join(', ') } : {})
+        };
         heartbeat({ phase: 'committed', sliceNumber: input.sliceNumber });
         await options.afterCommit?.(result);
         return result;
       } catch (cause) {
-        if (
-          livePackageLogOutcome === undefined
-          && isPackageInput
-          && !(cause instanceof CancelledFailure)
-          && !signal.aborted
-        ) {
-          livePackageLogOutcome = 'failed';
+        if (livePackageLogDetail === undefined && isPackageInput) {
+          if (signal.aborted || cause instanceof CancelledFailure) {
+            livePackageLogDetail = {
+              outcome: 'failed',
+              errorCode: 'ACTIVITY_CANCELLED_OR_TIMED_OUT',
+              message: cause instanceof Error ? cause.message : 'Activity cancelled or timed out',
+              stage: 'execution',
+              deliveryAttempt: info.attempt,
+              durationMs: now().getTime() - sliceStartedAt
+            };
+          } else {
+            const classified = classifySliceFailure(cause, info.attempt);
+            livePackageLogDetail = {
+              outcome: 'failed',
+              errorCode: cause instanceof ApplicationFailure && cause.type
+                ? cause.type
+                : classified.kind === 'failed'
+                  ? classified.failureCode
+                  : 'ACTIVITY_RETRYABLE_ERROR',
+              message: cause instanceof Error ? cause.message : String(cause),
+              retryable: classified.kind === 'retry',
+              deliveryAttempt: info.attempt,
+              durationMs: now().getTime() - sliceStartedAt
+            };
+          }
         }
         if (!committed && (signal.aborted || cause instanceof CancelledFailure)) {
           execution?.cancel();
@@ -437,8 +508,8 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
         clearInterval(leaseTimer);
         signal.removeEventListener('abort', cancelExecution);
         await rm(outputDir, { recursive: true, force: true }).catch(() => undefined);
-        if (liveRunLog !== undefined && livePackageLogOutcome !== undefined) {
-          await liveRunLog.finish(livePackageLogOutcome).catch((cause) => {
+        if (liveRunLog !== undefined && livePackageLogDetail !== undefined) {
+          await liveRunLog.finish(livePackageLogDetail.outcome, livePackageLogDetail).catch((cause) => {
             process.stderr.write(`live slice run-log finish failed for ${input.taskId}: ${cause instanceof Error ? cause.message : 'unknown'}\n`);
           });
         }

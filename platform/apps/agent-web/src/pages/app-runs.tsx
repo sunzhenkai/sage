@@ -84,9 +84,7 @@ export function AppRunDetailPage() {
               </Section>
             </>
           ) : tab === 'logs' ? (
-            <div className="flex min-h-0 flex-1 flex-col p-3">
-              <RunLogs taskId={taskId} live={live} />
-            </div>
+            <RunLogs taskId={taskId} live={live} fill />
           ) : (
             <div className="flex min-h-0 flex-1 flex-col">
               <Artifacts taskId={taskId} live={live} fill empty={

@@ -2,6 +2,8 @@ import { LocalAgentClient } from '@sage/agent-client';
 import {
   LiveProviderHarness,
   type LiveProviderInvoker,
+  type LiveProviderProgressEvent,
+  type LiveProviderProgressObserver,
   type LiveProviderRoute,
   type LiveProviderToolCall,
   type LiveProviderToolExecutionResult,
@@ -45,6 +47,7 @@ export function createLivePackageAgentClient(options: {
   readonly invoker?: LiveProviderInvoker;
   readonly tools?: readonly LiveProviderToolSpec[];
   readonly executeTool?: LiveProviderToolExecutor;
+  readonly onProgress?: LiveProviderProgressObserver;
 }): LocalAgentClient {
   return new LocalAgentClient({
     harness: new LiveProviderHarness({
@@ -55,13 +58,16 @@ export function createLivePackageAgentClient(options: {
       ...(options.maxOutputTokens === undefined ? {} : { maxOutputTokens: options.maxOutputTokens }),
       ...(options.invoker === undefined ? {} : { invoker: options.invoker }),
       ...(options.tools === undefined ? {} : { tools: options.tools }),
-      ...(options.executeTool === undefined ? {} : { executeTool: options.executeTool })
+      ...(options.executeTool === undefined ? {} : { executeTool: options.executeTool }),
+      ...(options.onProgress === undefined ? {} : { onProgress: options.onProgress })
     })
   });
 }
 
 export type {
   LiveProviderInvoker,
+  LiveProviderProgressEvent,
+  LiveProviderProgressObserver,
   LiveProviderRoute,
   LiveProviderToolCall,
   LiveProviderToolExecutionResult,

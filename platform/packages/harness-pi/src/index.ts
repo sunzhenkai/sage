@@ -69,6 +69,43 @@ export interface LiveProviderCompletion {
   readonly assistantMessage?: AssistantMessage;
 }
 
+export type LiveProviderProgressEvent =
+  | {
+      readonly kind: 'model.completed';
+      readonly turn: number;
+      readonly modelId: string;
+      readonly adapterKind: LiveProviderRoute['adapterKind'];
+      readonly tokens: number;
+      readonly durationMs: number;
+      readonly toolCallCount: number;
+      readonly toolNames: readonly string[];
+      readonly textPreview?: string;
+      readonly stopReason: 'stop' | 'toolUse' | 'pause';
+    }
+  | {
+      readonly kind: 'model.failed';
+      readonly turn: number;
+      readonly modelId: string;
+      readonly adapterKind: LiveProviderRoute['adapterKind'];
+      readonly durationMs: number;
+      readonly errorMessage: string;
+    }
+  | {
+      readonly kind: 'tool.completed';
+      readonly turn: number;
+      readonly index: number;
+      readonly totalInTurn: number;
+      readonly toolCallId: string;
+      readonly toolName: string;
+      readonly arguments: Record<string, unknown>;
+      readonly ok: boolean;
+      readonly durationMs: number;
+      readonly resultContent: string;
+      readonly errorCode?: string;
+    };
+
+export type LiveProviderProgressObserver = (event: LiveProviderProgressEvent) => void | Promise<void>;
+
 /** Injectable completion boundary so the pi-ai mapping stays unit-testable. */
 export type LiveProviderInvoker = (input: {
   readonly route: LiveProviderRoute;
@@ -129,6 +166,7 @@ export class LiveProviderHarness implements HarnessPort {
   readonly #turnInput: boolean;
   readonly #tools: readonly LiveProviderToolSpec[];
   readonly #executeTool?: LiveProviderToolExecutor;
+  readonly #onProgress?: LiveProviderProgressObserver;
   #conversation?: PiMessage[];
 
   constructor(options: {
@@ -140,6 +178,7 @@ export class LiveProviderHarness implements HarnessPort {
     readonly turnInput?: boolean;
     readonly tools?: readonly LiveProviderToolSpec[];
     readonly executeTool?: LiveProviderToolExecutor;
+    readonly onProgress?: LiveProviderProgressObserver;
   }) {
     const tools = options.tools ?? [];
     const hasTools = tools.length > 0 && options.executeTool !== undefined;
@@ -156,6 +195,16 @@ export class LiveProviderHarness implements HarnessPort {
     this.#turnInput = options.turnInput ?? false;
     this.#tools = tools;
     if (options.executeTool !== undefined) this.#executeTool = options.executeTool;
+    if (options.onProgress !== undefined) this.#onProgress = options.onProgress;
+  }
+
+  async #emitProgress(event: LiveProviderProgressEvent): Promise<void> {
+    if (this.#onProgress === undefined) return;
+    try {
+      await this.#onProgress(event);
+    } catch {
+      // Progress observers must never interrupt model or tool execution.
+    }
   }
 
   async executeTurn(request: HarnessTurnRequest, signal: AbortSignal): Promise<HarnessTurnResult> {
@@ -163,12 +212,38 @@ export class LiveProviderHarness implements HarnessPort {
     const maxTokens = Math.max(1, Math.min(this.#maxOutputTokens, request.remaining.tokens));
     const hasTools = this.#tools.length > 0 && this.#executeTool !== undefined;
     if (!hasTools) {
-      const completion = await this.#invoker({
-        route: this.#route,
-        systemPrompt: this.#systemPrompt,
-        messages: this.#turnInput ? [{ role: 'user', text: request.input }] : this.#transcript,
-        maxTokens,
-        signal
+      const modelStartedAt = Date.now();
+      let completion: LiveProviderCompletion;
+      try {
+        completion = await this.#invoker({
+          route: this.#route,
+          systemPrompt: this.#systemPrompt,
+          messages: this.#turnInput ? [{ role: 'user', text: request.input }] : this.#transcript,
+          maxTokens,
+          signal
+        });
+      } catch (cause) {
+        await this.#emitProgress({
+          kind: 'model.failed',
+          turn: request.turn,
+          modelId: this.#route.modelId,
+          adapterKind: this.#route.adapterKind,
+          durationMs: Date.now() - modelStartedAt,
+          errorMessage: cause instanceof Error ? cause.message : String(cause)
+        });
+        throw cause;
+      }
+      await this.#emitProgress({
+        kind: 'model.completed',
+        turn: request.turn,
+        modelId: this.#route.modelId,
+        adapterKind: this.#route.adapterKind,
+        tokens: completion.tokens,
+        durationMs: Date.now() - modelStartedAt,
+        toolCallCount: 0,
+        toolNames: [],
+        ...(completion.text.length > 0 ? { textPreview: completion.text.slice(0, 1_000) } : {}),
+        stopReason: completion.pause === true ? 'pause' : 'stop'
       });
       return { output: completion.text, done: completion.done ?? true, toolCalls: 0, tokens: completion.tokens, ...(completion.pause === true ? { pause: true } : {}) };
     }
@@ -176,17 +251,44 @@ export class LiveProviderHarness implements HarnessPort {
     if (this.#conversation === undefined) {
       this.#conversation = [{ role: 'user', content: request.input, timestamp: Date.now() }];
     }
-    const completion = await this.#invoker({
-      route: this.#route,
-      systemPrompt: this.#systemPrompt,
-      messages: [{ role: 'user', text: request.input }],
-      piMessages: this.#conversation,
-      tools: this.#tools,
-      maxTokens,
-      signal
-    });
+    const modelStartedAt = Date.now();
+    let completion: LiveProviderCompletion;
+    try {
+      completion = await this.#invoker({
+        route: this.#route,
+        systemPrompt: this.#systemPrompt,
+        messages: [{ role: 'user', text: request.input }],
+        piMessages: this.#conversation,
+        tools: this.#tools,
+        maxTokens,
+        signal
+      });
+    } catch (cause) {
+      await this.#emitProgress({
+        kind: 'model.failed',
+        turn: request.turn,
+        modelId: this.#route.modelId,
+        adapterKind: this.#route.adapterKind,
+        durationMs: Date.now() - modelStartedAt,
+        errorMessage: cause instanceof Error ? cause.message : String(cause)
+      });
+      throw cause;
+    }
 
     const toolCalls = completion.toolCalls ?? [];
+    await this.#emitProgress({
+      kind: 'model.completed',
+      turn: request.turn,
+      modelId: this.#route.modelId,
+      adapterKind: this.#route.adapterKind,
+      tokens: completion.tokens,
+      durationMs: Date.now() - modelStartedAt,
+      toolCallCount: toolCalls.length,
+      toolNames: toolCalls.map((call) => call.name),
+      ...(completion.text.length > 0 ? { textPreview: completion.text.slice(0, 1_000) } : {}),
+      stopReason: toolCalls.length > 0 ? 'toolUse' : completion.pause === true ? 'pause' : 'stop'
+    });
+
     if (toolCalls.length > 0) {
       // 超出剩余工具预算时不执行外部调用，交由 AgentRunner 以 TOOL_BUDGET_EXHAUSTED 收口。
       if (toolCalls.length > request.remaining.toolCalls) {
@@ -207,8 +309,10 @@ export class LiveProviderHarness implements HarnessPort {
       };
       this.#conversation.push(assistantMessage);
 
-      for (const call of toolCalls) {
+      for (let idx = 0; idx < toolCalls.length; idx += 1) {
+        const call = toolCalls[idx]!;
         if (signal.aborted) throw new Error('Live provider tool execution aborted');
+        const toolStartedAt = Date.now();
         let execResult: LiveProviderToolExecutionResult;
         try {
           execResult = await this.#executeTool!(call, signal);
@@ -222,6 +326,30 @@ export class LiveProviderHarness implements HarnessPort {
             isError: true
           };
         }
+        let errorCode: string | undefined;
+        if (execResult.isError === true) {
+          try {
+            const parsed = JSON.parse(execResult.content) as { readonly errorCode?: unknown } | null;
+            if (parsed !== null && typeof parsed === 'object' && typeof parsed.errorCode === 'string') {
+              errorCode = parsed.errorCode;
+            }
+          } catch {
+            // Non-JSON tool error content; keep errorCode undefined.
+          }
+        }
+        await this.#emitProgress({
+          kind: 'tool.completed',
+          turn: request.turn,
+          index: idx + 1,
+          totalInTurn: toolCalls.length,
+          toolCallId: call.id,
+          toolName: call.name,
+          arguments: call.arguments,
+          ok: execResult.isError !== true,
+          durationMs: Date.now() - toolStartedAt,
+          resultContent: execResult.content,
+          ...(errorCode === undefined ? {} : { errorCode })
+        });
         const toolResultMessage: PiToolResultMessage = {
           role: 'toolResult',
           toolCallId: call.id,

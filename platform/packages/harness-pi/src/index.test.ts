@@ -384,4 +384,81 @@ describe('LiveProviderHarness multi-turn tool calling', () => {
     }, new AbortController().signal);
     expect(finalOutcome).toEqual({ output: 'handled', done: true, toolCalls: 0, tokens: 5 });
   });
+
+  it('emits model.completed before per-tool tool.completed events and isolates observer errors', async () => {
+    const progress: string[] = [];
+    const seenToolEvents: Array<{ toolName: string; index: number; totalInTurn: number; ok: boolean; errorCode?: string; resultContent: string }> = [];
+    let turn = 0;
+    const harness = new LiveProviderHarness({
+      route,
+      transcript: [],
+      turnInput: true,
+      tools: [dummyTool],
+      executeTool: async (call) => {
+        if (call.id === 'c2') {
+          return { content: JSON.stringify({ ok: false, errorCode: 'PROBE_TIMEOUT' }), isError: true };
+        }
+        return { content: JSON.stringify({ ok: true, url: call.arguments.url }) };
+      },
+      onProgress: async (event) => {
+        progress.push(event.kind);
+        if (event.kind === 'tool.completed') {
+          seenToolEvents.push({
+            toolName: event.toolName,
+            index: event.index,
+            totalInTurn: event.totalInTurn,
+            ok: event.ok,
+            ...(event.errorCode === undefined ? {} : { errorCode: event.errorCode }),
+            resultContent: event.resultContent
+          });
+        }
+        throw new Error('observer error must not fail turn');
+      },
+      invoker: async () => {
+        turn += 1;
+        if (turn === 1) {
+          return {
+            text: 'calling probes',
+            tokens: 12,
+            done: false,
+            toolCalls: [
+              { id: 'c1', name: 'http_probe', arguments: { url: 'https://a.example.com' } },
+              { id: 'c2', name: 'http_probe', arguments: { url: 'https://b.example.com' } }
+            ]
+          };
+        }
+        return { text: 'done', tokens: 8 };
+      }
+    });
+
+    await harness.executeTurn({
+      runId: 'run-progress', input: 'check', turn: 1, skillRefs: [], remaining: { toolCalls: 4, tokens: 1_000 }
+    }, new AbortController().signal);
+    await harness.executeTurn({
+      runId: 'run-progress', input: '', turn: 2, skillRefs: [], remaining: { toolCalls: 2, tokens: 988 }
+    }, new AbortController().signal);
+
+    expect(progress).toEqual(['model.completed', 'tool.completed', 'tool.completed', 'model.completed']);
+    expect(seenToolEvents).toEqual([
+      { toolName: 'http_probe', index: 1, totalInTurn: 2, ok: true, resultContent: '{"ok":true,"url":"https://a.example.com"}' },
+      { toolName: 'http_probe', index: 2, totalInTurn: 2, ok: false, errorCode: 'PROBE_TIMEOUT', resultContent: '{"ok":false,"errorCode":"PROBE_TIMEOUT"}' }
+    ]);
+  });
+
+  it('emits model.failed when invoker throws', async () => {
+    const events: Array<{ kind: string; errorMessage?: string }> = [];
+    const harness = new LiveProviderHarness({
+      route,
+      transcript: [],
+      turnInput: true,
+      onProgress: (event) => {
+        events.push({ kind: event.kind, ...(event.kind === 'model.failed' ? { errorMessage: event.errorMessage } : {}) });
+      },
+      invoker: async () => { throw new Error('provider 503'); }
+    });
+    await expect(harness.executeTurn({
+      runId: 'run-fail', input: 'check', turn: 1, skillRefs: [], remaining: { toolCalls: 4, tokens: 1_000 }
+    }, new AbortController().signal)).rejects.toThrow('provider 503');
+    expect(events).toEqual([{ kind: 'model.failed', errorMessage: 'provider 503' }]);
+  });
 });
