@@ -92,9 +92,9 @@ export interface ScheduleTriggerAdmissionInput {
   readonly writePackageInput: (record: {
     readonly tenantId: string; readonly taskId: string; readonly releaseId: string; readonly releaseDigest: string;
     readonly assembledInput: string; readonly assetDigests: Readonly<Record<string, string>>; readonly createdAt: string;
-    readonly runContract?: { readonly task?: string; readonly schema?: string; readonly files?: readonly string[]; readonly modelRoute?: PackageRunManifestSummary['modelRoute'] };
+    readonly runContract?: { readonly task?: string; readonly schema?: string; readonly files?: readonly string[]; readonly capabilityRefs?: readonly string[]; readonly modelRoute?: PackageRunManifestSummary['modelRoute'] };
   }) => Promise<void>;
-  readonly startRun: (input: { readonly taskId: string; readonly inputRef: string }) => Promise<void>;
+  readonly startRun: (input: { readonly taskId: string; readonly inputRef: string; readonly slice?: { readonly maxTurns: number; readonly maxToolCalls: number; readonly maxTokens: number; readonly timeoutMs: number } }) => Promise<void>;
   readonly now: Date;
 }
 
@@ -116,15 +116,20 @@ export class ScheduleTriggerAdmissionError extends Error {
 }
 
 const SLICE_TIMEOUT_CAP_MS = 300_000;
+const RUNTIME_TOOL_CAPABILITY_REFS = new Set<string>([
+  'capability://net-probe-readonly/v1',
+  'capability://ssh-readonly-inspect/v1',
+]);
 
 /** 包运行 slice 预算来自 manifest budgets；缺省回退 controller 默认（与 runs-api 同一钳制）。 */
-export const scheduleSliceLimits = (budgets?: PackageRunManifestSummary['budgets']) => {
-  if (budgets === undefined) return undefined;
+export const scheduleSliceLimits = (budgets?: PackageRunManifestSummary['budgets'], capabilityRefs?: readonly string[]) => {
+  const hasRuntimeCapability = (capabilityRefs ?? []).some((ref) => RUNTIME_TOOL_CAPABILITY_REFS.has(ref));
+  if (budgets === undefined && !hasRuntimeCapability) return undefined;
   return {
-    maxTurns: 1,
-    maxToolCalls: Math.min(budgets.maxToolCalls ?? 4, 16),
-    maxTokens: Math.min(budgets.maxTokens ?? 8_000, 200_000),
-    timeoutMs: Math.min(budgets.maxDurationMs ?? 10_000, SLICE_TIMEOUT_CAP_MS)
+    maxTurns: budgets?.maxTurns !== undefined ? Math.min(budgets.maxTurns, 24) : (hasRuntimeCapability ? 12 : 1),
+    maxToolCalls: Math.min(budgets?.maxToolCalls ?? (hasRuntimeCapability ? 32 : 4), 64),
+    maxTokens: Math.min(budgets?.maxTokens ?? 8_000, 200_000),
+    timeoutMs: Math.min(budgets?.maxDurationMs ?? 10_000, SLICE_TIMEOUT_CAP_MS)
   };
 };
 
@@ -214,21 +219,24 @@ export async function admitScheduleTrigger(input: ScheduleTriggerAdmissionInput)
     const declaredSchemaRef = selectedTask.output.schema;
     const declaredSchemaAsset = declaredSchemaRef === undefined ? undefined : input.references.find(asset => asset.relativePath === declaredSchemaRef);
     const declaredFiles = selectedTask.output.files ?? [];
+    const declaredCapabilities = manifest.capabilityRefs ?? [];
     const manifestRoute = manifest.modelRoute;
     await input.writePackageInput({
       tenantId: input.tenantId, taskId,
       releaseId: input.release.releaseId, releaseDigest: input.release.releaseDigest,
       assembledInput: assembled.text, assetDigests: assembled.assetDigests, createdAt: input.now.toISOString(),
-      ...(selectedTask === undefined && declaredSchemaAsset === undefined && declaredFiles.length === 0 && manifestRoute === undefined ? {} : {
+      ...(selectedTask === undefined && declaredSchemaAsset === undefined && declaredFiles.length === 0 && declaredCapabilities.length === 0 && manifestRoute === undefined ? {} : {
         runContract: {
           task: selectedTask.name,
           ...(declaredSchemaAsset === undefined ? {} : { schema: declaredSchemaAsset.content }),
           ...(declaredFiles.length === 0 ? {} : { files: [...declaredFiles] }),
+          ...(declaredCapabilities.length === 0 ? {} : { capabilityRefs: [...declaredCapabilities] }),
           ...(manifestRoute === undefined ? {} : { modelRoute: manifestRoute })
         }
       })
     });
-    await input.startRun({ taskId, inputRef });
+    const slice = scheduleSliceLimits(manifest.budgets, manifest.capabilityRefs);
+    await input.startRun({ taskId, inputRef, ...(slice === undefined ? {} : { slice }) });
   }
   const spec = admitted.spec;
   return {

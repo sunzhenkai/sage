@@ -51,8 +51,10 @@ export interface TaskSliceInputResolver {
   resolve(inputRef: TaskInputRef, tenantId: string): Promise<string>;
 }
 export interface AgentTaskActivityOptions {
-  /** live provider 客户端工厂：所有 slice（package 与 chat）在执行边界按解析路由构造；第三参为包运行声明的输出 token 预算（chat 不传，保持逐轮缺省）。 */
-  readonly liveClientFactory: (route: LiveProviderRoute, mode: 'package' | 'chat', maxOutputTokens?: number) => LocalAgentClient;
+  /** live provider 客户端工厂：所有 slice（package 与 chat）在执行边界按解析路由构造；第三参为包运行声明的输出 token 预算，第四参为声明的 capabilityRefs。 */
+  readonly liveClientFactory: (route: LiveProviderRoute, mode: 'package' | 'chat', maxOutputTokens?: number, capabilityRefs?: readonly string[]) => LocalAgentClient;
+  /** 判定声明的 capabilityRefs 是否需要在 AgentRunSpec 中开启 tools 能力。 */
+  readonly hasRuntimeTools?: (capabilityRefs: readonly string[]) => boolean;
   /** 运行 agent 设置读取：缺省视 unset（无默认 provider，fail-closed）。 */
   readonly settingsStore?: Pick<RunAgentSettingsStore, 'getRunAgentSettings'>;
   /** 注册表访问：slice 执行边界解析条目与密封凭据。 */
@@ -89,13 +91,14 @@ export interface AgentTaskActivities {
 export async function resolveConnectionLiveClient(
   providerConnections: ProviderConnectionStore | undefined,
   secretBackend: SecretBackend | undefined,
-  liveClientFactory: ((route: LiveProviderRoute, mode: 'package' | 'chat', maxOutputTokens?: number) => LocalAgentClient) | undefined,
+  liveClientFactory: ((route: LiveProviderRoute, mode: 'package' | 'chat', maxOutputTokens?: number, capabilityRefs?: readonly string[]) => LocalAgentClient) | undefined,
   tenantId: string,
   connectionId: string | undefined,
   mode: 'package' | 'chat',
   maxOutputTokens?: number,
   /** 已解析的运行模型（manifest 命中的模型），缺省用连接默认模型。 */
-  modelId?: string
+  modelId?: string,
+  capabilityRefs?: readonly string[]
 ): Promise<LocalAgentClient> {
   const failure = (): string =>
     connectionId === undefined
@@ -123,7 +126,7 @@ export async function resolveConnectionLiveClient(
     baseUrl: connection.baseUrl,
     modelId: modelId ?? connection.modelId,
     apiKey
-  }, mode, maxOutputTokens);
+  }, mode, maxOutputTokens, capabilityRefs);
 }
 
 export function createAgentTaskActivities(options: AgentTaskActivityOptions): AgentTaskActivities {
@@ -198,11 +201,13 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
       }, LEASE_RENEW_INTERVAL_MS);
       try {
         if (providerFailure !== undefined) throw providerFailure;
+        const packageCapabilityRefs = isPackageInput ? (packageRecord?.runContract?.capabilityRefs ?? []) : [];
         const sliceClient = await resolveConnectionLiveClient(
           options.providerConnections, options.secretBackend, options.liveClientFactory,
           input.tenantId, resolvedConnection!.connectionId, isPackageInput ? 'package' : 'chat',
           isPackageInput ? input.limits.maxTokens : undefined,
-          resolvedConnection!.modelId
+          resolvedConnection!.modelId,
+          packageCapabilityRefs.length > 0 ? packageCapabilityRefs : undefined
         );
         if (signal.aborted) throw new CancelledFailure('TASK_SLICE_CANCELLED');
         const resolvedInput = injectOutputDirectory(
@@ -224,8 +229,10 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
         }
         const startedAt = now().getTime();
         const runId = `task-${input.taskId.slice(0, 96)}-a${input.attempt}-s${input.sliceNumber}`;
+        const toolsEnabled = packageCapabilityRefs.length > 0 && options.hasRuntimeTools?.(packageCapabilityRefs) === true;
         const spec: AgentRunSpec = {
-          schemaVersion: '1', runId, input: resolvedInput, skillRefs: [], requiredCapabilities: ['events'],
+          schemaVersion: '1', runId, input: resolvedInput, skillRefs: [],
+          requiredCapabilities: toolsEnabled ? ['events', 'tools'] : ['events'],
           limits: {
             maxTurns: input.limits.maxTurns, maxToolCalls: input.limits.maxToolCalls, maxTokens: input.limits.maxTokens,
             deadlineAt: new Date(startedAt + input.limits.timeoutMs).toISOString()

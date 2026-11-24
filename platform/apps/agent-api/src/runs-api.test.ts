@@ -193,8 +193,8 @@ describe('Package run API boundaries', () => {
     expect(body.inputRef).toBe(`task-input://package/tenant-local/${body.taskId}`);
     expect(controller.created).toHaveLength(1);
     expect(controller.created[0]?.taskId).toBe(body.taskId);
-    // slice 预算来自 manifest budgets（toolCalls 超过 schema 上限 16 被截断；无 maxDurationMs 回退默认超时）。
-    expect(controller.created[0]).toMatchObject({ slice: { maxTurns: 1, maxToolCalls: 16, maxTokens: 4000, timeoutMs: 10_000 } });
+    // slice 预算来自 manifest budgets（无 maxDurationMs 回退默认超时）。
+    expect(controller.created[0]).toMatchObject({ slice: { maxTurns: 1, maxToolCalls: 20, maxTokens: 4000, timeoutMs: 10_000 } });
     const stored = await taskStore.getPackageInput('tenant-local', body.taskId);
     expect(stored?.assembledInput).toContain('你是演示助手。');
     expect(stored?.assembledInput).not.toContain('--- user input ---');

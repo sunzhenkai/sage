@@ -9,6 +9,7 @@ import {
   effectTools,
   runAgentSettingsTools,
 } from './provider.js';
+import { netProbeRuleTools, sshTargetTools } from './capabilities.js';
 
 /**
  * 全量 tool registry：1:1 映射 /v1/* 既有端点。
@@ -26,6 +27,8 @@ export const allTools: readonly ToolDef[] = [
   ...scheduleTools,
   ...effectTools,
   ...runAgentSettingsTools,
+  ...netProbeRuleTools,
+  ...sshTargetTools,
 ];
 
 /** 判据 10 资源组 → 至少一个 tool 覆盖断言用。 */
@@ -39,6 +42,8 @@ export const REQUIRED_GROUPS = [
   'schedule',
   'effect',
   'run_agent_settings',
+  'net_probe_rule',
+  'ssh_target',
 ] as const;
 
 /** 被排除端点（SHALL NOT 出现在 tools/list）。 */

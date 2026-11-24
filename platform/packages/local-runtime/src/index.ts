@@ -1,5 +1,14 @@
 import { LocalAgentClient } from '@sage/agent-client';
-import { LiveProviderHarness, type LiveProviderInvoker, type LiveProviderRoute, type LiveProviderTurnMessage } from '@sage/harness-pi';
+import {
+  LiveProviderHarness,
+  type LiveProviderInvoker,
+  type LiveProviderRoute,
+  type LiveProviderToolCall,
+  type LiveProviderToolExecutionResult,
+  type LiveProviderToolExecutor,
+  type LiveProviderToolSpec,
+  type LiveProviderTurnMessage
+} from '@sage/harness-pi';
 
 /**
  * Chat-only composition for provider-routed runs. The route and transcript stay
@@ -34,6 +43,8 @@ export function createLivePackageAgentClient(options: {
   readonly systemPrompt?: string;
   readonly maxOutputTokens?: number;
   readonly invoker?: LiveProviderInvoker;
+  readonly tools?: readonly LiveProviderToolSpec[];
+  readonly executeTool?: LiveProviderToolExecutor;
 }): LocalAgentClient {
   return new LocalAgentClient({
     harness: new LiveProviderHarness({
@@ -42,10 +53,20 @@ export function createLivePackageAgentClient(options: {
       turnInput: true,
       systemPrompt: options.systemPrompt ?? PACKAGE_RUN_SYSTEM_PROMPT,
       ...(options.maxOutputTokens === undefined ? {} : { maxOutputTokens: options.maxOutputTokens }),
-      ...(options.invoker === undefined ? {} : { invoker: options.invoker })
+      ...(options.invoker === undefined ? {} : { invoker: options.invoker }),
+      ...(options.tools === undefined ? {} : { tools: options.tools }),
+      ...(options.executeTool === undefined ? {} : { executeTool: options.executeTool })
     })
   });
 }
 
-export type { LiveProviderInvoker, LiveProviderRoute, LiveProviderTurnMessage };
+export type {
+  LiveProviderInvoker,
+  LiveProviderRoute,
+  LiveProviderToolCall,
+  LiveProviderToolExecutionResult,
+  LiveProviderToolExecutor,
+  LiveProviderToolSpec,
+  LiveProviderTurnMessage
+};
 export * from './kernel.js';

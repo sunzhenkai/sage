@@ -13,6 +13,7 @@ RUN pnpm install --frozen-lockfile
 RUN pnpm exec tsc -b --pretty false
 
 FROM node:24.14.0-bookworm-slim AS runtime
+RUN apt-get update && apt-get install -y --no-install-recommends openssh-client && rm -rf /var/lib/apt/lists/*
 ENV NODE_ENV=development
 WORKDIR /workspace
 COPY --from=build /workspace ./

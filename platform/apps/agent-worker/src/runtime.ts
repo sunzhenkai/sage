@@ -4,7 +4,23 @@ import { fileURLToPath } from 'node:url';
 import { Pool } from 'pg';
 import { bundleWorkflowCode, NativeConnection, Worker, type WorkerStatus } from '@temporalio/worker';
 import { ChatStore } from '@sage/chat-domain';
-import { CHAT_SLICE_SYSTEM_PROMPT, createLivePackageAgentClient, createLocalKernelComposition, PACKAGE_RUN_SYSTEM_PROMPT, type LiveProviderRoute } from '@sage/local-runtime';
+import {
+  CHAT_SLICE_SYSTEM_PROMPT,
+  createLivePackageAgentClient,
+  createLocalKernelComposition,
+  PACKAGE_RUN_SYSTEM_PROMPT,
+  type LiveProviderRoute,
+  type LiveProviderToolExecutor,
+  type LiveProviderToolSpec
+} from '@sage/local-runtime';
+import {
+  createNetProbeCapabilityTools,
+  createSshInspectCapabilityTools,
+  NET_PROBE_ALLOWLIST_ENV,
+  NET_PROBE_CAPABILITY_REF,
+  SSH_INSPECT_CAPABILITY_REF,
+  type RuntimeToolBinding,
+} from '@sage/tool-runtime';
 import { createLocalSecretBackendFromEnv } from '@sage/secret-vault';
 import { LegacyAgentRunSpecV1Adapter, parseAgentExecutionFeatureConfig, selectAgentExecutionMode, type AgentExecutionMode, type AgentLifecycleOwner, type LegacyAdapterResult } from '@sage/agent-client';
 import { PostgresAgentAuthorityStore, PostgresAgentStateAdapter } from '@sage/agent-state-postgres';
@@ -166,17 +182,66 @@ export async function createWorkerRuntime(config = readWorkerRuntimeConfig()): P
     };
     native = await NativeConnection.connect({ address: config.temporalAddress });
     const secretBackendMode = secretBackend.describe().mode;
+    const netProbeBindings = createNetProbeCapabilityTools({
+      allowlistRaw: process.env[NET_PROBE_ALLOWLIST_ENV],
+      resolveRules: async () => {
+        const rows = await tasks.listNetProbeRules(config.tenantId);
+        return rows.filter((row) => row.enabled).map((row) => ({ hostname: row.pattern, ports: row.ports }));
+      },
+    });
+    const sshInspectBindings = createSshInspectCapabilityTools({
+      targetProvider: {
+        listTargets: () => tasks.listSshTargets(config.tenantId),
+        getTarget: (alias) => tasks.getSshTarget(config.tenantId, alias),
+        openPrivateKey: async (alias) => {
+          const sealed = await tasks.getSshCredential(config.tenantId, alias);
+          if (sealed === undefined) return undefined;
+          try {
+            return secretBackend.open({ ciphertext: sealed.ciphertext, keyVersion: sealed.keyVersion });
+          } catch {
+            return undefined;
+          }
+        },
+      },
+    });
+    const resolveCapabilityBundle = (capabilityRefs?: readonly string[]): { readonly tools: readonly LiveProviderToolSpec[]; readonly executeTool: LiveProviderToolExecutor } | undefined => {
+      if (capabilityRefs === undefined || capabilityRefs.length === 0) return undefined;
+      const selected: RuntimeToolBinding[] = [];
+      if (capabilityRefs.includes(NET_PROBE_CAPABILITY_REF)) selected.push(...netProbeBindings);
+      if (capabilityRefs.includes(SSH_INSPECT_CAPABILITY_REF)) selected.push(...sshInspectBindings);
+      if (selected.length === 0) return undefined;
+      const byName = new Map<string, RuntimeToolBinding>(selected.map((tool) => [tool.name, tool]));
+      const tools: LiveProviderToolSpec[] = selected.map((tool) => ({
+        name: tool.name,
+        description: tool.description,
+        parameters: tool.parameters
+      }));
+      const executeTool: LiveProviderToolExecutor = async (call, signal) => {
+        const binding = byName.get(call.name);
+        if (binding === undefined) {
+          return { content: JSON.stringify({ ok: false, errorCode: 'TOOL_NOT_GRANTED', message: `Tool '${call.name}' is not granted` }), isError: true };
+        }
+        return binding.execute(call.arguments, signal);
+      };
+      return { tools, executeTool };
+    };
     worker = await Worker.create({
       connection: native, namespace: TASK_NAMESPACE, taskQueue: TASK_QUEUE, workflowBundle,
       activities: createAgentTaskActivities({
         settingsStore: tasks,
         providerConnections: tasks,
         secretBackend,
-        liveClientFactory: (route: LiveProviderRoute, mode: 'package' | 'chat', maxOutputTokens?: number) => createLivePackageAgentClient({
-          route,
-          systemPrompt: mode === 'package' ? PACKAGE_RUN_SYSTEM_PROMPT : CHAT_SLICE_SYSTEM_PROMPT,
-          ...(maxOutputTokens === undefined ? {} : { maxOutputTokens })
-        }),
+        hasRuntimeTools: (capabilityRefs) =>
+          capabilityRefs.includes(NET_PROBE_CAPABILITY_REF) || capabilityRefs.includes(SSH_INSPECT_CAPABILITY_REF),
+        liveClientFactory: (route: LiveProviderRoute, mode: 'package' | 'chat', maxOutputTokens?: number, capabilityRefs?: readonly string[]) => {
+          const bundle = mode === 'package' ? resolveCapabilityBundle(capabilityRefs) : undefined;
+          return createLivePackageAgentClient({
+            route,
+            systemPrompt: mode === 'package' ? PACKAGE_RUN_SYSTEM_PROMPT : CHAT_SLICE_SYSTEM_PROMPT,
+            ...(maxOutputTokens === undefined ? {} : { maxOutputTokens }),
+            ...(bundle === undefined ? {} : { tools: bundle.tools, executeTool: bundle.executeTool })
+          });
+        },
         ...(canonicalCompatibility === undefined ? {} : { canonicalCompatibility }),
         store: tasks, projectionStore: tasks, outputStore: tasks, inputResolver: new CompositeTaskInputResolver([
           { scheme: 'chat', resolver: new ChatTaskInputResolver(chat) },

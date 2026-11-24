@@ -269,3 +269,119 @@ describe('Pi shared EngineAdapter conformance', () => {
     ]);
   });
 });
+
+describe('LiveProviderHarness multi-turn tool calling', () => {
+  const route = { adapterKind: 'openai-compatible' as const, baseUrl: 'https://provider.example/v1', modelId: 'model-x', apiKey: 'key-1' };
+  const dummyTool = {
+    name: 'http_probe',
+    description: 'probe',
+    parameters: { type: 'object', properties: { url: { type: 'string' } }, required: ['url'] } as never
+  };
+
+  it('executes multi-turn tool calls, appends tool results, and finishes on text reply', async () => {
+    let callIndex = 0;
+    const seenMessagesCount: number[] = [];
+    const harness = new LiveProviderHarness({
+      route,
+      transcript: [],
+      turnInput: true,
+      tools: [dummyTool],
+      executeTool: async (call) => ({ content: JSON.stringify({ ok: true, echoed: call.arguments.url }) }),
+      invoker: async ({ piMessages }) => {
+        seenMessagesCount.push(piMessages?.length ?? 0);
+        callIndex += 1;
+        if (callIndex === 1) {
+          return {
+            text: '',
+            tokens: 15,
+            done: false,
+            toolCalls: [{ id: 'call-1', name: 'http_probe', arguments: { url: 'https://example.com' } }]
+          };
+        }
+        return { text: '{"status":"ok"}', tokens: 20 };
+      }
+    });
+    expect(harness.capabilities.supported).toContain('tools');
+
+    const { AgentRunner } = await import('@sage/agent-lib');
+    const runner = new AgentRunner();
+    const execution = runner.start({
+      schemaVersion: '1',
+      runId: 'run-tool-1',
+      input: 'check example.com',
+      skillRefs: [],
+      requiredCapabilities: ['events', 'tools'],
+      limits: { maxTurns: 4, maxToolCalls: 4, maxTokens: 1_000, deadlineAt: new Date(Date.now() + 30_000).toISOString() }
+    }, harness);
+
+    const events = [];
+    for await (const event of execution.events) events.push(event);
+    const outcome = await execution.result;
+
+    expect(outcome.status).toBe('succeeded');
+    expect(outcome.output).toBe('{"status":"ok"}');
+    expect(outcome.usage).toEqual({ turns: 2, toolCalls: 1, tokens: 35 });
+    expect(seenMessagesCount).toEqual([1, 3]);
+    expect(events.some((e) => e.type === 'tool.completed')).toBe(true);
+  });
+
+  it('turns thrown tool errors into isError toolResult and stops on tool budget exhaustion', async () => {
+    const harness = new LiveProviderHarness({
+      route,
+      transcript: [],
+      turnInput: true,
+      tools: [dummyTool],
+      executeTool: async () => { throw new Error('boom'); },
+      invoker: async () => ({
+        text: '',
+        tokens: 10,
+        done: false,
+        toolCalls: [
+          { id: 'c1', name: 'http_probe', arguments: { url: 'https://a.example.com' } },
+          { id: 'c2', name: 'http_probe', arguments: { url: 'https://b.example.com' } }
+        ]
+      })
+    });
+
+    const { AgentRunner } = await import('@sage/agent-lib');
+    const outcome = await new AgentRunner().start({
+      schemaVersion: '1',
+      runId: 'run-tool-budget',
+      input: 'check',
+      skillRefs: [],
+      requiredCapabilities: ['events', 'tools'],
+      limits: { maxTurns: 4, maxToolCalls: 1, maxTokens: 1_000, deadlineAt: new Date(Date.now() + 30_000).toISOString() }
+    }, harness).result;
+
+    expect(outcome.status).toBe('budget_exhausted');
+    expect(outcome.error?.code).toBe('TOOL_BUDGET_EXHAUSTED');
+
+    // When within budget, thrown tool errors are caught and returned to the model.
+    let turns = 0;
+    const recovering = new LiveProviderHarness({
+      route,
+      transcript: [],
+      turnInput: true,
+      tools: [dummyTool],
+      executeTool: async () => { throw new Error('network down'); },
+      invoker: async ({ piMessages }) => {
+        turns += 1;
+        if (turns === 1) {
+          return { text: '', tokens: 5, done: false, toolCalls: [{ id: 'c1', name: 'http_probe', arguments: { url: 'https://a.example.com' } }] };
+        }
+        const lastMsg = piMessages?.[piMessages.length - 1];
+        expect(lastMsg?.role).toBe('toolResult');
+        expect((lastMsg as { isError?: boolean })?.isError).toBe(true);
+        return { text: 'handled', tokens: 5 };
+      }
+    });
+    const okOutcome = await recovering.executeTurn({
+      runId: 'run-recover', input: 'check', turn: 1, skillRefs: [], remaining: { toolCalls: 4, tokens: 1_000 }
+    }, new AbortController().signal);
+    expect(okOutcome.done).toBe(false);
+    const finalOutcome = await recovering.executeTurn({
+      runId: 'run-recover', input: '', turn: 2, skillRefs: [], remaining: { toolCalls: 3, tokens: 995 }
+    }, new AbortController().signal);
+    expect(finalOutcome).toEqual({ output: 'handled', done: true, toolCalls: 0, tokens: 5 });
+  });
+});

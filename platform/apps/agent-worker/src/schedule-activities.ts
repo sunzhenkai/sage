@@ -26,7 +26,7 @@ export interface CreateScheduleDispatcherActivitiesOptions {
   readonly idempotencyStore: AdmissionIdempotencyStoreV1;
   readonly auditOutbox: AdmissionAuditOutboxPortV1;
   readonly writePackageInput: (record: Parameters<Parameters<typeof admitScheduleTrigger>[0]['writePackageInput']>[0]) => Promise<void>;
-  readonly startRun: (input: { readonly taskId: string; readonly inputRef: string }) => Promise<void>;
+  readonly startRun: (input: { readonly taskId: string; readonly inputRef: string; readonly slice?: { readonly maxTurns: number; readonly maxToolCalls: number; readonly maxTokens: number; readonly timeoutMs: number } }) => Promise<void>;
   /** 对账用：设施侧 miss/overlap 计数（cron 触发规则的差集辅助证据）。 */
   readonly facilityCounters?: (ref: { readonly tenantId: string; readonly scheduleId: string }) => Promise<{ readonly missedCatchup: number; readonly skippedOverlap: number } | undefined>;
   readonly now?: () => Date;

@@ -283,13 +283,15 @@ export function registerPackageRunsRoutes(app: FastifyInstance, options: Registe
           ? undefined
           : assets.find((asset) => asset.relativePath === declaredSchemaRef);
         const declaredFiles = selectedTask?.output.files ?? [];
+        const declaredCapabilities = manifest.capabilityRefs ?? [];
         const manifestRoute = manifest.modelRoute;
-        const runContract = selectedTask === undefined && declaredSchemaAsset === undefined && declaredFiles.length === 0 && manifestRoute === undefined
+        const runContract = selectedTask === undefined && declaredSchemaAsset === undefined && declaredFiles.length === 0 && declaredCapabilities.length === 0 && manifestRoute === undefined
           ? undefined
           : {
               ...(selectedTask === undefined ? {} : { task: selectedTask.name }),
               ...(declaredSchemaAsset === undefined ? {} : { schema: declaredSchemaAsset.content }),
               ...(declaredFiles.length === 0 ? {} : { files: [...declaredFiles] }),
+              ...(declaredCapabilities.length === 0 ? {} : { capabilityRefs: [...declaredCapabilities] }),
               ...(manifestRoute === undefined ? {} : { modelRoute: manifestRoute })
             };
         const record: TaskPackageInputRecord = {
@@ -307,7 +309,7 @@ export function registerPackageRunsRoutes(app: FastifyInstance, options: Registe
         // taskId/runId/attemptId（存于已提交的 spec），否则调用方拿到的是不存在的幻影 id。
         if (admitted.status === 'admitted') {
           await options.taskStore.writePackageInput(record);
-          const slice = packageRunSliceLimits(manifest.budgets);
+          const slice = packageRunSliceLimits(manifest.budgets, manifest.capabilityRefs);
           await options.controller.create({ taskId, inputRef, ...(slice === undefined ? {} : { slice }) }, principal);
         }
         const effectiveTaskId = admitted.status === 'admitted' ? taskId : admitted.spec.taskId;
@@ -362,13 +364,18 @@ function rejectedRunFields(body: unknown): string[] {
 
 /** 包运行 slice 预算来自 manifest budgets；缺省回退 controller 默认，超时上限对齐活动 startToClose（5 分钟）。 */
 const PACKAGE_SLICE_TIMEOUT_CAP_MS = 300_000;
-function packageRunSliceLimits(budgets?: PackageRunManifestSummary['budgets']) {
-  if (budgets === undefined) return undefined;
+const RUNTIME_TOOL_CAPABILITY_REFS = new Set<string>([
+  'capability://net-probe-readonly/v1',
+  'capability://ssh-readonly-inspect/v1',
+]);
+function packageRunSliceLimits(budgets?: PackageRunManifestSummary['budgets'], capabilityRefs?: readonly string[]) {
+  const hasRuntimeCapability = (capabilityRefs ?? []).some((ref) => RUNTIME_TOOL_CAPABILITY_REFS.has(ref));
+  if (budgets === undefined && !hasRuntimeCapability) return undefined;
   return {
-    maxTurns: 1,
-    maxToolCalls: Math.min(budgets.maxToolCalls ?? 4, 16),
+    maxTurns: budgets?.maxTurns !== undefined ? Math.min(budgets.maxTurns, 24) : (hasRuntimeCapability ? 12 : 1),
+    maxToolCalls: Math.min(budgets?.maxToolCalls ?? (hasRuntimeCapability ? 32 : 4), 64),
     // 预算钳制须覆盖平台输入快照上限（512 KiB ≈ 128k token）+ 输出，不得静默削弱声明预算。
-    maxTokens: Math.min(budgets.maxTokens ?? 8_000, 200_000),
-    timeoutMs: Math.min(budgets.maxDurationMs ?? 10_000, PACKAGE_SLICE_TIMEOUT_CAP_MS)
+    maxTokens: Math.min(budgets?.maxTokens ?? 8_000, 200_000),
+    timeoutMs: Math.min(budgets?.maxDurationMs ?? 10_000, PACKAGE_SLICE_TIMEOUT_CAP_MS)
   };
 }

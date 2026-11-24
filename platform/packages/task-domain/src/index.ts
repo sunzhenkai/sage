@@ -52,8 +52,8 @@ export const TaskControlSchema = Type.Object({
 export type TaskControl = Static<typeof TaskControlSchema>;
 
 export const TaskSliceLimitsSchema = Type.Object({
-  maxTurns: Type.Integer({ minimum: 1, maximum: 4 }),
-  maxToolCalls: Type.Integer({ minimum: 0, maximum: 16 }),
+  maxTurns: Type.Integer({ minimum: 1, maximum: 24 }),
+  maxToolCalls: Type.Integer({ minimum: 0, maximum: 64 }),
   // 上限对齐包运行预算钳制（runs-api 200k：须覆盖 512 KiB 输入快照 ≈128k token + 输出，不静默削弱声明预算）。
   maxTokens: Type.Integer({ minimum: 1, maximum: 200_000 }),
   // 上限对齐 live provider 真实推理（活动 startToClose 5 分钟 + 重试余量）；echo 执行毫秒级完成不受影响。
@@ -284,6 +284,7 @@ export interface PackageRunContract {
   readonly task?: string;
   readonly schema?: string;
   readonly files?: readonly string[];
+  readonly capabilityRefs?: readonly string[];
   readonly modelRoute?: { readonly provider: string; readonly model: string; readonly fallbacks?: readonly string[] };
 }
 
@@ -465,6 +466,77 @@ export interface ProviderConnectionStore {
   /** 执行边界专用：取密封凭据（不校验 enabled，由调用方决定语义）；不存在返回 undefined。 */
   getProviderCredential(tenantId: string, id: string): Promise<ProviderCredentialSealed | undefined>;
   deleteProviderConnection(tenantId: string, id: string): Promise<boolean>;
+}
+
+export const SSH_TARGET_ALIAS_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
+export const SSH_CUSTOM_CHECK_NAME_PATTERN = /^[a-z][a-z0-9_-]{0,63}$/;
+
+export interface SshCredentialSealed {
+  readonly ciphertext: Buffer;
+  readonly keyVersion: number;
+  readonly updatedAt: string;
+}
+
+export interface SshTargetRecord {
+  readonly tenantId: string;
+  readonly alias: string;
+  readonly host: string;
+  readonly port: number;
+  readonly username: string;
+  readonly knownHostEntry?: string;
+  readonly customChecks: Readonly<Record<string, string>>;
+  readonly enabled: boolean;
+  readonly credentialPresent: boolean;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly updatedBy?: string;
+}
+
+export interface SshTargetWrite {
+  readonly host: string;
+  readonly port: number;
+  readonly username: string;
+  readonly knownHostEntry?: string;
+  readonly customChecks?: Readonly<Record<string, string>>;
+  readonly enabled: boolean;
+  readonly updatedBy?: string;
+  readonly credential?: SshCredentialSealed;
+}
+
+export interface SshTargetStore {
+  listSshTargets(tenantId: string): Promise<readonly SshTargetRecord[]>;
+  getSshTarget(tenantId: string, alias: string): Promise<SshTargetRecord | undefined>;
+  upsertSshTarget(tenantId: string, alias: string, write: SshTargetWrite, nowIso: string): Promise<SshTargetRecord>;
+  getSshCredential(tenantId: string, alias: string): Promise<SshCredentialSealed | undefined>;
+  deleteSshTarget(tenantId: string, alias: string): Promise<boolean>;
+}
+
+export const NET_PROBE_RULE_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
+
+export interface NetProbeRuleRecord {
+  readonly tenantId: string;
+  readonly id: string;
+  readonly pattern: string;
+  readonly ports: readonly number[];
+  readonly enabled: boolean;
+  readonly description?: string;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly updatedBy?: string;
+}
+
+export interface NetProbeRuleWrite {
+  readonly pattern: string;
+  readonly ports: readonly number[];
+  readonly enabled: boolean;
+  readonly description?: string;
+  readonly updatedBy?: string;
+}
+
+export interface NetProbeRuleStore {
+  listNetProbeRules(tenantId: string): Promise<readonly NetProbeRuleRecord[]>;
+  upsertNetProbeRule(tenantId: string, id: string, write: NetProbeRuleWrite, nowIso: string): Promise<NetProbeRuleRecord>;
+  deleteNetProbeRule(tenantId: string, id: string): Promise<boolean>;
 }
 export type ProjectionStaleReason = 'age_threshold_exceeded' | 'history_ahead' | 'target_unavailable' | 'projection_unavailable';
 export interface TaskProjectionView {

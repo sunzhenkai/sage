@@ -138,3 +138,7 @@ export interface CatalogModelItem { modelId: string; providerId: string; name: s
 export interface CatalogModelPage { schemaVersion: '1'; snapshotId: string; activeSince: string; stale: boolean; items: CatalogModelItem[]; nextCursor?: string }
 export interface RunAgentSettings { schemaVersion: string; unset: boolean; providerConnectionId?: string; updatedAt?: string; updatedBy?: string; providers: { id: string; name: string; available: boolean; modelId?: string; models?: string[] }[] }
 export interface CatalogStatus { source: string; availability: string; snapshotId?: string; activeSince?: string; providerCount?: number; modelCount?: number; lastCheckedAt?: string; lastSuccessAt?: string; nextSyncAt?: string; projection?: string; [key: string]: unknown }
+export interface NetProbeRule { id: string; pattern: string; ports: number[]; enabled: boolean; description?: string; createdAt: string; updatedAt: string; updatedBy?: string }
+export interface NetProbeRuleWrite { pattern: string; ports?: number[]; enabled?: boolean; description?: string }
+export interface SshTarget { alias: string; host: string; port: number; username: string; hasKnownHostEntry: boolean; customCheckNames: string[]; enabled: boolean; credentialPresent: boolean; createdAt: string; updatedAt: string; updatedBy?: string }
+export interface SshTargetWrite { host: string; port?: number; username: string; knownHostEntry?: string; customChecks?: Record<string, string>; enabled?: boolean; privateKey?: string }

@@ -37,6 +37,8 @@ import { buildSnapshotEgressConnector, SNAPSHOT_EGRESS_ALLOWLIST_ENV } from './p
 import { registerRunAgentSettingsRoutes } from './run-agent-settings-api.js';
 import { registerMcpRoutes } from './mcp/index.js';
 import { bootstrapDeploymentEnvProviderConnection, registerProviderConnectionRoutes } from './provider-connections-api.js';
+import { registerSshTargetsRoutes } from './ssh-targets-api.js';
+import { registerNetProbeRulesRoutes } from './net-probe-rules-api.js';
 import { createRunOutputArtifactResolver } from './run-output-resolver.js';
 
 export interface ApiRuntimeConfig {
@@ -382,6 +384,8 @@ export async function createApiRuntime(config = readApiRuntimeConfig()): Promise
     }
     registerRunAgentSettingsRoutes(app, { tenantId: config.tenantId, settingsStore: tasks, providerConnections: tasks, authenticator });
     registerProviderConnectionRoutes(app, { tenantId: config.tenantId, store: tasks, secretBackend, authenticator });
+    registerSshTargetsRoutes(app, { tenantId: config.tenantId, store: tasks, secretBackend, authenticator });
+    registerNetProbeRulesRoutes(app, { tenantId: config.tenantId, store: tasks, authenticator });
     registerProviderCatalogRoutes(app, { service: catalogService, store: catalog, manager: catalogManager, authenticator });
     registerMcpRoutes(app, { serviceToken });
     await catalogManager.start();

@@ -4,9 +4,12 @@ import type { ChatModelSelection } from './connection-models';
 import type {
   AppCreateResult, AppDetail, AppDraft, AppRelease, AppReleaseDetail, AppReleaseResult, AppRunDetail, AppRunList, AppSummary,
   CatalogModelPage, CatalogProviderPage, CatalogStatus, ChatRun, Message,
+  NetProbeRule, NetProbeRuleWrite,
   PackageRunResult, ProviderConnection,
   ProviderConnectionCheck, ProviderConnectionCheckResult, ProviderConnectionModelsQuery, ProviderConnectionModelsResult, ProviderConnectionWrite, RunAgentSettings,
-  RunLogPage, ScheduleDefinition, ScheduleSnapshot, ScheduleTriggerEvent, Session, SessionDetail, SessionList, TaskArtifact, TaskArtifactList, TaskEvent,
+  RunLogPage, ScheduleDefinition, ScheduleSnapshot, ScheduleTriggerEvent, Session, SessionDetail, SessionList,
+  SshTarget, SshTargetWrite,
+  TaskArtifact, TaskArtifactList, TaskEvent,
   TaskStatus, TaskView, TimelineEvent
 } from './types';
 
@@ -184,5 +187,14 @@ export const api = {
     catalogModels: (query: { providerId?: string; q?: string; status?: string; limit?: number; cursor?: string } = {}) => request<CatalogModelPage>('GET', '/v1/provider-catalog/models', { query }),
     checkConnection: (body: ProviderConnectionCheck) => request<ProviderConnectionCheckResult>('POST', '/v1/provider-catalog/check-connection', { body }),
     connectionModels: (body: ProviderConnectionModelsQuery) => request<ProviderConnectionModelsResult>('POST', '/v1/provider-connections/models', { body })
+  },
+
+  capabilities: {
+    listNetProbeRules: () => request<{ items: NetProbeRule[] }>('GET', '/v1/net-probe-rules'),
+    upsertNetProbeRule: (id: string, body: NetProbeRuleWrite) => request<NetProbeRule>('PUT', `/v1/net-probe-rules/${enc(id)}`, { body }),
+    deleteNetProbeRule: (id: string) => request<{ deleted: boolean; id: string }>('DELETE', `/v1/net-probe-rules/${enc(id)}`),
+    listSshTargets: () => request<{ items: SshTarget[] }>('GET', '/v1/ssh-targets'),
+    upsertSshTarget: (alias: string, body: SshTargetWrite) => request<SshTarget>('PUT', `/v1/ssh-targets/${enc(alias)}`, { body }),
+    deleteSshTarget: (alias: string) => request<{ deleted: boolean; alias: string }>('DELETE', `/v1/ssh-targets/${enc(alias)}`)
   }
 };

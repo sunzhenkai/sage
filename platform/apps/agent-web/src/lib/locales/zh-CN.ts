@@ -791,6 +791,7 @@ export const zhCN = {
       shortcuts: { title: '快捷键', description: '无需离开键盘即可浏览控制台。' },
       general: { title: '连接', description: '控制台如何访问 agent-api。仅存储在 localStorage 中。' },
       mcp: { title: 'MCP', description: '让外部 MCP 客户端（如 Claude Code）操作 Sage。' },
+      capabilities: { title: '能力目标', description: '动态网络探测白名单与受控只读 SSH 检查目标（免重启即时生效）。' },
       status: { title: '状态', description: '对 agent-api 的实时探测。' },
       developer: { title: '开发者', description: '界面开发与截图工具。' }
     },
@@ -803,6 +804,7 @@ export const zhCN = {
       shortcuts: '快捷键',
       connection: '连接',
       mcp: 'MCP',
+      capabilities: '能力目标',
       status: '状态',
       developer: '开发者'
     },
@@ -831,6 +833,28 @@ export const zhCN = {
     shell: {
       searchAria: '搜索设置',
       empty: '没有匹配的设置：“{query}”。'
+    },
+    capabilities: {
+      netProbeCard: '网络探测白名单',
+      netProbeEmpty: '暂无规则。添加域名或子域通配符（如 *.example.com）后，探测工具无需重启即可生效。',
+      ruleIdPlaceholder: '规则 ID（如 primary-domain）',
+      rulePatternPlaceholder: '域名或通配符（如 *.example.com）',
+      rulePortsPlaceholder: '端口（如 443, 8443）',
+      ruleDescriptionPlaceholder: '备注（可选）',
+      addOrUpdateRule: '保存规则',
+      sshCard: '只读 SSH 目标',
+      sshEmpty: '暂无 SSH 目标。私钥经 secret-vault 加密落库，保存后永不明文回显。',
+      sshAliasPlaceholder: '别名（如 node-a）',
+      sshHostPlaceholder: '主机名或 IP',
+      sshPortPlaceholder: '端口（22）',
+      sshUsernamePlaceholder: '用户名',
+      sshKeyPlaceholder: '私钥（PEM / OpenSSH；仅改元数据时可留空）',
+      sshCustomChecksPlaceholder: '自定义只读检查 JSON（可选，如 {"app_check":"echo ok"}）',
+      addOrUpdateTarget: '保存目标',
+      credentialSealed: '已密封私钥',
+      credentialMissing: '未配置私钥',
+      invalidCustomChecks: '自定义检查必须是字符串值的 JSON 对象。',
+      remove: '删除'
     },
     general: {
       apiBaseUrl: { title: 'API 基础 URL', description: '留空 = 同源；开发服务器将 /v1 代理到 :9610。', placeholder: '同源' },

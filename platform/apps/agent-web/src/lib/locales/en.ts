@@ -787,6 +787,7 @@ export const en = {
       shortcuts: { title: 'Keyboard shortcuts', description: 'Navigate the console without leaving the keyboard.' },
       general: { title: 'Connection', description: 'How the console reaches agent-api. Stored in localStorage only.' },
       mcp: { title: 'MCP', description: 'Let external MCP clients such as Claude Code operate Sage.' },
+      capabilities: { title: 'Capabilities', description: 'Dynamic network probe allowlists and sealed read-only SSH inspection targets.' },
       status: { title: 'Status', description: 'Live probes against agent-api.' },
       developer: { title: 'Developer', description: 'Tools for UI development and screenshots.' }
     },
@@ -799,6 +800,7 @@ export const en = {
       shortcuts: 'Shortcuts',
       connection: 'Connection',
       mcp: 'MCP',
+      capabilities: 'Capabilities',
       status: 'Status',
       developer: 'Developer'
     },
@@ -827,6 +829,28 @@ export const en = {
     shell: {
       searchAria: 'Search settings',
       empty: 'No settings match “{query}”.'
+    },
+    capabilities: {
+      netProbeCard: 'Network probe allowlist',
+      netProbeEmpty: 'No rules yet. Add a domain or wildcard (e.g. *.example.com) to enable http_probe / tls_probe / tcp_probe immediately without restarting.',
+      ruleIdPlaceholder: 'Rule id (e.g. primary-domain)',
+      rulePatternPlaceholder: 'Pattern (e.g. *.example.com)',
+      rulePortsPlaceholder: 'Ports (e.g. 443, 8443)',
+      ruleDescriptionPlaceholder: 'Description (optional)',
+      addOrUpdateRule: 'Save rule',
+      sshCard: 'Read-only SSH targets',
+      sshEmpty: 'No SSH targets yet. Private keys are sealed with secret-vault and never echoed back.',
+      sshAliasPlaceholder: 'Alias (e.g. node-a)',
+      sshHostPlaceholder: 'Host or IP',
+      sshPortPlaceholder: 'Port (22)',
+      sshUsernamePlaceholder: 'Username',
+      sshKeyPlaceholder: 'Private key (PEM / OpenSSH, optional when updating metadata)',
+      sshCustomChecksPlaceholder: 'Custom read-only checks JSON (optional, e.g. {"app_check":"echo ok"})',
+      addOrUpdateTarget: 'Save target',
+      credentialSealed: 'Key sealed',
+      credentialMissing: 'No key',
+      invalidCustomChecks: 'Custom checks must be a valid JSON object of string commands.',
+      remove: 'Delete'
     },
     general: {
       apiBaseUrl: { title: 'API base URL', description: 'Empty = same origin; dev server proxies /v1 to :9610.', placeholder: 'Same origin' },

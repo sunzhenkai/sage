@@ -187,6 +187,35 @@ describe('schedule dispatcher activities', () => {
     const events = await store.listTriggerEvents({ tenantId: 'tenant-a', scheduleId: 'daily-brief' }, { limit: 50 });
     expect(events.every(event => event.kind === 'MISSED' && event.occurrenceId.startsWith('recon-'))).toBe(true);
   });
+
+  it('forwards capabilityRefs and multi-turn slice limits when triggering capability-enabled releases', async () => {
+    const store = new InMemoryScheduleControlStore();
+    await snapshot(store);
+    const recordedContracts: unknown[] = [];
+    const recordedSlices: unknown[] = [];
+    const probeManifest: PackageRunManifestSummary = {
+      ...manifest,
+      capabilityRefs: ['capability://net-probe-readonly/v1'],
+      budgets: { maxTurns: 12, maxToolCalls: 40, maxTokens: 60_000, maxDurationMs: 240_000 }
+    };
+    const activities = createScheduleDispatcherActivities({
+      scheduleStore: store,
+      ledger: ledgerOk(),
+      releaseResolver: resolver({
+        resolveRelease: async () => ({ ...resolution, manifest: probeManifest, references: [] })
+      }),
+      specStore: specStore(),
+      idempotencyStore: idempotencyStore(),
+      auditOutbox: auditOutbox(),
+      writePackageInput: async (record) => { recordedContracts.push(record.runContract); },
+      startRun: async (input) => { recordedSlices.push(input.slice); },
+      now: () => new Date(10_000)
+    });
+    const result = await activities.dispatchScheduleOccurrence(dispatchInput('cap-1'));
+    expect(result.outcome).toBe('SUCCEEDED');
+    expect(recordedContracts[0]).toMatchObject({ capabilityRefs: ['capability://net-probe-readonly/v1'] });
+    expect(recordedSlices[0]).toEqual({ maxTurns: 12, maxToolCalls: 40, maxTokens: 60_000, timeoutMs: 240_000 });
+  });
 });
 
 function createLedgerlessHarness(store: ScheduleControlStore) {

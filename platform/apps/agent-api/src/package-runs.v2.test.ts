@@ -270,4 +270,71 @@ describe('package runs v2 admission', () => {
     expect((second.json() as { taskId: string }).taskId).not.toBe((first.json() as { taskId: string }).taskId);
     expect(h.storedInputs).toHaveLength(2);
   });
+
+  it('persists declared capabilityRefs into runContract and passes multi-turn slice limits', async () => {
+    const manifestWithProbe = {
+      id: 'probe-app',
+      version: '1.0.0',
+      entry: 'prompts/system.md',
+      modelRoute: { provider: 'anthropic', model: 'claude-sonnet-4-5' },
+      skillRefs: [],
+      capabilityRefs: ['capability://net-probe-readonly/v1'],
+      budgets: { maxTurns: 10, maxToolCalls: 25, maxTokens: 50_000, maxDurationMs: 120_000 },
+      tasks: [{ name: 'audit', entry: 'prompts/system.md', params: [], output: { schema: 'output.schema.json', files: ['report.json'] } }]
+    };
+    const resolver: PackageReleaseResolver = {
+      async resolveRelease(_tenantId, releaseId) {
+        if (releaseId !== 'a'.repeat(64)) return undefined;
+        return { release: release as never, lockPayload: { manifest: manifestWithProbe as never, assets } };
+      }
+    };
+    const storedInputs: TaskPackageInputRecord[] = [];
+    const createdSlices: unknown[] = [];
+    const app = Fastify({ logger: false, ajv: { customOptions: { removeAdditional: false } } });
+    registerPackageRunsRoutes(app, {
+      tenantId: 'tenant-local',
+      controller: {
+        async create(input) {
+          createdSlices.push(input.slice);
+          return { workflow: { status: 'running' } } as unknown as TaskQueryResult;
+        },
+        async query() { throw new Error('unused'); },
+        async signal() { throw new Error('unused'); },
+        async cancel() { throw new Error('unused'); },
+        async retry() { throw new Error('unused'); }
+      },
+      releaseResolver: resolver,
+      taskStore: {
+        async writePackageInput(record) { storedInputs.push(record); return { status: 'stored' as const }; },
+        async getPackageInput() { return storedInputs[0]; }
+      },
+      specStore: new InMemoryAgentTaskSpecStore(),
+      settingsStore: {
+        async getRunAgentSettings() {
+          return { tenantId: 'tenant-local', providerConnectionId: 'conn-ok', updatedAt: '2026-08-25T00:00:00.000Z', updatedBy: 'principal://op' };
+        }
+      },
+      providerConnections: {
+        async listProviderConnections() {
+          return [{
+            tenantId: 'tenant-local', id: 'conn-ok', name: 'ok', source: 'user', adapterKind: 'anthropic',
+            baseUrl: 'https://api.example', modelId: 'm1', enabled: true, credentialPresent: true,
+            createdAt: '2026-08-25T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z'
+          }];
+        },
+        async getProviderConnection() { return undefined; }
+      },
+      authenticator: { authenticateRequest: () => operator },
+      deploymentMode: 'local'
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/v1/releases/${'a'.repeat(64)}/runs`,
+      payload: { task: 'audit', params: {} }
+    });
+    expect(response.statusCode).toBe(202);
+    expect(storedInputs[0]?.runContract?.capabilityRefs).toEqual(['capability://net-probe-readonly/v1']);
+    expect(createdSlices[0]).toEqual({ maxTurns: 10, maxToolCalls: 25, maxTokens: 50_000, timeoutMs: 120_000 });
+  });
 });

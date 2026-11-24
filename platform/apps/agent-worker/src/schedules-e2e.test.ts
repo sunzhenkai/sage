@@ -119,7 +119,12 @@ describe('ai-app-lifecycle-e2e (schedule path)', () => {
     const result = await harness.dispatchOccurrence(activities, { schemaVersion: '1', scheduleId: definition.scheduleId, tenantId: definition.tenantId, occurrenceId: 'occ-1', dueAtMs: 60_000 });
     expect(result.outcome).toBe('SUCCEEDED');
     // durable run：确定性 taskId + 已启动 workflow；包输入已物化；spec 可回读且 digest 与锚定 Release 一致。
-    expect(harness.startedRuns).toEqual([{ taskId: result.taskId!, inputRef: expect.stringContaining(`task-input://package/tenant-a/${result.taskId}`) }]);
+    expect(harness.startedRuns).toEqual([
+      expect.objectContaining({
+        taskId: result.taskId!,
+        inputRef: expect.stringContaining(`task-input://package/tenant-a/${result.taskId}`)
+      })
+    ]);
     expect(harness.writtenInputs).toEqual([result.taskId]);
     const spec = [...harness.specs.values()][0]!;
     expect(spec.taskId).toBe(result.taskId);

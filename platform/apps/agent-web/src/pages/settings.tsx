@@ -1,5 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
-import { Activity, Check, Code2, Copy, Eye, EyeOff, Keyboard, Monitor, Moon, Palette, Plug, RadioTower, RotateCcw, Server, Sun, X } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Activity, Check, Code2, Copy, Eye, EyeOff, Keyboard, Monitor, Moon, Palette, Plug, RadioTower, RotateCcw, Server, ShieldCheck, Sun, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
 import { Navigate, useParams } from 'react-router';
 import { CodeBlock } from '@/components/bui/code-block';
@@ -7,7 +7,7 @@ import { ViewTab, ViewTabs } from '@/components/layout/app-shell';
 import { SettingsCard, SettingsEmpty, SettingsFooter, SettingsItem, SettingsSearch, SettingsShell, SettingsTitle, type SettingsNavItem } from '@/components/layout/settings-shell';
 import { StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Input, Textarea } from '@/components/ui/input';
 import { JsonView, Kbd, Spinner } from '@/components/ui/misc';
 import { Switch } from '@/components/ui/switch';
 import { api } from '@/lib/api';
@@ -24,6 +24,7 @@ const pages = {
   shortcuts: { title: 'settings.pages.shortcuts.title', description: 'settings.pages.shortcuts.description' },
   general: { title: 'settings.pages.general.title', description: 'settings.pages.general.description' },
   mcp: { title: 'settings.pages.mcp.title', description: 'settings.pages.mcp.description' },
+  capabilities: { title: 'settings.pages.capabilities.title', description: 'settings.pages.capabilities.description' },
   status: { title: 'settings.pages.status.title', description: 'settings.pages.status.description' },
   developer: { title: 'settings.pages.developer.title', description: 'settings.pages.developer.description' }
 } as const;
@@ -31,7 +32,7 @@ type PageId = keyof typeof pages;
 
 const groups: { label: string; items: SettingsNavItem[] }[] = [
   { label: 'settings.groups.preferences', items: [{ to: '/settings/appearance', label: 'settings.nav.appearance', icon: Palette }, { to: '/settings/shortcuts', label: 'settings.nav.shortcuts', icon: Keyboard }] },
-  { label: 'settings.groups.system', items: [{ to: '/settings/general', label: 'settings.nav.connection', icon: Server }, { to: '/settings/mcp', label: 'settings.nav.mcp', icon: RadioTower }, { to: '/providers', label: 'nav.providers', icon: Plug, external: true }, { to: '/settings/status', label: 'settings.nav.status', icon: Activity }, { to: '/settings/developer', label: 'settings.nav.developer', icon: Code2 }] }
+  { label: 'settings.groups.system', items: [{ to: '/settings/general', label: 'settings.nav.connection', icon: Server }, { to: '/settings/mcp', label: 'settings.nav.mcp', icon: RadioTower }, { to: '/settings/capabilities', label: 'settings.nav.capabilities', icon: ShieldCheck }, { to: '/providers', label: 'nav.providers', icon: Plug, external: true }, { to: '/settings/status', label: 'settings.nav.status', icon: Activity }, { to: '/settings/developer', label: 'settings.nav.developer', icon: Code2 }] }
 ];
 
 /** `keywords` keeps the original English search terms; `texts` are the rendered (translated) labels. */
@@ -54,7 +55,7 @@ export function SettingsPage() {
           <div className="flex-1" />
           {reset ? <Button size="sm" variant="secondary" onClick={reset}><RotateCcw />{t('settings.resetToDefaults')}</Button> : null}
         </>} />
-      {id === 'appearance' ? <AppearanceSection q={q} /> : id === 'shortcuts' ? <ShortcutsSection q={q} /> : id === 'general' ? <ConnectionSection key={section} q={q} /> : id === 'mcp' ? <McpSection q={q} /> : id === 'status' ? <StatusSection q={q} /> : <DeveloperSection q={q} />}
+      {id === 'appearance' ? <AppearanceSection q={q} /> : id === 'shortcuts' ? <ShortcutsSection q={q} /> : id === 'general' ? <ConnectionSection key={section} q={q} /> : id === 'mcp' ? <McpSection q={q} /> : id === 'capabilities' ? <CapabilitiesSection q={q} /> : id === 'status' ? <StatusSection q={q} /> : <DeveloperSection q={q} />}
     </SettingsShell>
   );
 }
@@ -220,5 +221,185 @@ function McpSection({ q }: { q: string }) {
         </div>
       </SettingsItem>
     </SettingsCard>
+  );
+}
+
+function CapabilitiesSection({ q }: { q: string }) {
+  const t = useT();
+  const qc = useQueryClient();
+
+  const rulesQuery = useQuery({ queryKey: ['net-probe-rules'], queryFn: () => api.capabilities.listNetProbeRules() });
+  const sshQuery = useQuery({ queryKey: ['ssh-targets'], queryFn: () => api.capabilities.listSshTargets() });
+
+  const [ruleForm, setRuleForm] = useState({ id: '', pattern: '', ports: '443', description: '' });
+  const [ruleError, setRuleError] = useState<string | null>(null);
+  const saveRule = useMutation({
+    mutationFn: () => {
+      const ports = ruleForm.ports
+        .split(/[,\s]+/)
+        .map((s) => Number(s.trim()))
+        .filter((n) => Number.isInteger(n) && n >= 1 && n <= 65_535);
+      return api.capabilities.upsertNetProbeRule(ruleForm.id.trim(), {
+        pattern: ruleForm.pattern.trim(),
+        ports: ports.length > 0 ? ports : [443],
+        enabled: true,
+        ...(ruleForm.description.trim() ? { description: ruleForm.description.trim() } : {})
+      });
+    },
+    onSuccess: async () => {
+      setRuleError(null);
+      setRuleForm({ id: '', pattern: '', ports: '443', description: '' });
+      await qc.invalidateQueries({ queryKey: ['net-probe-rules'] });
+    },
+    onError: (err) => setRuleError(errorDisplay(err).text)
+  });
+
+  const toggleRule = useMutation({
+    mutationFn: (r: { id: string; pattern: string; ports: number[]; enabled: boolean; description?: string }) =>
+      api.capabilities.upsertNetProbeRule(r.id, {
+        pattern: r.pattern,
+        ports: r.ports,
+        enabled: !r.enabled,
+        ...(r.description ? { description: r.description } : {})
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['net-probe-rules'] })
+  });
+
+  const removeRule = useMutation({
+    mutationFn: (id: string) => api.capabilities.deleteNetProbeRule(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['net-probe-rules'] })
+  });
+
+  const [sshForm, setSshForm] = useState({ alias: '', host: '', port: '22', username: '', privateKey: '', customChecks: '' });
+  const [sshError, setSshError] = useState<string | null>(null);
+  const saveSsh = useMutation({
+    mutationFn: () => {
+      let customChecks: Record<string, string> | undefined;
+      if (sshForm.customChecks.trim()) {
+        const parsed = JSON.parse(sshForm.customChecks) as unknown;
+        if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          throw new Error(t('settings.capabilities.invalidCustomChecks'));
+        }
+        customChecks = {};
+        for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
+          if (typeof v !== 'string') throw new Error(t('settings.capabilities.invalidCustomChecks'));
+          customChecks[k] = v;
+        }
+      }
+      const port = Number(sshForm.port.trim() || '22');
+      return api.capabilities.upsertSshTarget(sshForm.alias.trim(), {
+        host: sshForm.host.trim(),
+        port: Number.isInteger(port) && port >= 1 && port <= 65_535 ? port : 22,
+        username: sshForm.username.trim(),
+        enabled: true,
+        ...(sshForm.privateKey.trim() ? { privateKey: sshForm.privateKey } : {}),
+        ...(customChecks ? { customChecks } : {})
+      });
+    },
+    onSuccess: async () => {
+      setSshError(null);
+      setSshForm({ alias: '', host: '', port: '22', username: '', privateKey: '', customChecks: '' });
+      await qc.invalidateQueries({ queryKey: ['ssh-targets'] });
+    },
+    onError: (err) => setSshError(errorDisplay(err).text)
+  });
+
+  const toggleSsh = useMutation({
+    mutationFn: (target: { alias: string; host: string; port: number; username: string; enabled: boolean }) =>
+      api.capabilities.upsertSshTarget(target.alias, {
+        host: target.host,
+        port: target.port,
+        username: target.username,
+        enabled: !target.enabled
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['ssh-targets'] })
+  });
+
+  const removeSsh = useMutation({
+    mutationFn: (alias: string) => api.capabilities.deleteSshTarget(alias),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['ssh-targets'] })
+  });
+
+  const showNet = match(q, t('settings.capabilities.netProbeCard'), 'net probe allowlist wildcard domain http tls tcp');
+  const showSsh = match(q, t('settings.capabilities.sshCard'), 'ssh targets private key secret vault');
+  if (!showNet && !showSsh) return <SettingsEmpty q={q} />;
+
+  const rules = rulesQuery.data?.items ?? [];
+  const targets = sshQuery.data?.items ?? [];
+
+  return (
+    <div className="space-y-4">
+      {showNet ? (
+        <SettingsCard title={t('settings.capabilities.netProbeCard')}>
+          {rules.length === 0 ? (
+            <SettingsItem title={t('settings.capabilities.netProbeEmpty')} />
+          ) : rules.map((r) => (
+            <SettingsItem key={r.id} title={`${r.id} · ${r.pattern}`} description={`${r.ports.join(', ')}${r.description ? ` — ${r.description}` : ''}`}>
+              <Switch checked={r.enabled} label={r.id} onChange={() => toggleRule.mutate(r)} />
+              <Button size="icon-sm" variant="ghost" title={t('settings.capabilities.remove')} onClick={() => removeRule.mutate(r.id)}><Trash2 /></Button>
+            </SettingsItem>
+          ))}
+          <SettingsItem title={t('settings.capabilities.addOrUpdateRule')} stacked>
+            <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2">
+              <Input placeholder={t('settings.capabilities.ruleIdPlaceholder')} value={ruleForm.id} onChange={(e) => setRuleForm((s) => ({ ...s, id: e.target.value }))} />
+              <Input placeholder={t('settings.capabilities.rulePatternPlaceholder')} value={ruleForm.pattern} onChange={(e) => setRuleForm((s) => ({ ...s, pattern: e.target.value }))} />
+              <Input placeholder={t('settings.capabilities.rulePortsPlaceholder')} value={ruleForm.ports} onChange={(e) => setRuleForm((s) => ({ ...s, ports: e.target.value }))} />
+              <Input placeholder={t('settings.capabilities.ruleDescriptionPlaceholder')} value={ruleForm.description} onChange={(e) => setRuleForm((s) => ({ ...s, description: e.target.value }))} />
+            </div>
+            <div className="mt-2 flex items-center gap-3">
+              <Button size="sm" variant="secondary" disabled={saveRule.isPending || !ruleForm.id.trim() || !ruleForm.pattern.trim()} onClick={() => saveRule.mutate()}>
+                {t('settings.capabilities.addOrUpdateRule')}
+              </Button>
+              {ruleError ? <span className="t-meta text-red">{ruleError}</span> : null}
+            </div>
+          </SettingsItem>
+        </SettingsCard>
+      ) : null}
+
+      {showSsh ? (
+        <SettingsCard title={t('settings.capabilities.sshCard')}>
+          {targets.length === 0 ? (
+            <SettingsItem title={t('settings.capabilities.sshEmpty')} />
+          ) : targets.map((target) => (
+            <SettingsItem
+              key={target.alias}
+              title={`${target.alias} · ${target.username}@${target.host}:${target.port}`}
+              description={`${target.credentialPresent ? t('settings.capabilities.credentialSealed') : t('settings.capabilities.credentialMissing')}${target.customCheckNames.length > 0 ? ` · ${target.customCheckNames.join(', ')}` : ''}`}
+            >
+              <Switch checked={target.enabled} label={target.alias} onChange={() => toggleSsh.mutate(target)} />
+              <Button size="icon-sm" variant="ghost" title={t('settings.capabilities.remove')} onClick={() => removeSsh.mutate(target.alias)}><Trash2 /></Button>
+            </SettingsItem>
+          ))}
+          <SettingsItem title={t('settings.capabilities.addOrUpdateTarget')} stacked>
+            <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2">
+              <Input placeholder={t('settings.capabilities.sshAliasPlaceholder')} value={sshForm.alias} onChange={(e) => setSshForm((s) => ({ ...s, alias: e.target.value }))} />
+              <Input placeholder={t('settings.capabilities.sshHostPlaceholder')} value={sshForm.host} onChange={(e) => setSshForm((s) => ({ ...s, host: e.target.value }))} />
+              <Input placeholder={t('settings.capabilities.sshPortPlaceholder')} value={sshForm.port} onChange={(e) => setSshForm((s) => ({ ...s, port: e.target.value }))} />
+              <Input placeholder={t('settings.capabilities.sshUsernamePlaceholder')} value={sshForm.username} onChange={(e) => setSshForm((s) => ({ ...s, username: e.target.value }))} />
+            </div>
+            <Textarea
+              className="mt-2 font-mono text-[12px]"
+              rows={3}
+              placeholder={t('settings.capabilities.sshKeyPlaceholder')}
+              value={sshForm.privateKey}
+              onChange={(e) => setSshForm((s) => ({ ...s, privateKey: e.target.value }))}
+            />
+            <Textarea
+              className="mt-2 font-mono text-[12px]"
+              rows={2}
+              placeholder={t('settings.capabilities.sshCustomChecksPlaceholder')}
+              value={sshForm.customChecks}
+              onChange={(e) => setSshForm((s) => ({ ...s, customChecks: e.target.value }))}
+            />
+            <div className="mt-2 flex items-center gap-3">
+              <Button size="sm" variant="secondary" disabled={saveSsh.isPending || !sshForm.alias.trim() || !sshForm.host.trim() || !sshForm.username.trim()} onClick={() => saveSsh.mutate()}>
+                {t('settings.capabilities.addOrUpdateTarget')}
+              </Button>
+              {sshError ? <span className="t-meta text-red">{sshError}</span> : null}
+            </div>
+          </SettingsItem>
+        </SettingsCard>
+      ) : null}
+    </div>
   );
 }

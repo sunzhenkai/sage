@@ -1,0 +1,3 @@
+schema: spec-driven
+created: 2026-11-24
+goal: 新增 secret-vault 托管的受控 SSH 目标与只读主机检查能力 capability://ssh-readonly-inspect/v1

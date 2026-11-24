@@ -68,4 +68,19 @@ describe('MCP tool registry 覆盖断言', () => {
     const list = allTools.find((tool) => tool.name === 'app_list_releases');
     expect(list?.build({ appId: 'demo' })).toEqual({ method: 'GET', path: '/v1/apps/demo/releases' });
   });
+
+  it('包含 net_probe_rule 与 ssh_target 工具并映射正确路径', () => {
+    const upsertRule = allTools.find((t) => t.name === 'net_probe_rule_upsert');
+    expect(upsertRule?.build({ id: 'wii', pattern: '*.example.com', ports: [443] })).toEqual({
+      method: 'PUT',
+      path: '/v1/net-probe-rules/wii',
+      body: { pattern: '*.example.com', ports: [443] },
+    });
+    const upsertSsh = allTools.find((t) => t.name === 'ssh_target_upsert');
+    expect(upsertSsh?.build({ alias: 'node-a', host: '203.0.113.1', username: 'ro' })).toEqual({
+      method: 'PUT',
+      path: '/v1/ssh-targets/node-a',
+      body: { host: '203.0.113.1', username: 'ro' },
+    });
+  });
 });

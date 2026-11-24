@@ -5,6 +5,8 @@ import {
   type AgentSliceResult, type ExecuteAgentSliceInput, type ProviderConnectionAdapterKind, type ProviderConnectionRecord, type ProviderConnectionSource,
   type ProviderConnectionWrite, type ProviderCredentialSealed, type RouteDecision,
   type RunAgentSettingsRecord,
+  type SshCredentialSealed, type SshTargetRecord, type SshTargetStore, type SshTargetWrite,
+  type NetProbeRuleRecord, type NetProbeRuleStore, type NetProbeRuleWrite,
   type SliceClaim, type TaskArtifactReference, type TaskListFilter, type TaskPackageInputRecord, type TaskPackageRunIndexEntry,
   type TaskPackageRunIndexFilter, type TaskProjection, type TaskProjectionEvent,
   type TaskRunOutputRecord,
@@ -79,6 +81,17 @@ interface ProviderConnectionRow extends QueryResultRow {
 interface ProviderCredentialRow extends QueryResultRow {
   ciphertext: Buffer; key_version: number; updated_at: Date | string;
 }
+
+interface SshTargetRow extends QueryResultRow {
+  tenant_id: string; alias: string; host: string; port: number; username: string;
+  known_host_entry: string | null; custom_checks: unknown; enabled: boolean;
+  credential_present: boolean; created_at: Date | string; updated_at: Date | string; updated_by: string | null;
+}
+
+interface NetProbeRuleRow extends QueryResultRow {
+  tenant_id: string; id: string; pattern: string; ports: number[];
+  enabled: boolean; description: string | null; created_at: Date | string; updated_at: Date | string; updated_by: string | null;
+}
 const iso = (value: Date | string): string => value instanceof Date ? value.toISOString() : new Date(value).toISOString();
 
 interface TaskViewRow extends RoutingRow {
@@ -130,7 +143,9 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
       new URL('../../task-domain/migrations/008_output_package_and_failure.sql', import.meta.url),
       new URL('../../task-domain/migrations/009_provider_connection_models.sql', import.meta.url),
       new URL('../../task-domain/migrations/010_task_state_generation.sql', import.meta.url),
-      new URL('../../task-domain/migrations/011_artifact_role.sql', import.meta.url)
+      new URL('../../task-domain/migrations/011_artifact_role.sql', import.meta.url),
+      new URL('../../task-domain/migrations/012_ssh_targets.sql', import.meta.url),
+      new URL('../../task-domain/migrations/013_net_probe_rules.sql', import.meta.url)
     ];
     const migrations = (await Promise.all(migrationUrls.map((url) => readFile(url, 'utf8'))))
       .map((sql) => sql.replace(/^\s*BEGIN;\s*/, '').replace(/\s*COMMIT;\s*$/, '').trim());
@@ -931,4 +946,162 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
       WHERE tenant_id=$1 AND id=$2 RETURNING id`, [tenantId, id]);
     return deleted.rowCount === 1;
   }
+
+  #sshTargetOf(row: SshTargetRow): SshTargetRecord {
+    const rawChecks = typeof row.custom_checks === 'object' && row.custom_checks !== null && !Array.isArray(row.custom_checks)
+      ? row.custom_checks as Record<string, unknown>
+      : {};
+    const customChecks: Record<string, string> = {};
+    for (const [k, v] of Object.entries(rawChecks)) {
+      if (typeof v === 'string') customChecks[k] = v;
+    }
+    return {
+      tenantId: row.tenant_id,
+      alias: row.alias,
+      host: row.host,
+      port: row.port,
+      username: row.username,
+      ...(row.known_host_entry === null ? {} : { knownHostEntry: row.known_host_entry }),
+      customChecks,
+      enabled: row.enabled,
+      credentialPresent: row.credential_present,
+      createdAt: iso(row.created_at),
+      updatedAt: iso(row.updated_at),
+      ...(row.updated_by === null ? {} : { updatedBy: row.updated_by }),
+    };
+  }
+
+  async listSshTargets(tenantId: string): Promise<readonly SshTargetRecord[]> {
+    if (typeof tenantId !== 'string') throw new TaskStoreError('listSshTargets.invalid');
+    const result = await this.#query<SshTargetRow>('listSshTargets', `SELECT
+      t.tenant_id, t.alias, t.host, t.port, t.username, t.known_host_entry, t.custom_checks,
+      t.enabled, t.created_at, t.updated_at, t.updated_by,
+      (c.alias IS NOT NULL) AS credential_present
+      FROM ssh_targets t
+      LEFT JOIN ssh_credentials c ON c.tenant_id = t.tenant_id AND c.alias = t.alias
+      WHERE t.tenant_id=$1 ORDER BY t.alias`, [tenantId]);
+    return result.rows.map((row) => this.#sshTargetOf(row));
+  }
+
+  async getSshTarget(tenantId: string, alias: string): Promise<SshTargetRecord | undefined> {
+    if (typeof tenantId !== 'string' || typeof alias !== 'string') throw new TaskStoreError('getSshTarget.invalid');
+    const result = await this.#query<SshTargetRow>('getSshTarget', `SELECT
+      t.tenant_id, t.alias, t.host, t.port, t.username, t.known_host_entry, t.custom_checks,
+      t.enabled, t.created_at, t.updated_at, t.updated_by,
+      (c.alias IS NOT NULL) AS credential_present
+      FROM ssh_targets t
+      LEFT JOIN ssh_credentials c ON c.tenant_id = t.tenant_id AND c.alias = t.alias
+      WHERE t.tenant_id=$1 AND t.alias=$2`, [tenantId, alias]);
+    const row = result.rows[0];
+    return row === undefined ? undefined : this.#sshTargetOf(row);
+  }
+
+  async upsertSshTarget(tenantId: string, alias: string, write: SshTargetWrite, nowIso: string): Promise<SshTargetRecord> {
+    if (typeof tenantId !== 'string' || typeof alias !== 'string' || alias.length === 0 || typeof nowIso !== 'string' || write === null || typeof write !== 'object') {
+      throw new TaskStoreError('upsertSshTarget.invalid');
+    }
+    const client = await this.#pool.connect();
+    try {
+      await client.query('BEGIN');
+      const upserted = await client.query<SshTargetRow>(`INSERT INTO ssh_targets
+        (tenant_id, alias, host, port, username, known_host_entry, custom_checks, enabled, created_at, updated_at, updated_by)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$9,$10)
+        ON CONFLICT (tenant_id, alias) DO UPDATE SET
+          host=EXCLUDED.host,
+          port=EXCLUDED.port,
+          username=EXCLUDED.username,
+          known_host_entry=EXCLUDED.known_host_entry,
+          custom_checks=EXCLUDED.custom_checks,
+          enabled=EXCLUDED.enabled,
+          updated_at=EXCLUDED.updated_at,
+          updated_by=EXCLUDED.updated_by
+        RETURNING tenant_id, alias, host, port, username, known_host_entry, custom_checks, enabled, created_at, updated_at, updated_by, false AS credential_present`,
+      [tenantId, alias, write.host, write.port, write.username, write.knownHostEntry ?? null,
+        json(write.customChecks ?? {}), write.enabled, iso(nowIso), write.updatedBy ?? null]);
+      let credentialPresent = false;
+      if (write.credential !== undefined) {
+        await client.query(`INSERT INTO ssh_credentials (tenant_id, alias, ciphertext, key_version, updated_at)
+          VALUES ($1,$2,$3,$4,$5) ON CONFLICT (tenant_id, alias) DO UPDATE SET
+          ciphertext=EXCLUDED.ciphertext, key_version=EXCLUDED.key_version, updated_at=EXCLUDED.updated_at`,
+        [tenantId, alias, write.credential.ciphertext, write.credential.keyVersion, iso(write.credential.updatedAt)]);
+        credentialPresent = true;
+      } else {
+        const existing = await client.query('SELECT alias FROM ssh_credentials WHERE tenant_id=$1 AND alias=$2', [tenantId, alias]);
+        credentialPresent = existing.rows[0] !== undefined;
+      }
+      await client.query('COMMIT');
+      return this.#sshTargetOf({ ...upserted.rows[0]!, credential_present: credentialPresent });
+    } catch (cause) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw new TaskStoreError('upsertSshTarget', { cause });
+    } finally {
+      client.release();
+    }
+  }
+
+  async getSshCredential(tenantId: string, alias: string): Promise<SshCredentialSealed | undefined> {
+    if (typeof tenantId !== 'string' || typeof alias !== 'string') throw new TaskStoreError('getSshCredential.invalid');
+    const result = await this.#query<ProviderCredentialRow>('getSshCredential', `SELECT
+      ciphertext, key_version, updated_at FROM ssh_credentials WHERE tenant_id=$1 AND alias=$2`, [tenantId, alias]);
+    const row = result.rows[0];
+    if (row === undefined) return undefined;
+    return { ciphertext: row.ciphertext, keyVersion: row.key_version, updatedAt: iso(row.updated_at) };
+  }
+
+  async deleteSshTarget(tenantId: string, alias: string): Promise<boolean> {
+    if (typeof tenantId !== 'string' || typeof alias !== 'string') throw new TaskStoreError('deleteSshTarget.invalid');
+    const deleted = await this.#query('deleteSshTarget', `DELETE FROM ssh_targets
+      WHERE tenant_id=$1 AND alias=$2 RETURNING alias`, [tenantId, alias]);
+    return deleted.rowCount === 1;
+  }
+
+  #netProbeRuleOf(row: NetProbeRuleRow): NetProbeRuleRecord {
+    return {
+      tenantId: row.tenant_id,
+      id: row.id,
+      pattern: row.pattern,
+      ports: row.ports,
+      enabled: row.enabled,
+      ...(row.description === null ? {} : { description: row.description }),
+      createdAt: iso(row.created_at),
+      updatedAt: iso(row.updated_at),
+      ...(row.updated_by === null ? {} : { updatedBy: row.updated_by }),
+    };
+  }
+
+  async listNetProbeRules(tenantId: string): Promise<readonly NetProbeRuleRecord[]> {
+    if (typeof tenantId !== 'string') throw new TaskStoreError('listNetProbeRules.invalid');
+    const result = await this.#query<NetProbeRuleRow>('listNetProbeRules', `SELECT
+      tenant_id, id, pattern, ports, enabled, description, created_at, updated_at, updated_by
+      FROM net_probe_rules WHERE tenant_id=$1 ORDER BY id`, [tenantId]);
+    return result.rows.map((row) => this.#netProbeRuleOf(row));
+  }
+
+  async upsertNetProbeRule(tenantId: string, id: string, write: NetProbeRuleWrite, nowIso: string): Promise<NetProbeRuleRecord> {
+    if (typeof tenantId !== 'string' || typeof id !== 'string' || id.length === 0 || typeof nowIso !== 'string' || write === null || typeof write !== 'object') {
+      throw new TaskStoreError('upsertNetProbeRule.invalid');
+    }
+    const result = await this.#query<NetProbeRuleRow>('upsertNetProbeRule', `INSERT INTO net_probe_rules
+      (tenant_id, id, pattern, ports, enabled, description, created_at, updated_at, updated_by)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$7,$8)
+      ON CONFLICT (tenant_id, id) DO UPDATE SET
+        pattern=EXCLUDED.pattern,
+        ports=EXCLUDED.ports,
+        enabled=EXCLUDED.enabled,
+        description=EXCLUDED.description,
+        updated_at=EXCLUDED.updated_at,
+        updated_by=EXCLUDED.updated_by
+      RETURNING tenant_id, id, pattern, ports, enabled, description, created_at, updated_at, updated_by`,
+    [tenantId, id, write.pattern, [...write.ports], write.enabled, write.description ?? null, iso(nowIso), write.updatedBy ?? null]);
+    return this.#netProbeRuleOf(result.rows[0]!);
+  }
+
+  async deleteNetProbeRule(tenantId: string, id: string): Promise<boolean> {
+    if (typeof tenantId !== 'string' || typeof id !== 'string') throw new TaskStoreError('deleteNetProbeRule.invalid');
+    const deleted = await this.#query('deleteNetProbeRule', `DELETE FROM net_probe_rules
+      WHERE tenant_id=$1 AND id=$2 RETURNING id`, [tenantId, id]);
+    return deleted.rowCount === 1;
+  }
 }
+
+export type { SshTargetStore, NetProbeRuleStore };

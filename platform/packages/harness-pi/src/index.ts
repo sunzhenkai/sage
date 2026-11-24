@@ -1,4 +1,14 @@
-import { complete as piComplete, type AssistantMessage, type Context, type Message as PiMessage, type Model, type UserMessage } from '@mariozechner/pi-ai';
+import {
+  complete as piComplete,
+  type AssistantMessage,
+  type Context,
+  type Message as PiMessage,
+  type Model,
+  type Tool as PiTool,
+  type ToolCall as PiToolCall,
+  type ToolResultMessage as PiToolResultMessage,
+  type UserMessage
+} from '@mariozechner/pi-ai';
 import {
   sha256Digest,
   type CheckpointCandidate,
@@ -28,6 +38,24 @@ export interface LiveProviderTurnMessage {
   readonly text: string;
 }
 
+export type LiveProviderToolSpec = PiTool;
+
+export interface LiveProviderToolCall {
+  readonly id: string;
+  readonly name: string;
+  readonly arguments: Record<string, unknown>;
+}
+
+export interface LiveProviderToolExecutionResult {
+  readonly content: string;
+  readonly isError?: boolean;
+}
+
+export type LiveProviderToolExecutor = (
+  call: LiveProviderToolCall,
+  signal: AbortSignal
+) => Promise<LiveProviderToolExecutionResult>;
+
 export interface LiveProviderCompletion {
   readonly text: string;
   readonly tokens: number;
@@ -35,6 +63,10 @@ export interface LiveProviderCompletion {
   readonly done?: boolean;
   /** 可选暂停标记（配合 done:false），由 Runner 归一为 paused 终态。 */
   readonly pause?: boolean;
+  /** 模型发出的工具调用列表；非空时进入下一轮工具执行。 */
+  readonly toolCalls?: readonly LiveProviderToolCall[];
+  /** 原始模型消息，供多轮 tool-use 对话原样回填。 */
+  readonly assistantMessage?: AssistantMessage;
 }
 
 /** Injectable completion boundary so the pi-ai mapping stays unit-testable. */
@@ -42,6 +74,8 @@ export type LiveProviderInvoker = (input: {
   readonly route: LiveProviderRoute;
   readonly systemPrompt: string;
   readonly messages: readonly LiveProviderTurnMessage[];
+  readonly piMessages?: readonly PiMessage[];
+  readonly tools?: readonly LiveProviderToolSpec[];
   readonly maxTokens: number;
   readonly signal: AbortSignal;
 }) => Promise<LiveProviderCompletion>;
@@ -93,6 +127,9 @@ export class LiveProviderHarness implements HarnessPort {
   readonly #maxOutputTokens: number;
   readonly #systemPrompt: string;
   readonly #turnInput: boolean;
+  readonly #tools: readonly LiveProviderToolSpec[];
+  readonly #executeTool?: LiveProviderToolExecutor;
+  #conversation?: PiMessage[];
 
   constructor(options: {
     readonly route: LiveProviderRoute;
@@ -101,30 +138,118 @@ export class LiveProviderHarness implements HarnessPort {
     readonly maxOutputTokens?: number;
     readonly systemPrompt?: string;
     readonly turnInput?: boolean;
+    readonly tools?: readonly LiveProviderToolSpec[];
+    readonly executeTool?: LiveProviderToolExecutor;
   }) {
-    this.capabilities = { harness: 'pi-live', version: '0.73.1', supported: ['events', 'cancellation'] };
+    const tools = options.tools ?? [];
+    const hasTools = tools.length > 0 && options.executeTool !== undefined;
+    this.capabilities = {
+      harness: 'pi-live',
+      version: '0.73.1',
+      supported: hasTools ? ['events', 'cancellation', 'tools'] : ['events', 'cancellation']
+    };
     this.#route = options.route;
     this.#transcript = options.transcript;
     this.#invoker = options.invoker ?? defaultLiveInvoker;
     this.#maxOutputTokens = options.maxOutputTokens ?? 4_096;
     this.#systemPrompt = options.systemPrompt ?? SYSTEM_PROMPT;
     this.#turnInput = options.turnInput ?? false;
+    this.#tools = tools;
+    if (options.executeTool !== undefined) this.#executeTool = options.executeTool;
   }
 
   async executeTurn(request: HarnessTurnRequest, signal: AbortSignal): Promise<HarnessTurnResult> {
     if (request.skillRefs.length > 0) throw new Error('Live provider harness does not support skills');
+    const maxTokens = Math.max(1, Math.min(this.#maxOutputTokens, request.remaining.tokens));
+    const hasTools = this.#tools.length > 0 && this.#executeTool !== undefined;
+    if (!hasTools) {
+      const completion = await this.#invoker({
+        route: this.#route,
+        systemPrompt: this.#systemPrompt,
+        messages: this.#turnInput ? [{ role: 'user', text: request.input }] : this.#transcript,
+        maxTokens,
+        signal
+      });
+      return { output: completion.text, done: completion.done ?? true, toolCalls: 0, tokens: completion.tokens, ...(completion.pause === true ? { pause: true } : {}) };
+    }
+
+    if (this.#conversation === undefined) {
+      this.#conversation = [{ role: 'user', content: request.input, timestamp: Date.now() }];
+    }
     const completion = await this.#invoker({
       route: this.#route,
       systemPrompt: this.#systemPrompt,
-      messages: this.#turnInput ? [{ role: 'user', text: request.input }] : this.#transcript,
-      maxTokens: Math.max(1, Math.min(this.#maxOutputTokens, request.remaining.tokens)),
+      messages: [{ role: 'user', text: request.input }],
+      piMessages: this.#conversation,
+      tools: this.#tools,
+      maxTokens,
       signal
     });
-    return { output: completion.text, done: completion.done ?? true, toolCalls: 0, tokens: completion.tokens, ...(completion.pause === true ? { pause: true } : {}) };
+
+    const toolCalls = completion.toolCalls ?? [];
+    if (toolCalls.length > 0) {
+      // 超出剩余工具预算时不执行外部调用，交由 AgentRunner 以 TOOL_BUDGET_EXHAUSTED 收口。
+      if (toolCalls.length > request.remaining.toolCalls) {
+        return { output: completion.text, done: false, toolCalls: toolCalls.length, tokens: completion.tokens };
+      }
+      const assistantMessage: AssistantMessage = completion.assistantMessage ?? {
+        role: 'assistant',
+        content: [
+          ...(completion.text.length > 0 ? [{ type: 'text' as const, text: completion.text }] : []),
+          ...toolCalls.map((call): PiToolCall => ({ type: 'toolCall', id: call.id, name: call.name, arguments: call.arguments }))
+        ],
+        api: this.#route.adapterKind === 'anthropic' ? 'anthropic-messages' : 'openai-completions',
+        provider: this.#route.adapterKind,
+        model: this.#route.modelId,
+        usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: completion.tokens, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+        stopReason: 'toolUse',
+        timestamp: Date.now()
+      };
+      this.#conversation.push(assistantMessage);
+
+      for (const call of toolCalls) {
+        if (signal.aborted) throw new Error('Live provider tool execution aborted');
+        let execResult: LiveProviderToolExecutionResult;
+        try {
+          execResult = await this.#executeTool!(call, signal);
+        } catch (cause) {
+          execResult = {
+            content: JSON.stringify({
+              ok: false,
+              errorCode: 'TOOL_EXECUTION_FAILED',
+              message: cause instanceof Error ? cause.message : 'Tool execution failed'
+            }),
+            isError: true
+          };
+        }
+        const toolResultMessage: PiToolResultMessage = {
+          role: 'toolResult',
+          toolCallId: call.id,
+          toolName: call.name,
+          content: [{ type: 'text', text: execResult.content }],
+          isError: execResult.isError === true,
+          timestamp: Date.now()
+        };
+        this.#conversation.push(toolResultMessage);
+      }
+
+      return { output: completion.text, done: false, toolCalls: toolCalls.length, tokens: completion.tokens };
+    }
+
+    if (completion.assistantMessage !== undefined) {
+      this.#conversation.push(completion.assistantMessage);
+    }
+    return {
+      output: completion.text,
+      done: completion.done ?? true,
+      toolCalls: 0,
+      tokens: completion.tokens,
+      ...(completion.pause === true ? { pause: true } : {})
+    };
   }
 }
 
-export const defaultLiveInvoker: LiveProviderInvoker = async ({ route, systemPrompt, messages, maxTokens, signal }) => {
+export const defaultLiveInvoker: LiveProviderInvoker = async ({ route, systemPrompt, messages, piMessages: rawPiMessages, tools, maxTokens, signal }) => {
   const model: Model<'openai-completions' | 'anthropic-messages'> = {
     id: route.modelId,
     name: route.modelId,
@@ -137,7 +262,11 @@ export const defaultLiveInvoker: LiveProviderInvoker = async ({ route, systemPro
     contextWindow: 128_000,
     maxTokens: Math.max(maxTokens, 1_024)
   };
-  const context: Context = { systemPrompt, messages: piMessages(messages) };
+  const context: Context = {
+    systemPrompt,
+    messages: rawPiMessages !== undefined ? [...rawPiMessages] : piMessages(messages),
+    ...(tools !== undefined && tools.length > 0 ? { tools: [...tools] } : {})
+  };
   const message = await piComplete(model, context, { apiKey: route.apiKey, maxTokens, signal });
   if (message.stopReason === 'error') throw new Error(message.errorMessage ?? 'Live provider call failed');
   if (message.stopReason === 'aborted') throw new Error('Live provider call aborted');
@@ -145,6 +274,12 @@ export const defaultLiveInvoker: LiveProviderInvoker = async ({ route, systemPro
     .filter((part): part is { type: 'text'; text: string } => part.type === 'text')
     .map((part) => part.text)
     .join('');
+  const toolCalls: LiveProviderToolCall[] = message.content
+    .filter((part): part is PiToolCall => part.type === 'toolCall')
+    .map((part) => ({ id: part.id, name: part.name, arguments: part.arguments }));
+  if (toolCalls.length > 0) {
+    return { text, tokens: message.usage.totalTokens, done: false, toolCalls, assistantMessage: message };
+  }
   if (text.trim().length === 0) throw new Error('Live provider returned an empty response');
   return { text, tokens: message.usage.totalTokens };
 };

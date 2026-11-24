@@ -81,12 +81,15 @@ export async function createScheduleDispatcher(config: ScheduleDispatcherConfig,
     },
     auditOutbox: { async append(input) { process.stdout.write(`[schedule-admission-audit] ${JSON.stringify(input.record)}\n`); return 'stored' as const; } },
     writePackageInput: async (record) => { await tasks.writePackageInput(record as never); },
-    startRun: async ({ taskId, inputRef }) => {
+    startRun: async ({ taskId, inputRef, slice }) => {
       // 与 temporal-routing 的 workflowIdFor 同构（worker 不依赖控制面路由包）。
       const workflowId = `${config.tenantId}:${taskId}`;
       const input = {
         schemaVersion: '1' as const, taskType: TASK_TYPE, taskId, tenantId: config.tenantId,
-        workflowId, targetId: TASK_TARGET, inputRef, attempt: 1
+        workflowId, targetId: TASK_TARGET, inputRef, attempt: 1,
+        maxSlices: 1,
+        sliceDelayMs: 100,
+        slice: slice ?? { maxTurns: 1, maxToolCalls: 4, maxTokens: 8_000, timeoutMs: 60_000 }
       };
       await workflowClient.start('AgentTaskWorkflow', { workflowId, taskQueue: TASK_QUEUE, args: [input] });
     },

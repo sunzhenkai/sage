@@ -22,7 +22,7 @@ describe('task-domain v1 contracts', () => {
       slice: { maxTurns: 4, maxToolCalls: 16, maxTokens: 32_000, timeoutMs: 30_000 }
     };
     expect(Value.Check(AgentTaskWorkflowInputSchema, base)).toBe(true);
-    expect(Value.Check(AgentTaskWorkflowInputSchema, { ...base, slice: { ...base.slice, maxTurns: 5 } })).toBe(false);
+    expect(Value.Check(AgentTaskWorkflowInputSchema, { ...base, slice: { ...base.slice, maxTurns: 25 } })).toBe(false);
   });
   it('requires the complete versioned Target identity including isolationKey and rejects tampering fields', () => {
     const snapshot = {

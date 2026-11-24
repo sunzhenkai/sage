@@ -139,4 +139,43 @@ describe('task package input migration', () => {
     expect(sql).not.toMatch(/\bDELETE\s+FROM\b/i);
     expect(sql).not.toMatch(/\bTRUNCATE\b/i);
   });
+
+  it('adds net_probe_rules table additively and rerunnably', async () => {
+    const sql = await readFile(new URL('../migrations/013_net_probe_rules.sql', import.meta.url), 'utf8');
+    expect(sql.startsWith('BEGIN;')).toBe(true);
+    expect(sql.endsWith('COMMIT;\n')).toBe(true);
+    expect(sql).toContain('CREATE TABLE IF NOT EXISTS net_probe_rules');
+    expect(sql).toContain('PRIMARY KEY (tenant_id, id)');
+    expect(sql).not.toMatch(/DROP\s+TABLE/i);
+    expect(sql).not.toMatch(/DROP\s+COLUMN/i);
+    expect(sql).not.toMatch(/\bDELETE\s+FROM\b/i);
+    expect(sql).not.toMatch(/\bTRUNCATE\b/i);
+  });
+});
+
+describe('ssh targets migration', () => {
+  it('is additive, rerunnable, and creates ssh_targets + ssh_credentials tables', async () => {
+    const sql = await readFile(new URL('../migrations/012_ssh_targets.sql', import.meta.url), 'utf8');
+    expect(sql.startsWith('BEGIN;')).toBe(true);
+    expect(sql.endsWith('COMMIT;\n')).toBe(true);
+    expect(sql).toContain('CREATE TABLE IF NOT EXISTS ssh_targets');
+    expect(sql).toContain('CREATE TABLE IF NOT EXISTS ssh_credentials');
+    expect(sql).toContain('ON DELETE CASCADE');
+    expect(sql).not.toMatch(/DROP\s+TABLE/i);
+    expect(sql).not.toMatch(/DROP\s+COLUMN/i);
+    expect(sql).not.toMatch(/\bDELETE\s+FROM\b/i);
+    expect(sql).not.toMatch(/\bTRUNCATE\b/i);
+  });
+
+  it('adds net_probe_rules table additively and rerunnably', async () => {
+    const sql = await readFile(new URL('../migrations/013_net_probe_rules.sql', import.meta.url), 'utf8');
+    expect(sql.startsWith('BEGIN;')).toBe(true);
+    expect(sql.endsWith('COMMIT;\n')).toBe(true);
+    expect(sql).toContain('CREATE TABLE IF NOT EXISTS net_probe_rules');
+    expect(sql).toContain('PRIMARY KEY (tenant_id, id)');
+    expect(sql).not.toMatch(/DROP\s+TABLE/i);
+    expect(sql).not.toMatch(/DROP\s+COLUMN/i);
+    expect(sql).not.toMatch(/\bDELETE\s+FROM\b/i);
+    expect(sql).not.toMatch(/\bTRUNCATE\b/i);
+  });
 });
