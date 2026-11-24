@@ -213,6 +213,14 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
     return (renewed.rowCount ?? 0) === 1;
   }
 
+  async releaseLease(idempotencyKey: string, ownerToken: string): Promise<boolean> {
+    const released = await this.#query<LedgerRow>('releaseLease', `UPDATE task_effect_ledger
+      SET lease_expires_at=now(),updated_at=now()
+      WHERE idempotency_key=$1 AND owner_token=$2 AND status='claimed'
+      RETURNING status,lease_expires_at,result`, [idempotencyKey, ownerToken]);
+    return (released.rowCount ?? 0) === 1;
+  }
+
   /** 把长期未续租的认领置为过期，供后续投递重新认领；不改动已结算结果。 */
   async expireStaleClaims(olderThanMs: number): Promise<number> {
     if (!Number.isFinite(olderThanMs) || olderThanMs < 0) throw new Error('INVALID_STALE_CLAIM_THRESHOLD');
@@ -334,7 +342,19 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
       authority_receipt_digest=EXCLUDED.authority_receipt_digest,projection_freshness=EXCLUDED.projection_freshness,
       freshness_reason=EXCLUDED.freshness_reason,last_reconciled_at=EXCLUDED.last_reconciled_at,last_repair_id=EXCLUDED.last_repair_id,
       last_reconciliation_error=EXCLUDED.last_reconciliation_error,projection_audit_version=EXCLUDED.projection_audit_version,
-      failure_code=EXCLUDED.failure_code,failure_detail=EXCLUDED.failure_detail
+      failure_code=CASE
+        WHEN EXCLUDED.status='failed' AND EXCLUDED.failure_code='ACTIVITY_RETRIES_EXHAUSTED'
+          AND task_projection.attempt=EXCLUDED.attempt AND task_projection.status='failed'
+          AND task_projection.failure_code IS NOT NULL AND task_projection.failure_code<>'ACTIVITY_RETRIES_EXHAUSTED'
+        THEN task_projection.failure_code
+        ELSE EXCLUDED.failure_code
+      END,
+      failure_detail=CASE
+        WHEN EXCLUDED.status='failed' AND EXCLUDED.failure_detail IS NULL
+          AND task_projection.attempt=EXCLUDED.attempt AND task_projection.status='failed'
+        THEN task_projection.failure_detail
+        ELSE EXCLUDED.failure_detail
+      END
       WHERE task_projection.attempt < EXCLUDED.attempt OR (task_projection.attempt=EXCLUDED.attempt AND (
         (EXCLUDED.projection_source='history' AND (task_projection.projection_source='writer' OR task_projection.history_event_id < EXCLUDED.history_event_id))
         OR (EXCLUDED.projection_source='writer' AND task_projection.projection_source='writer'

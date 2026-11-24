@@ -78,4 +78,57 @@ integration.sequential('claimSlice expired-lease reclaim', () => {
       'SELECT task_id,status FROM task_effect_ledger WHERE task_id=$1 ORDER BY generation', [settledTaskId])).rows;
     expect(rows).toEqual([{ task_id: settledTaskId, status: 'committed' }]);
   });
+
+  it('releases a claimed lease only for the current owner and lets the next claim proceed immediately', async () => {
+    const taskId = `release-${randomUUID()}`;
+    const key = `effect-${taskId}`;
+    expect((await store.claimSlice(inputFor(taskId), key, 'owner://first', '2099-01-01T00:00:00.000Z')).status).toBe('claimed');
+    expect(await store.releaseLease(key, 'owner://other')).toBe(false);
+    expect(await store.releaseLease(key, 'owner://first')).toBe(true);
+    expect((await store.claimSlice(inputFor(taskId), key, 'owner://second', '2099-01-01T00:00:00.000Z')).status).toBe('claimed');
+
+    await store.commitSlice(key, 'owner://second', {
+      schemaVersion: '1', taskId, sliceNumber: 1, outcome: 'committed', done: true, duplicate: false
+    }, {
+      schemaVersion: '1', taskType: TASK_TYPE, tenantId: 'tenant-reclaim', taskId, workflowId: `workflow-${taskId}`,
+      targetId: 'target-reclaim', attempt: 1, status: 'succeeded', revision: 1, projectionSource: 'writer', historyEventId: '0',
+      projectionUpdatedAt: '2026-01-01T00:00:00.000Z', historyObservedAt: '2026-01-01T00:00:00.000Z'
+    });
+    expect(await store.releaseLease(key, 'owner://second')).toBe(false);
+  });
+
+  it('preserves specific failureCode and failureDetail across consecutive failed writes in the same attempt', async () => {
+    const taskId = `proj-fail-${randomUUID()}`;
+    const key = `effect-${taskId}`;
+    await store.claimSlice(inputFor(taskId), key, 'owner://fail', '2099-01-01T00:00:00.000Z');
+    await store.markSliceFailed(key, 'owner://fail', {
+      schemaVersion: '1', taskId, sliceNumber: 1, outcome: 'failed', done: true, duplicate: false,
+      failureCode: 'SLICE_TIMEOUT', detail: 'provider hung'
+    }, {
+      schemaVersion: '1', taskType: TASK_TYPE, tenantId: 'tenant-reclaim', taskId, workflowId: `workflow-${taskId}`,
+      targetId: 'target-reclaim', attempt: 1, status: 'failed', revision: 0, projectionSource: 'writer', historyEventId: '0',
+      failureCode: 'SLICE_TIMEOUT', failureDetail: 'provider hung',
+      projectionUpdatedAt: '2026-01-01T00:00:01.000Z', historyObservedAt: '2026-01-01T00:00:01.000Z'
+    });
+
+    await store.writeProjection({
+      schemaVersion: '1', taskType: TASK_TYPE, tenantId: 'tenant-reclaim', taskId, workflowId: `workflow-${taskId}`,
+      targetId: 'target-reclaim', attempt: 1, status: 'failed', revision: 0, projectionSource: 'writer', historyEventId: '0',
+      failureCode: 'ACTIVITY_RETRIES_EXHAUSTED',
+      projectionUpdatedAt: '2026-01-01T00:00:02.000Z', historyObservedAt: '2026-01-01T00:00:02.000Z'
+    });
+    const preserved = await store.getProjection('tenant-reclaim', taskId);
+    expect(preserved?.failureCode).toBe('SLICE_TIMEOUT');
+    expect(preserved?.failureDetail).toBe('provider hung');
+
+    await store.writeProjection({
+      schemaVersion: '1', taskType: TASK_TYPE, tenantId: 'tenant-reclaim', taskId, workflowId: `workflow-${taskId}`,
+      targetId: 'target-reclaim', attempt: 1, status: 'running', revision: 0, projectionSource: 'writer', historyEventId: '0',
+      projectionUpdatedAt: '2026-01-01T00:00:03.000Z', historyObservedAt: '2026-01-01T00:00:03.000Z'
+    });
+    const retried = await store.getProjection('tenant-reclaim', taskId);
+    expect(retried?.status).toBe('running');
+    expect(retried?.failureCode).toBeUndefined();
+    expect(retried?.failureDetail).toBeUndefined();
+  });
 });

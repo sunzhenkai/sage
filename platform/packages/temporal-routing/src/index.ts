@@ -702,6 +702,7 @@ function projectionFromWorkflow(tenantId: string, state: TaskWorkflowState, time
     ...(state.checkpointRef === undefined ? {} : { checkpointRef: state.checkpointRef }),
     ...(state.artifactRef === undefined ? {} : { artifactRef: state.artifactRef }),
     ...(state.failureCode === undefined ? {} : { failureCode: state.failureCode }),
+    ...(state.failureDetail === undefined ? {} : { failureDetail: state.failureDetail }),
     ...(controlId === undefined ? {} : { lastControlId: controlId }), projectionUpdatedAt: timestamp, historyObservedAt: timestamp };
 }
 async function workflowState(workflow: WorkflowClient, workflowId: string): Promise<TaskWorkflowState> {

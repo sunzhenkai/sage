@@ -1,5 +1,5 @@
 import {
-  ActivityCancellationType, CancellationScope, condition, defineQuery, defineSignal, isCancellation,
+  ActivityCancellationType, ActivityFailure, ApplicationFailure, CancellationScope, TimeoutFailure, condition, defineQuery, defineSignal, isCancellation,
   proxyActivities, setHandler, sleep
 } from '@temporalio/workflow';
 import type { AgentSliceResult, AgentTaskWorkflowInput, ExecuteAgentSliceInput, TaskControl, TaskProjection, TaskWorkflowState } from '@sage/task-domain';
@@ -26,7 +26,31 @@ export const taskStateQuery = defineQuery<TaskWorkflowState>('sage.task.state.v1
 function clearFailureCode(state: TaskWorkflowState): TaskWorkflowState {
   const next = { ...state };
   delete next.failureCode;
+  delete next.failureDetail;
   return next;
+}
+
+/** 从 Temporal Activity 异常中提取确定性的错误码与详情，避免吞掉底层根因。 */
+export function extractActivityFailure(cause: unknown): {
+  readonly failureCode: string;
+  readonly failureDetail?: string;
+} {
+  const inner = cause instanceof ActivityFailure && cause.cause !== undefined ? cause.cause : cause;
+  let failureCode = 'ACTIVITY_RETRIES_EXHAUSTED';
+  if (inner instanceof ApplicationFailure && typeof inner.type === 'string' && inner.type.length > 0 && inner.type !== 'Error') {
+    failureCode = inner.type.slice(0, 128);
+  } else if (inner instanceof TimeoutFailure) {
+    failureCode = 'ACTIVITY_TIMED_OUT';
+  }
+  const innerMsg = inner instanceof Error ? inner.message.trim() : '';
+  const outerMsg = cause instanceof Error ? cause.message.trim() : '';
+  let detail: string | undefined = innerMsg.length > 0 ? innerMsg : outerMsg.length > 0 ? outerMsg : undefined;
+  if (detail === undefined && inner instanceof TimeoutFailure) {
+    detail = `Activity timed out (${String(inner.timeoutType ?? 'unknown')})`;
+  }
+  return detail === undefined
+    ? { failureCode }
+    : { failureCode, failureDetail: detail.slice(0, 2_048) };
 }
 
 /** 分片结果 → 下一状态。失败结果（含账本重放）永不算成功；paused 不被提交覆盖。 */
@@ -45,7 +69,8 @@ export function projectionOfState(input: AgentTaskWorkflowInput, state: TaskWork
     projectionSource: 'writer', historyEventId: '0',
     ...(state.checkpointRef === undefined ? {} : { checkpointRef: state.checkpointRef }),
     ...(state.artifactRef === undefined ? {} : { artifactRef: state.artifactRef }),
-    ...(state.failureCode === undefined ? {} : { failureCode: state.failureCode })
+    ...(state.failureCode === undefined ? {} : { failureCode: state.failureCode }),
+    ...(state.failureDetail === undefined ? {} : { failureDetail: state.failureDetail })
   };
 }
 
@@ -115,7 +140,13 @@ export async function AgentTaskWorkflow(input: AgentTaskWorkflowInput): Promise<
       }
       // 账本里的失败结果（含重放）不得被当作成功；等人工 retry 或 cancel。
       if (result.outcome === 'failed') {
-        state = { ...state, status: 'failed', failureCode: result.failureCode ?? 'SLICE_FAILED' };
+        const failedDetail = result.detail?.trim();
+        state = {
+          ...clearFailureCode(state),
+          status: 'failed',
+          failureCode: result.failureCode ?? 'SLICE_FAILED',
+          ...(failedDetail !== undefined && failedDetail.length > 0 ? { failureDetail: failedDetail.slice(0, 2_048) } : {})
+        };
         await finish(state);
         await condition(() => state.status === 'cancelled' || retryGeneration > observedRetryGeneration);
         continue;
@@ -136,7 +167,13 @@ export async function AgentTaskWorkflow(input: AgentTaskWorkflowInput): Promise<
     } catch (cause) {
       if (activeSliceScope === scope) activeSliceScope = undefined;
       if (state.status === 'cancelled' || isCancellation(cause)) return finish({ ...state, status: 'cancelled' });
-      state = { ...state, status: 'failed', failureCode: 'ACTIVITY_RETRIES_EXHAUSTED' };
+      const extracted = extractActivityFailure(cause);
+      state = {
+        ...clearFailureCode(state),
+        status: 'failed',
+        failureCode: extracted.failureCode,
+        ...(extracted.failureDetail === undefined ? {} : { failureDetail: extracted.failureDetail })
+      };
       await finish(state);
       await condition(() => state.status === 'cancelled' || retryGeneration > observedRetryGeneration);
       continue;

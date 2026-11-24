@@ -151,7 +151,8 @@ export const TaskWorkflowStateSchema = Type.Object({
   targetId: Id, attempt: Type.Integer({ minimum: 1 }), status: TaskStatusSchema,
   committedSlices: Type.Integer({ minimum: 0 }), manualRetries: Type.Integer({ minimum: 0 }),
   checkpointRef: Type.Optional(TaskCheckpointRefSchema), artifactRef: Type.Optional(TaskArtifactRefSchema),
-  lastControlId: Type.Optional(Id), failureCode: Type.Optional(Type.String({ minLength: 1, maxLength: 128 }))
+  lastControlId: Type.Optional(Id), failureCode: Type.Optional(Type.String({ minLength: 1, maxLength: 128 })),
+  failureDetail: Type.Optional(Type.String({ minLength: 1, maxLength: 2_048 }))
 }, { additionalProperties: false, $id: 'TaskWorkflowState.v1' });
 export type TaskWorkflowState = Static<typeof TaskWorkflowStateSchema>;
 
@@ -221,6 +222,8 @@ export interface TaskCommitStore {
   cancelSlice(idempotencyKey: string, ownerToken: string, projection: TaskProjection): Promise<void>;
   /** 心跳续租；返回 false 表示认领已丢失。实现方可选提供。 */
   renewLease?(idempotencyKey: string, ownerToken: string, leaseExpiresAt: string): Promise<boolean>;
+  /** 可重试失败或超时退出时主动归还自己持有的未结算租约；返回 true 表示成功归还。实现方可选提供。 */
+  releaseLease?(idempotencyKey: string, ownerToken: string): Promise<boolean>;
 }
 export interface TaskProjectionStore {
   getProjection(tenantId: string, taskId: string): Promise<TaskProjection | undefined>;

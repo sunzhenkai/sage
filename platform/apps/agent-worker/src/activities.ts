@@ -37,7 +37,7 @@ import {
   enforceOutputContract, OutputContractViolation, OUTPUT_CONTRACT_VIOLATION_CODE
 } from './output-contract.js';
 import { runTaskAgentPath, type TaskCanonicalCompatibilityOptions } from './task-compatibility.js';
-import { LiveSliceRunLogSession, type LiveSliceRunLogFinishDetail, type LiveSliceRunLogOutcome } from './slice-run-log.js';
+import { LiveSliceRunLogSession, boundedText, type LiveSliceRunLogFinishDetail, type LiveSliceRunLogOutcome } from './slice-run-log.js';
 import { buildRunResult, RUN_RESULT_FILE_NAME } from './run-result.js';
 import type { AgentEventStorePort } from '@sage/platform-ports';
 
@@ -46,6 +46,8 @@ const ACTIVITY_RETRY_MAX_ATTEMPTS = 5;
 const DEFAULT_SLICE_LEASE_MS = 2_000;
 const LEASE_RENEW_INTERVAL_MS = 500;
 const HEARTBEAT_INTERVAL_MS = 50;
+const DEFAULT_LEASE_HARD_GRACE_MS = 5_000;
+const DEFAULT_CANCEL_SETTLE_GRACE_MS = 2_000;
 
 export interface TaskSliceInputResolver {
   resolve(inputRef: TaskInputRef, tenantId: string): Promise<string>;
@@ -69,6 +71,10 @@ export interface AgentTaskActivityOptions {
   /** 包输入读取：物化点取任务输出契约（声明 schema 的 Task 才进入强制管线）。 */
   readonly packageInputReader?: { getPackageInput(tenantId: string, taskId: string): Promise<TaskPackageInputRecord | undefined> };
   readonly leaseMs?: number;
+  /** 租约与执行 watchdog 相对 timeoutMs 的宽限毫秒数，防止卡死后无限续租。 */
+  readonly leaseHardGraceMs?: number;
+  /** 触发 cancel 后等待执行流收敛的宽限毫秒数。 */
+  readonly cancelSettleGraceMs?: number;
   readonly now?: () => Date;
   readonly afterCommit?: (result: AgentSliceResult) => Promise<void> | void;
   readonly telemetry?:CrossChainTelemetryRecorder;
@@ -179,13 +185,45 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
       if (claim.status === 'effect_unknown') return { ...claim.result, duplicate: true };
       if (claim.status === 'failed') return { ...claim.result, duplicate: true };
       if (claim.status === 'cancelled') throw new CancelledFailure('TASK_SLICE_CANCELLED');
-      if (claim.status === 'in_progress') throw new Error('TASK_SLICE_ALREADY_IN_PROGRESS');
+      if (claim.status === 'in_progress') {
+        if (isPackageInput && options.runLogEvents !== undefined) {
+          await LiveSliceRunLogSession.open({
+            events: options.runLogEvents,
+            tenantId: input.tenantId,
+            taskId: input.taskId,
+            attempt: input.attempt,
+            deliveryAttempt: info.attempt,
+            sliceNumber: input.sliceNumber,
+            source: 'package'
+          })
+            .then((session) => session?.finish('failed', {
+              errorCode: 'TASK_SLICE_ALREADY_IN_PROGRESS',
+              message: 'Previous activity delivery still holds an active slice lease',
+              stage: 'claim',
+              retryable: true,
+              deliveryAttempt: info.attempt
+            }))
+            .catch(() => undefined);
+        }
+        throw new Error('TASK_SLICE_ALREADY_IN_PROGRESS');
+      }
 
       heartbeat({ phase: 'claimed', sliceNumber: input.sliceNumber });
       const sliceStartedAt = now().getTime();
+      const leaseGraceMs = options.leaseHardGraceMs ?? DEFAULT_LEASE_HARD_GRACE_MS;
+      const cancelSettleGraceMs = options.cancelSettleGraceMs ?? DEFAULT_CANCEL_SETTLE_GRACE_MS;
+      const activityStartToCloseMs = typeof info.startToCloseTimeoutMs === 'number' && Number.isFinite(info.startToCloseTimeoutMs) && info.startToCloseTimeoutMs > 0
+        ? info.startToCloseTimeoutMs
+        : undefined;
+      const targetDeadlineMs = sliceStartedAt + input.limits.timeoutMs + leaseGraceMs;
+      const leaseHardDeadlineMs = activityStartToCloseMs === undefined
+        ? targetDeadlineMs
+        : Math.min(targetDeadlineMs, sliceStartedAt + Math.max(0, activityStartToCloseMs - leaseMs));
       const signal = cancellationSignal();
       let execution: ReturnType<LocalAgentClient['run']> | undefined;
       let committed = false;
+      let settledInLedger = false;
+      let leaseReleased = false;
       let livePackageLogDetail: (LiveSliceRunLogFinishDetail & { readonly outcome: LiveSliceRunLogOutcome }) | undefined;
       let liveRunLog: LiveSliceRunLogSession | undefined;
       let businessFiles: readonly string[] = [];
@@ -193,15 +231,32 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
       const cancelExecution = (): void => execution?.cancel();
       signal.addEventListener('abort', cancelExecution, { once: true });
       const heartbeatTimer = setInterval(() => {
+        if (signal.aborted || now().getTime() >= leaseHardDeadlineMs) {
+          clearInterval(heartbeatTimer);
+          execution?.cancel();
+          return;
+        }
         try { heartbeat({ phase: 'running', sliceNumber: input.sliceNumber }); }
         catch { execution?.cancel(); }
       }, HEARTBEAT_INTERVAL_MS);
-      // 租约独立续期：即使 Temporal 心跳失败，也由账本侧判断认领是否仍属于本次投递。
+      // 租约独立续期：受硬截止时间约束，防止卡死后无限续租把后续重试锁死。
       const leaseTimer = setInterval(() => {
+        if (signal.aborted || now().getTime() >= leaseHardDeadlineMs) {
+          clearInterval(leaseTimer);
+          execution?.cancel();
+          return;
+        }
         options.store.renewLease?.(idempotencyKey, ownerToken, leaseUntil())
           .then((renewed) => { if (renewed === false) execution?.cancel(); })
           .catch(() => undefined);
       }, LEASE_RENEW_INTERVAL_MS);
+      const stopTimersAndReleaseLease = async (): Promise<void> => {
+        clearInterval(heartbeatTimer);
+        clearInterval(leaseTimer);
+        if (settledInLedger || leaseReleased) return;
+        leaseReleased = true;
+        await options.store.releaseLease?.(idempotencyKey, ownerToken).catch(() => undefined);
+      };
       try {
         const packageCapabilityRefs = isPackageInput ? (packageRecord?.runContract?.capabilityRefs ?? []) : [];
         const toolsEnabled = packageCapabilityRefs.length > 0 && options.hasRuntimeTools?.(packageCapabilityRefs) === true;
@@ -303,15 +358,22 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
             }
           }
         })();
-        const [outcome] = await Promise.all([execution.result, consumeEvents]);
+        const [outcome] = await awaitExecutionWithWatchdog(
+          Promise.all([execution.result, consumeEvents]),
+          () => execution?.cancel(),
+          Math.max(20, (sliceStartedAt + input.limits.timeoutMs + leaseGraceMs) - now().getTime()),
+          cancelSettleGraceMs,
+          input.limits.timeoutMs
+        );
         if (signal.aborted || outcome.status === 'cancelled') throw new CancelledFailure('TASK_SLICE_CANCELLED');
         if (outcome.status !== 'succeeded' && outcome.status !== 'paused') {
           const failure = (outcome as { readonly error?: { readonly code?: string; readonly message?: string } }).error;
-          process.stderr.write(`agent slice outcome ${outcome.status} for ${input.taskId}: ${failure?.message ?? 'no error detail'}\n`);
+          const summary = failure?.message ? boundedText(failure.message, 500) : '';
+          process.stderr.write(`agent slice outcome ${outcome.status} for ${input.taskId}: ${summary || 'no error detail'}\n`);
           livePackageLogDetail = {
             outcome: 'failed',
             errorCode: failure?.code ?? `AGENT_SLICE_${outcome.status.toUpperCase()}`,
-            ...(failure?.message === undefined ? {} : { message: failure.message }),
+            ...(summary.length > 0 ? { message: summary } : {}),
             stage: 'execution',
             deliveryAttempt: info.attempt,
             turns: outcome.usage.turns,
@@ -319,7 +381,7 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
             tokens: outcome.usage.tokens,
             durationMs: now().getTime() - sliceStartedAt
           };
-          throw new Error(`AGENT_SLICE_${outcome.status.toUpperCase()}`);
+          throw new Error(summary.length > 0 ? `AGENT_SLICE_${outcome.status.toUpperCase()}: ${summary}` : `AGENT_SLICE_${outcome.status.toUpperCase()}`);
         }
 
         const outputContract = packageRecord?.runContract;
@@ -407,6 +469,7 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
         const projection = projectionOf(input, result, result.done ? 'succeeded' : 'running', input.sliceNumber, now().toISOString());
         await options.store.commitSlice(idempotencyKey, ownerToken, result, projection);
         committed = true;
+        settledInLedger = true;
         livePackageLogDetail = {
           outcome: outcome.status === 'paused' ? 'paused' : 'succeeded',
           turns: outcome.usage.turns,
@@ -447,8 +510,16 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
         }
         if (!committed && (signal.aborted || cause instanceof CancelledFailure)) {
           execution?.cancel();
-          await execution?.result.catch(() => undefined);
+          if (execution !== undefined) {
+            let settleTimer: ReturnType<typeof setTimeout> | undefined;
+            await Promise.race([
+              execution.result.catch(() => undefined),
+              new Promise<void>((resolve) => { settleTimer = setTimeout(resolve, cancelSettleGraceMs); })
+            ]);
+            if (settleTimer !== undefined) clearTimeout(settleTimer);
+          }
           await options.store.cancelSlice(idempotencyKey, ownerToken, cancelledProjectionOf(input, now().toISOString()));
+          settledInLedger = true;
           throw cause instanceof CancelledFailure ? cause : new CancelledFailure('TASK_SLICE_CANCELLED');
         }
         if (cause instanceof Error && cause.message === 'TASK_EFFECT_CLAIM_LOST') {
@@ -458,11 +529,15 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
           };
           await options.store.markEffectUnknown(idempotencyKey, ownerToken, unknown,
             projectionOf(input, unknown, 'effect_unknown', input.sliceNumber - 1, now().toISOString())).catch(() => undefined);
+          settledInLedger = true;
           throw cause;
         }
         if (committed) throw cause;
         const classified = classifySliceFailure(cause, info.attempt);
-        if (classified.kind === 'retry') throw cause;
+        if (classified.kind === 'retry') {
+          await stopTimersAndReleaseLease();
+          throw cause;
+        }
         if (classified.kind === 'unknown') {
           process.stderr.write(`agent slice effect-unknown cause for ${input.taskId}: ${cause instanceof Error ? cause.stack : String(cause)}\n`);
           const result: AgentSliceResult = {
@@ -472,6 +547,7 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
           if(input.sessionId&&input.runId&&input.messageId)try{options.telemetry?.record('sage_task_effect_unknown_total',1,{tenant_id:input.tenantId,message_id:input.messageId,session_id:input.sessionId,run_id:input.runId,task_id:input.taskId,workflow_id:input.workflowId,target_id:input.targetId,attempt:input.attempt},{slice_number:input.sliceNumber});}catch{/* Telemetry cannot change Activity semantics. */}
           await options.store.markEffectUnknown(idempotencyKey, ownerToken, result,
             projectionOf(input, result, 'effect_unknown', input.sliceNumber - 1, now().toISOString()));
+          settledInLedger = true;
           return result;
         }
         const detail = classified.detail.slice(0, 500);
@@ -481,6 +557,7 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
         };
         await options.store.markSliceFailed(idempotencyKey, ownerToken, failed,
           projectionOf(input, failed, 'failed', input.sliceNumber - 1, now().toISOString(), classified.failureCode, classified.detail));
+        settledInLedger = true;
         if (isPackageInput && packageRecord !== undefined && options.outputStore !== undefined) {
           // 失败也产出可校验运行结果（最小形态）；写入失败只记日志，不改变失败语义。
           try {
@@ -504,8 +581,7 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
         }
         throw cause;
       } finally {
-        clearInterval(heartbeatTimer);
-        clearInterval(leaseTimer);
+        await stopTimersAndReleaseLease();
         signal.removeEventListener('abort', cancelExecution);
         await rm(outputDir, { recursive: true, force: true }).catch(() => undefined);
         if (liveRunLog !== undefined && livePackageLogDetail !== undefined) {
@@ -528,6 +604,34 @@ export function classifySliceFailure(cause: unknown, attempt: number):
   if (attempt < ACTIVITY_RETRY_MAX_ATTEMPTS) return { kind: 'retry' };
   const message = cause instanceof Error ? cause.message : String(cause);
   return { kind: 'failed', failureCode: 'ACTIVITY_FAILED', detail: message };
+}
+
+/** 防止底层模型/工具无视 AbortSignal 导致 activity 永久卡死并无限续租。 */
+async function awaitExecutionWithWatchdog<T>(
+  work: Promise<T>,
+  onTimeout: () => void,
+  timeoutMs: number,
+  cancelSettleGraceMs: number,
+  declaredTimeoutMs: number
+): Promise<T> {
+  let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
+  let settleTimer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      work,
+      new Promise<never>((_, reject) => {
+        deadlineTimer = setTimeout(() => {
+          onTimeout();
+          settleTimer = setTimeout(() => {
+            reject(new Error(`SLICE_EXECUTION_TIMED_OUT: agent execution did not settle within ${declaredTimeoutMs}ms`));
+          }, cancelSettleGraceMs);
+        }, timeoutMs);
+      })
+    ]);
+  } finally {
+    if (deadlineTimer !== undefined) clearTimeout(deadlineTimer);
+    if (settleTimer !== undefined) clearTimeout(settleTimer);
+  }
 }
 
 function projectionOf(

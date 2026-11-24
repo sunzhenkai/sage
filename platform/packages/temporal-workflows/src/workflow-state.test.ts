@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { ActivityFailure, ApplicationFailure, TimeoutFailure } from '@temporalio/workflow';
 import type { AgentSliceResult, AgentTaskWorkflowInput } from '@sage/task-domain';
-import { nextStatusAfterSlice, projectionOfState } from './workflows.js';
+import { extractActivityFailure, nextStatusAfterSlice, projectionOfState } from './workflows.js';
 
 const sliceResult = (overrides: Partial<AgentSliceResult>): AgentSliceResult => ({
   schemaVersion: '1', taskId: 'task-state', sliceNumber: 1, outcome: 'committed', done: false, duplicate: false, ...overrides
@@ -37,11 +38,54 @@ describe('workflow slice status transitions', () => {
 });
 
 describe('terminal projection shape', () => {
-  it('uses committed slices as revision and carries failure code', () => {
+  it('uses committed slices as revision and carries failure code and detail', () => {
     expect(projectionOfState(input, {
       schemaVersion: '1', taskType: 'sage.agent-task.v1', taskId: 'task-state', workflowId: 'workflow-state',
       targetId: 'target-state', attempt: 1, status: 'failed', committedSlices: 0, manualRetries: 1,
-      failureCode: 'SLICE_FAILED'
-    })).toMatchObject({ status: 'failed', revision: 0, failureCode: 'SLICE_FAILED', projectionSource: 'writer' });
+      failureCode: 'SLICE_FAILED', failureDetail: 'upstream model timed out'
+    })).toMatchObject({
+      status: 'failed', revision: 0, failureCode: 'SLICE_FAILED',
+      failureDetail: 'upstream model timed out', projectionSource: 'writer'
+    });
+  });
+});
+
+describe('extractActivityFailure', () => {
+  it('unwraps ActivityFailure wrapping a typed ApplicationFailure', () => {
+    const inner = ApplicationFailure.nonRetryable('bad schema output', 'OUTPUT_CONTRACT_VIOLATION');
+    const wrapped = new ActivityFailure('Activity task failed', 'executeAgentSlice', '1', undefined, undefined, inner);
+    expect(extractActivityFailure(wrapped)).toEqual({
+      failureCode: 'OUTPUT_CONTRACT_VIOLATION',
+      failureDetail: 'bad schema output'
+    });
+  });
+
+  it('falls back to ACTIVITY_RETRIES_EXHAUSTED for generic Error type while preserving message', () => {
+    const inner = ApplicationFailure.retryable('TASK_SLICE_ALREADY_IN_PROGRESS', 'Error');
+    const wrapped = new ActivityFailure('Activity task failed', 'executeAgentSlice', '1', undefined, undefined, inner);
+    expect(extractActivityFailure(wrapped)).toEqual({
+      failureCode: 'ACTIVITY_RETRIES_EXHAUSTED',
+      failureDetail: 'TASK_SLICE_ALREADY_IN_PROGRESS'
+    });
+  });
+
+  it('maps TimeoutFailure to ACTIVITY_TIMED_OUT with readable detail', () => {
+    const inner = new TimeoutFailure('', undefined, 1 as unknown as TimeoutFailure['timeoutType']);
+    const wrapped = new ActivityFailure('Activity task timed out', 'executeAgentSlice', '1', undefined, undefined, inner);
+    expect(extractActivityFailure(wrapped)).toEqual({
+      failureCode: 'ACTIVITY_TIMED_OUT',
+      failureDetail: 'Activity task timed out'
+    });
+    expect(extractActivityFailure(inner)).toEqual({
+      failureCode: 'ACTIVITY_TIMED_OUT',
+      failureDetail: 'Activity timed out (1)'
+    });
+  });
+
+  it('extracts message from plain Error', () => {
+    expect(extractActivityFailure(new Error('network reset'))).toEqual({
+      failureCode: 'ACTIVITY_RETRIES_EXHAUSTED',
+      failureDetail: 'network reset'
+    });
   });
 });
