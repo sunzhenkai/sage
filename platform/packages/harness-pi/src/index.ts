@@ -67,6 +67,8 @@ export interface LiveProviderCompletion {
   readonly toolCalls?: readonly LiveProviderToolCall[];
   /** 原始模型消息，供多轮 tool-use 对话原样回填。 */
   readonly assistantMessage?: AssistantMessage;
+  /** 模型是否因达到 maxTokens 上限而被截断。 */
+  readonly truncated?: boolean;
 }
 
 export type LiveProviderProgressEvent =
@@ -80,7 +82,7 @@ export type LiveProviderProgressEvent =
       readonly toolCallCount: number;
       readonly toolNames: readonly string[];
       readonly textPreview?: string;
-      readonly stopReason: 'stop' | 'toolUse' | 'pause';
+      readonly stopReason: 'stop' | 'toolUse' | 'pause' | 'length';
     }
   | {
       readonly kind: 'model.failed';
@@ -167,7 +169,10 @@ export class LiveProviderHarness implements HarnessPort {
   readonly #tools: readonly LiveProviderToolSpec[];
   readonly #executeTool?: LiveProviderToolExecutor;
   readonly #onProgress?: LiveProviderProgressObserver;
+  readonly #validateFinalOutput?: (text: string) => string | undefined;
+  readonly #toolConcurrency: number;
   #conversation?: PiMessage[];
+  #outputRepairAttempted = false;
 
   constructor(options: {
     readonly route: LiveProviderRoute;
@@ -179,6 +184,8 @@ export class LiveProviderHarness implements HarnessPort {
     readonly tools?: readonly LiveProviderToolSpec[];
     readonly executeTool?: LiveProviderToolExecutor;
     readonly onProgress?: LiveProviderProgressObserver;
+    readonly validateFinalOutput?: (text: string) => string | undefined;
+    readonly toolConcurrency?: number;
   }) {
     const tools = options.tools ?? [];
     const hasTools = tools.length > 0 && options.executeTool !== undefined;
@@ -194,8 +201,10 @@ export class LiveProviderHarness implements HarnessPort {
     this.#systemPrompt = options.systemPrompt ?? SYSTEM_PROMPT;
     this.#turnInput = options.turnInput ?? false;
     this.#tools = tools;
+    this.#toolConcurrency = Math.max(1, options.toolConcurrency ?? 4);
     if (options.executeTool !== undefined) this.#executeTool = options.executeTool;
     if (options.onProgress !== undefined) this.#onProgress = options.onProgress;
+    if (options.validateFinalOutput !== undefined) this.#validateFinalOutput = options.validateFinalOutput;
   }
 
   async #emitProgress(event: LiveProviderProgressEvent): Promise<void> {
@@ -205,6 +214,39 @@ export class LiveProviderHarness implements HarnessPort {
     } catch {
       // Progress observers must never interrupt model or tool execution.
     }
+  }
+
+  #maybeRepairOutput(request: HarnessTurnRequest, completion: LiveProviderCompletion): HarnessTurnResult | undefined {
+    if (this.#validateFinalOutput === undefined || this.#outputRepairAttempted || completion.pause === true) {
+      return undefined;
+    }
+    const violation = this.#validateFinalOutput(completion.text);
+    if (violation === undefined) {
+      return undefined;
+    }
+    this.#outputRepairAttempted = true;
+    if (this.#conversation === undefined) {
+      this.#conversation = this.#turnInput
+        ? [{ role: 'user', content: request.input, timestamp: Date.now() }]
+        : piMessages(this.#transcript);
+    }
+    const assistantMessage: AssistantMessage = completion.assistantMessage ?? {
+      role: 'assistant',
+      content: completion.text.length > 0 ? [{ type: 'text', text: completion.text }] : [],
+      api: this.#route.adapterKind === 'anthropic' ? 'anthropic-messages' : 'openai-completions',
+      provider: this.#route.adapterKind,
+      model: this.#route.modelId,
+      usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: completion.tokens, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+      stopReason: completion.truncated === true ? 'length' : 'stop',
+      timestamp: Date.now()
+    };
+    this.#conversation.push(assistantMessage);
+    this.#conversation.push({
+      role: 'user',
+      content: `Your previous response did not satisfy the required output contract (${violation}). Output ONLY a valid JSON object matching the required schema, with no extra commentary.`,
+      timestamp: Date.now()
+    });
+    return { output: completion.text, done: false, toolCalls: 0, tokens: completion.tokens };
   }
 
   async executeTurn(request: HarnessTurnRequest, signal: AbortSignal): Promise<HarnessTurnResult> {
@@ -219,6 +261,7 @@ export class LiveProviderHarness implements HarnessPort {
           route: this.#route,
           systemPrompt: this.#systemPrompt,
           messages: this.#turnInput ? [{ role: 'user', text: request.input }] : this.#transcript,
+          ...(this.#conversation === undefined ? {} : { piMessages: this.#conversation }),
           maxTokens,
           signal
         });
@@ -243,8 +286,10 @@ export class LiveProviderHarness implements HarnessPort {
         toolCallCount: 0,
         toolNames: [],
         ...(completion.text.length > 0 ? { textPreview: completion.text.slice(0, 1_000) } : {}),
-        stopReason: completion.pause === true ? 'pause' : 'stop'
+        stopReason: completion.truncated === true ? 'length' : completion.pause === true ? 'pause' : 'stop'
       });
+      const repair = this.#maybeRepairOutput(request, completion);
+      if (repair !== undefined) return repair;
       return { output: completion.text, done: completion.done ?? true, toolCalls: 0, tokens: completion.tokens, ...(completion.pause === true ? { pause: true } : {}) };
     }
 
@@ -286,7 +331,7 @@ export class LiveProviderHarness implements HarnessPort {
       toolCallCount: toolCalls.length,
       toolNames: toolCalls.map((call) => call.name),
       ...(completion.text.length > 0 ? { textPreview: completion.text.slice(0, 1_000) } : {}),
-      stopReason: toolCalls.length > 0 ? 'toolUse' : completion.pause === true ? 'pause' : 'stop'
+      stopReason: toolCalls.length > 0 ? 'toolUse' : completion.truncated === true ? 'length' : completion.pause === true ? 'pause' : 'stop'
     });
 
     if (toolCalls.length > 0) {
@@ -309,60 +354,72 @@ export class LiveProviderHarness implements HarnessPort {
       };
       this.#conversation.push(assistantMessage);
 
-      for (let idx = 0; idx < toolCalls.length; idx += 1) {
-        const call = toolCalls[idx]!;
-        if (signal.aborted) throw new Error('Live provider tool execution aborted');
-        const toolStartedAt = Date.now();
-        let execResult: LiveProviderToolExecutionResult;
-        try {
-          execResult = await this.#executeTool!(call, signal);
-        } catch (cause) {
-          execResult = {
-            content: JSON.stringify({
-              ok: false,
-              errorCode: 'TOOL_EXECUTION_FAILED',
-              message: cause instanceof Error ? cause.message : 'Tool execution failed'
-            }),
-            isError: true
-          };
-        }
-        let errorCode: string | undefined;
-        if (execResult.isError === true) {
-          try {
-            const parsed = JSON.parse(execResult.content) as { readonly errorCode?: unknown } | null;
-            if (parsed !== null && typeof parsed === 'object' && typeof parsed.errorCode === 'string') {
-              errorCode = parsed.errorCode;
+      const toolResultMessages = new Array<PiToolResultMessage>(toolCalls.length);
+      let nextIndex = 0;
+      const workerCount = Math.min(this.#toolConcurrency, toolCalls.length);
+      await Promise.all(
+        Array.from({ length: workerCount }, async () => {
+          while (nextIndex < toolCalls.length) {
+            const idx = nextIndex;
+            nextIndex += 1;
+            const call = toolCalls[idx]!;
+            if (signal.aborted) throw new Error('Live provider tool execution aborted');
+            const toolStartedAt = Date.now();
+            let execResult: LiveProviderToolExecutionResult;
+            try {
+              execResult = await this.#executeTool!(call, signal);
+            } catch (cause) {
+              execResult = {
+                content: JSON.stringify({
+                  ok: false,
+                  errorCode: 'TOOL_EXECUTION_FAILED',
+                  message: cause instanceof Error ? cause.message : 'Tool execution failed'
+                }),
+                isError: true
+              };
             }
-          } catch {
-            // Non-JSON tool error content; keep errorCode undefined.
+            let errorCode: string | undefined;
+            if (execResult.isError === true) {
+              try {
+                const parsed = JSON.parse(execResult.content) as { readonly errorCode?: unknown } | null;
+                if (parsed !== null && typeof parsed === 'object' && typeof parsed.errorCode === 'string') {
+                  errorCode = parsed.errorCode;
+                }
+              } catch {
+                // Non-JSON tool error content; keep errorCode undefined.
+              }
+            }
+            await this.#emitProgress({
+              kind: 'tool.completed',
+              turn: request.turn,
+              index: idx + 1,
+              totalInTurn: toolCalls.length,
+              toolCallId: call.id,
+              toolName: call.name,
+              arguments: call.arguments,
+              ok: execResult.isError !== true,
+              durationMs: Date.now() - toolStartedAt,
+              resultContent: execResult.content,
+              ...(errorCode === undefined ? {} : { errorCode })
+            });
+            toolResultMessages[idx] = {
+              role: 'toolResult',
+              toolCallId: call.id,
+              toolName: call.name,
+              content: [{ type: 'text', text: execResult.content }],
+              isError: execResult.isError === true,
+              timestamp: Date.now()
+            };
           }
-        }
-        await this.#emitProgress({
-          kind: 'tool.completed',
-          turn: request.turn,
-          index: idx + 1,
-          totalInTurn: toolCalls.length,
-          toolCallId: call.id,
-          toolName: call.name,
-          arguments: call.arguments,
-          ok: execResult.isError !== true,
-          durationMs: Date.now() - toolStartedAt,
-          resultContent: execResult.content,
-          ...(errorCode === undefined ? {} : { errorCode })
-        });
-        const toolResultMessage: PiToolResultMessage = {
-          role: 'toolResult',
-          toolCallId: call.id,
-          toolName: call.name,
-          content: [{ type: 'text', text: execResult.content }],
-          isError: execResult.isError === true,
-          timestamp: Date.now()
-        };
-        this.#conversation.push(toolResultMessage);
-      }
+        })
+      );
+      this.#conversation.push(...toolResultMessages);
 
       return { output: completion.text, done: false, toolCalls: toolCalls.length, tokens: completion.tokens };
     }
+
+    const repair = this.#maybeRepairOutput(request, completion);
+    if (repair !== undefined) return repair;
 
     if (completion.assistantMessage !== undefined) {
       this.#conversation.push(completion.assistantMessage);
@@ -409,7 +466,11 @@ export const defaultLiveInvoker: LiveProviderInvoker = async ({ route, systemPro
     return { text, tokens: message.usage.totalTokens, done: false, toolCalls, assistantMessage: message };
   }
   if (text.trim().length === 0) throw new Error('Live provider returned an empty response');
-  return { text, tokens: message.usage.totalTokens };
+  return {
+    text,
+    tokens: message.usage.totalTokens,
+    ...(message.stopReason === 'length' ? { truncated: true } : {})
+  };
 };
 
 export interface FakeLiveInvokerOptions {

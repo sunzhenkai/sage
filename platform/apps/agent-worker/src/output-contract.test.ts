@@ -4,7 +4,8 @@ import {
   stripThinkSegments,
   unwrapJsonFence,
   validateJsonSchemaSubset,
-  enforceOutputContract
+  enforceOutputContract,
+  formatOutputContractInstruction
 } from './output-contract.js';
 import { classifySliceFailure } from './activities.js';
 
@@ -73,6 +74,45 @@ describe('enforceOutputContract', () => {
     const body = 'not json at all';
     expect(enforceOutputContract(body, { files: ['brief.md'] })).toBe(body);
     expect(enforceOutputContract(body, { files: ['brief.md'], ...({ schema: undefined } as unknown as { schema?: string }) })).toBe(body);
+  });
+
+  it('extracts a single embedded json fence when preceded by prose commentary', () => {
+    const schema = JSON.stringify({
+      type: 'object',
+      required: ['overallStatus', 'summary'],
+      properties: {
+        overallStatus: { type: 'string', enum: ['ok', 'warning'] },
+        summary: { type: 'string' }
+      }
+    });
+    const raw = '全部探测已完成，无文件写入工具故内联返回：\n\n```json\n{"overallStatus":"warning","summary":"done"}\n```';
+    expect(JSON.parse(enforceOutputContract(raw, { schema, files: ['report.json'] }))).toEqual({
+      overallStatus: 'warning',
+      summary: 'done'
+    });
+  });
+
+  it('rejects output with multiple json fences instead of guessing', () => {
+    const schema = JSON.stringify({ type: 'object', required: ['overallStatus'], properties: { overallStatus: { type: 'string' } } });
+    const raw = '```json\n{"overallStatus":"ok"}\n```\n\n```json\n{"overallStatus":"warning"}\n```';
+    expect(() => enforceOutputContract(raw, { schema })).toThrow('output is not valid JSON');
+  });
+
+  it('reports schema violations inside an embedded json fence', () => {
+    const schema = JSON.stringify({ type: 'object', required: ['overallStatus', 'headline'], properties: { overallStatus: { type: 'string' }, headline: { type: 'string' } } });
+    const raw = '说明文字：\n```json\n{"overallStatus":"ok"}\n```';
+    expect(() => enforceOutputContract(raw, { schema })).toThrow("missing required property 'headline'");
+  });
+});
+
+describe('formatOutputContractInstruction', () => {
+  it('returns undefined when no schema is declared and formats schema + target file otherwise', () => {
+    expect(formatOutputContractInstruction({ files: ['report.json'] })).toBeUndefined();
+    const schema = JSON.stringify({ type: 'object', required: ['overallStatus'] });
+    const instruction = formatOutputContractInstruction({ schema, files: ['report.json'] });
+    expect(instruction).toContain('## Output Contract (REQUIRED)');
+    expect(instruction).toContain('report.json');
+    expect(instruction).toContain(schema);
   });
 });
 

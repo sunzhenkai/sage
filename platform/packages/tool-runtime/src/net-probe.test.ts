@@ -268,4 +268,17 @@ describe('buildTlsInspectResult & defaultTlsInspect', () => {
       await new Promise<void>((resolve) => server.close(() => resolve()));
     }
   });
+
+  it('rejects with NET_PROBE_TIMEOUT when dns resolution hangs', async () => {
+    const hangingDns = {
+      resolve: () => new Promise<readonly string[]>(() => { /* never resolves */ }),
+    };
+    await expect(authorizeNetProbeTarget(
+      'ok.example.com',
+      443,
+      [{ hostname: 'ok.example.com', ports: [443] }],
+      hangingDns,
+      { timeoutMs: 25 }
+    )).rejects.toThrow('NET_PROBE_TIMEOUT');
+  });
 });

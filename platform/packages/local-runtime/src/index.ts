@@ -48,6 +48,8 @@ export function createLivePackageAgentClient(options: {
   readonly tools?: readonly LiveProviderToolSpec[];
   readonly executeTool?: LiveProviderToolExecutor;
   readonly onProgress?: LiveProviderProgressObserver;
+  readonly validateFinalOutput?: (text: string) => string | undefined;
+  readonly toolConcurrency?: number;
 }): LocalAgentClient {
   return new LocalAgentClient({
     harness: new LiveProviderHarness({
@@ -59,7 +61,9 @@ export function createLivePackageAgentClient(options: {
       ...(options.invoker === undefined ? {} : { invoker: options.invoker }),
       ...(options.tools === undefined ? {} : { tools: options.tools }),
       ...(options.executeTool === undefined ? {} : { executeTool: options.executeTool }),
-      ...(options.onProgress === undefined ? {} : { onProgress: options.onProgress })
+      ...(options.onProgress === undefined ? {} : { onProgress: options.onProgress }),
+      ...(options.validateFinalOutput === undefined ? {} : { validateFinalOutput: options.validateFinalOutput }),
+      ...(options.toolConcurrency === undefined ? {} : { toolConcurrency: options.toolConcurrency })
     })
   });
 }

@@ -34,7 +34,7 @@ import {
   assertDeclaredFiles, injectOutputDirectory, listOutputFiles, packOutputDirectory, writeCompatOutput, OutputArchiveError
 } from '@sage/agent-package-release';
 import {
-  enforceOutputContract, OutputContractViolation, OUTPUT_CONTRACT_VIOLATION_CODE
+  enforceOutputContract, formatOutputContractInstruction, OutputContractViolation, OUTPUT_CONTRACT_VIOLATION_CODE
 } from './output-contract.js';
 import { runTaskAgentPath, type TaskCanonicalCompatibilityOptions } from './task-compatibility.js';
 import { LiveSliceRunLogSession, boundedText, type LiveSliceRunLogFinishDetail, type LiveSliceRunLogOutcome } from './slice-run-log.js';
@@ -42,6 +42,7 @@ import { buildRunResult, RUN_RESULT_FILE_NAME } from './run-result.js';
 import type { AgentEventStorePort } from '@sage/platform-ports';
 
 const ACTIVITY_RETRY_MAX_ATTEMPTS = 5;
+const MAX_PACKAGE_OUTPUT_TOKENS_PER_TURN = 16_384;
 /** 认领租约：必须短于 Temporal 的重试窗口（约 3s），否则重试永远撞上未过期租约。 */
 const DEFAULT_SLICE_LEASE_MS = 2_000;
 const LEASE_RENEW_INTERVAL_MS = 500;
@@ -53,8 +54,15 @@ export interface TaskSliceInputResolver {
   resolve(inputRef: TaskInputRef, tenantId: string): Promise<string>;
 }
 export interface AgentTaskActivityOptions {
-  /** live provider 客户端工厂：所有 slice（package 与 chat）在执行边界按解析路由构造；第三参为包运行声明的输出 token 预算，第四参为声明的 capabilityRefs，第五参为实时进度回调。 */
-  readonly liveClientFactory: (route: LiveProviderRoute, mode: 'package' | 'chat', maxOutputTokens?: number, capabilityRefs?: readonly string[], onProgress?: LiveProviderProgressObserver) => LocalAgentClient;
+  /** live provider 客户端工厂：所有 slice（package 与 chat）在执行边界按解析路由构造；第三参为包运行声明的输出 token 预算，第四参为声明的 capabilityRefs，第五参为实时进度回调，第六参为终态输出校验器。 */
+  readonly liveClientFactory: (
+    route: LiveProviderRoute,
+    mode: 'package' | 'chat',
+    maxOutputTokens?: number,
+    capabilityRefs?: readonly string[],
+    onProgress?: LiveProviderProgressObserver,
+    validateFinalOutput?: (text: string) => string | undefined
+  ) => LocalAgentClient;
   /** 判定声明的 capabilityRefs 是否需要在 AgentRunSpec 中开启 tools 能力。 */
   readonly hasRuntimeTools?: (capabilityRefs: readonly string[]) => boolean;
   /** 运行 agent 设置读取：缺省视 unset（无默认 provider，fail-closed）。 */
@@ -97,7 +105,14 @@ export interface AgentTaskActivities {
 export async function resolveConnectionLiveClient(
   providerConnections: ProviderConnectionStore | undefined,
   secretBackend: SecretBackend | undefined,
-  liveClientFactory: ((route: LiveProviderRoute, mode: 'package' | 'chat', maxOutputTokens?: number, capabilityRefs?: readonly string[], onProgress?: LiveProviderProgressObserver) => LocalAgentClient) | undefined,
+  liveClientFactory: ((
+    route: LiveProviderRoute,
+    mode: 'package' | 'chat',
+    maxOutputTokens?: number,
+    capabilityRefs?: readonly string[],
+    onProgress?: LiveProviderProgressObserver,
+    validateFinalOutput?: (text: string) => string | undefined
+  ) => LocalAgentClient) | undefined,
   tenantId: string,
   connectionId: string | undefined,
   mode: 'package' | 'chat',
@@ -105,7 +120,8 @@ export async function resolveConnectionLiveClient(
   /** 已解析的运行模型（manifest 命中的模型），缺省用连接默认模型。 */
   modelId?: string,
   capabilityRefs?: readonly string[],
-  onProgress?: LiveProviderProgressObserver
+  onProgress?: LiveProviderProgressObserver,
+  validateFinalOutput?: (text: string) => string | undefined
 ): Promise<LocalAgentClient> {
   const failure = (): string =>
     connectionId === undefined
@@ -133,7 +149,7 @@ export async function resolveConnectionLiveClient(
     baseUrl: connection.baseUrl,
     modelId: modelId ?? connection.modelId,
     apiKey
-  }, mode, maxOutputTokens, capabilityRefs, onProgress);
+  }, mode, maxOutputTokens, capabilityRefs, onProgress, validateFinalOutput);
 }
 
 export function createAgentTaskActivities(options: AgentTaskActivityOptions): AgentTaskActivities {
@@ -288,21 +304,41 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
           });
         }
         if (providerFailure !== undefined) throw providerFailure;
+        const packageRunContract = isPackageInput ? packageRecord?.runContract : undefined;
+        const validateFinalOutput = packageRunContract?.schema === undefined
+          ? undefined
+          : (text: string): string | undefined => {
+            try {
+              enforceOutputContract(text, packageRunContract);
+              return undefined;
+            } catch (cause) {
+              return cause instanceof OutputContractViolation
+                ? cause.message
+                : (cause instanceof Error ? cause.message : 'Output contract violation');
+            }
+          };
         const sliceClient = await resolveConnectionLiveClient(
           options.providerConnections, options.secretBackend, options.liveClientFactory,
           input.tenantId, resolvedConnection!.connectionId, isPackageInput ? 'package' : 'chat',
-          isPackageInput ? input.limits.maxTokens : undefined,
+          isPackageInput ? Math.min(input.limits.maxTokens, MAX_PACKAGE_OUTPUT_TOKENS_PER_TURN) : undefined,
           resolvedConnection!.modelId,
           packageCapabilityRefs.length > 0 ? packageCapabilityRefs : undefined,
           liveRunLog === undefined ? undefined : (progressEvent) => liveRunLog!.recordProgress(progressEvent).catch((cause) => {
             process.stderr.write(`live slice run-log progress failed for ${input.taskId}: ${cause instanceof Error ? cause.message : 'unknown'}\n`);
-          })
+          }),
+          validateFinalOutput
         );
         if (signal.aborted) throw new CancelledFailure('TASK_SLICE_CANCELLED');
-        const resolvedInput = injectOutputDirectory(
+        const baseResolvedInput = injectOutputDirectory(
           await options.inputResolver.resolve(input.inputRef as TaskInputRef, input.tenantId),
           outputDir
         );
+        const outputContractInstruction = isPackageInput && packageRecord?.runContract !== undefined
+          ? formatOutputContractInstruction(packageRecord.runContract)
+          : undefined;
+        const resolvedInput = outputContractInstruction === undefined
+          ? baseResolvedInput
+          : `${baseResolvedInput.replace(/\s+$/, '')}\n\n${outputContractInstruction}\n`;
         if (signal.aborted) throw new CancelledFailure('TASK_SLICE_CANCELLED');
         if (liveRunLog !== undefined) {
           await liveRunLog.recordContextResolved({
@@ -367,12 +403,13 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
         );
         if (signal.aborted || outcome.status === 'cancelled') throw new CancelledFailure('TASK_SLICE_CANCELLED');
         if (outcome.status !== 'succeeded' && outcome.status !== 'paused') {
-          const failure = (outcome as { readonly error?: { readonly code?: string; readonly message?: string } }).error;
+          const failure = (outcome as { readonly error?: { readonly code?: string; readonly message?: string; readonly retryable?: boolean } }).error;
           const summary = failure?.message ? boundedText(failure.message, 500) : '';
+          const errorCode = failure?.code ?? `AGENT_SLICE_${outcome.status.toUpperCase()}`;
           process.stderr.write(`agent slice outcome ${outcome.status} for ${input.taskId}: ${summary || 'no error detail'}\n`);
           livePackageLogDetail = {
             outcome: 'failed',
-            errorCode: failure?.code ?? `AGENT_SLICE_${outcome.status.toUpperCase()}`,
+            errorCode,
             ...(summary.length > 0 ? { message: summary } : {}),
             stage: 'execution',
             deliveryAttempt: info.attempt,
@@ -381,6 +418,12 @@ export function createAgentTaskActivities(options: AgentTaskActivityOptions): Ag
             tokens: outcome.usage.tokens,
             durationMs: now().getTime() - sliceStartedAt
           };
+          if (failure?.retryable === false) {
+            throw ApplicationFailure.nonRetryable(
+              summary.length > 0 ? `${errorCode}: ${summary}` : errorCode,
+              errorCode
+            );
+          }
           throw new Error(summary.length > 0 ? `AGENT_SLICE_${outcome.status.toUpperCase()}: ${summary}` : `AGENT_SLICE_${outcome.status.toUpperCase()}`);
         }
 

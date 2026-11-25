@@ -38,6 +38,34 @@ export function unwrapJsonFence(text: string): string {
   return match === null ? text : match[1]!;
 }
 
+/** 从带说明文字的模型回复中提取唯一代码围栏块（优先唯一 json 围栏，多块不猜）。 */
+function extractEmbeddedJsonFence(text: string): string | undefined {
+  const blocks: Array<{ readonly lang: string; readonly body: string }> = [];
+  const pattern = /```([a-zA-Z0-9_-]*)[ \t]*\n([\s\S]*?)\n?[ \t]*```/g;
+  for (const match of text.matchAll(pattern)) {
+    blocks.push({ lang: (match[1] ?? '').toLowerCase(), body: match[2] ?? '' });
+  }
+  if (blocks.length === 0) return undefined;
+  const jsonBlocks = blocks.filter((b) => b.lang === 'json');
+  if (jsonBlocks.length === 1) return jsonBlocks[0]!.body;
+  if (jsonBlocks.length > 1) return undefined;
+  return blocks.length === 1 ? blocks[0]!.body : undefined;
+}
+
+/** 将包运行声明的 JSON Schema 注入模型输入，明确无文件工具时直接输出符合契约的纯 JSON。 */
+export function formatOutputContractInstruction(contract: PackageRunContract): string | undefined {
+  if (contract.schema === undefined) return undefined;
+  const targetFile = contract.files?.[0] ?? 'report.json';
+  return [
+    '## Output Contract (REQUIRED)',
+    `If no filesystem write tool is available, do NOT try to write to SAGE_OUTPUT_DIR; return ONLY a single valid JSON value matching the JSON Schema below (the platform will materialize your final response into \`${targetFile}\`).`,
+    'Do NOT include any prose, apology, or commentary before or after the JSON.',
+    '```json',
+    contract.schema.trim(),
+    '```'
+  ].join('\n');
+}
+
 type JsonValue = null | boolean | number | string | JsonValue[] | { readonly [key: string]: JsonValue };
 
 const jsonTypeOf = (value: JsonValue): string => {
@@ -100,7 +128,15 @@ export function enforceOutputContract(rawOutput: string, contract: PackageRunCon
   try {
     instance = JSON.parse(unwrapped) as JsonValue;
   } catch {
-    throw new OutputContractViolation('output is not valid JSON while the task declares an output schema');
+    const embedded = extractEmbeddedJsonFence(stripped);
+    if (embedded === undefined) {
+      throw new OutputContractViolation('output is not valid JSON while the task declares an output schema');
+    }
+    try {
+      instance = JSON.parse(embedded) as JsonValue;
+    } catch {
+      throw new OutputContractViolation('output is not valid JSON while the task declares an output schema');
+    }
   }
   let schema: unknown;
   try {

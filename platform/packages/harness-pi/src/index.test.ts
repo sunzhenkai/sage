@@ -461,4 +461,97 @@ describe('LiveProviderHarness multi-turn tool calling', () => {
     }, new AbortController().signal)).rejects.toThrow('provider 503');
     expect(events).toEqual([{ kind: 'model.failed', errorMessage: 'provider 503' }]);
   });
+
+  it('runs at most one in-conversation output repair turn when validateFinalOutput rejects initial response', async () => {
+    let calls = 0;
+    const seenPrompts: unknown[] = [];
+    const harness = new LiveProviderHarness({
+      route,
+      transcript: [],
+      turnInput: true,
+      validateFinalOutput: (text) => (text.startsWith('{') ? undefined : 'PACKAGE_OUTPUT_CONTRACT_VIOLATION:not json'),
+      invoker: async (input) => {
+        calls += 1;
+        seenPrompts.push(input.piMessages);
+        if (calls === 1) return { text: 'Here is plain prose without json', tokens: 10 };
+        return { text: '{"ok":true}', tokens: 12 };
+      }
+    });
+
+    const turn1 = await harness.executeTurn({
+      runId: 'run-repair', input: 'audit', turn: 1, skillRefs: [], remaining: { toolCalls: 4, tokens: 1_000 }
+    }, new AbortController().signal);
+    expect(turn1.done).toBe(false);
+
+    const turn2 = await harness.executeTurn({
+      runId: 'run-repair', input: '', turn: 2, skillRefs: [], remaining: { toolCalls: 4, tokens: 990 }
+    }, new AbortController().signal);
+    expect(turn2).toEqual({ output: '{"ok":true}', done: true, toolCalls: 0, tokens: 12 });
+    expect(seenPrompts[1]).toHaveLength(3);
+
+    // Even if the repaired response is still invalid, a second harness will not loop > 1 repair.
+    const failingHarness = new LiveProviderHarness({
+      route,
+      transcript: [],
+      turnInput: true,
+      validateFinalOutput: () => 'still invalid',
+      invoker: async () => ({ text: 'bad', tokens: 5 })
+    });
+    const first = await failingHarness.executeTurn({
+      runId: 'run-repair-2', input: 'audit', turn: 1, skillRefs: [], remaining: { toolCalls: 4, tokens: 1_000 }
+    }, new AbortController().signal);
+    expect(first.done).toBe(false);
+    const second = await failingHarness.executeTurn({
+      runId: 'run-repair-2', input: '', turn: 2, skillRefs: [], remaining: { toolCalls: 4, tokens: 995 }
+    }, new AbortController().signal);
+    expect(second.done).toBe(true);
+  });
+
+  it('executes tool calls concurrently within toolConcurrency while preserving toolResult order', async () => {
+    let turn = 0;
+    let secondTurnMessages: readonly { role: string; toolCallId?: string }[] = [];
+    const harness = new LiveProviderHarness({
+      route,
+      transcript: [],
+      turnInput: true,
+      toolConcurrency: 3,
+      tools: [{ name: 'net_probe', description: 'probe', parameters: {} as never }],
+      executeTool: async (call) => {
+        const delayMs = call.id === 'c1' ? 50 : call.id === 'c2' ? 35 : 15;
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        return { content: JSON.stringify({ id: call.id }) };
+      },
+      invoker: async (input) => {
+        turn += 1;
+        if (turn === 1) {
+          return {
+            text: '',
+            tokens: 10,
+            done: false,
+            toolCalls: [
+              { id: 'c1', name: 'net_probe', arguments: {} },
+              { id: 'c2', name: 'net_probe', arguments: {} },
+              { id: 'c3', name: 'net_probe', arguments: {} }
+            ]
+          };
+        }
+        secondTurnMessages = (input.piMessages ?? []) as unknown as readonly { role: string; toolCallId?: string }[];
+        return { text: '{"done":true}', tokens: 5 };
+      }
+    });
+
+    const startedAt = Date.now();
+    await harness.executeTurn({
+      runId: 'run-conc', input: 'probe all', turn: 1, skillRefs: [], remaining: { toolCalls: 10, tokens: 1_000 }
+    }, new AbortController().signal);
+    const elapsedMs = Date.now() - startedAt;
+    expect(elapsedMs).toBeLessThan(95);
+
+    const turn2 = await harness.executeTurn({
+      runId: 'run-conc', input: '', turn: 2, skillRefs: [], remaining: { toolCalls: 7, tokens: 990 }
+    }, new AbortController().signal);
+    expect(turn2.done).toBe(true);
+    const toolResultIds = secondTurnMessages.filter((m) => m.role === 'toolResult').map((m) => m.toolCallId);
+    expect(toolResultIds).toEqual(['c1', 'c2', 'c3']);
+  });
 });

@@ -296,4 +296,125 @@ describe('slice lease resilience & failure diagnostics', () => {
       deliveryAttempt: 2
     });
   });
+
+  it('injects declared output schema into model input and materializes prose + json fence output', async () => {
+    const taskId = 'pkg-output-contract-inject';
+    const { events, secretBackend, providerConnections, settingsStore } = createStubDeps(taskId);
+    const schema = JSON.stringify({
+      type: 'object',
+      required: ['overallStatus', 'headline'],
+      properties: {
+        overallStatus: { type: 'string', enum: ['ok', 'warning'] },
+        headline: { type: 'string' }
+      }
+    });
+    const packageInputReader = {
+      async getPackageInput(): Promise<TaskPackageInputRecord> {
+        return {
+          tenantId: 'tenant-local',
+          taskId,
+          releaseId: 'sha256:' + 'a'.repeat(64),
+          releaseDigest: 'sha256:' + 'b'.repeat(64),
+          assembledInput: 'run audit',
+          assetDigests: {},
+          runContract: { task: 'audit', files: ['report.json'], schema },
+          createdAt: '2026-01-01T00:00:00.000Z'
+        };
+      }
+    };
+    const commitStore: TaskCommitStore = {
+      async claimSlice() { return { status: 'claimed' }; },
+      async commitSlice() { /* noop */ },
+      async markEffectUnknown() { /* noop */ },
+      async markSliceFailed() { /* noop */ },
+      async cancelSlice() { /* noop */ }
+    };
+
+    let seenInput = '';
+    const activities = createAgentTaskActivities({
+      settingsStore,
+      providerConnections,
+      secretBackend,
+      store: commitStore,
+      packageInputReader,
+      inputResolver: { async resolve() { return 'run audit'; } },
+      runLogEvents: events,
+      liveClientFactory: (() => ({
+        run(spec: { input: string }) {
+          seenInput = spec.input;
+          return {
+            events: (async function* () { /* empty */ })(),
+            result: Promise.resolve({
+              schemaVersion: '1' as const,
+              runId: 'run-contract-1',
+              status: 'succeeded' as const,
+              output: '巡检完成，结果如下：\n```json\n{"overallStatus":"ok","headline":"all green"}\n```',
+              usage: { turns: 1, toolCalls: 0, tokens: 20 },
+              completedAt: new Date().toISOString()
+            }),
+            cancel() { /* noop */ }
+          };
+        }
+      })) as unknown as () => LocalAgentClient
+    });
+
+    const res = await activities.executeAgentSlice(makeSliceInput(taskId));
+    expect(res.outcome).toBe('committed');
+    expect(res.done).toBe(true);
+    expect(seenInput).toContain('## Output Contract (REQUIRED)');
+    expect(seenInput).toContain('report.json');
+    expect(seenInput).toContain(schema);
+  });
+
+  it('throws non-retryable ApplicationFailure when execution returns retryable:false and clamps per-turn maxOutputTokens', async () => {
+    const taskId = 'pkg-nonretryable-clamp';
+    const { events, secretBackend, providerConnections, settingsStore } = createStubDeps(taskId);
+    const commitStore: TaskCommitStore = {
+      async claimSlice() { return { status: 'claimed' }; },
+      async commitSlice() { /* noop */ },
+      async markEffectUnknown() { /* noop */ },
+      async markSliceFailed() { /* noop */ },
+      async cancelSlice() { /* noop */ }
+    };
+
+    let seenMaxOutputTokens: number | undefined;
+    const activities = createAgentTaskActivities({
+      settingsStore,
+      providerConnections,
+      secretBackend,
+      store: commitStore,
+      inputResolver: { async resolve() { return 'run audit'; } },
+      runLogEvents: events,
+      liveClientFactory: ((_route: unknown, _mode: unknown, maxOutputTokens?: number) => {
+        seenMaxOutputTokens = maxOutputTokens;
+        return {
+          run() {
+            return {
+              events: (async function* () { /* empty */ })(),
+              result: Promise.resolve({
+                schemaVersion: '1' as const,
+                runId: 'run-budget-1',
+                status: 'budget_exhausted' as const,
+                error: { code: 'TURN_BUDGET_EXHAUSTED', message: 'exceeded max turns', retryable: false },
+                usage: { turns: 8, toolCalls: 3, tokens: 120 },
+                completedAt: new Date().toISOString()
+              }),
+              cancel() { /* noop */ }
+            };
+          }
+        };
+      }) as unknown as () => LocalAgentClient
+    });
+
+    const input = makeSliceInput(taskId);
+    await expect(activities.executeAgentSlice({
+      ...input,
+      limits: { ...input.limits, maxTokens: 64_000 }
+    })).rejects.toMatchObject({
+      name: 'ApplicationFailure',
+      nonRetryable: true,
+      type: 'TURN_BUDGET_EXHAUSTED'
+    });
+    expect(seenMaxOutputTokens).toBe(16_384);
+  });
 });

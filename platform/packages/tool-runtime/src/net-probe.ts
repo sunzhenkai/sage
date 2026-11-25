@@ -166,11 +166,58 @@ export function parseNetProbeAllowlist(raw: string | undefined): readonly NetPro
   return rules;
 }
 
+async function resolveDnsWithDeadline(
+  dns: TrustedDnsResolverPort,
+  hostname: string,
+  timeoutMs?: number,
+  signal?: AbortSignal
+): Promise<readonly string[]> {
+  if (signal?.aborted) {
+    throw new Error('NET_PROBE_ABORTED');
+  }
+  if (timeoutMs === undefined && signal === undefined) {
+    return await dns.resolve(hostname);
+  }
+  return await new Promise<readonly string[]>((resolve, reject) => {
+    let settled = false;
+    const timer = timeoutMs === undefined ? undefined : setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      signal?.removeEventListener('abort', onAbort);
+      reject(new Error('NET_PROBE_TIMEOUT'));
+    }, Math.max(1, timeoutMs));
+    const onAbort = () => {
+      if (settled) return;
+      settled = true;
+      if (timer !== undefined) clearTimeout(timer);
+      reject(new Error('NET_PROBE_ABORTED'));
+    };
+    signal?.addEventListener('abort', onAbort, { once: true });
+    dns.resolve(hostname).then(
+      (ips) => {
+        if (settled) return;
+        settled = true;
+        if (timer !== undefined) clearTimeout(timer);
+        signal?.removeEventListener('abort', onAbort);
+        resolve(ips);
+      },
+      (cause) => {
+        if (settled) return;
+        settled = true;
+        if (timer !== undefined) clearTimeout(timer);
+        signal?.removeEventListener('abort', onAbort);
+        reject(cause);
+      }
+    );
+  });
+}
+
 export async function authorizeNetProbeTarget(
   rawHostname: string,
   port: number,
   rules: readonly NetProbeAllowlistRule[],
-  dns: TrustedDnsResolverPort
+  dns: TrustedDnsResolverPort,
+  options?: { readonly timeoutMs?: number; readonly signal?: AbortSignal }
 ): Promise<AuthorizedNetProbeTarget> {
   const hostname = rawHostname.trim().toLowerCase();
   if (!isValidPublicHostname(hostname)) {
@@ -183,7 +230,7 @@ export async function authorizeNetProbeTarget(
   if (!matched) {
     throw new Error('NET_PROBE_TARGET_NOT_ALLOWLISTED');
   }
-  const resolved = await dns.resolve(hostname);
+  const resolved = await resolveDnsWithDeadline(dns, hostname, options?.timeoutMs, options?.signal);
   const normalized = [...new Set(resolved.map((addr) => addr.toLowerCase()))];
   if (normalized.length === 0 || normalized.some(isBlockedEgressAddress)) {
     throw new Error('NET_PROBE_ADDRESS_DENIED');
@@ -492,7 +539,7 @@ export function createNetProbeCapabilityTools(options: CreateNetProbeToolsOption
         const rules = await activeRules();
         for (let hop = 0; hop <= maxRedirects; hop += 1) {
           const port = currentUrl.port !== '' ? Number(currentUrl.port) : currentUrl.protocol === 'https:' ? 443 : 80;
-          const target = await authorizeNetProbeTarget(currentUrl.hostname, port, rules, dnsResolver);
+          const target = await authorizeNetProbeTarget(currentUrl.hostname, port, rules, dnsResolver, { timeoutMs, signal });
           const response = await httpRequest({ url: currentUrl, method, target, timeoutMs, signal });
           const location = headerValue(response.headers, 'location');
           if (response.statusCode >= 300 && response.statusCode < 400 && location !== undefined && hop < maxRedirects) {
@@ -547,7 +594,7 @@ export function createNetProbeCapabilityTools(options: CreateNetProbeToolsOption
       const startedAt = now();
       try {
         const rules = await activeRules();
-        const target = await authorizeNetProbeTarget(input.host, port, rules, dnsResolver);
+        const target = await authorizeNetProbeTarget(input.host, port, rules, dnsResolver, { timeoutMs, signal });
         const result = await tlsInspect({ target, timeoutMs, signal });
         const validToMs = result.validTo !== undefined ? Date.parse(result.validTo) : Number.NaN;
         const daysRemaining = Number.isFinite(validToMs) ? Math.floor((validToMs - now()) / 86_400_000) : undefined;
@@ -590,7 +637,7 @@ export function createNetProbeCapabilityTools(options: CreateNetProbeToolsOption
       const startedAt = now();
       try {
         const rules = await activeRules();
-        const target = await authorizeNetProbeTarget(input.host, input.port, rules, dnsResolver);
+        const target = await authorizeNetProbeTarget(input.host, input.port, rules, dnsResolver, { timeoutMs, signal });
         await tcpConnect({ target, timeoutMs, signal });
         return {
           content: JSON.stringify({

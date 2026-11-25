@@ -111,4 +111,19 @@ integration.sequential('PostgreSQL task run output', () => {
     const invalid = { ...recordFor(`run-out-${randomUUID()}`), artifactRef: 'not-an-artifact-ref' } as unknown as TaskRunOutputRecord;
     await expect(store.writeRunOutput(invalid)).rejects.toThrow(/writeRunOutput\.invalid/u);
   });
+
+  it('allows overwriting a failed RunResult.v1 placeholder with real output', async () => {
+    const taskId = `run-failed-${randomUUID()}`;
+    await store.writeRunOutput({
+      tenantId: 'tenant-run-output',
+      taskId,
+      artifactRef: `artifact://tasks/${taskId}/attempt-1/slice-1`,
+      output: JSON.stringify({ schemaVersion: 'RunResult.v1', status: 'failed', reason: 'timeout' }),
+      mediaType: 'application/json',
+      createdAt: '2026-08-24T00:00:00.000Z'
+    });
+    const replaced = await store.writeRunOutput(recordFor(taskId, '{"overallStatus":"ok"}'));
+    expect(replaced.status).toBe('stored');
+    expect((await store.getRunOutput('tenant-run-output', taskId))?.output).toBe('{"overallStatus":"ok"}');
+  });
 });

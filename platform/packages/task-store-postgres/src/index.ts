@@ -700,6 +700,18 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
     }));
   }
 
+  #isFailedRunResultRow(row: RunOutputRow): boolean {
+    if (row.package_bytes !== null || row.media_type !== 'application/json' || row.output === null) {
+      return false;
+    }
+    try {
+      const parsed = JSON.parse(row.output) as { readonly schemaVersion?: unknown; readonly status?: unknown };
+      return parsed.schemaVersion === 'RunResult.v1' && parsed.status === 'failed';
+    } catch {
+      return false;
+    }
+  }
+
   async writeRunOutput(record: TaskRunOutputRecord): Promise<{ readonly status: 'stored' | 'existing' }> {
     if (record === null || typeof record !== 'object' || typeof record.tenantId !== 'string' || typeof record.taskId !== 'string'
       || typeof record.artifactRef !== 'string' || !record.artifactRef.startsWith('artifact://')
@@ -741,6 +753,13 @@ export class PostgresTaskStore implements TaskStorePort, TaskReconciliationStore
       FROM task_run_output WHERE tenant_id=$1 AND task_id=$2`, [record.tenantId, record.taskId]);
     const row = existing.rows[0];
     if (row === undefined) throw new TaskStoreError('writeRunOutput.missing');
+    if (this.#isFailedRunResultRow(row)) {
+      await this.#query('writeRunOutput.overwriteFailed', `UPDATE task_run_output
+        SET artifact_ref=$3, output=$4, package_bytes=$5, file_manifest=$6, media_type=$7, created_at=$8
+        WHERE tenant_id=$1 AND task_id=$2`,
+        [record.tenantId, record.taskId, record.artifactRef, textOutput ?? null, packageBytes ?? null, json(manifest), record.mediaType, iso(record.createdAt)]);
+      return { status: 'stored' };
+    }
     const existingBytes = row.package_bytes === null ? undefined : row.package_bytes;
     const sameText = (row.output ?? undefined) === textOutput;
     const samePackage = (existingBytes === undefined && packageBytes === undefined)

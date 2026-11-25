@@ -234,14 +234,22 @@ export async function createWorkerRuntime(config = readWorkerRuntimeConfig()): P
         secretBackend,
         hasRuntimeTools: (capabilityRefs) =>
           capabilityRefs.includes(NET_PROBE_CAPABILITY_REF) || capabilityRefs.includes(SSH_INSPECT_CAPABILITY_REF),
-        liveClientFactory: (route: LiveProviderRoute, mode: 'package' | 'chat', maxOutputTokens?: number, capabilityRefs?: readonly string[], onProgress?: LiveProviderProgressObserver) => {
+        liveClientFactory: (
+          route: LiveProviderRoute,
+          mode: 'package' | 'chat',
+          maxOutputTokens?: number,
+          capabilityRefs?: readonly string[],
+          onProgress?: LiveProviderProgressObserver,
+          validateFinalOutput?: (text: string) => string | undefined
+        ) => {
           const bundle = mode === 'package' ? resolveCapabilityBundle(capabilityRefs) : undefined;
           return createLivePackageAgentClient({
             route,
             systemPrompt: mode === 'package' ? PACKAGE_RUN_SYSTEM_PROMPT : CHAT_SLICE_SYSTEM_PROMPT,
             ...(maxOutputTokens === undefined ? {} : { maxOutputTokens }),
             ...(bundle === undefined ? {} : { tools: bundle.tools, executeTool: bundle.executeTool }),
-            ...(onProgress === undefined ? {} : { onProgress })
+            ...(onProgress === undefined ? {} : { onProgress }),
+            ...(validateFinalOutput === undefined ? {} : { validateFinalOutput })
           });
         },
         ...(canonicalCompatibility === undefined ? {} : { canonicalCompatibility }),

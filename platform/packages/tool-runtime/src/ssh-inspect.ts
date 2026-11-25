@@ -172,6 +172,8 @@ export const defaultSshCommandRunner: SshCommandRunner = async ({ target, privat
           reject(error);
         }
       );
+      // 防止远端 ssh 进程先退出（如认证失败/超时关闭）时写入 stdin 触发未捕获 EPIPE。
+      child.stdin?.on('error', () => undefined);
       child.stdin?.write(script);
       child.stdin?.end();
     });
