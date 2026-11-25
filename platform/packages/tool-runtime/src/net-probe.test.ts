@@ -1,7 +1,10 @@
+import net from 'node:net';
 import { describe, expect, it } from 'vitest';
 import {
   authorizeNetProbeTarget,
+  buildTlsInspectResult,
   createNetProbeCapabilityTools,
+  defaultTlsInspect,
   isValidNetProbePattern,
   parseNetProbeAllowlist,
   redactProbeSnippet,
@@ -200,5 +203,69 @@ describe('createNetProbeCapabilityTools', () => {
     dynamicRules = [];
     const deniedAgain = await httpTool.execute({ url: 'https://api.example.com/' }, signal);
     expect(deniedAgain.isError).toBe(true);
+  });
+});
+
+describe('buildTlsInspectResult & defaultTlsInspect', () => {
+  it('handles null authorizationError from authorized Node TLS sockets without throwing', () => {
+    expect(buildTlsInspectResult({
+      authorized: true,
+      authorizationError: null,
+      protocol: 'TLSv1.3',
+      cipher: { name: 'TLS_AES_256_GCM_SHA384' },
+      peerCertificate: {
+        subject: { CN: 'dove.wii.pub' },
+        issuer: { CN: 'R10' },
+        subjectaltname: 'DNS:dove.wii.pub',
+        valid_from: 'Nov 1 00:00:00 2026 GMT',
+        valid_to: 'Jan 30 00:00:00 2027 GMT',
+      },
+    })).toEqual({
+      authorized: true,
+      protocol: 'TLSv1.3',
+      cipher: 'TLS_AES_256_GCM_SHA384',
+      subject: 'CN=dove.wii.pub',
+      issuer: 'CN=R10',
+      subjectAltName: 'DNS:dove.wii.pub',
+      validFrom: 'Nov 1 00:00:00 2026 GMT',
+      validTo: 'Jan 30 00:00:00 2027 GMT',
+    });
+
+    expect(buildTlsInspectResult({ authorized: true, authorizationError: undefined })).toEqual({ authorized: true });
+    expect(buildTlsInspectResult({ authorized: false, authorizationError: 'DEPTH_ZERO_SELF_SIGNED_CERT' })).toEqual({
+      authorized: false,
+      authorizationError: 'DEPTH_ZERO_SELF_SIGNED_CERT',
+    });
+    expect(buildTlsInspectResult({ authorized: false, authorizationError: new Error('CERT_HAS_EXPIRED') })).toEqual({
+      authorized: false,
+      authorizationError: 'CERT_HAS_EXPIRED',
+    });
+  });
+
+  it('rejects immediately when passed an already-aborted signal', async () => {
+    const controller = new AbortController();
+    controller.abort(new Error('ABORTED_TEST'));
+    await expect(defaultTlsInspect({
+      target: { hostname: 'ok.example.com', port: 443, pinnedAddress: '127.0.0.1', pinnedAddresses: ['127.0.0.1'] },
+      timeoutMs: 5_000,
+      signal: controller.signal,
+    })).rejects.toThrow('ABORTED_TEST');
+  });
+
+  it('rejects promptly when the peer closes the TCP socket before TLS handshake completes', async () => {
+    const server = net.createServer((socket) => socket.destroy());
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()));
+    const address = server.address() as net.AddressInfo;
+    try {
+      const started = Date.now();
+      await expect(defaultTlsInspect({
+        target: { hostname: 'ok.example.com', port: address.port, pinnedAddress: '127.0.0.1', pinnedAddresses: ['127.0.0.1'] },
+        timeoutMs: 5_000,
+        signal: new AbortController().signal,
+      })).rejects.toThrow();
+      expect(Date.now() - started).toBeLessThan(2_000);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
   });
 });

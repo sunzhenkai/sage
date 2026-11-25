@@ -224,6 +224,12 @@ const defaultHttpRequest: NonNullable<NetProbeClients['httpRequest']> = async ({
   const combined = combineSignal(signal, timeoutMs);
   const transport = url.protocol === 'https:' ? https : http;
   return new Promise<NetProbeHttpResponse>((resolve, reject) => {
+    let settled = false;
+    const finish = (fn: () => void): void => {
+      if (settled) return;
+      settled = true;
+      fn();
+    };
     const req = transport.request(
       url,
       {
@@ -247,13 +253,17 @@ const defaultHttpRequest: NonNullable<NetProbeClients['httpRequest']> = async ({
           received += chunk.byteLength;
         });
         res.on('end', () => {
-          resolve({
+          const payload: NetProbeHttpResponse = {
             statusCode: res.statusCode ?? 0,
             headers: res.headers,
             body: new Uint8Array(Buffer.concat(chunks)),
-          });
+          };
+          finish(() => resolve(payload));
         });
-        res.on('error', reject);
+        res.on('error', (cause) => finish(() => reject(cause)));
+        res.once('close', () => {
+          if (!res.complete) finish(() => reject(new Error('NET_PROBE_HTTP_CLOSED')));
+        });
       }
     );
     req.on('socket', (socket) => {
@@ -267,12 +277,12 @@ const defaultHttpRequest: NonNullable<NetProbeClients['httpRequest']> = async ({
       socket.on('connect', check);
       socket.on('secureConnect', check);
     });
-    req.on('error', reject);
+    req.on('error', (cause) => finish(() => reject(cause)));
     req.end();
   });
 };
 
-const formatDn = (dn: tls.PeerCertificate['subject'] | undefined): string | undefined => {
+const formatDn = (dn: object | null | undefined): string | undefined => {
   if (dn === undefined || dn === null) return undefined;
   const parts = Object.entries(dn)
     .filter(([, v]) => typeof v === 'string' && v.length > 0)
@@ -280,7 +290,45 @@ const formatDn = (dn: tls.PeerCertificate['subject'] | undefined): string | unde
   return parts.length > 0 ? parts.join(', ') : undefined;
 };
 
-const defaultTlsInspect: NonNullable<NetProbeClients['tlsInspect']> = async ({ target, timeoutMs, signal }) => {
+export interface TlsPeerSnapshot {
+  readonly authorized: boolean;
+  readonly authorizationError?: Error | string | null | undefined;
+  readonly protocol?: string | null | undefined;
+  readonly cipher?: { readonly name?: string | undefined } | null | undefined;
+  readonly peerCertificate?: {
+    readonly subject?: Partial<tls.PeerCertificate['subject']> | undefined;
+    readonly issuer?: Partial<tls.PeerCertificate['issuer']> | undefined;
+    readonly subjectaltname?: string | undefined;
+    readonly valid_from?: string | undefined;
+    readonly valid_to?: string | undefined;
+  } | null | undefined;
+}
+
+export function buildTlsInspectResult(snapshot: TlsPeerSnapshot): NetProbeTlsResult {
+  const authErr = snapshot.authorizationError;
+  const authorizationError = authErr == null
+    ? undefined
+    : typeof authErr === 'string'
+      ? (authErr.length > 0 ? authErr : undefined)
+      : authErr instanceof Error
+        ? (authErr.message.length > 0 ? authErr.message : authErr.name)
+        : String(authErr);
+  const subject = formatDn(snapshot.peerCertificate?.subject);
+  const issuer = formatDn(snapshot.peerCertificate?.issuer);
+  return {
+    authorized: snapshot.authorized,
+    ...(authorizationError === undefined ? {} : { authorizationError }),
+    ...(snapshot.protocol ? { protocol: snapshot.protocol } : {}),
+    ...(snapshot.cipher?.name ? { cipher: snapshot.cipher.name } : {}),
+    ...(subject ? { subject } : {}),
+    ...(issuer ? { issuer } : {}),
+    ...(typeof snapshot.peerCertificate?.subjectaltname === 'string' ? { subjectAltName: snapshot.peerCertificate.subjectaltname } : {}),
+    ...(typeof snapshot.peerCertificate?.valid_from === 'string' ? { validFrom: snapshot.peerCertificate.valid_from } : {}),
+    ...(typeof snapshot.peerCertificate?.valid_to === 'string' ? { validTo: snapshot.peerCertificate.valid_to } : {}),
+  };
+}
+
+export const defaultTlsInspect: NonNullable<NetProbeClients['tlsInspect']> = async ({ target, timeoutMs, signal }) => {
   const combined = combineSignal(signal, timeoutMs);
   return new Promise<NetProbeTlsResult>((resolve, reject) => {
     let settled = false;
@@ -299,31 +347,29 @@ const defaultTlsInspect: NonNullable<NetProbeClients['tlsInspect']> = async ({ t
       rejectUnauthorized: false,
     });
     combined.addEventListener('abort', onAbort, { once: true });
+    if (combined.aborted) {
+      onAbort();
+      return;
+    }
     socket.once('secureConnect', () => {
+      let result: NetProbeTlsResult;
       try {
         verifyPinnedAddress(socket.remoteAddress, target);
-        const cert = socket.getPeerCertificate();
-        const cipher = socket.getCipher();
-        const authErr = socket.authorizationError;
-        const protocol = socket.getProtocol();
-        const subject = formatDn(cert?.subject);
-        const issuer = formatDn(cert?.issuer);
-        done(() => resolve({
+        result = buildTlsInspectResult({
           authorized: socket.authorized,
-          ...(authErr === undefined ? {} : { authorizationError: typeof authErr === 'string' ? authErr : authErr.message }),
-          ...(protocol ? { protocol } : {}),
-          ...(cipher?.name ? { cipher: cipher.name } : {}),
-          ...(subject ? { subject } : {}),
-          ...(issuer ? { issuer } : {}),
-          ...(typeof cert?.subjectaltname === 'string' ? { subjectAltName: cert.subjectaltname } : {}),
-          ...(typeof cert?.valid_from === 'string' ? { validFrom: cert.valid_from } : {}),
-          ...(typeof cert?.valid_to === 'string' ? { validTo: cert.valid_to } : {}),
-        }));
+          authorizationError: socket.authorizationError,
+          protocol: socket.getProtocol(),
+          cipher: socket.getCipher(),
+          peerCertificate: socket.getPeerCertificate(),
+        });
       } catch (cause) {
         done(() => reject(cause instanceof Error ? cause : new Error('NET_PROBE_TLS_FAILED')));
+        return;
       }
+      done(() => resolve(result));
     });
     socket.once('error', (cause) => done(() => reject(cause)));
+    socket.once('close', () => done(() => reject(new Error('NET_PROBE_TLS_CLOSED'))));
   });
 };
 
@@ -341,15 +387,21 @@ const defaultTcpConnect: NonNullable<NetProbeClients['tcpConnect']> = async ({ t
     const onAbort = (): void => done(() => reject(combined.reason instanceof Error ? combined.reason : new Error('NET_PROBE_TIMEOUT')));
     const socket = net.createConnection({ host: target.pinnedAddress, port: target.port });
     combined.addEventListener('abort', onAbort, { once: true });
+    if (combined.aborted) {
+      onAbort();
+      return;
+    }
     socket.once('connect', () => {
       try {
         verifyPinnedAddress(socket.remoteAddress, target);
-        done(() => resolve());
       } catch (cause) {
         done(() => reject(cause instanceof Error ? cause : new Error('NET_PROBE_TCP_FAILED')));
+        return;
       }
+      done(() => resolve());
     });
     socket.once('error', (cause) => done(() => reject(cause)));
+    socket.once('close', () => done(() => reject(new Error('NET_PROBE_TCP_CLOSED'))));
   });
 };
 
